@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#080c14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="學習艙">
+  <meta name="description" content="AI 驅動知識吸收工具 — 邊聽邊讀，智能回顧">
+  <title>學習艙 · KnowledgePod</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500;700&family=Noto+Serif+TC:wght@400;500;700&family=Noto+Sans+TC:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/nav.css">
+  <link rel="stylesheet" href="css/home.css">
+  <link rel="stylesheet" href="css/import.css">
+  <link rel="stylesheet" href="css/player.css">
+  <link rel="stylesheet" href="css/library.css">
+  <link rel="stylesheet" href="css/review.css">
+  <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+  <!-- ── SPLASH ── -->
+  <div id="splash">
+    <div class="splash-core">
+      <div class="splash-rings">
+        <div class="ring r1"></div>
+        <div class="ring r2"></div>
+        <div class="ring r3"></div>
+      </div>
+      <div class="splash-center">
+        <img src="icons/icon-192.png" width="72" height="72" alt="學習艙" style="border-radius:18px;box-shadow:0 0 40px rgba(232,201,107,0.3)">
+      </div>
+    </div>
+    <div class="splash-wordmark">
+      <span class="splash-cjk">學習艙</span>
+      <span class="splash-en">KNOWLEDGE POD</span>
+    </div>
+  </div>
+
+  <!-- ── APP ROOT ── -->
+  <div id="app" aria-hidden="true">
+
+    <!-- Background ambient -->
+    <div class="ambient-bg" aria-hidden="true">
+      <div class="amb-orb orb1"></div>
+      <div class="amb-orb orb2"></div>
+      <div class="amb-orb orb3"></div>
+    </div>
+
+    <!-- ── PAGE CONTAINER ── -->
+    <main id="pages">
+
+      <!-- ═══════════ HOME ═══════════ -->
+      <section id="page-home" class="page active" data-page="home">
+
+        <header class="page-header home-header">
+          <div class="home-greeting">
+            <p class="greeting-label" id="greetingLabel">早安</p>
+            <h1 class="home-title">今日學習</h1>
+          </div>
+          <button class="header-action-btn" id="searchTrigger" aria-label="搜尋">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          </button>
+        </header>
+
+        <!-- Today card -->
+        <div class="today-card" id="todayCard">
+          <div class="today-card-inner">
+            <div class="today-stats-row">
+              <div class="today-stat">
+                <span class="ts-num" id="statToday">0</span>
+                <span class="ts-label">今日回顧</span>
+              </div>
+              <div class="today-stat-divider"></div>
+              <div class="today-stat">
+                <span class="ts-num" id="statStreak">0</span>
+                <span class="ts-label">連續天數</span>
+              </div>
+              <div class="today-stat-divider"></div>
+              <div class="today-stat">
+                <span class="ts-num" id="statDue">0</span>
+                <span class="ts-label">待回顧</span>
+              </div>
+            </div>
+            <div class="today-progress-row">
+              <div class="today-progress-bar">
+                <div class="today-progress-fill" id="todayProgressFill"></div>
+              </div>
+              <span class="today-progress-label" id="todayProgressLabel">0%</span>
+            </div>
+          </div>
+          <div class="today-review-cta" id="todayReviewCta" style="display:none">
+            <button class="cta-btn" onclick="Router.go('review')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              <span id="ctaDueCount">0</span> 個待回顧
+            </button>
+          </div>
+        </div>
+
+        <!-- Course section -->
+        <div class="section-head">
+          <h2 class="section-title">我的課程</h2>
+          <button class="section-action" onclick="Router.go('import')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            新增
+          </button>
+        </div>
+        <div id="courseList" class="course-list">
+          <div class="empty-well" id="emptyHome">
+            <div class="empty-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            </div>
+            <p class="empty-title">尚無課程</p>
+            <p class="empty-sub">點擊右上角「新增」匯入你的第一堂課</p>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ═══════════ IMPORT ═══════════ -->
+      <section id="page-import" class="page" data-page="import">
+        <header class="page-header">
+          <button class="back-btn" onclick="Router.back()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h1 class="page-title">匯入課程</h1>
+        </header>
+
+        <div class="import-body">
+
+          <!-- Step 1: Audio -->
+          <div class="import-block">
+            <div class="import-block-label">
+              <span class="step-badge">1</span>
+              <span>音訊檔案</span>
+              <span class="required-dot"></span>
+            </div>
+            <div class="drop-zone" id="audioZone">
+              <div class="dz-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              </div>
+              <p class="dz-primary">拖曳或點擊上傳音訊</p>
+              <p class="dz-secondary">MP3 · WAV · M4A · OGG · FLAC</p>
+              <input type="file" id="audioInput" accept="audio/*" hidden>
+            </div>
+            <div class="audio-picked" id="audioPicked" style="display:none">
+              <div class="ap-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+              </div>
+              <div class="ap-info">
+                <p class="ap-name" id="apName">—</p>
+                <p class="ap-meta" id="apMeta">—</p>
+              </div>
+              <div class="ap-waveform" id="apWaveform">
+                <canvas id="apWaveCanvas" width="80" height="28"></canvas>
+              </div>
+              <button class="ap-remove" id="apRemove" aria-label="移除">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: Transcript -->
+          <div class="import-block">
+            <div class="import-block-label">
+              <span class="step-badge">2</span>
+              <span>字幕 / 逐字稿</span>
+              <span class="optional-badge">選填</span>
+            </div>
+            <div class="mode-switcher" id="transcriptModeSwitcher">
+              <button class="mode-btn active" data-mode="upload">上傳 SRT</button>
+              <button class="mode-btn" data-mode="manual">手動輸入</button>
+              <button class="mode-btn" data-mode="none">略過</button>
+            </div>
+            <div id="transcriptUploadArea">
+              <div class="drop-zone small" id="srtZone">
+                <div class="dz-icon small">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </div>
+                <p class="dz-primary small">SRT · VTT · TXT</p>
+                <input type="file" id="srtInput" accept=".srt,.vtt,.txt" hidden>
+              </div>
+              <div class="srt-loaded" id="srtLoaded" style="display:none">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span id="srtInfo">已載入字幕</span>
+              </div>
+            </div>
+            <div id="transcriptManualArea" style="display:none">
+              <textarea class="manual-ta" id="manualTA" placeholder="貼上逐字稿文字…每行視為一段（每段約 5 秒）"></textarea>
+            </div>
+          </div>
+
+          <!-- Step 3: Slides -->
+          <div class="import-block">
+            <div class="import-block-label">
+              <span class="step-badge">3</span>
+              <span>投影片頁面</span>
+              <span class="optional-badge">選填</span>
+            </div>
+            <div class="drop-zone small" id="pagesZone">
+              <div class="dz-icon small">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </div>
+              <p class="dz-primary small">投影片圖片（多選）</p>
+              <input type="file" id="pagesInput" accept="image/*" multiple hidden>
+            </div>
+            <div class="pages-thumbs" id="pagesThumbs"></div>
+          </div>
+
+          <!-- Step 4: Info -->
+          <div class="import-block">
+            <div class="import-block-label">
+              <span class="step-badge">4</span>
+              <span>課程資訊</span>
+            </div>
+            <div class="field-group">
+              <label class="field-label">課程名稱</label>
+              <input type="text" class="field-input" id="iTitle" placeholder="例：民法概論第三章">
+            </div>
+            <div class="field-group">
+              <label class="field-label">描述 <span class="field-opt">選填</span></label>
+              <textarea class="field-ta" id="iDesc" placeholder="課程說明…"></textarea>
+            </div>
+            <div class="field-group">
+              <label class="field-label">標籤 <span class="field-opt">按 Enter 新增</span></label>
+              <input type="text" class="field-input" id="iTagInput" placeholder="法律 / 考試 / 第三章…">
+              <div class="tags-row" id="iTagsRow"></div>
+            </div>
+          </div>
+
+          <button class="primary-cta" id="importBtn" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            建立課程
+          </button>
+
+        </div>
+      </section>
+
+      <!-- ═══════════ PLAYER ═══════════ -->
+      <section id="page-player" class="page" data-page="player">
+        <div class="player-shell">
+
+          <!-- Top bar -->
+          <div class="player-topbar">
+            <button class="topbar-btn" onclick="Router.back()" aria-label="返回">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div class="player-meta">
+              <p class="player-course-name" id="playerCourseName">課程名稱</p>
+              <p class="player-position" id="playerPosition">— / —</p>
+            </div>
+            <button class="topbar-btn topbar-ai" id="aiToggleBtn" aria-label="AI 分析">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/><circle cx="19" cy="5" r="3" fill="currentColor" stroke="none" opacity="0.6"/></svg>
+            </button>
+          </div>
+
+          <!-- View tabs -->
+          <div class="view-tabs">
+            <button class="view-tab active" data-view="transcript">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>
+              逐字稿
+            </button>
+            <button class="view-tab" data-view="pages">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              投影片
+            </button>
+            <div class="view-tab-indicator"></div>
+          </div>
+
+          <!-- Content -->
+          <div class="player-content-area">
+            <!-- Transcript -->
+            <div class="content-pane active" id="paneTranscript">
+              <div class="transcript-scroller" id="transcriptScroller">
+                <div class="transcript-lines" id="transcriptLines">
+                  <div class="transcript-placeholder">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>
+                    <p>尚無字幕</p>
+                    <p class="ph-sub">匯入時可上傳 SRT 字幕檔</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Slides -->
+            <div class="content-pane" id="panePages">
+              <div class="slide-viewer" id="slideViewer">
+                <div class="slide-frame">
+                  <img id="slideImg" src="" alt="投影片" style="display:none">
+                  <div class="slide-placeholder" id="slidePlaceholder">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <p>尚無投影片</p>
+                  </div>
+                </div>
+                <div class="slide-nav">
+                  <button class="slide-nav-btn" id="prevSlide">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <span class="slide-indicator" id="slideIndicator">— / —</span>
+                  <button class="slide-nav-btn" id="nextSlide">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chunk capture bar -->
+          <div class="chunk-bar" id="chunkBar" style="display:none">
+            <div class="chunk-bar-range">
+              <span class="chunk-ts" id="chunkStartTs">0:00</span>
+              <div class="chunk-range-track">
+                <div class="chunk-range-fill" id="chunkRangeFill"></div>
+              </div>
+              <span class="chunk-ts" id="chunkEndTs">0:00</span>
+              <button class="chunk-confirm-btn" id="chunkConfirmBtn">設定終點</button>
+            </div>
+            <div class="chunk-bar-fields">
+              <input class="chunk-note-field" id="chunkNoteField" type="text" placeholder="加入筆記（選填）…">
+              <div class="chunk-bar-tags">
+                <input class="chunk-tag-field" id="chunkTagField" type="text" placeholder="標籤…">
+              </div>
+            </div>
+            <div class="chunk-bar-actions">
+              <button class="chunk-save-btn" id="chunkSaveBtn">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+                存入碎片庫
+              </button>
+              <button class="chunk-cancel-btn" id="chunkCancelBtn">取消</button>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="player-controls">
+            <audio id="playerAudio" preload="metadata"></audio>
+
+            <!-- Waveform / Progress -->
+            <div class="progress-section">
+              <div class="waveform-wrap" id="waveformWrap">
+                <canvas id="waveformCanvas" height="40"></canvas>
+                <div class="progress-overlay" id="progressOverlay"></div>
+              </div>
+              <div class="time-row">
+                <span class="time-el" id="timeNow">0:00</span>
+                <span class="time-el" id="timeTotal">0:00</span>
+              </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="ctrl-row">
+              <button class="ctrl-ghost speed-btn" id="speedBtn">1×</button>
+              <button class="ctrl-ghost skip-btn" id="skipBackBtn" aria-label="後退 15 秒">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+                <span class="skip-label">15</span>
+              </button>
+              <button class="ctrl-play" id="playBtn" aria-label="播放/暫停">
+                <svg class="icon-play" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <svg class="icon-pause" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              </button>
+              <button class="ctrl-ghost skip-btn" id="skipFwdBtn" aria-label="快進 15 秒">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M18.01 16A8.003 8.003 0 0 1 4 13H2c.45 4.38 4.15 7.81 8.72 7.99C15.21 21.19 19.01 17.48 19.01 13c0-2.25-.94-4.28-2.44-5.73L14 4.99l-.01 8 4.5-5.48C19.43 8.84 20 10.86 20 13c0 1.08-.21 2.1-.58 3.04l.01-.04z"/></svg>
+                <span class="skip-label">15</span>
+              </button>
+              <button class="ctrl-ghost capture-btn" id="captureBtn" aria-label="截取片段">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- AI Side Panel -->
+        <div class="ai-panel" id="aiPanel" aria-hidden="true">
+          <div class="ai-panel-header">
+            <div class="ai-panel-title">
+              <div class="ai-dot"></div>
+              <h2>AI 分析</h2>
+            </div>
+            <button class="ai-close-btn" id="aiCloseBtn" aria-label="關閉">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="ai-panel-body" id="aiPanelBody">
+            <!-- States injected by ai.js -->
+          </div>
+        </div>
+        <div class="ai-scrim" id="aiScrim"></div>
+
+      </section>
+
+      <!-- ═══════════ LIBRARY ═══════════ -->
+      <section id="page-library" class="page" data-page="library">
+        <header class="page-header">
+          <h1 class="page-title">碎片庫</h1>
+          <button class="header-action-btn" id="libSearchToggle" aria-label="搜尋">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          </button>
+        </header>
+
+        <div class="lib-search-bar" id="libSearchBar" style="display:none">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" class="lib-search-input" id="libSearchInput" placeholder="搜尋碎片、筆記、標籤…">
+          <button class="lib-search-clear" id="libSearchClear" style="display:none">✕</button>
+        </div>
+
+        <div class="lib-filter-scroll">
+          <div class="lib-filters" id="libFilters">
+            <button class="lib-filter active" data-filter="all">全部</button>
+          </div>
+        </div>
+
+        <div class="lib-sort-row">
+          <span class="lib-count" id="libCount">0 個碎片</span>
+          <select class="lib-sort-select" id="libSortSelect">
+            <option value="newest">最新</option>
+            <option value="oldest">最舊</option>
+            <option value="level">記憶等級</option>
+            <option value="due">待回顧</option>
+          </select>
+        </div>
+
+        <div class="lib-grid" id="libGrid">
+          <div class="empty-well">
+            <div class="empty-icon-wrap">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </div>
+            <p class="empty-title">碎片庫是空的</p>
+            <p class="empty-sub">在播放時按 ★ 截取片段</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════ REVIEW ═══════════ -->
+      <section id="page-review" class="page" data-page="review">
+        <header class="page-header">
+          <h1 class="page-title">回顧</h1>
+          <div class="review-header-meta" id="reviewHeaderMeta">SM-2 間隔重複</div>
+        </header>
+
+        <!-- Dashboard -->
+        <div class="review-dashboard" id="reviewDashboard">
+          <div class="rv-ring-wrap">
+            <svg class="rv-ring-svg" viewBox="0 0 100 100">
+              <circle class="rv-ring-bg" cx="50" cy="50" r="40"/>
+              <circle class="rv-ring-fg" cx="50" cy="50" r="40" id="rvRingFg"/>
+            </svg>
+            <div class="rv-ring-text">
+              <span class="rv-ring-num" id="rvDue">0</span>
+              <span class="rv-ring-label">待回顧</span>
+            </div>
+          </div>
+
+          <div class="rv-info-grid">
+            <div class="rv-info-card">
+              <span class="rv-info-num" id="rvTotal">0</span>
+              <span class="rv-info-label">碎片總數</span>
+            </div>
+            <div class="rv-info-card">
+              <span class="rv-info-num" id="rvMastered">0</span>
+              <span class="rv-info-label">已熟練</span>
+            </div>
+            <div class="rv-info-card">
+              <span class="rv-info-num" id="rvTodayDone">0</span>
+              <span class="rv-info-label">今日完成</span>
+            </div>
+            <div class="rv-info-card">
+              <span class="rv-info-num" id="rvAccuracy">—</span>
+              <span class="rv-info-label">正確率</span>
+            </div>
+          </div>
+
+          <!-- Heatmap -->
+          <div class="rv-heatmap-section">
+            <p class="rv-section-label">回顧記錄</p>
+            <div class="rv-heatmap" id="rvHeatmap"></div>
+          </div>
+
+          <button class="primary-cta" id="startReviewBtn">開始回顧</button>
+        </div>
+
+        <!-- Quiz -->
+        <div class="quiz-shell" id="quizShell" style="display:none">
+          <div class="quiz-prog-bar">
+            <div class="quiz-prog-fill" id="quizProgFill"></div>
+          </div>
+          <div class="quiz-count-row">
+            <span id="quizCountLabel">1 / 10</span>
+            <button class="quiz-skip-btn" id="quizSkipBtn">跳過</button>
+          </div>
+          <div class="quiz-card" id="quizCard">
+            <p class="quiz-source-label" id="quizSource"></p>
+            <p class="quiz-text" id="quizText"></p>
+            <p class="quiz-note" id="quizNote"></p>
+            <div class="quiz-tags-row" id="quizTagsRow"></div>
+          </div>
+          <button class="quiz-audio-btn" id="quizAudioBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            播放原段落
+          </button>
+          <div class="quiz-action-row">
+            <button class="quiz-btn quiz-fail" id="quizFail">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              忘了
+            </button>
+            <button class="quiz-btn quiz-hard" id="quizHard">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              模糊
+            </button>
+            <button class="quiz-btn quiz-pass" id="quizPass">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              記得
+            </button>
+          </div>
+        </div>
+
+        <!-- Done -->
+        <div class="review-done" id="reviewDone" style="display:none">
+          <div class="done-burst">
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+              <circle cx="32" cy="32" r="28" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="4 4"/>
+              <text x="32" y="40" text-anchor="middle" font-size="28">🎉</text>
+            </svg>
+          </div>
+          <h2 class="done-title">回顧完成！</h2>
+          <p class="done-sub" id="doneSub"></p>
+          <button class="primary-cta" onclick="ReviewPage.backToDashboard()">返回總覽</button>
+        </div>
+
+      </section>
+
+      <!-- ═══════════ SETTINGS ═══════════ -->
+      <section id="page-settings" class="page" data-page="settings">
+        <header class="page-header">
+          <h1 class="page-title">設定</h1>
+        </header>
+        <div class="settings-body">
+
+          <div class="settings-group">
+            <p class="sg-label">AI 功能</p>
+            <div class="sg-card">
+              <div class="sg-row">
+                <div class="sg-row-info">
+                  <span class="sg-row-title">Claude API Key</span>
+                  <span class="sg-row-sub">用於 AI 分析、重點整理、問答生成</span>
+                </div>
+              </div>
+              <input type="password" class="sg-input" id="sgApiKey" placeholder="sk-ant-api03-…" autocomplete="off">
+              <button class="sg-save-btn" id="sgApiKeySave">儲存</button>
+              <p class="sg-hint">API Key 僅儲存於您的裝置，不上傳任何伺服器</p>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <p class="sg-label">播放設定</p>
+            <div class="sg-card">
+              <div class="sg-row sg-select-row">
+                <span class="sg-row-title">預設倍速</span>
+                <select class="sg-select" id="sgSpeed">
+                  <option value="0.5">0.5×</option>
+                  <option value="0.75">0.75×</option>
+                  <option value="1" selected>1×</option>
+                  <option value="1.25">1.25×</option>
+                  <option value="1.5">1.5×</option>
+                  <option value="1.75">1.75×</option>
+                  <option value="2">2×</option>
+                </select>
+              </div>
+              <div class="sg-divider"></div>
+              <div class="sg-row sg-select-row">
+                <span class="sg-row-title">跳轉秒數</span>
+                <select class="sg-select" id="sgSkip">
+                  <option value="5">5 秒</option>
+                  <option value="10">10 秒</option>
+                  <option value="15" selected>15 秒</option>
+                  <option value="30">30 秒</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <p class="sg-label">回顧設定</p>
+            <div class="sg-card">
+              <div class="sg-row sg-select-row">
+                <span class="sg-row-title">每日回顧上限</span>
+                <select class="sg-select" id="sgReviewLimit">
+                  <option value="10">10 個</option>
+                  <option value="20" selected>20 個</option>
+                  <option value="30">30 個</option>
+                  <option value="50">50 個</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <p class="sg-label">資料</p>
+            <div class="sg-card">
+              <div class="sg-row">
+                <div class="sg-row-info">
+                  <span class="sg-row-title">匯出資料</span>
+                  <span class="sg-row-sub">將課程與碎片匯出為 JSON</span>
+                </div>
+                <button class="sg-action-btn" id="sgExportBtn">匯出</button>
+              </div>
+              <div class="sg-divider"></div>
+              <div class="sg-row">
+                <div class="sg-row-info">
+                  <span class="sg-row-title">清除所有資料</span>
+                  <span class="sg-row-sub">無法復原，請謹慎操作</span>
+                </div>
+                <button class="sg-danger-btn" id="sgClearBtn">清除</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <p class="sg-label">安裝</p>
+            <div class="sg-card">
+              <div class="sg-row">
+                <div class="sg-row-info">
+                  <span class="sg-row-title">安裝為 App</span>
+                  <span class="sg-row-sub">加入主畫面，離線使用</span>
+                </div>
+                <button class="sg-action-btn" id="sgInstallBtn" style="display:none">安裝</button>
+                <span class="sg-badge" id="sgInstallBadge">—</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-about">
+            <p>學習艙 · KnowledgePod</p>
+            <p>v2.0.0 · 資料僅存於本機</p>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ── BOTTOM NAV ── -->
+    <nav class="bottom-nav" id="bottomNav">
+      <button class="nav-item" data-page="home">
+        <div class="nav-item-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <span class="nav-item-label">首頁</span>
+      </button>
+      <button class="nav-item" data-page="library">
+        <div class="nav-item-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <span class="nav-item-label">碎片庫</span>
+      </button>
+      <button class="nav-item nav-item-center" data-page="import">
+        <div class="nav-center-ring">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+      </button>
+      <button class="nav-item" data-page="review">
+        <div class="nav-item-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </div>
+        <span class="nav-item-label">回顧</span>
+      </button>
+      <button class="nav-item" data-page="settings">
+        <div class="nav-item-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+        <span class="nav-item-label">設定</span>
+      </button>
+    </nav>
+
+  </div><!-- #app -->
+
+  <!-- ── GLOBAL UI ── -->
+  <div id="toastStack"></div>
+  <div id="modalOverlay" style="display:none" aria-hidden="true">
+    <div class="modal-box" id="modalBox">
+      <p class="modal-title" id="modalTitle"></p>
+      <p class="modal-body" id="modalBody"></p>
+      <div class="modal-actions">
+        <button class="modal-cancel" id="modalCancel">取消</button>
+        <button class="modal-confirm" id="modalConfirm">確認</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS — core -->
+  <script src="js/core/db.js"></script>
+  <script src="js/core/store.js"></script>
+  <script src="js/core/router.js"></script>
+  <script src="js/core/toast.js"></script>
+  <script src="js/core/modal.js"></script>
+  <!-- parsers -->
+  <script src="js/parsers/srt.js"></script>
+  <script src="js/parsers/audio-utils.js"></script>
+  <!-- features -->
+  <script src="js/features/spaced.js"></script>
+  <script src="js/features/chunk.js"></script>
+  <script src="js/features/ai.js"></script>
+  <!-- ui -->
+  <script src="js/ui/waveform.js"></script>
+  <!-- pages -->
+  <script src="js/pages/home.js"></script>
+  <script src="js/pages/import.js"></script>
+  <script src="js/pages/player.js"></script>
+  <script src="js/pages/library.js"></script>
+  <script src="js/pages/review.js"></script>
+  <script src="js/pages/settings.js"></script>
+  <!-- bootstrap -->
+  <script src="js/core/app.js"></script>
+</body>
+</html>

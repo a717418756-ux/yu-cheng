@@ -1,0 +1,56 @@
+{
+  "name": "學習艙 · KnowledgePod",
+  "short_name": "學習艙",
+  "description": "AI 驅動的知識吸收工具 — 邊聽邊讀，間隔回顧，持續精進",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#05080f",
+  "theme_color": "#080c14",
+  "lang": "zh-TW",
+  "dir": "ltr",
+  "categories": ["education", "productivity", "lifestyle"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "今日回顧",
+      "short_name": "回顧",
+      "url": "./?goto=review",
+      "description": "快速進入今日回顧"
+    },
+    {
+      "name": "匯入課程",
+      "short_name": "匯入",
+      "url": "./?goto=import",
+      "description": "新增學習素材"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
