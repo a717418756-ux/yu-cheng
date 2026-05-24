@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500;700&family=Noto+Serif+TC:wght@400;500;700&family=Noto+Sans+TC:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
+
 /* ═══════════ TOKENS ═══════════ */
 :root{
 --bg:#06090f;--bg1:#09101a;--bg2:#0d1422;--bg3:#111928;--bg4:#162030;
@@ -65,8 +66,6 @@ select{-webkit-appearance:none;appearance:none}
 @keyframes splashOut{to{opacity:0;pointer-events:none}}
 
 /* ═══════════ APP SHELL ═══════════ */
-#app{position:fixed;inset:0;overflow:hidden;opacity:0;transition:opacity .4s var(--ease)}
-#app.ready{opacity:1}
 
 /* ambient orbs */
 .amb{position:absolute;inset:0;pointer-events:none;overflow:hidden}
@@ -90,76 +89,10 @@ select{-webkit-appearance:none;appearance:none}
 .page.out{opacity:0;transform:translateX(-10px)}
 
 /* ═══════════ FAB MENU ═══════════ */
-#fab-wrap{
-  position:fixed;right:20px;z-index:200;
-  bottom:calc(env(safe-area-inset-bottom,0px) + 24px);
-  display:flex;flex-direction:column;align-items:flex-end;gap:12px;
-}
-#fab-main{
-  width:58px;height:58px;border-radius:50%;
-  background:var(--amber);color:#07090e;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:var(--shadow),var(--glow);
-  transition:transform .22s var(--spring),box-shadow .22s;
-  position:relative;z-index:1;
-}
-#fab-main:active{transform:scale(.9);box-shadow:none}
-#fab-main svg{transition:transform .25s var(--spring)}
-#fab-wrap.open #fab-main svg{transform:rotate(45deg)}
-
-.fab-items{
-  display:flex;flex-direction:column;align-items:flex-end;gap:10px;
-  pointer-events:none;
-}
-.fab-wrap.open .fab-items{pointer-events:all}
-
-.fab-item{
-  display:flex;align-items:center;gap:10px;
-  opacity:0;transform:translateY(16px) scale(.9);
-  transition:opacity .2s var(--ease),transform .2s var(--ease);
-}
-#fab-wrap.open .fab-item{opacity:1;transform:none}
-#fab-wrap.open .fab-item:nth-child(1){transition-delay:.04s}
-#fab-wrap.open .fab-item:nth-child(2){transition-delay:.08s}
-#fab-wrap.open .fab-item:nth-child(3){transition-delay:.12s}
-#fab-wrap.open .fab-item:nth-child(4){transition-delay:.16s}
-#fab-wrap.open .fab-item:nth-child(5){transition-delay:.20s}
-
-.fab-label{
-  background:var(--s2);border:1px solid var(--b2);
-  border-radius:10px;padding:6px 14px;
-  font-size:.78rem;font-weight:500;color:var(--t1);
-  box-shadow:var(--shadow);white-space:nowrap;
-  backdrop-filter:blur(12px);
-}
-.fab-btn{
-  width:46px;height:46px;border-radius:50%;
-  background:var(--s2);border:1px solid var(--b2);
-  display:flex;align-items:center;justify-content:center;
-  color:var(--t1);box-shadow:var(--shadow);
-  transition:all .15s;flex-shrink:0;
-}
-.fab-btn:active{transform:scale(.88);background:var(--s3)}
-.fab-btn.fab-active{background:var(--amber);color:#09100d;border-color:transparent;box-shadow:var(--glow)}
 
 /* scrim */
-#fab-scrim{
-  position:fixed;inset:0;z-index:150;
-  background:rgba(6,9,15,.6);backdrop-filter:blur(4px);
-  opacity:0;pointer-events:none;
-  transition:opacity .25s;
-}
-#fab-scrim.show{opacity:1;pointer-events:all}
 
 /* ═══════════ DUE BADGE ═══════════ */
-.due-badge{
-  position:absolute;top:-2px;right:-2px;
-  width:16px;height:16px;border-radius:50%;
-  background:var(--rose);color:#fff;
-  font-size:.52rem;font-weight:700;font-family:var(--fm);
-  display:flex;align-items:center;justify-content:center;
-  border:2px solid var(--bg);
-}
 
 /* ═══════════ HOME ═══════════ */
 #page-home{padding-bottom:100px}
@@ -780,9 +713,127 @@ select{-webkit-appearance:none;appearance:none}
   background:var(--b1);border:1px solid var(--b1);
   font-size:.67rem;color:var(--t3);
 }
+
+/* ── APP VISIBILITY ── */
+#app{position:fixed;inset:0;overflow:hidden;opacity:0;pointer-events:none;transition:opacity .5s ease}
+#app.ready{opacity:1;pointer-events:all}
+
+/* ── PAGE TRANSITIONS ── */
+.page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  opacity:0;pointer-events:none;transform:translateX(14px);
+  transition:opacity .22s cubic-bezier(.16,1,.3,1),transform .22s cubic-bezier(.16,1,.3,1)}
+.page.active{opacity:1;pointer-events:all;transform:none}
+.page.out{opacity:0;pointer-events:none;transform:translateX(-10px)}
+
+/* ── FAB ── */
+
+/* ── PREVENT TEXT SELECTION ON LONG PRESS ── */
+body{-webkit-user-select:none;user-select:none}
+.tl-txt,.ck-text,.qz-txt,.ai-kp-t,.ai-gl-def,.ai-qa-q,.ai-qa-a,.ai-hl,
+.ck-note,.cc-title,.cc-meta,.tl{-webkit-user-select:text;user-select:text}
+
+/* ── MISSING CSS CLASSES ── */
+.cc-thumb{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--s2),var(--bg3));
+  display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0}
+.cc-body{flex:1;min-width:0}
+.cc-title{font-size:.9rem;font-weight:500;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.cc-meta{font-size:.68rem;color:var(--t3);display:flex;gap:6px;align-items:center}
+.cc-meta-sep{opacity:.4}
+.cc-tags{display:flex;gap:3px;flex-wrap:wrap;margin-top:5px}
+.cc-progress{flex-shrink:0}
+.cc-progress-ring{position:relative;width:32px;height:32px}
+.cc-progress-ring svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.cc-progress-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:.45rem;color:var(--amber)}
+.ck-note{font-size:.77rem;color:var(--t2);font-style:italic;margin-bottom:8px}
+.ck-text{font-size:.86rem;color:var(--t1);line-height:1.65;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ck-footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ck-tags{display:flex;gap:3px;flex-wrap:wrap;flex:1}
+.ai-loading-state{display:flex;flex-direction:column;align-items:center;padding:48px 20px;gap:14px}
+.ai-spinner{width:30px;height:30px;border-radius:50%;border:2px solid var(--s3);border-top-color:var(--amber);animation:spin .7s linear infinite}
+.ai-loading-label{font-size:.8rem;color:var(--t2)}
+.ai-setup-state{display:flex;flex-direction:column;gap:12px;padding:16px 0}
+.ai-setup-title{font-size:.9rem;font-weight:600;color:var(--t1)}
+.ai-setup-sub{font-size:.78rem;color:var(--t2);line-height:1.6}
+.ai-key-input{width:100%;background:var(--bg);border:1px solid var(--b2);border-radius:12px;padding:11px 14px;font-family:var(--fm);font-size:.78rem;color:var(--t0)}
+.ai-key-input:focus{border-color:var(--amber);outline:none}
+.empty-well{display:flex;flex-direction:column;align-items:center;padding:64px 24px;gap:12px}
+.empty-icon-wrap{width:64px;height:64px;border-radius:16px;background:var(--bg2);border:1px solid var(--b1);display:flex;align-items:center;justify-content:center;margin-bottom:4px;color:var(--t3)}
+.empty-title{font-size:.92rem;color:var(--t2);font-weight:500}
+.empty-sub{font-size:.78rem;color:var(--t3);text-align:center;line-height:1.6;max-width:220px}
+.bump{animation:numBump .35s cubic-bezier(.34,1.56,.64,1)}
+@keyframes numBump{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+.speed-btn.changed{color:var(--amber)}
+.tr-ph{display:flex;flex-direction:column;align-items:center;padding:60px 24px;gap:12px;color:var(--t3)}
+.tr-ph p{font-size:.85rem}.tr-ph .sub{font-size:.72rem;text-align:center}
+.ph-sub{font-size:.72rem;color:var(--t3);text-align:center}
+.done-title{font-family:var(--fd);font-size:1.4rem;font-style:italic;color:var(--t0)}
+.done-sub{font-size:.84rem;color:var(--t2);text-align:center;line-height:1.6}
+.done-burst{animation:burst .5s cubic-bezier(.34,1.56,.64,1)}
+
+/* ── PRESS FEEDBACK ── */
+button:active{opacity:.72}
+.c-card:active{transform:scale(.984)!important;background:var(--s2)!important}
+.ck-card:active{transform:scale(.984)!important;background:var(--s2)!important}
+.btn-cta:active{transform:scale(.97)!important;box-shadow:none!important;opacity:1}
+.ctrl-play:active{transform:scale(.88)!important;box-shadow:none!important;opacity:1}
+.ctrl-g:active{background:rgba(255,255,255,.14)!important;transform:scale(.86)!important;opacity:1}
+.vt:active{opacity:.6}
+.dz:active{border-color:var(--amber)!important;background:var(--amber3)!important}
+.mode-btn:active{background:var(--s3)!important}
+.ph-back:active,.ph-action:active{background:rgba(255,255,255,.12)!important;opacity:1}
+.qz-btn:active{transform:scale(.93)!important;opacity:1}
+.sl-nav-btn:active{background:var(--s3)!important;opacity:1}
+.sg-save:active,.sg-act:active,.sg-danger:active{transform:scale(.95)!important;opacity:1}
+.lib-f:active{transform:scale(.94)!important;opacity:1}
+.tl:active{background:rgba(255,255,255,.08)!important}
+[data-action]:active,[data-fab-page]:active{opacity:.75}
+
+/* ── FAB MENU ── */
+
+/* FAB 主按鈕永遠可點 */
+
+/* FAB 開啟時整個 wrap 可點 */
+
+/* items 容器：關閉時完全不可點 */
+
+/* 每個 item：關閉=看不見+不可點，開啟=可見+可點 */
+
+/* Label 和 Btn：跟隨父層 item 的 pointer-events */
+
+/* 待回顧 badge */
+
+/* ═══════ FAB MENU ═══════ */
+#fab-scrim{position:fixed;inset:0;z-index:150;background:rgba(6,9,15,.65);opacity:0;pointer-events:none;transition:opacity .25s}
+#fab-scrim.show{opacity:1;pointer-events:auto}
+
+#fab-wrap{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);z-index:200;display:flex;flex-direction:column;align-items:flex-end;gap:12px;pointer-events:none}
+#fab-main{width:58px;height:58px;border-radius:50%;background:var(--amber);color:#09100d;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow),var(--glow);transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s;pointer-events:auto}
+#fab-main svg{transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
+#fab-main:active{transform:scale(.9)!important;box-shadow:none!important}
+#fab-wrap.open #fab-main svg{transform:rotate(45deg)}
+#fab-wrap.open{pointer-events:auto}
+
+.fab-items{display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none}
+#fab-wrap.open .fab-items{pointer-events:auto}
+
+.fab-item{display:flex;align-items:center;gap:10px;opacity:0;transform:translateY(16px) scale(.9);pointer-events:none;transition:opacity .2s cubic-bezier(.16,1,.3,1),transform .2s cubic-bezier(.16,1,.3,1)}
+#fab-wrap.open .fab-item{opacity:1;transform:none;pointer-events:auto}
+#fab-wrap.open .fab-item:nth-child(1){transition-delay:.04s}
+#fab-wrap.open .fab-item:nth-child(2){transition-delay:.08s}
+#fab-wrap.open .fab-item:nth-child(3){transition-delay:.12s}
+#fab-wrap.open .fab-item:nth-child(4){transition-delay:.16s}
+#fab-wrap.open .fab-item:nth-child(5){transition-delay:.20s}
+
+.fab-label{background:var(--s2);border:1px solid var(--b2);border-radius:10px;padding:6px 14px;font-size:.78rem;font-weight:500;color:var(--t1);box-shadow:var(--shadow);white-space:nowrap}
+.fab-btn{width:46px;height:46px;border-radius:50%;background:var(--s2);border:1px solid var(--b2);display:flex;align-items:center;justify-content:center;color:var(--t1);box-shadow:var(--shadow);transition:all .15s;flex-shrink:0}
+.fab-btn.fab-active{background:var(--amber);color:#09100d;border-color:transparent}
+.fab-btn:active{transform:scale(.86)!important;background:var(--s3)!important}
+
+.due-badge{position:absolute;top:-2px;right:-2px;width:16px;height:16px;border-radius:50%;background:var(--rose);color:#fff;font-size:.52rem;font-weight:700;font-family:var(--fm);display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
 </style>
 </head>
 <body>
+
 
 
 <!-- ── SPLASH ── -->
@@ -802,7 +853,7 @@ select{-webkit-appearance:none;appearance:none}
 </div>
 
 <!-- ── APP ── -->
-<div id="app" aria-hidden="true">
+<div id="app">
   <div class="amb" aria-hidden="true">
     <div class="orb orb1"></div>
     <div class="orb orb2"></div>
@@ -837,8 +888,7 @@ select{-webkit-appearance:none;appearance:none}
       <!-- Courses -->
       <div class="cl-head">
         <span class="cl-title">我的課程</span>
-        <button class="cl-add" onclick="Router.go('import')">＋ 新增</button>
-      </div>
+        </div>
       <div class="course-list" id="courseList">
         <div class="empty" id="emptyHome">
           <div class="empty-ico">
@@ -853,7 +903,7 @@ select{-webkit-appearance:none;appearance:none}
     <!-- ════════ IMPORT ════════ -->
     <section id="page-import" class="page">
       <header class="page-header">
-        <button class="ph-back" onclick="Router.back()">
+        <button class="ph-back" data-action="back">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <h1 class="ph-title">匯入課程</h1>
@@ -930,7 +980,7 @@ select{-webkit-appearance:none;appearance:none}
     <section id="page-player" class="page">
       <div class="pl-shell">
         <div class="pl-top">
-          <button class="pl-back" onclick="Router.back()">
+          <button class="pl-back" data-action="back">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <div class="pl-meta">
@@ -1138,7 +1188,7 @@ select{-webkit-appearance:none;appearance:none}
         </div>
         <h2 class="rv-done-h">回顧完成！</h2>
         <p class="rv-done-s" id="doneSub"></p>
-        <button class="btn-cta" onclick="ReviewPage.backToDashboard()" style="margin-top:8px">返回總覽</button>
+        <button class="btn-cta" data-action="review-back" style="margin-top:8px">返回總覽</button>
       </div>
     </section>
 
@@ -1248,95 +1298,117 @@ select{-webkit-appearance:none;appearance:none}
 </div>
 
 <script>
+
+// ── SAFE DOM UTILITIES ──
+function $el(id) {
+  var el = document.getElementById(id);
+  if (!el) console.error('[DOM] Missing: #' + id);
+  return el;
+}
+function $bind(id, event, fn) {
+  var el = document.getElementById(id);
+  if (!el) { console.error('[DOM] $bind missing: #' + id); return; }
+  el.addEventListener(event, fn);
+}
+function $qs(sel, ctx)    { return (ctx || document).querySelector(sel); }
+function $qsAll(sel, ctx) { return Array.from((ctx || document).querySelectorAll(sel)); }
+
+
 const Toast = (() => {
-  function show(msg, type='info', dur=2500) {
-    const container = document.getElementById('toast-stack');
-    if (!container) { setTimeout(()=>show(msg,type,dur),200); return; }
-    const icons = {success:'✓',error:'✕',warn:'⚠',info:'·'};
-    const el = document.createElement('div');
+  function show(msg, type, dur) {
+    if (!type) type = 'info';
+    if (!dur)  dur  = 2500;
+    var stack = document.getElementById('toast-stack');
+    if (!stack) { setTimeout(function(){ show(msg,type,dur); }, 100); return; }
+    var icons = { success:'✓', error:'✕', warn:'⚠', info:'·' };
+    var el = document.createElement('div');
     el.className = 'ti ' + type;
     el.innerHTML = '<span class="ti-ico">' + (icons[type]||'·') + '</span><span>' + msg + '</span>';
-    container.appendChild(el);
-    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
-    setTimeout(() => { el.classList.remove('show'); setTimeout(()=>el.remove(),300); }, dur);
+    stack.appendChild(el);
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ el.classList.add('show'); });
+    });
+    setTimeout(function(){
+      el.classList.remove('show');
+      setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 300);
+    }, dur);
   }
   return {
-    show,
-    success: (m,d) => show(m,'success',d),
-    error:   (m,d) => show(m,'error',d),
-    warn:    (m,d) => show(m,'warn',d),
-    info:    (m,d) => show(m,'info',d),
+    show:    function(m,d){ show(m,'info',d); },
+    success: function(m,d){ show(m,'success',d); },
+    error:   function(m,d){ show(m,'error',d); },
+    warn:    function(m,d){ show(m,'warn',d); },
+    info:    function(m,d){ show(m,'info',d); },
   };
 })();
 
 const Modal = (() => {
-  let res = null;
-  function confirm(title, body, ok='確認', cancel='取消') {
-    return new Promise(r => {
-      res = r;
-      document.getElementById('modalTitle').textContent = title;
-      document.getElementById('modalBody').textContent = body;
-      document.getElementById('modalConfirm').textContent = ok;
-      document.getElementById('modalCancel').textContent = cancel;
-      document.getElementById('modal-ov').style.display = 'flex';
+  var _cb = null;
+  function _close(val) {
+    var ov = document.getElementById('modal-ov');
+    if (ov) ov.style.display = 'none';
+    if (_cb) { _cb(val); _cb = null; }
+  }
+  function confirm(title, body, okLabel, cancelLabel) {
+    if (!okLabel)     okLabel     = '確認';
+    if (!cancelLabel) cancelLabel = '取消';
+    return new Promise(function(resolve) {
+      _cb = resolve;
+      var t  = document.getElementById('modalTitle');
+      var b  = document.getElementById('modalBody');
+      var ok = document.getElementById('modalConfirm');
+      var cn = document.getElementById('modalCancel');
+      var ov = document.getElementById('modal-ov');
+      if (t)  t.textContent  = title;
+      if (b)  b.textContent  = body;
+      if (ok) ok.textContent = okLabel;
+      if (cn) cn.textContent = cancelLabel;
+      if (ov) ov.style.display = 'flex';
     });
   }
   function init() {
-    document.getElementById('modalConfirm').addEventListener('click', () => {
-      document.getElementById('modal-ov').style.display = 'none';
-      if (res) { res(true); res = null; }
-    });
-    document.getElementById('modalCancel').addEventListener('click', () => {
-      document.getElementById('modal-ov').style.display = 'none';
-      if (res) { res(false); res = null; }
-    });
-    document.getElementById('modal-ov').addEventListener('click', (e) => {
-      if (e.target === e.currentTarget) {
-        document.getElementById('modal-ov').style.display = 'none';
-        if (res) { res(false); res = null; }
-      }
+    $bind('modalConfirm', 'click', function(){ _close(true);  });
+    $bind('modalCancel',  'click', function(){ _close(false); });
+    $bind('modal-ov',     'click', function(e){
+      if (e.target === e.currentTarget) _close(false);
     });
   }
-  return { confirm, init };
+  return { confirm: confirm, init: init };
 })();
 
 const Router = (() => {
-  let current = 'home';
-  let hist = ['home'];
-  const cbs = {};
-
+  var _cur  = 'home';
+  var _hist = ['home'];
+  var _cbs  = {};
   function go(page) {
-    if (page === current) { FAB.close(); return; }
-    const from = document.getElementById('page-' + current);
-    const to   = document.getElementById('page-' + page);
-    if (!to) return;
+    if (page === _cur) { if (window.FAB) FAB.close(); return; }
+    var from = document.getElementById('page-' + _cur);
+    var to   = document.getElementById('page-' + page);
+    if (!to) { console.error('[Router] No page: ' + page); return; }
     if (from) {
       from.classList.remove('active');
       from.classList.add('out');
-      setTimeout(()=>from.classList.remove('out'), 280);
+      setTimeout(function(){ from.classList.remove('out'); }, 280);
     }
     to.classList.add('active');
     to.scrollTop = 0;
-    hist.push(page);
-    current = page;
-    FAB.close();
-    if (cbs[page]) cbs[page]();
+    _hist.push(page);
+    _cur = page;
+    if (window.FAB) FAB.close();
+    if (_cbs[page]) _cbs[page]();
   }
-
   function back() {
-    if (hist.length > 1) {
-      hist.pop();
-      const prev = hist[hist.length - 1];
+    if (_hist.length > 1) {
+      _hist.pop();
+      var prev = _hist[_hist.length - 1];
+      _hist.pop();
       go(prev);
-      hist.pop(); // go() pushes again, remove duplicate
     }
   }
-
-  function onEnter(page, fn) { cbs[page] = fn; }
-  function getCurrent() { return current; }
-  function initNav() {}
-
-  return { go, back, onEnter, getCurrent, initNav };
+  function onEnter(p, fn) { _cbs[p] = fn; }
+  function getCurrent()   { return _cur; }
+  function initNav()      {}
+  return { go:go, back:back, onEnter:onEnter, getCurrent:getCurrent, initNav:initNav };
 })();
 
 /**
@@ -1948,7 +2020,7 @@ const AIFeature = (() => {
         <button class="primary-cta" id="aiKeySubmit">儲存並分析</button>
       </div>`;
 
-    document.getElementById('aiKeySubmit').addEventListener('click', async () => {
+    $bind('aiKeySubmit', 'click', async () => {
       const key = document.getElementById('aiKeyInput').value.trim();
       if (!key.startsWith('sk-ant-')) { Toast.warn('API Key 格式不正確'); return; }
       await DB.Settings.set('apiKey', key);
@@ -2039,9 +2111,9 @@ ${text}
     // Key points
     body.appendChild(section('📌 重點整理', s.keyPoints?.length || 0, `
       ${(s.keyPoints || []).map((p, i) => `
-        <div class="ai-key-point">
-          <span class="ai-kp-num">${String(i + 1).padStart(2, '0')}</span>
-          <span class="ai-kp-text">${p}</span>
+        <div class="ai-kp">
+          <span class="ai-kp-n">${String(i + 1).padStart(2, '0')}</span>
+          <span class="ai-kp-t">${p}</span>
         </div>
       `).join('')}
     `));
@@ -2049,7 +2121,7 @@ ${text}
     // Glossary
     body.appendChild(section('📖 名詞解釋', s.glossary?.length || 0, `
       ${(s.glossary || []).map(g => `
-        <div class="ai-glossary-item">
+        <div class="ai-gl">
           <p class="ai-gl-term">${g.term}</p>
           <p class="ai-gl-def">${g.def}</p>
         </div>
@@ -2058,36 +2130,36 @@ ${text}
 
     // Q&A
     const qaHtml = (s.qa || []).map((item, i) => `
-      <div class="ai-qa-item" data-i="${i}">
+      <div class="ai-qa" data-i="${i}">
         <p class="ai-qa-q">${item.q}</p>
         <div class="ai-qa-a">${item.a}</div>
-        <p class="ai-qa-toggle">▾ 查看答案</p>
+        <p class="ai-qa-tog">▾ 查看答案</p>
       </div>
     `).join('');
     const qaSection = section('❓ 問答', s.qa?.length || 0, qaHtml);
     body.appendChild(qaSection);
 
     // Q&A toggle
-    qaSection.querySelectorAll('.ai-qa-item').forEach(el => {
+    qaSection.querySelectorAll('.ai-qa').forEach(el => {
       el.addEventListener('click', () => {
         el.classList.toggle('open');
-        el.querySelector('.ai-qa-toggle').textContent = el.classList.contains('open') ? '▴ 收起' : '▾ 查看答案';
+        el.querySelector('.ai-qa-tog').textContent = el.classList.contains('open') ? '▴ 收起' : '▾ 查看答案';
       });
     });
 
     // Highlights
     body.appendChild(section('💡 重點句', s.highlights?.length || 0, `
-      ${(s.highlights || []).map(h => `<div class="ai-highlight">${h}</div>`).join('')}
+      ${(s.highlights || []).map(h => `<div class="ai-hl">${h}</div>`).join('')}
     `));
   }
 
   function section(title, count, inner) {
     const div = document.createElement('div');
-    div.className = 'ai-section';
+    div.className = 'ai-sec';
     div.innerHTML = `
-      <div class="ai-section-head">
-        <span class="ai-section-title">${title}</span>
-        <span class="ai-section-count">${count}</span>
+      <div class="ai-sec-h">
+        <span class="ai-sec-t">${title}</span>
+        <span class="ai-sec-c">${count}</span>
       </div>
       ${inner}
     `;
@@ -2260,19 +2332,12 @@ const HomePage = (() => {
     const done = parseInt(todayDone);
     const total = Math.max(done, Math.min(due + done, parseInt(reviewLimit)));
     const pct = total ? Math.round((done / total) * 100) : 0;
-    const fill = document.getElementById('todayProgressFill');
-    const label = document.getElementById('todayProgressLabel');
+    const fill = document.getElementById('todayFill');
+    const label = document.getElementById('todayPct');
     if (fill)  setTimeout(() => { fill.style.width = pct + '%'; }, 100);
     if (label) label.textContent = pct + '%';
 
-    // CTA
-    const cta = document.getElementById('todayReviewCta');
-    const ctaCount = document.getElementById('ctaDueCount');
-    if (cta) {
-      cta.style.display = due > 0 ? '' : 'none';
-      if (ctaCount) ctaCount.textContent = due;
-    }
-  }
+      }
 
   function _setNum(id, val) {
     const el = document.getElementById(id);
@@ -2292,7 +2357,7 @@ const HomePage = (() => {
     const empty = document.getElementById('emptyHome');
     if (!list) return;
 
-    list.querySelectorAll('.course-card').forEach(c => c.remove());
+    list.querySelectorAll('.c-card').forEach(c => c.remove());
 
     if (!courses.length) {
       if (empty) empty.style.display = 'flex';
@@ -2310,7 +2375,7 @@ const HomePage = (() => {
 
   function _makeCourseCard(course, allChunks, idx) {
     const card = document.createElement('div');
-    card.className = 'course-card';
+    card.className = 'c-card';
 
     const courseChunks = allChunks.filter(ch => ch.courseId === course.id);
     const masteredCount = courseChunks.filter(ch => ch.reviewLevel >= 4).length;
@@ -2336,7 +2401,7 @@ const HomePage = (() => {
         </div>
         ${course.tags?.length ? `
           <div class="cc-tags">
-            ${course.tags.map(t => `<span class="tag-pill">${t}</span>`).join('')}
+            ${course.tags.map(t => `<span class="tpill">${t}</span>`).join('')}
           </div>` : ''}
       </div>
       <div class="cc-progress">
@@ -2419,35 +2484,35 @@ const ImportPage = (() => {
     transcriptMode = 'upload';
 
     // Reset UI
-    document.getElementById('audioZone').style.display = '';
-    document.getElementById('audioPicked').style.display = 'none';
-    document.getElementById('srtLoaded').style.display = 'none';
-    document.getElementById('transcriptUploadArea').style.display = '';
-    document.getElementById('transcriptManualArea').style.display = 'none';
-    document.getElementById('pagesThumbs').innerHTML = '';
-    document.getElementById('iTitle').value = '';
-    document.getElementById('iDesc').value = '';
-    document.getElementById('iTagsRow').innerHTML = '';
-    document.getElementById('iTagInput').value = '';
-    document.getElementById('manualTA').value = '';
-    document.getElementById('audioInput').value = '';
-    document.getElementById('srtInput').value = '';
-    document.getElementById('pagesInput').value = '';
+    (document.getElementById('audioZone')||{}).style.display = '';
+    (document.getElementById('audioPicked')||{}).style.display = 'none';
+    (document.getElementById('srtLoaded')||{}).style.display = 'none';
+    (document.getElementById('transcriptUploadArea')||{}).style.display = '';
+    (document.getElementById('transcriptManualArea')||{}).style.display = 'none';
+    (document.getElementById('pagesThumbs')||{}).innerHTML = '';
+    (document.getElementById('iTitle')||{}).value = '';
+    (document.getElementById('iDesc')||{}).value = '';
+    (document.getElementById('iTagsRow')||{}).innerHTML = '';
+    (document.getElementById('iTagInput')||{}).value = '';
+    (document.getElementById('manualTA')||{}).value = '';
+    (document.getElementById('audioInput')||{}).value = '';
+    (document.getElementById('srtInput')||{}).value = '';
+    (document.getElementById('pagesInput')||{}).value = '';
     document.querySelectorAll('.mode-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
     _checkReady();
   }
 
   function _initAudioZone() {
-    const zone  = document.getElementById('audioZone');
-    const input = document.getElementById('audioInput');
-    const rem   = document.getElementById('apRemove');
-
-    zone.addEventListener('click', () => input.click());
+    var zone  = document.getElementById('audioZone');
+    var input = document.getElementById('audioInput');
+    var rem   = document.getElementById('apRemove');
+    if (!zone || !input || !rem) { console.error('[Import] audioZone missing'); return; }
+    zone.addEventListener('click', function(){ input.click(); });
     _dropZone(zone, input, _handleAudio);
     rem.addEventListener('click', () => {
       data.audioBlob = null;
       zone.style.display = '';
-      document.getElementById('audioPicked').style.display = 'none';
+      (document.getElementById('audioPicked')||{}).style.display = 'none';
       _checkReady();
     });
   }
@@ -2456,7 +2521,7 @@ const ImportPage = (() => {
     data.audioBlob = file;
     data.audioDuration = await AudioUtils.getDuration(file);
 
-    document.getElementById('audioZone').style.display = 'none';
+    (document.getElementById('audioZone')||{}).style.display = 'none';
     const picked = document.getElementById('audioPicked');
     picked.style.display = 'flex';
     document.getElementById('apName').textContent = file.name;
@@ -2476,16 +2541,17 @@ const ImportPage = (() => {
   }
 
   function _initSrtZone() {
-    const zone  = document.getElementById('srtZone');
-    const input = document.getElementById('srtInput');
-    zone.addEventListener('click', () => input.click());
+    var zone  = document.getElementById('srtZone');
+    var input = document.getElementById('srtInput');
+    if (!zone || !input) { console.error('[Import] srtZone missing'); return; }
+    zone.addEventListener('click', function(){ input.click(); });
     _dropZone(zone, input, _handleSrt);
   }
 
   async function _handleSrt(file) {
     try {
       data.transcript = await SRTParser.parseFile(file);
-      document.getElementById('srtLoaded').style.display = 'flex';
+      (document.getElementById('srtLoaded')||{}).style.display = 'flex';
       document.getElementById('srtInfo').textContent = `已載入 ${data.transcript.length} 行字幕`;
       Toast.success(`✓ 字幕載入成功（${data.transcript.length} 行）`);
     } catch (e) {
@@ -2494,9 +2560,10 @@ const ImportPage = (() => {
   }
 
   function _initPagesZone() {
-    const zone  = document.getElementById('pagesZone');
-    const input = document.getElementById('pagesInput');
-    zone.addEventListener('click', () => input.click());
+    var zone  = document.getElementById('pagesZone');
+    var input = document.getElementById('pagesInput');
+    if (!zone || !input) { console.error('[Import] pagesZone missing'); return; }
+    zone.addEventListener('click', function(){ input.click(); });
     zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
     zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
     zone.addEventListener('drop', e => {
@@ -2540,17 +2607,18 @@ const ImportPage = (() => {
         transcriptMode = btn.dataset.mode;
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        document.getElementById('transcriptUploadArea').style.display =
+        (document.getElementById('transcriptUploadArea')||{}).style.display =
           transcriptMode === 'upload' ? '' : 'none';
-        document.getElementById('transcriptManualArea').style.display =
+        (document.getElementById('transcriptManualArea')||{}).style.display =
           transcriptMode === 'manual' ? '' : 'none';
       });
     });
   }
 
   function _initTagInput() {
-    const input = document.getElementById('iTagInput');
-    input.addEventListener('keydown', e => {
+    var input = document.getElementById('iTagInput');
+    if (!input) { console.error('[Import] iTagInput missing'); return; }
+    input.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') {
         const v = input.value.trim();
         if (v && !data.tags.includes(v)) {
@@ -2565,12 +2633,12 @@ const ImportPage = (() => {
   function _renderTags() {
     const row = document.getElementById('iTagsRow');
     row.innerHTML = data.tags.map((t, i) => `
-      <span class="tag-pill amber">
+      <span class="tpill amber">
         ${t}
-        <span class="tag-pill-remove" data-idx="${i}">✕</span>
+        <span class="tpill-x" data-idx="${i}">✕</span>
       </span>
     `).join('');
-    row.querySelectorAll('.tag-pill-remove').forEach(btn => {
+    row.querySelectorAll('.tpill-x').forEach(btn => {
       btn.addEventListener('click', () => {
         data.tags.splice(parseInt(btn.dataset.idx), 1);
         _renderTags();
@@ -2583,18 +2651,18 @@ const ImportPage = (() => {
   }
 
   function _initImportBtn() {
-    document.getElementById('importBtn').addEventListener('click', _doImport);
+    $bind('importBtn', 'click', _doImport);
   }
 
   async function _doImport() {
     if (!data.audioBlob) return;
 
-    const title = document.getElementById('iTitle').value.trim() || '未命名課程';
-    const desc  = document.getElementById('iDesc').value.trim();
+    const title = (document.getElementById('iTitle')||{}).value.trim() || '未命名課程';
+    const desc  = (document.getElementById('iDesc')||{}).value.trim();
 
     // Manual transcript
     if (transcriptMode === 'manual') {
-      const txt = document.getElementById('manualTA').value.trim();
+      const txt = (document.getElementById('manualTA')||{}).value.trim();
       if (txt) data.transcript = SRTParser.parsePlain(txt);
     }
 
@@ -2679,9 +2747,9 @@ const PlayerPage = (() => {
     }
 
     // UI
-    document.getElementById('playerCourseName').textContent = c.title;
-    document.getElementById('playerPosition').textContent = '—';
-    document.getElementById('speedBtn').textContent = speeds[speedIdx] + '×';
+    (document.getElementById('playerCourseName')||{}).textContent = c.title;
+    (document.getElementById('playerPosition')||{}).textContent = '—';
+    (document.getElementById('speedBtn')||{}).textContent = speeds[speedIdx] + '×';
 
     _renderTranscript();
     _renderSlides();
@@ -2715,13 +2783,13 @@ const PlayerPage = (() => {
     }
 
     container.innerHTML = transcript.map((line, i) => `
-      <div class="t-line" data-idx="${i}" data-start="${line.start}">
-        <div class="t-time">${SRTParser.fmt(line.start)}</div>
-        <div class="t-text">${line.text}</div>
+      <div class="tl" data-idx="${i}" data-start="${line.start}">
+        <div class="tl-ts">${SRTParser.fmt(line.start)}</div>
+        <div class="tl-txt">${line.text}</div>
       </div>
     `).join('');
 
-    container.querySelectorAll('.t-line').forEach(el => {
+    container.querySelectorAll('.tl').forEach(el => {
       el.addEventListener('click', () => {
         const t = parseFloat(el.dataset.start);
         audio().currentTime = t;
@@ -2735,7 +2803,7 @@ const PlayerPage = (() => {
     if (idx === activeLine) return;
     activeLine = idx;
 
-    const lines = document.querySelectorAll('.t-line');
+    const lines = document.querySelectorAll('.tl');
     lines.forEach((el, i) => {
       el.classList.toggle('active', i === idx);
       el.classList.toggle('past',   i < idx);
@@ -2767,10 +2835,10 @@ const PlayerPage = (() => {
     img.style.display         = '';
     _showSlide(0);
 
-    document.getElementById('prevSlide').addEventListener('click', () => {
+    $bind('prevSlide', 'click', function() {
       if (slideIdx > 0) _showSlide(slideIdx - 1);
     });
-    document.getElementById('nextSlide').addEventListener('click', () => {
+    $bind('nextSlide', 'click', function() {
       if (slideIdx < pages.length - 1) _showSlide(slideIdx + 1);
     });
   }
@@ -2779,7 +2847,7 @@ const PlayerPage = (() => {
     slideIdx = idx;
     const p = pages[idx];
     document.getElementById('slideImg').src        = p.imageUrl || URL.createObjectURL(p.imageBlob);
-    document.getElementById('slideIndicator').textContent = `${idx + 1} / ${pages.length}`;
+    (document.getElementById('slideIndicator')||{}).textContent = `${idx + 1} / ${pages.length}`;
   }
 
   function _syncSlideToTime(t) {
@@ -2805,9 +2873,9 @@ const PlayerPage = (() => {
       const pct = d ? t / d : 0;
       WaveformUI.setProgress(pct);
 
-      document.getElementById('timeNow').textContent   = SRTParser.fmt(t);
-      document.getElementById('timeTotal').textContent  = SRTParser.fmt(d);
-      document.getElementById('playerPosition').textContent =
+      (document.getElementById('timeNow')||{}).textContent   = SRTParser.fmt(t);
+      (document.getElementById('timeTotal')||{}).textContent  = SRTParser.fmt(d);
+      (document.getElementById('playerPosition')||{}).textContent =
         `${SRTParser.fmt(t)} / ${SRTParser.fmt(d)}`;
     });
 
@@ -2820,7 +2888,7 @@ const PlayerPage = (() => {
       document.querySelector('.icon-pause').style.display = 'none';
     });
     a.addEventListener('loadedmetadata', () => {
-      document.getElementById('timeTotal').textContent = SRTParser.fmt(a.duration);
+      (document.getElementById('timeTotal')||{}).textContent = SRTParser.fmt(a.duration);
       WaveformUI.resize();
     });
   }
@@ -2828,13 +2896,13 @@ const PlayerPage = (() => {
   // ── CONTROLS ──
   function _initControls() {
     // Play/pause
-    document.getElementById('playBtn').addEventListener('click', () => {
+    $bind('playBtn', 'click', () => {
       const a = audio();
       if (a.paused) a.play(); else a.pause();
     });
 
     // Speed cycle
-    document.getElementById('speedBtn').addEventListener('click', () => {
+    $bind('speedBtn', 'click', () => {
       speedIdx = (speedIdx + 1) % speeds.length;
       audio().playbackRate = speeds[speedIdx];
       _updateSpeedBtn();
@@ -2842,19 +2910,19 @@ const PlayerPage = (() => {
     });
 
     // Skip
-    document.getElementById('skipBackBtn').addEventListener('click', () => {
+    $bind('skipBackBtn', 'click', () => {
       const sec = Store.get('settings')?.skipSec || 15;
       audio().currentTime = Math.max(0, audio().currentTime - sec);
     });
-    document.getElementById('skipFwdBtn').addEventListener('click', () => {
+    $bind('skipFwdBtn', 'click', () => {
       const sec = Store.get('settings')?.skipSec || 15;
       audio().currentTime = Math.min(audio().duration || 0, audio().currentTime + sec);
     });
 
     // View tabs
-    document.querySelectorAll('.view-tab').forEach(tab => {
+    document.querySelectorAll('.vt').forEach(tab => {
       tab.addEventListener('click', () => {
-        document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.vt').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         const view = tab.dataset.view;
         document.getElementById('paneTranscript').classList.toggle('active', view === 'transcript');
@@ -3005,7 +3073,7 @@ const LibraryPage = (() => {
 
     grid.innerHTML = list.map(c => _chunkCardHTML(c)).join('');
 
-    grid.querySelectorAll('.chunk-card').forEach(card => {
+    grid.querySelectorAll('.ck-card').forEach(card => {
       const id = card.dataset.id;
 
       // Long press to delete
@@ -3028,21 +3096,21 @@ const LibraryPage = (() => {
     const isDue = Spaced.isDue(c) && c.lastReviewedAt;
 
     return `
-      <div class="chunk-card" data-id="${c.id}">
-        <div class="ck-header">
-          <span class="ck-source">${c.courseTitle || '未知課程'} · ${SRTParser.fmt(c.startTime)}–${SRTParser.fmt(c.endTime)}</span>
-          <div class="ck-level-badge">
-            <div class="level-pip ${pipClass}"></div>
-            <span class="level-label">${Spaced.levelLabel(level)}</span>
+      <div class="ck-card" data-id="${c.id}">
+        <div class="ck-head">
+          <span class="ck-src">${c.courseTitle || '未知課程'} · ${SRTParser.fmt(c.startTime)}–${SRTParser.fmt(c.endTime)}</span>
+          <div class="ck-lvl">
+            <div class="lvl-pip ${pipClass}"></div>
+            <span class="lvl-txt">${Spaced.levelLabel(level)}</span>
           </div>
         </div>
         <p class="ck-text">${c.transcript}</p>
         ${c.note ? `<p class="ck-note">📝 ${c.note}</p>` : ''}
         <div class="ck-footer">
           <div class="ck-tags">
-            ${(c.tags || []).map(t => `<span class="tag-pill">${t}</span>`).join('')}
+            ${(c.tags || []).map(t => `<span class="tpill">${t}</span>`).join('')}
           </div>
-          <span class="ck-next-review ${isDue ? 'due' : ''}">${nextLabel}</span>
+          <span class="ck-next ${isDue ? 'due' : ''}">${nextLabel}</span>
         </div>
       </div>
     `;
@@ -3075,7 +3143,7 @@ const LibraryPage = (() => {
 
   function init() {
     // Search toggle
-    document.getElementById('libSearchToggle').addEventListener('click', () => {
+    $bind('libSearchToggle', 'click', function() {
       const bar = document.getElementById('libSearchBar');
       const visible = bar.style.display !== 'none';
       bar.style.display = visible ? 'none' : 'flex';
@@ -3083,22 +3151,22 @@ const LibraryPage = (() => {
     });
 
     // Search input
-    document.getElementById('libSearchInput').addEventListener('input', (e) => {
+    $bind('libSearchInput', 'input', function(e) {
       searchQuery = e.target.value.trim();
       const clear = document.getElementById('libSearchClear');
       if (clear) clear.style.display = searchQuery ? '' : 'none';
       _renderChunks();
     });
 
-    document.getElementById('libSearchClear')?.addEventListener('click', () => {
-      document.getElementById('libSearchInput').value = '';
+    $bind('libSearchClear', 'click', function() {
+      (document.getElementById('libSearchInput')||{}).value = '';
       searchQuery = '';
-      document.getElementById('libSearchClear').style.display = 'none';
+      (document.getElementById('libSearchClear')||{style:{}}).style.display = 'none';
       _renderChunks();
     });
 
     // Sort
-    document.getElementById('libSortSelect').addEventListener('change', (e) => {
+    $bind('libSortSelect', 'change', function(e) {
       sortMode = e.target.value;
       _renderChunks();
     });
@@ -3138,26 +3206,26 @@ const ReviewPage = (() => {
     const passCount = reviews.filter(r => r.result === 'pass').length;
     const acc = reviews.length ? Math.round((passCount / reviews.length) * 100) + '%' : '—';
 
-    document.getElementById('rvDue').textContent      = due;
-    document.getElementById('rvTotal').textContent    = all.length;
-    document.getElementById('rvMastered').textContent = mastered;
-    document.getElementById('rvTodayDone').textContent = todayDone;
-    document.getElementById('rvAccuracy').textContent  = acc;
+    (document.getElementById('rvDue')||{}).textContent      = due;
+    (document.getElementById('rvTotal')||{}).textContent    = all.length;
+    (document.getElementById('rvMastered')||{}).textContent = mastered;
+    (document.getElementById('rvTodayDone')||{}).textContent = todayDone;
+    (document.getElementById('rvAccuracy')||{}).textContent  = acc;
 
     // Ring: show % of today's quota done
     const limit = Store.get('settings')?.reviewLimit || 20;
     const pct   = limit ? Math.min(1, todayDone / limit) : 0;
     const circumference = 251.2;
     const offset = circumference - pct * circumference;
-    document.getElementById('rvRingFg').style.strokeDashoffset = offset;
+    (document.getElementById('rvRingFg')||{}).style.strokeDashoffset = offset;
 
     // Heatmap (last 12 weeks × 7 = 84 days)
     _renderHeatmap(reviews);
 
     // Visibility
-    document.getElementById('reviewDashboard').style.display = '';
-    document.getElementById('quizShell').style.display = 'none';
-    document.getElementById('reviewDone').style.display = 'none';
+    (document.getElementById('reviewDashboard')||{}).style.display = '';
+    (document.getElementById('quizShell')||{}).style.display = 'none';
+    (document.getElementById('reviewDone')||{}).style.display = 'none';
   }
 
   function _renderHeatmap(reviews) {
@@ -3196,9 +3264,9 @@ const ReviewPage = (() => {
     const today  = new Date().toISOString().slice(0, 10);
     DB.Settings.get('todayDone_' + today, 0).then(v => { todayDoneBase = parseInt(v); });
 
-    document.getElementById('reviewDashboard').style.display = 'none';
-    document.getElementById('quizShell').style.display = '';
-    document.getElementById('reviewDone').style.display = 'none';
+    (document.getElementById('reviewDashboard')||{}).style.display = 'none';
+    (document.getElementById('quizShell')||{}).style.display = '';
+    (document.getElementById('reviewDone')||{}).style.display = 'none';
     _showCard();
   }
 
@@ -3208,17 +3276,17 @@ const ReviewPage = (() => {
 
     // Progress
     const pct = (current / dueChunks.length) * 100;
-    document.getElementById('quizProgFill').style.width = pct + '%';
-    document.getElementById('quizCountLabel').textContent = `${current + 1} / ${dueChunks.length}`;
+    (document.getElementById('quizProgFill')||{}).style.width = pct + '%';
+    (document.getElementById('quizCountLabel')||{}).textContent = `${current + 1} / ${dueChunks.length}`;
 
     // Content
-    document.getElementById('quizSource').textContent =
+    (document.getElementById('quizSource')||{}).textContent =
       `${chunk.courseTitle || '課程'} · ${SRTParser.fmt(chunk.startTime)} – ${SRTParser.fmt(chunk.endTime)}`;
-    document.getElementById('quizText').textContent  = chunk.transcript;
-    document.getElementById('quizNote').textContent  = chunk.note || '';
+    (document.getElementById('quizText')||{}).textContent  = chunk.transcript;
+    (document.getElementById('quizNote')||{}).textContent  = chunk.note || '';
 
     const tagsRow = document.getElementById('quizTagsRow');
-    tagsRow.innerHTML = (chunk.tags || []).map(t => `<span class="tag-pill">${t}</span>`).join('');
+    tagsRow.innerHTML = (chunk.tags || []).map(t => `<span class="tpill">${t}</span>`).join('');
 
     // Card flip animation
     const card = document.getElementById('quizCard');
@@ -3255,11 +3323,11 @@ const ReviewPage = (() => {
   }
 
   async function _showDone() {
-    document.getElementById('quizShell').style.display = 'none';
-    document.getElementById('reviewDone').style.display = '';
+    (document.getElementById('quizShell')||{}).style.display = 'none';
+    (document.getElementById('reviewDone')||{}).style.display = '';
 
     const total = sessionPass + sessionHard + sessionFail;
-    document.getElementById('doneSub').textContent =
+    (document.getElementById('doneSub')||{}).textContent =
       `完成 ${total} 個 · 記得 ${sessionPass} · 模糊 ${sessionHard} · 忘了 ${sessionFail}`;
 
     // Update streak
@@ -3292,15 +3360,15 @@ const ReviewPage = (() => {
   }
 
   function init() {
-    document.getElementById('startReviewBtn').addEventListener('click', startSession);
-    document.getElementById('quizPass').addEventListener('click', () => _handleResult(2));
-    document.getElementById('quizHard').addEventListener('click', () => _handleResult(1));
-    document.getElementById('quizFail').addEventListener('click', () => _handleResult(0));
-    document.getElementById('quizSkipBtn').addEventListener('click', () => {
+    $bind('startReviewBtn', 'click', startSession);
+    $bind('quizPass', 'click', () => _handleResult(2));
+    $bind('quizHard', 'click', () => _handleResult(1));
+    $bind('quizFail', 'click', () => _handleResult(0));
+    $bind('quizSkipBtn', 'click', () => {
       current++;
       _showCard();
     });
-    document.getElementById('quizAudioBtn').addEventListener('click', _playChunkAudio);
+    $bind('quizAudioBtn', 'click', _playChunkAudio);
 
     Router.onEnter('review', render);
   }
@@ -3338,7 +3406,7 @@ const SettingsPage = (() => {
 
   function _bindEvents() {
     // API Key
-    document.getElementById('sgApiKeySave').addEventListener('click', async () => {
+    $bind('sgApiKeySave', 'click', async () => {
       const key = document.getElementById('sgApiKey').value.trim();
       if (key && !key.startsWith('sk-ant-')) { Toast.warn('API Key 格式不正確'); return; }
       await DB.Settings.set('apiKey', key);
@@ -3347,7 +3415,7 @@ const SettingsPage = (() => {
     });
 
     // Speed
-    document.getElementById('sgSpeed').addEventListener('change', async (e) => {
+    $bind('sgSpeed', 'change', async (e) => {
       const s = Store.get('settings') || {};
       s.speed = parseFloat(e.target.value);
       Store.set('settings', s);
@@ -3355,7 +3423,7 @@ const SettingsPage = (() => {
     });
 
     // Skip
-    document.getElementById('sgSkip').addEventListener('change', async (e) => {
+    $bind('sgSkip', 'change', async (e) => {
       const s = Store.get('settings') || {};
       s.skipSec = parseInt(e.target.value);
       Store.set('settings', s);
@@ -3363,7 +3431,7 @@ const SettingsPage = (() => {
     });
 
     // Review limit
-    document.getElementById('sgReviewLimit').addEventListener('change', async (e) => {
+    $bind('sgReviewLimit', 'change', async (e) => {
       const s = Store.get('settings') || {};
       s.reviewLimit = parseInt(e.target.value);
       Store.set('settings', s);
@@ -3371,7 +3439,7 @@ const SettingsPage = (() => {
     });
 
     // Export
-    document.getElementById('sgExportBtn').addEventListener('click', async () => {
+    $bind('sgExportBtn', 'click', async () => {
       try {
         const json = await DB.exportJSON();
         const blob = new Blob([json], { type: 'application/json' });
@@ -3388,7 +3456,7 @@ const SettingsPage = (() => {
     });
 
     // Clear
-    document.getElementById('sgClearBtn').addEventListener('click', async () => {
+    $bind('sgClearBtn', 'click', async () => {
       const ok = await Modal.confirm(
         '清除所有資料',
         '此操作將刪除所有課程、碎片、回顧記錄，無法復原。確定繼續嗎？',
@@ -3423,33 +3491,30 @@ const SettingsPage = (() => {
     });
 
     // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
       const badge = document.getElementById('sgInstallBadge');
       if (badge) badge.textContent = '已安裝';
     }
   }
 
-  return { init };
+  return { init: init, load: _loadValues };
 })();
 
+
 const FAB = (() => {
-  let open = false;
-
+  var _open = false;
   function init() {
-    document.getElementById('fab-main').addEventListener('click', toggle);
-    document.getElementById('fab-scrim').addEventListener('click', close);
-    document.querySelectorAll('[data-fab-page]').forEach(btn => {
-      btn.addEventListener('click', () => Router.go(btn.dataset.fabPage));
+    $bind('fab-main',  'click', toggle);
+    $bind('fab-scrim', 'click', close);
+    $qsAll('[data-fab-page]').forEach(function(btn){
+      btn.addEventListener('click', function(){ Router.go(btn.dataset.fabPage); });
     });
-    _updateBadge();
   }
-
-  async function _updateBadge() {
-    try {
-      const due = await DB.Chunks.getDue(999);
-      const btn = document.getElementById('fabReviewBtn');
+  function updateBadge() {
+    DB.Chunks.getDue(999).then(function(due){
+      var btn = document.getElementById('fabReviewBtn');
       if (!btn) return;
-      let badge = btn.querySelector('.due-badge');
+      var badge = btn.querySelector('.due-badge');
       if (due.length > 0) {
         if (!badge) {
           badge = document.createElement('div');
@@ -3457,71 +3522,111 @@ const FAB = (() => {
           btn.style.position = 'relative';
           btn.appendChild(badge);
         }
-        badge.textContent = due.length > 99 ? '99+' : due.length;
-      } else if (badge) {
-        badge.remove();
-      }
-    } catch(e) {}
+        badge.textContent = due.length > 99 ? '99+' : String(due.length);
+      } else if (badge) { badge.parentNode.removeChild(badge); }
+    }).catch(function(){});
   }
-
-  function toggle() { open ? close() : openMenu(); }
-
+  function toggle()   { _open ? close() : openMenu(); }
   function openMenu() {
-    open = true;
-    document.getElementById('fab-wrap').classList.add('open');
-    document.getElementById('fab-scrim').classList.add('show');
-    _updateBadge();
+    _open = true;
+    var fw = document.getElementById('fab-wrap');
+    var fs = document.getElementById('fab-scrim');
+    if (fw) fw.classList.add('open');
+    if (fs) fs.classList.add('show');
+    updateBadge();
   }
-
   function close() {
-    if (!open) return;
-    open = false;
-    document.getElementById('fab-wrap').classList.remove('open');
-    document.getElementById('fab-scrim').classList.remove('show');
+    if (!_open) return;
+    _open = false;
+    var fw = document.getElementById('fab-wrap');
+    var fs = document.getElementById('fab-scrim');
+    if (fw) fw.classList.remove('open');
+    if (fs) fs.classList.remove('show');
   }
-
-  return { init, close, updateBadge: _updateBadge };
+  return { init:init, close:close, updateBadge:updateBadge };
 })();
 
-(async () => {
-  await DB.open();
-  await Store.loadSettings();
-  Modal.init();
-  Router.initNav();
-  FAB.init();
 
-  ImportPage.init();
-  PlayerPage.init();
-  LibraryPage.init();
-  ReviewPage.init();
-  await SettingsPage.init();
-  await HomePage.render();
+// ── Expose to window (fixes onclick= attributes) ──
+window.Toast        = Toast;
+window.Modal        = Modal;
+window.Router       = Router;
+window.FAB          = FAB;
+window.DB           = DB;
+window.Store        = Store;
+window.SRTParser    = SRTParser;
+window.AudioUtils   = AudioUtils;
+window.Spaced       = Spaced;
+window.ChunkFeature = ChunkFeature;
+window.AIFeature    = AIFeature;
+window.WaveformUI   = WaveformUI;
+window.HomePage     = HomePage;
+window.ImportPage   = ImportPage;
+window.PlayerPage   = PlayerPage;
+window.LibraryPage  = LibraryPage;
+window.ReviewPage   = ReviewPage;
+window.SettingsPage = SettingsPage;
 
-  const now = new Date();
-  const dateEl = document.getElementById('homeDate');
-  if (dateEl) {
-    dateEl.textContent = now.toLocaleDateString('zh-TW', {month:'long',day:'numeric',weekday:'short'});
+// ── Boot ──
+(function boot() {
+  // Show app FIRST - before anything else
+  var app = document.getElementById('app');
+  if (app) app.classList.add('ready');
+
+  // Greeting
+  var h = new Date().getHours();
+  var grEl = document.getElementById('greetingLabel');
+  if (grEl) grEl.textContent = h<6?'深夜':h<12?'早安':h<18?'午安':'晚安';
+  var dateEl = document.getElementById('homeDate');
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString('zh-TW',
+    {month:'long',day:'numeric',weekday:'short'});
+
+  // Init each module — isolated, failures don't cascade
+  function safeInit(name, fn) {
+    try { fn(); }
+    catch(e) { console.error('[INIT] ' + name + ':', e.message); }
   }
+  safeInit('Modal',   function(){ Modal.init(); });
+  safeInit('Router',  function(){ Router.initNav(); });
+  safeInit('FAB',     function(){ FAB.init(); });
+  safeInit('Import',  function(){ ImportPage.init(); });
+  safeInit('Player',  function(){ PlayerPage.init(); });
+  safeInit('Library', function(){ LibraryPage.init(); });
+  safeInit('Review',  function(){ ReviewPage.init(); });
 
-  setTimeout(() => {
-    const app = document.getElementById('app');
-    app.classList.add('ready');
-    app.removeAttribute('aria-hidden');
-  }, 2100);
+  // Page callbacks
+  Router.onEnter('home',     function(){ HomePage.render(); FAB.updateBadge(); });
+  Router.onEnter('library',  function(){ LibraryPage.render(); });
+  Router.onEnter('review',   function(){ ReviewPage.render(); });
+  Router.onEnter('import',   function(){ ImportPage.reset(); });
+  Router.onEnter('settings', function(){ if(SettingsPage.load) SettingsPage.load(); });
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
-  }
+  // Global click delegation
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    var arg    = btn.dataset.arg;
+    if (action === 'go'          && arg) Router.go(arg);
+    if (action === 'back')               Router.back();
+    if (action === 'review-back')        ReviewPage.backToDashboard();
+  });
 
-  const goto = new URLSearchParams(location.search).get('goto');
-  if (goto && ['review','import','library','settings'].includes(goto)) {
-    setTimeout(() => Router.go(goto), 2400);
-  }
-
-  Router.onEnter('home',    () => { HomePage.render(); FAB._updateBadge && FAB._updateBadge(); });
-  Router.onEnter('library', () => LibraryPage.render());
-  Router.onEnter('review',  () => ReviewPage.render());
-  Router.onEnter('import',  () => ImportPage.reset());
+  // Async data load — UI already visible
+  (async function() {
+    try {
+      await DB.open();
+      await Store.loadSettings();
+      safeInit('Settings', function(){ SettingsPage.init(); });
+      await HomePage.render();
+      FAB.updateBadge();
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(function(){});
+      }
+    } catch(e) {
+      console.error('[DATA]', e);
+    }
+  })();
 })();
 
 </script>
