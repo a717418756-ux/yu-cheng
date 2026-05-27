@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0c10">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>KnowledgeForce</title>
+<link rel="stylesheet" href="loading.css">
+<link rel="stylesheet" href="app.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () =>
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('[SW] registered', r.scope))
+      .catch(e => console.warn('[SW] failed', e))
+  );
+}
+</script>
+</head>
+<body>
+
+<!-- ══ SPLASH ═══════════════════════════════════════════════ -->
+<div id="splash">
+  <!-- Ambient background -->
+  <div class="ld-bg">
+    <div class="ld-bg-orb ld-bg-orb-1"></div>
+    <div class="ld-bg-orb ld-bg-orb-2"></div>
+    <div class="ld-bg-orb ld-bg-orb-3"></div>
+  </div>
+  <div class="ld-grain"></div>
+
+  <!-- Rotating rings + glassy core -->
+  <div class="ld-stage">
+    <div class="ld-ring-outer"></div>
+    <div class="ld-ring-inner"></div>
+    <div class="ld-dots">
+      <div class="ld-dot ld-dot-1"></div>
+      <div class="ld-dot ld-dot-2"></div>
+      <div class="ld-dot ld-dot-3"></div>
+    </div>
+    <div class="ld-spark ld-spark-1"></div>
+    <div class="ld-spark ld-spark-2"></div>
+    <div class="ld-spark ld-spark-3"></div>
+    <div class="ld-core">
+      <div class="ld-icon">⚖️</div>
+    </div>
+  </div>
+
+  <!-- Title & subtitle -->
+  <div class="ld-text">
+    <div class="ld-title">KnowledgeForce</div>
+    <div class="ld-divider"></div>
+    <div class="ld-sub">智慧學習作戰平台</div>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="ld-progress">
+    <div class="ld-bar-track">
+      <div class="ld-bar-fill" id="splashProg"></div>
+    </div>
+    <div class="ld-pct" id="splashPct">0%</div>
+  </div>
+
+  <!-- Bottom tagline -->
+  <div class="ld-tagline">
+    <div class="ld-tag-dot"></div>
+    <div class="ld-tagline-text">學習 × 成長 × 行動 × 實現</div>
+    <div class="ld-tag-dot"></div>
+  </div>
+</div>
+
+<!-- ══ APP ══════════════════════════════════════════════════ -->
+<div id="app">
+  <div class="page-wrap">
+
+    <!-- ═══════════════════ HOME ═══════════════════ -->
+    <div class="page active" id="page-home">
+      <!-- Header -->
+      <div class="home-header">
+        <div class="greet-label" id="greetLabel">早安</div>
+        <div class="greet-name" id="greetName" onclick="editMottoPrompt()">加油</div>
+        <div class="home-motto" id="homeMotto"></div>
+        <div class="home-date" id="homeDate"></div>
+        <div id="homeCountdown" style="display:none">
+          <div class="countdown-pill">
+            <span>⏱ 距離</span>
+            <span id="cdExamName">考試</span>
+            <span>還有</span>
+            <span class="countdown-days" id="cdDays">—</span>
+            <span>天</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section Tabs -->
+      <div class="section-tabs">
+        <div class="sec-tab active" id="tab-study" data-section="study" role="tab" aria-selected="true">
+          <div class="ic">🎧</div>
+          <div class="tl">學習區</div>
+          <div class="ds">課程・碎片・複習</div>
+        </div>
+        <div class="sec-tab" id="tab-exam" data-section="exam" role="tab" aria-selected="false">
+          <div class="ic">📋</div>
+          <div class="tl">考試區</div>
+          <div class="ds">題庫・測驗・法條</div>
+        </div>
+      </div>
+
+      <!-- ─── STUDY PANEL ─── -->
+      <div id="study-panel" class="active">
+        <!-- Stats -->
+        <div class="stat-grid" id="studyStats">
+          <div class="stat-card"><div class="stat-val" id="sStat0">0</div><div class="stat-lbl">今日回顧</div></div>
+          <div class="stat-card"><div class="stat-val" id="sStat1">0</div><div class="stat-lbl">連續天數</div></div>
+          <div class="stat-card"><div class="stat-val" id="sStat2">0</div><div class="stat-lbl">待複習</div></div>
+          <div class="stat-card"><div class="stat-val" id="sStat3">0</div><div class="stat-lbl">課程數</div></div>
+        </div>
+
+        <!-- My Courses -->
+        <div class="sec-head">
+          <div class="sec-title">我的課程</div>
+        </div>
+        <div id="courseList">
+          <div class="empty">
+            <div class="ic">🎧</div>
+            <div class="empty-title">尚無課程</div>
+            <div class="empty-desc">點右下角 + 匯入第一堂課</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── EXAM PANEL ─── -->
+      <div id="exam-panel">
+        <!-- Stats -->
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-val" id="eStat0">0</div><div class="stat-lbl">今日刷題</div></div>
+          <div class="stat-card"><div class="stat-val" id="eStat1">—</div><div class="stat-lbl">今日正確率</div></div>
+          <div class="stat-card"><div class="stat-val" id="eStat2">0</div><div class="stat-lbl">題庫總數</div></div>
+          <div class="stat-card"><div class="stat-val" id="eStat3">0</div><div class="stat-lbl">待複習題</div></div>
+        </div>
+
+        <!-- Start Exam Button -->
+        <div style="padding:12px 16px">
+          <button class="qb" style="width:100%;flex-direction:row;min-height:56px;border-color:rgba(232,201,107,.2);background:linear-gradient(135deg,rgba(232,201,107,.06),rgba(88,180,255,.03))"
+            onclick="openExamMenu()">
+            <div class="ic" style="font-size:22px">⚡</div>
+            <div style="flex:1;text-align:left;margin-left:4px">
+              <div class="ql" style="font-size:14px;color:var(--gold)">開始測驗</div>
+              <div class="qs">選擇模式・科目篩選・立即開刷</div>
+            </div>
+            <div style="color:var(--t3);font-size:16px">›</div>
+          </button>
+        </div>
+
+        <!-- Quick Modes -->
+        <div class="qb-grid">
+          <button class="qb" onclick="goKfPage('page-pg-list')">
+            <div class="ic">🔍</div><div class="ql">題目/資料閱覽</div><div class="qs">題目篩選・法條查閱</div>
+          </button>
+          <button class="qb" onclick="goKfPage('page-pg-stats')">
+            <div class="ic">📊</div><div class="ql">分析統計</div><div class="qs">正確率・AI 匯出</div>
+          </button>
+        </div>
+
+        <!-- Today's Tasks -->
+        <div id="todayTasksExam" style="display:none">
+          <div class="sec-head"><div class="sec-title">今日任務</div></div>
+          <div id="taskListExam"></div>
+        </div>
+      </div>
+    </div><!-- /page-home -->
+
+    <!-- ═══════════════════ IMPORT (Learning) ═══════════════════ -->
+    <div class="page" id="page-import">
+      <div class="page-bar">
+        <button class="back-btn" data-action="back">‹</button>
+        <div class="page-bar-title">匯入課程</div>
+      </div>
+
+      <!-- Step 1: Audio -->
+      <div class="imp-section">
+        <div class="imp-row">
+          <div class="imp-num">1</div>
+          <div class="imp-row-label">音訊檔案</div>
+          <div class="req-badge">必填</div>
+        </div>
+        <label for="audioInput">
+          <div class="drop-zone" id="audioDropUI">
+            <div class="drop-zone-icon">🎵</div>
+            <div class="drop-zone-label">點擊選擇音訊檔案</div>
+            <div class="drop-zone-sub">MP3 · WAV · M4A · OGG · FLAC</div>
+          </div>
+        </label>
+        <input type="file" id="audioInput" accept="audio/*" style="display:none">
+        <audio id="audioPreview" style="display:none"></audio>
+        <div id="audioFileList"></div>
+      </div>
+
+      <!-- Step 2: Pages -->
+      <div class="imp-section">
+        <div class="imp-row">
+          <div class="imp-num">2</div>
+          <div class="imp-row-label">投影片圖片</div>
+          <div class="opt-badge">選填</div>
+        </div>
+        <label for="pagesInput">
+          <div class="drop-zone">
+            <div class="drop-zone-icon">🖼</div>
+            <div class="drop-zone-label">點擊選擇投影片圖片（可多選）</div>
+            <div class="drop-zone-sub">JPG · PNG · WEBP</div>
+          </div>
+        </label>
+        <input type="file" id="pagesInput" accept="image/*" multiple style="display:none">
+        <div id="pagesFileList"></div>
+      </div>
+
+      <!-- Step 3: Info -->
+      <div class="imp-section">
+        <div class="imp-row">
+          <div class="imp-num">3</div>
+          <div class="imp-row-label">課程資訊</div>
+          <div class="req-badge">必填</div>
+        </div>
+        <div class="fi-group">
+          <label class="fi-label">課程名稱</label>
+          <input class="fi allow-select" id="impTitle" placeholder="例：警察法規總整理">
+        </div>
+        <div class="fi-group">
+          <label class="fi-label">課程描述</label>
+          <textarea class="fi allow-select" id="impDesc" rows="2" placeholder="選填" style="resize:none"></textarea>
+        </div>
+        <div class="fi-group">
+          <label class="fi-label">標籤</label>
+          <input class="fi allow-select" id="impTagInput" placeholder="按 Enter 新增標籤">
+          <div id="impTagList" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>
+        </div>
+        <button class="btn-gold" id="btnCreateCourse" disabled style="width:100%;padding:14px;border-radius:12px;font-size:15px;font-weight:700;margin-top:4px">
+          建立課程
+        </button>
+      </div>
+
+      <!-- Image Preview Overlay -->
+      <div id="imgPrevOv" onclick="this.classList.remove('open')">
+        <img id="imgPrevEl" src="" alt="">
+      </div>
+    </div><!-- /page-import -->
+
+    <!-- ═══════════════════ PLAYER ═══════════════════ -->
+    <div class="page" id="page-player">
+      <div class="page-bar" style="background:transparent;border:none;position:relative">
+        <button class="back-btn" data-action="back">‹</button>
+        <div class="page-bar-title" id="playerBarTitle">課程播放</div>
+      </div>
+      <!-- Art -->
+      <div class="player-art">
+        <div class="player-art-bg"></div>
+        <div class="player-art-icon">🎧</div>
+        <img id="playerPageImg" class="player-page-img" src="" alt="" style="display:none">
+      </div>
+      <!-- Slides -->
+      <div class="player-thumb-strip" id="playerThumbStrip"></div>
+      <!-- Info -->
+      <div class="player-info">
+        <div class="player-title" id="playerTitle">—</div>
+        <div class="player-meta" id="playerMeta"></div>
+      </div>
+      <!-- Waveform -->
+      <div class="waveform-wrap">
+        <canvas id="waveform" height="56"></canvas>
+      </div>
+      <div class="player-time">
+        <span id="playerCur">0:00</span>
+        <span id="playerDur">0:00</span>
+      </div>
+      <!-- Controls -->
+      <div class="player-controls">
+        <button class="ctrl-btn" id="btnSkipB" title="後退">⏮</button>
+        <button class="ctrl-btn" id="btnBack10">−10s</button>
+        <button class="ctrl-play" id="btnPlay">▶</button>
+        <button class="ctrl-btn" id="btnFwd10">+10s</button>
+        <button class="ctrl-btn" id="btnSkipF">⏭</button>
+      </div>
+      <!-- Speed -->
+      <div class="speed-row" id="speedRow">
+        <span style="font-size:11px;color:var(--t3)">速度：</span>
+        <button class="speed-btn" data-spd="0.75">0.75×</button>
+        <button class="speed-btn on" data-spd="1">1×</button>
+        <button class="speed-btn" data-spd="1.25">1.25×</button>
+        <button class="speed-btn" data-spd="1.5">1.5×</button>
+        <button class="speed-btn" data-spd="2">2×</button>
+      </div>
+      <!-- Chunks -->
+      <div class="sec-head"><div class="sec-title">知識碎片</div></div>
+      <div id="chunkList"></div>
+    </div><!-- /page-player -->
+
+    <!-- ═══════════════════ SNIPPET LIBRARY ═══════════════════ -->
+    <div class="page" id="page-s-library">
+      <div class="page-bar">
+        <div class="page-bar-title">碎片庫</div>
+      </div>
+      <div style="padding:10px 16px">
+        <input class="fi allow-select" id="sLibSearch" placeholder="搜尋碎片..." style="width:100%">
+      </div>
+      <div class="chip-row" style="margin-bottom:10px">
+        <button class="chip on" id="slib-all">全部</button>
+        <button class="chip" id="slib-due">待複習</button>
+        <button class="chip" id="slib-done">已掌握</button>
+      </div>
+      <div id="slibList">
+        <div class="empty"><div class="ic">💡</div><div class="empty-title">暫無碎片</div><div class="empty-desc">在學習艙中截取碎片</div></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ REVIEW ═══════════════════ -->
+    <div class="page" id="page-review">
+      <div class="page-bar"><div class="page-bar-title">間隔複習</div></div>
+      <div style="padding:32px 16px;display:flex;flex-direction:column;align-items:center;gap:20px">
+        <div class="review-circle" style="--prog:0%">
+          <div class="review-num" id="revDue">0</div>
+          <div class="review-sub">待複習</div>
+        </div>
+        <div class="stat-grid" style="width:100%">
+          <div class="stat-card" style="grid-column:span 1"><div class="stat-val" id="revToday">0</div><div class="stat-lbl">今日已複習</div></div>
+          <div class="stat-card" style="grid-column:span 1"><div class="stat-val" id="revStreak">0</div><div class="stat-lbl">連續天數</div></div>
+          <div class="stat-card" style="grid-column:span 2"><div class="stat-val" id="revTotal">0</div><div class="stat-lbl">碎片總數</div></div>
+        </div>
+      </div>
+      <div class="sec-head"><div class="sec-title">學習熱力圖</div></div>
+      <div class="heatmap" id="heatmap"></div>
+      <div style="padding:16px">
+        <button class="btn-gold" onclick="ReviewPage.start()" style="width:100%;padding:14px;border-radius:12px;font-size:15px;font-weight:700">開始複習</button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ EXAM IMPORT (PE) ═══════════════════ -->
+    <div class="page" id="page-exam-import">
+      <div class="page-bar">
+        <button class="back-btn" data-action="back">‹</button>
+        <div class="page-bar-title">匯入題目</div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="chip-row" style="margin:10px 0 0">
+        <button class="chip on" id="eitab-single" onclick="switchEiTab('single',this)">單題新增</button>
+        <button class="chip" id="eitab-bulk" onclick="switchEiTab('bulk',this)">大量貼題</button>
+        <button class="chip" id="eitab-json" onclick="switchEiTab('json',this)">JSON備份</button>
+      </div>
+
+      <!-- Single Add -->
+      <div id="ei-single" style="padding:16px">
+        <div class="fi-group">
+          <label class="fi-label">題目類型</label>
+          <div style="display:flex;gap:8px">
+            <button class="chip on" id="qt-mc" onclick="peSetQT('mc')">✅ 選擇題</button>
+            <button class="chip" id="qt-es" onclick="peSetQT('es')">📝 申論題</button>
+          </div>
+        </div>
+        <div class="fi-group">
+          <label class="fi-label">題幹 *</label>
+          <textarea class="fi allow-select" id="qstemInput" rows="3" placeholder="請輸入題目內容..." style="resize:none"></textarea>
+        </div>
+        <div id="opts-wrap">
+          <label class="fi-label">選項</label>
+          <div class="fi-group" style="display:flex;gap:6px;align-items:center"><span style="width:22px;color:var(--gold);font-weight:700;flex-shrink:0">A</span><input class="fi allow-select" id="optA" placeholder="選項 A"></div>
+          <div class="fi-group" style="display:flex;gap:6px;align-items:center"><span style="width:22px;color:var(--gold);font-weight:700;flex-shrink:0">B</span><input class="fi allow-select" id="optB" placeholder="選項 B"></div>
+          <div class="fi-group" style="display:flex;gap:6px;align-items:center"><span style="width:22px;color:var(--gold);font-weight:700;flex-shrink:0">C</span><input class="fi allow-select" id="optC" placeholder="選項 C"></div>
+          <div class="fi-group" style="display:flex;gap:6px;align-items:center"><span style="width:22px;color:var(--gold);font-weight:700;flex-shrink:0">D</span><input class="fi allow-select" id="optD" placeholder="選項 D"></div>
+          <div class="fi-group">
+            <label class="fi-label">正確答案</label>
+            <input class="fi allow-select" id="answerInput" placeholder="例：A 或 ACD（複選）" style="text-transform:uppercase">
+          </div>
+        </div>
+        <div id="es-wrap" style="display:none">
+          <div class="fi-group">
+            <label class="fi-label">參考解析</label>
+            <textarea class="fi allow-select" id="answerEs" rows="4" placeholder="申論題參考答案..." style="resize:none"></textarea>
+          </div>
+        </div>
+        <div class="bi-meta">
+          <div class="fi-group"><label class="fi-label">科目</label><input class="fi allow-select" id="subInput" list="bi-subs" placeholder="警察法規"></div>
+          <div class="fi-group"><label class="fi-label">年度</label><input class="fi allow-select" id="yrInput" placeholder="114"></div>
+          <div class="fi-group"><label class="fi-label">考試別</label><input class="fi allow-select" id="exInput" placeholder="警佐二類"></div>
+          <div class="fi-group"><label class="fi-label">題號</label><input class="fi allow-select" id="numInput" placeholder="1" type="number"></div>
+        </div>
+        <datalist id="bi-subs"></datalist>
+        <div class="fi-group">
+          <label class="fi-label">備註</label>
+          <input class="fi allow-select" id="noteInput" placeholder="選填">
+        </div>
+        <div id="ei-edit-info" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:8px;background:var(--amb2);border:1px solid var(--amb);font-size:12px;color:var(--amb)">
+          ✏ 編輯模式中
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-ghost" onclick="resetEiForm()" style="flex:1">清除</button>
+          <button class="btn-gold" onclick="saveQ()" style="flex:2;padding:13px;border-radius:12px;font-size:14px;font-weight:700">儲存題目</button>
+        </div>
+      </div>
+
+      <!-- Bulk -->
+      <div id="ei-bulk" style="display:none;padding:16px">
+        <div class="bi-meta">
+          <div class="fi-group"><label class="fi-label">科目</label><input class="fi allow-select" id="bi-sub" list="bi-subs2" placeholder="警察法規"></div>
+          <div class="fi-group"><label class="fi-label">年度</label><input class="fi allow-select" id="bi-yr" placeholder="114"></div>
+          <div class="fi-group"><label class="fi-label">考試別</label><input class="fi allow-select" id="bi-ex" placeholder="警佐二類"></div>
+          <div class="fi-group"><label class="fi-label">答案串</label><input class="fi allow-select" id="bi-ans" placeholder="ABCDA..."></div>
+          <div class="fi-group"><label class="fi-label">編</label><input class="fi allow-select" id="bi-part" placeholder="第一編"></div>
+          <div class="fi-group"><label class="fi-label">章</label><input class="fi allow-select" id="bi-chapter" placeholder="第一章"></div>
+        </div>
+        <datalist id="bi-subs2"></datalist>
+        <div class="fi-group">
+          <label class="fi-label">節</label>
+          <input class="fi allow-select" id="bi-section" placeholder="第一節">
+        </div>
+        <div class="fi-group">
+          <label class="fi-label">題目文字（貼上整段）</label>
+          <textarea class="fi allow-select" id="bi-text" rows="8" placeholder="直接貼上考卷OCR文字..." style="resize:none"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button class="btn-ghost" onclick="clearBulk()" style="flex:1">清除</button>
+          <button class="btn-gold" onclick="parseBulk()" style="flex:2;padding:13px;border-radius:12px;font-size:14px;font-weight:700">解析題目</button>
+        </div>
+        <div id="bulk-result" class="hide">
+          <div id="bulk-stats" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px"></div>
+          <div id="prev-list"></div>
+          <button class="btn-gold" onclick="importBulk()" style="width:100%;padding:13px;border-radius:12px;font-size:14px;font-weight:700;margin-top:8px">
+            確認匯入
+          </button>
+        </div>
+      </div>
+
+      <!-- JSON -->
+      <div id="ei-json" style="display:none;padding:16px">
+        <div class="set-section">
+          <div class="set-row">
+            <div class="set-icon" style="background:rgba(74,222,128,.1)">📥</div>
+            <div class="set-info"><div class="set-label">匯入 JSON 備份</div><div class="set-desc">題目不重複寫入</div></div>
+            <label for="jsonImpInput" style="cursor:pointer;font-size:13px;color:var(--sky);font-weight:600">匯入</label>
+            <input type="file" id="jsonImpInput" accept=".json" style="display:none" onchange="impJSON(event)">
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-exam-import -->
+
+    <!-- ═══════════════════ Q LIBRARY (PE) ═══════════════════ -->
+    <div class="page" id="page-q-library">
+      <div class="page-bar" style="gap:6px">
+        <div class="page-bar-title">題目管理</div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="hd-btn bg" onclick="openBulkImportQ()">📋 大量匯入</button>
+          <button class="hd-btn red" onclick="openBulkDelQ()">🗑 大量刪除</button>
+          <button class="hd-btn blue plus" onclick="showAddQ()">＋</button>
+        </div>
+      </div>
+      <div style="padding:8px 16px">
+        <input class="fi allow-select" id="si" type="search" placeholder="搜尋題目、科目、關鍵字..." style="width:100%" oninput="_debouncedRenderList()">
+      </div>
+      <div class="chip-row" style="margin-bottom:8px">
+        <button class="chip on" onclick="setF('all',this)">全部</button>
+        <button class="chip" onclick="setF('mc',this)">選擇題</button>
+        <button class="chip" onclick="setF('es',this)">申論題</button>
+        <button class="chip" onclick="setF('wrong',this)">錯題</button>
+        <button class="chip" onclick="setF('star',this)">收藏</button>
+      </div>
+      <div class="chip-row" id="schips" style="margin-bottom:8px"></div>
+      <div style="padding:0 16px;font-size:12px;color:var(--t3)">共 <span id="lc">0</span> 題</div>
+      <div id="qlist" style="padding:8px 0"></div>
+    </div>
+
+    <!-- ═══════════════════ DB / LAW LIBRARY ═══════════════════ -->
+    <div class="page" id="page-pg-db">
+      <div class="page-bar" style="gap:6px">
+        <div class="page-bar-title">資料庫</div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="hd-btn bg" onclick="openLawSortMenu()">⇅ 排序</button>
+          <button class="hd-btn bg" onclick="showBulkLaw()">批次匯入</button>
+          <button class="hd-btn red" onclick="openBulkDelLaw()">🗑 大量刪除</button>
+          <button class="hd-btn blue plus" onclick="showAddLaw()">＋</button>
+        </div>
+      </div>
+      <div style="padding:8px 16px">
+        <input class="fi allow-select" id="lsi" type="search" placeholder="搜尋法規名稱、條號§條號、關鍵字..." style="width:100%" oninput="_debouncedRenderDB()">
+      </div>
+      <div class="chip-row" style="margin-bottom:8px" id="lchips">
+        <button class="chip on" onclick="setLC(this,'all')">全部</button>
+        <button class="chip" onclick="setLC(this,'statute')">法規條文</button>
+        <button class="chip" onclick="setLC(this,'sop')">SOP</button>
+        <button class="chip" onclick="setLC(this,'supplement')">補充資料</button>
+        <button class="chip" onclick="setLC(this,'interpretation')">函釋</button>
+      </div>
+      <div style="font-size:11px;color:var(--t2);padding:4px 16px" id="db-lc"></div>
+      <div id="llist"></div>
+    </div>
+
+    <!-- ═══════════════════ STATS ═══════════════════ -->
+    <div class="page" id="page-pg-stats">
+      <div class="page-bar">
+        <div class="page-bar-title">分析 &amp; AI 匯出</div>
+      </div>
+
+      <!-- 頁籤 -->
+      <div class="chip-row" style="margin:8px 0 12px">
+        <button class="chip on" id="stab-overview" onclick="switchStatTab('overview',this)">📊 總覽</button>
+        <button class="chip" id="stab-export" onclick="switchStatTab('export',this)">📋 匯出給 AI</button>
+        <button class="chip" id="stab-ai" onclick="switchStatTab('ai',this)">🤖 AI 分析</button>
+      </div>
+
+      <!-- ── 總覽面板 ── -->
+      <div id="stat-overview-panel">
+        <div class="stat-grid" style="margin-bottom:16px">
+          <div class="stat-card"><div class="stat-val" id="st-q">0</div><div class="stat-lbl">總題數</div></div>
+          <div class="stat-card"><div class="stat-val" id="st-a">0</div><div class="stat-lbl">總作答</div></div>
+          <div class="stat-card" style="grid-column:span 2"><div class="stat-val" id="st-r">—</div><div class="stat-lbl">正確率</div></div>
+        </div>
+        <div class="sec-head"><div class="sec-title">📊 各科正確率</div></div>
+        <div style="padding:0 16px 12px" id="subj-bars"></div>
+        <div class="sec-head"><div class="sec-title">📅 近7天練習量</div></div>
+        <div style="padding:0 16px 12px;height:160px"><canvas id="dchart"></canvas></div>
+        <div class="sec-head"><div class="sec-title">🎯 危險等級分佈</div></div>
+        <div style="padding:0 16px 12px" id="wrong-subs"></div>
+        <div class="sec-head"><div class="sec-title">🔑 高頻錯誤關鍵字</div></div>
+        <div style="padding:0 16px 20px;display:flex;flex-wrap:wrap;gap:6px" id="kw-cloud"></div>
+      </div>
+
+      <!-- ── 匯出給 AI 面板 ── -->
+      <div id="stat-export-panel" style="display:none;padding:0 16px 20px">
+        <div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:14px;padding:12px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2)">
+          💡 選擇匯出內容後，點「產生摘要文字」，複製後直接貼給 Claude / ChatGPT，請 AI 分析弱點、出考題或擬複習計畫。
+        </div>
+
+        <!-- 匯出選項 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+          <label class="export-opt-card" id="eopt-wrong">
+            <input type="checkbox" id="eo-wrong" checked onchange="updateExportPreview()">
+            <div class="eopt-icon">❌</div>
+            <div class="eopt-label">錯題清單</div>
+            <div class="eopt-desc">連錯 2 次以上</div>
+          </label>
+          <label class="export-opt-card" id="eopt-weak">
+            <input type="checkbox" id="eo-weak" checked onchange="updateExportPreview()">
+            <div class="eopt-icon">📉</div>
+            <div class="eopt-label">最弱科目</div>
+            <div class="eopt-desc">錯誤次數排行</div>
+          </label>
+          <label class="export-opt-card" id="eopt-kw">
+            <input type="checkbox" id="eo-kw" checked onchange="updateExportPreview()">
+            <div class="eopt-icon">🔑</div>
+            <div class="eopt-label">高頻關鍵字</div>
+            <div class="eopt-desc">常錯的概念詞</div>
+          </label>
+          <label class="export-opt-card" id="eopt-stem">
+            <input type="checkbox" id="eo-stem" onchange="updateExportPreview()">
+            <div class="eopt-icon">📝</div>
+            <div class="eopt-label">錯題題幹</div>
+            <div class="eopt-desc">含完整題目</div>
+          </label>
+        </div>
+
+        <!-- 題數限制 -->
+        <div class="fi-group">
+          <label class="fi-label">錯題數量上限</label>
+          <div style="display:flex;gap:8px">
+            <button class="chip on" id="elim-10" onclick="setExportLimit(10,this)">10 題</button>
+            <button class="chip" id="elim-20" onclick="setExportLimit(20,this)">20 題</button>
+            <button class="chip" id="elim-50" onclick="setExportLimit(50,this)">50 題</button>
+            <button class="chip" id="elim-all" onclick="setExportLimit(0,this)">全部</button>
+          </div>
+        </div>
+
+        <button onclick="buildExportText()" style="width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,var(--sky),#3b82f6);color:#fff;font-size:14px;font-weight:700;border:none;margin-bottom:12px">
+          ⚡ 產生摘要文字
+        </button>
+
+        <!-- 預覽 & 複製 -->
+        <div id="export-result" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:12px;font-weight:700;color:var(--t2)">已產生 <span id="export-char-count">0</span> 字</div>
+            <button onclick="copyExportText()" class="set-action-btn set-action-sky" style="padding:6px 14px;font-size:12px">複製全文</button>
+          </div>
+          <div style="position:relative">
+            <textarea id="export-textarea" class="fi allow-select" rows="12"
+              style="resize:none;font-size:12px;line-height:1.7;font-family:monospace;padding:12px;background:var(--bg1);border-color:rgba(88,180,255,.2)"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button onclick="dlExportText()" class="set-action-btn set-action-grn" style="flex:1;padding:10px;border-radius:10px;font-size:12px;text-align:center">⬇ 下載 .txt</button>
+            <button onclick="dlExportJson()" class="set-action-btn set-action-pur" style="flex:1;padding:10px;border-radius:10px;font-size:12px;text-align:center">⬇ 下載 .json</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── AI 分析面板（呼叫 API）── -->
+      <div id="stat-ai-panel" style="display:none;padding:0 16px 20px">
+        <div style="padding:12px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2);margin-bottom:14px;font-size:13px;color:var(--t2);line-height:1.7">
+          🤖 使用設定頁的 AI API Key，直接呼叫 AI 取得弱點分析報告。需要先在「設定」頁儲存 API Key。
+        </div>
+        <div class="fi-group">
+          <label class="fi-label">分析模型</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="chip on" id="aimodel-claude" onclick="setAIModel('claude-sonnet-4-20250514',this)">Claude Sonnet</button>
+            <button class="chip" id="aimodel-haiku" onclick="setAIModel('claude-haiku-4-5-20251001',this)">Claude Haiku</button>
+          </div>
+        </div>
+        <button onclick="buildAI()" id="ai-call-btn" style="width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,var(--pur));color:#fff;font-size:14px;font-weight:700;border:none;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px">
+          <span id="ai-call-icon">✨</span> <span id="ai-call-label">呼叫 AI 分析</span>
+        </button>
+        <div id="ai-out" class="ai-out hide">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:700;color:var(--sky)">AI 弱點分析報告</div>
+            <button onclick="copyAI()" class="set-action-btn set-action-sky" style="padding:5px 12px;font-size:11px">複製</button>
+          </div>
+          <pre class="ai-pre" id="ai-md"></pre>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button onclick="dlAI('md')" class="set-action-btn set-action-grn" style="flex:1;padding:9px;border-radius:10px;font-size:12px;text-align:center">⬇ 下載 MD</button>
+            <button onclick="dlAI('json')" class="set-action-btn set-action-pur" style="flex:1;padding:9px;border-radius:10px;font-size:12px;text-align:center">⬇ 下載 JSON</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ BROWSE LIST ═══════════════════ -->
+    <div class="page" id="page-pg-list">
+      <div class="page-bar">
+        <div class="page-bar-title">題目/資料閱覽</div>
+      </div>
+      <!-- Tab 切換 -->
+      <div class="chip-row" style="margin:8px 0 4px">
+        <button class="chip on" id="tab-q-browse" onclick="switchBrowseTab('q',this)">📝 題目</button>
+        <button class="chip" id="tab-d-browse" onclick="switchBrowseTab('d',this)">📄 資料</button>
+      </div>
+
+      <!-- 題目面板 -->
+      <div id="browse-q-panel">
+        <!-- 題型篩選 -->
+        <div class="chip-row" id="bq-type-chips" style="margin-bottom:6px">
+          <button class="chip on" onclick="setBrowseQType('all',this)">全部</button>
+          <button class="chip" onclick="setBrowseQType('mc',this)">選擇題</button>
+          <button class="chip" onclick="setBrowseQType('es',this)">申論題</button>
+        </div>
+        <!-- 科目篩選（動態） -->
+        <div class="chip-row" id="bq-sub-chips" style="margin-bottom:6px"></div>
+        <!-- 年度篩選（動態） -->
+        <div class="chip-row" id="bq-year-chips" style="margin-bottom:6px"></div>
+        <div style="padding:0 16px 6px">
+          <input class="fi allow-select" id="bq-search" placeholder="搜尋題目、年度、科目..." style="width:100%" oninput="debounce(renderInlineList,200)()">
+        </div>
+        <div style="padding:0 16px 4px;font-size:12px;color:var(--t3)">共 <span id="bq-count">0</span> 題</div>
+        <div id="bq-list" style="padding:4px 0"></div>
+      </div>
+
+      <!-- 資料面板 -->
+      <div id="browse-d-panel" style="display:none">
+        <!-- 類別篩選 -->
+        <div class="chip-row" id="bd-cat-chips" style="margin-bottom:6px">
+          <button class="chip on" onclick="setBrowseLawCat('all',this)">全部</button>
+          <button class="chip" onclick="setBrowseLawCat('statute',this)">法規條文</button>
+          <button class="chip" onclick="setBrowseLawCat('sop',this)">SOP</button>
+          <button class="chip" onclick="setBrowseLawCat('supplement',this)">補充資料</button>
+          <button class="chip" onclick="setBrowseLawCat('interpretation',this)">函釋</button>
+        </div>
+        <!-- 法律名稱篩選（動態） -->
+        <div class="chip-row" id="bd-law-chips" style="margin-bottom:6px"></div>
+        <div style="padding:0 16px 6px">
+          <input class="fi allow-select" id="bd-search" placeholder="搜尋法條內容、條號..." style="width:100%" oninput="debounce(renderInlineLawList,200)()">
+        </div>
+        <div style="padding:0 16px 4px;font-size:12px;color:var(--t3)">共 <span id="bd-count">0</span> 條</div>
+        <div id="bd-list" style="padding:4px 0"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ GROUPS ═══════════════════ -->
+    <div class="page" id="page-pg-groups">
+      <div class="page-bar"><div class="page-bar-title">概念群組</div></div>
+      <div id="groups-list" style="padding:8px 0"></div>
+    </div>
+
+    <!-- ═══════════════════ SETTINGS ═══════════════════ -->
+    <div class="page" id="page-settings">
+      <div class="page-bar"><div class="page-bar-title">設定</div></div>
+
+      <!-- Exam settings -->
+      <div class="set-section">
+        <div class="set-row">
+          <div class="set-icon" style="background:rgba(248,113,113,.1)">🎯</div>
+          <div class="set-info"><div class="set-label" id="setExamName">警察升官等</div><div class="set-desc">考試名稱</div></div>
+        </div>
+        <div style="padding:10px 16px">
+          <input class="fi allow-select" id="examNameInput" placeholder="警佐二類升官等考試" style="margin-bottom:8px">
+          <input type="date" class="fi allow-select" id="examDateInput" style="margin-bottom:8px">
+          <button class="btn-gold" onclick="saveExamSettings()" style="width:100%;padding:11px;border-radius:10px;font-size:14px;font-weight:700">儲存考試設定</button>
+        </div>
+        <div class="set-row">
+          <div class="set-icon" style="background:rgba(88,180,255,.1)">🤖</div>
+          <div class="set-info"><div class="set-label">AI API Key</div><div class="set-desc">Claude / OpenAI 等 AI 解析功能</div></div>
+        </div>
+        <div style="padding:10px 16px">
+          <input class="fi allow-select" id="apiKeyInput" type="password" placeholder="sk-ant-... / sk-..." style="margin-bottom:8px">
+          <button class="btn-gold" onclick="saveApiKey()" style="width:100%;padding:11px;border-radius:10px;font-size:14px;font-weight:700">儲存 API Key</button>
+        </div>
+      </div>
+
+      <!-- Export / Import -->
+      <div class="set-section-title">備份與還原</div>
+      <div class="set-section">
+        <div class="set-row">
+          <div class="set-icon" style="background:rgba(74,222,128,.1)">📤</div>
+          <div class="set-info">
+            <div class="set-label">匯出完整備份 JSON</div>
+            <div class="set-desc" id="exp-info">0 題・0 條・0 筆</div>
+          </div>
+          <button class="set-action-btn set-action-grn" onclick="event.stopPropagation();expJSON()">匯出</button>
+        </div>
+        <div class="set-row">
+          <div class="set-icon" style="background:rgba(88,180,255,.1)">📥</div>
+          <div class="set-info"><div class="set-label">匯入 JSON 備份</div><div class="set-desc">題目不重複寫入</div></div>
+          <label for="jsonImpInput2" style="cursor:pointer;margin:0;display:flex;align-items:center">
+            <span class="set-action-btn set-action-sky">匯入</span>
+          </label>
+          <input type="file" id="jsonImpInput2" accept=".json" style="display:none" onchange="impJSON(event)">
+        </div>
+        <div class="set-row">
+          <div class="set-icon" style="background:rgba(167,139,250,.1)">📄</div>
+          <div class="set-info"><div class="set-label">匯出錯題 HTML</div><div class="set-desc">可列印複習卷</div></div>
+          <button class="set-action-btn set-action-pur" onclick="event.stopPropagation();expWrong()">匯出</button>
+        </div>
+      </div>
+
+      <!-- Google Drive Cloud Sync -->
+      <div class="set-section-title">☁ Google 雲端同步</div>
+      <div class="gd-card">
+        <div class="gd-card-title">
+          <svg width="18" height="18" viewBox="0 0 87.3 78" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.6 66.85L21.5 42.78l8.33 14.42L13.9 80.57A13.32 13.32 0 016.6 66.85z" fill="#0066DA"/><path d="M43.65 0L29.83 24.07h34.52L50.32 0z" fill="#0066DA"/><path d="M43.65 0L57.35 24.07H29.83L43.65 0z" fill="#EA4335"/><path d="M21.5 42.78L6.6 66.85a13.32 13.32 0 002.27 3.42l16.22-28.09-3.59-3.4z" fill="#00AC47"/><path d="M80.7 66.85a13.32 13.32 0 01-2.27 14.42L64.2 57.2l8.33-14.42z" fill="#00832D"/><path d="M43.65 78L29.83 53.93h27.69L43.65 78z" fill="#2684FC"/><path d="M43.65 78L57.52 53.93h-27.7L43.65 78z" fill="#0066DA"/><path d="M80.7 66.85l-8.17-9.65L57.52 53.93l14.68 3.27 8.5 9.65z" fill="#00AC47"/><path d="M6.6 66.85l8.17-9.65L29.83 53.93 15.15 57.2 6.6 66.85z" fill="#FFBA00"/><path d="M29.83 24.07L6.6 66.85l8.17-9.65 15.06-33.13z" fill="#FFBA00"/><path d="M57.52 24.07l23.18 42.78-8.17-9.65-15.01-33.13z" fill="#EA4335"/></svg>
+          Google Drive 備份
+          <span class="gd-status gd-idle" id="gd-status-pill">未連線</span>
+        </div>
+
+        <!-- 未登入狀態 -->
+        <div id="gd-unauth">
+          <div class="gd-info">📌 需要先填入 Google OAuth Client ID，然後登入授權，即可一鍵備份到 Google Drive 個人資料夾。</div>
+          <div style="margin-top:10px">
+            <label class="fi-label">Google OAuth Client ID</label>
+            <input class="fi allow-select" id="gd-client-id" placeholder="xxxxx.apps.googleusercontent.com" style="margin-bottom:8px">
+            <div class="gd-info" style="margin-bottom:8px">
+              ⓘ 前往 <b>console.cloud.google.com</b> → API 和服務 → 憑證 → 建立 OAuth 2.0 用戶端 ID（Web 應用程式），授權 JavaScript 來源填此頁面網址。
+            </div>
+            <button class="gd-btn gd-btn-primary" style="width:100%" onclick="gdSignIn()">
+              🔐 登入 Google 帳號授權
+            </button>
+          </div>
+        </div>
+
+        <!-- 已登入狀態 -->
+        <div id="gd-auth" style="display:none">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <div id="gd-user-avatar" style="width:32px;height:32px;border-radius:50%;background:var(--sky2);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">👤</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;color:var(--t0)" id="gd-user-name">使用者</div>
+              <div style="font-size:11px;color:var(--t3)" id="gd-user-email"></div>
+            </div>
+            <button class="gd-btn gd-btn-ghost" style="flex:none;padding:6px 12px;font-size:11px" onclick="gdSignOut()">登出</button>
+          </div>
+          <div id="gd-last-sync" class="gd-info" style="margin-bottom:10px">尚未同步</div>
+          <div class="gd-btn-row">
+            <button class="gd-btn gd-btn-success" onclick="gdBackup()" id="gd-btn-backup">
+              ☁ 備份到雲端
+            </button>
+            <button class="gd-btn gd-btn-warn" onclick="gdRestore()" id="gd-btn-restore">
+              ⬇ 從雲端還原
+            </button>
+          </div>
+          <div class="gd-info" style="margin-top:8px">備份檔案儲存於 Google Drive 根目錄，檔名：<b>KnowledgeForce_backup.json</b></div>
+        </div>
+      </div>
+
+      <!-- DB Status -->
+      <div class="set-section-title">資料庫狀態</div>
+      <div class="db-info-box" id="db-info">
+        題目：0<br>法條：0<br>作答：0<br>科目：（無）
+      </div>
+
+      <!-- Danger -->
+      <div class="set-section-label-danger">⚠ 危險操作</div>
+      <div class="set-section danger-section">
+        <div class="set-row" onclick="cfm('清除作答記錄','保留題目與法條，清除所有作答記錄？',clearAts)">
+          <div class="set-icon" style="background:rgba(251,191,36,.1)">🗑</div>
+          <div class="set-info"><div class="set-label">清除作答記錄</div><div class="set-desc">保留題目與法條</div></div>
+          <div class="set-arrow">›</div>
+        </div>
+        <div class="set-row" onclick="cfm('刪除全部資料','題目・法條・記錄全刪，無法復原！',delAll)">
+          <div class="set-icon" style="background:rgba(248,113,113,.1)">💣</div>
+          <div class="set-info"><div class="set-label danger-label">刪除全部資料</div><div class="set-desc">題目・法條・記錄全刪，無法復原</div></div>
+          <div class="set-arrow">›</div>
+        </div>
+      </div>
+
+      <!-- Version -->
+      <div class="set-section">
+        <div class="set-row">
+          <div class="set-icon" style="background:rgba(232,201,107,.1)">ℹ</div>
+          <div class="set-info"><div class="set-label">KnowledgeForce</div><div class="set-desc">智慧學習作戰平台 · <span id="app-ver"></span></div></div>
+        </div>
+      </div>
+
+      <div style="height:20px"></div>
+    </div><!-- /page-settings -->
+
+  </div><!-- /page-wrap -->
+
+  <!-- ══ FAB ══ -->
+  <div id="fab-scrim"></div>
+  <div id="fab-wrap">
+    <div id="fabItems"></div>
+    <button id="fab-main">
+      <svg id="fabIcon" width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="6" cy="7" r="2" fill="var(--sky)"/>
+        <rect x="11" y="6" width="8" height="2" rx="1" fill="var(--t1)"/>
+        <circle cx="6" cy="12" r="2" fill="var(--sky)"/>
+        <rect x="11" y="11" width="8" height="2" rx="1" fill="var(--t1)"/>
+        <circle cx="6" cy="17" r="2" fill="var(--sky)"/>
+        <rect x="11" y="16" width="6" height="2" rx="1" fill="var(--t1)"/>
+      </svg>
+    </button>
+  </div>
+</div><!-- /app -->
+
+<!-- ══ OVERLAYS ══ -->
+<!-- Toast Stack -->
+<div id="toast-stack"></div>
+
+<!-- Modal -->
+<div id="modal-ov">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modalCancel">取消</button>
+      <button class="btn-gold" id="modalConfirm">確認</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Overlay -->
+<div id="cfm-ov">
+  <div class="cfm-box">
+    <div class="cfm-handle"></div>
+    <div class="cfm-title" id="cfm-t"></div>
+    <div class="cfm-sub" id="cfm-s"></div>
+    <div class="cfm-actions">
+      <button class="btn-ghost" id="cfm-cancel" style="flex:1;padding:12px" onclick="document.getElementById('cfm-ov').style.display='none'">取消</button>
+      <button class="btn-danger" id="cfm-ok" style="flex:1;padding:12px">確認</button>
+    </div>
+  </div>
+</div>
+
+<!-- Exam Menu -->
+<div id="exam-menu" onclick="if(event.target===this)closeExamMenu()">
+  <div class="exam-menu-box">
+    <div class="exam-menu-handle"></div>
+    <div class="exam-menu-title">🏆 測驗專區</div>
+    <div class="exam-mode-grid">
+      <button class="exam-mode-card" onclick="closeExamMenu();startQ('review')">
+        <div class="exam-mode-icon">📅</div>
+        <div class="exam-mode-label">今日複習</div>
+        <div class="exam-mode-desc">遺忘曲線到期題目</div>
+      </button>
+      <button class="exam-mode-card" onclick="closeExamMenu();startQ('all')">
+        <div class="exam-mode-icon">🎯</div>
+        <div class="exam-mode-label">隨機刷題</div>
+        <div class="exam-mode-desc">全部題目隨機出題</div>
+      </button>
+      <button class="exam-mode-card" onclick="closeExamMenu();startQ('wrong')">
+        <div class="exam-mode-icon" style="font-size:20px">🔴</div>
+        <div class="exam-mode-label">危險題</div>
+        <div class="exam-mode-desc">錯誤率高的題目</div>
+      </button>
+      <button class="exam-mode-card" onclick="closeExamMenu();startQ('star')">
+        <div class="exam-mode-icon">⭐</div>
+        <div class="exam-mode-label">收藏題目</div>
+        <div class="exam-mode-desc">已加星號的題目</div>
+      </button>
+      <button class="exam-mode-card" onclick="closeExamMenu();startQuick()">
+        <div class="exam-mode-icon">⚡</div>
+        <div class="exam-mode-label">快刷5題</div>
+        <div class="exam-mode-desc">優先危險題共5題</div>
+      </button>
+      <button class="exam-mode-card" onclick="closeExamMenu();startQ('sim')">
+        <div class="exam-mode-icon">📝</div>
+        <div class="exam-mode-label">模擬考</div>
+        <div class="exam-mode-desc">50題限時計時</div>
+      </button>
+      <button class="exam-mode-card" onclick="closeExamMenu();startNumberMode()">
+        <div class="exam-mode-icon">🔢</div>
+        <div class="exam-mode-label">數字魔鬼</div>
+        <div class="exam-mode-desc">快速數字記憶訓練</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- QV Overlay (Quiz View) -->
+<div id="qv">
+  <div class="qv-head">
+    <button class="qv-close" onclick="exitQ()">✕</button>
+    <div class="qv-prog">
+      <div class="prog-wrap"><div class="prog-bar" id="qpb" style="width:0%"></div></div>
+    </div>
+    <div class="qv-ct" id="qct">0/0</div>
+  </div>
+
+  <div class="qv-body" id="qv-body">
+    <div class="q-meta-row">
+      <span class="badge bmc" id="qbadge">選擇</span>
+      <span id="qmeta" style="font-size:11px;color:var(--t3)"></span>
+      <span class="q-hint" id="q-type-hint">☑ 單選題</span>
+      <button id="qstar" onclick="toggleQStar()">☆</button>
+    </div>
+
+    <div class="q-stem" id="qstem"></div>
+
+    <!-- Options -->
+    <div id="qopts"></div>
+
+    <!-- ES input -->
+    <div class="q-es-wrap" id="qes" style="display:none">
+      <button class="qfoot-btn" id="qrevbtn" onclick="revealES()" style="width:100%;margin-bottom:8px">顯示參考答案 / 解析</button>
+      <textarea class="q-es-input allow-select" id="qes-input" placeholder="在此輸入你的作答（可選）..."></textarea>
+    </div>
+
+    <!-- Result -->
+    <div class="qres" id="qres"></div>
+    <div class="qnote" id="qnote"></div>
+
+    <!-- Law links -->
+    <div class="qlaw" id="qlaw">
+      <div class="qlaw-title">⚖ 相關法條</div>
+      <div class="qlaw-list" id="qlaw-list"></div>
+    </div>
+
+    <!-- Done area -->
+    <div id="qdone-area" style="display:none"></div>
+  </div>
+
+  <!-- Footer -->
+  <div class="qfoot" id="qfoot">
+    <button class="qfoot-btn" id="qmulti-confirm" onclick="submitAnswer()">確認答案</button>
+    <button class="qfoot-btn qfoot-primary hide" id="qnxt" onclick="nextQ()">下一題 →</button>
+  </div>
+</div>
+
+<!-- Law View -->
+<div id="lv" style="display:none;flex-direction:column">
+  <div class="lv-head">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="back-btn" onclick="exitLaw()">‹</button>
+      <div>
+        <div class="lv-title" id="lv-title"></div>
+        <div class="lv-sub" id="lv-sub"></div>
+      </div>
+    </div>
+    <div style="padding:8px 0 0;display:flex;gap:8px">
+      <input class="fi allow-select" id="lv-search" placeholder="搜尋條號、關鍵字..." style="flex:1" oninput="debounce(filterLvArts,200)()">
+    </div>
+  </div>
+  <div class="lv-body" id="lv-body"></div>
+</div>
+
+<!-- Browse Overlay -->
+<div id="browse-ov" style="display:none;flex-direction:column">
+  <div class="br-head">
+    <div class="page-bar" style="position:static;background:transparent;backdrop-filter:none;border:none">
+      <button class="back-btn" onclick="closeBrowse()">✕</button>
+      <div class="page-bar-title">題目/資料閱覽</div>
+    </div>
+    <div class="chip-row" style="padding-bottom:8px">
+      <button class="chip on" id="brtab-q" onclick="setBrTab('q',this)">📝 題目</button>
+      <button class="chip" id="brtab-d" onclick="setBrTab('d',this)">📄 資料</button>
+    </div>
+    <div id="br-q-filters">
+      <div class="chip-row" id="br-chips" style="margin-bottom:4px"></div>
+      <div class="chip-row" id="br-year-chips2" style="margin-bottom:4px"></div>
+      <div style="display:none"><!-- type filter chips -->
+        <button class="chip on" id="br-type-all" onclick="setBrType(this,'all')">全部</button>
+        <button class="chip" id="br-type-mc" onclick="setBrType(this,'mc')">選擇題</button>
+        <button class="chip" id="br-type-es" onclick="setBrType(this,'es')">申論題</button>
+      </div>
+      <div class="br-search-wrap">
+        <input class="br-search-input allow-select" id="br-search" placeholder="搜尋題目、年度、科目..." oninput="_debouncedBrowseSearch()">
+        <button class="icon-btn" onclick="closeBrowse()">✕</button>
+      </div>
+    </div>
+  </div>
+  <div class="br-body" id="br-list"></div>
+</div>
+
+<!-- Law Pop -->
+<div id="lawpop-ov" onclick="if(event.target===this)closeLawPop()" style="display:none;align-items:flex-end;justify-content:center">
+  <div class="lawpop-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:15px;font-weight:700;color:var(--t0)" id="lawpop-title">法條</div>
+      <button class="icon-btn" onclick="closeLawPop()">✕</button>
+    </div>
+    <div id="lawpop-body" style="font-size:13px;color:var(--t2);line-height:1.75;white-space:pre-wrap;word-break:break-all"></div>
+  </div>
+</div>
+
+<!-- Number Game -->
+<div id="num-ov" style="display:none;flex-direction:column;align-items:center;justify-content:center">
+  <div style="width:100%;max-width:360px;text-align:center">
+    <div style="font-size:13px;color:var(--t3);margin-bottom:8px">數字魔鬼</div>
+    <div class="num-q" id="num-q">—</div>
+    <input class="num-input allow-select" id="num-ans" type="number" placeholder="輸入條號..." oninput="checkNumAns()">
+    <div class="num-ans" id="num-res"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:center">
+      <button class="btn-ghost" onclick="document.getElementById('num-ov').style.display='none'" style="padding:11px 20px">離開</button>
+      <button class="btn-gold" onclick="nextNumQ()" id="num-next" style="display:none;padding:11px 20px;border-radius:10px;font-size:14px;font-weight:700">下一題</button>
+    </div>
+    <div id="num-score" style="margin-top:12px;font-size:12px;color:var(--t3)"></div>
+  </div>
+</div>
+
+<!-- Dup Overlay -->
+<div id="dup-ov" style="display:none;align-items:center;justify-content:center">
+  <div class="dup-box">
+    <div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:8px">⚠ 發現重複題目</div>
+    <div id="dup-info" style="font-size:13px;color:var(--t2);margin-bottom:16px;line-height:1.6"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost" onclick="dupAction('skip')" style="flex:1;padding:10px">略過重複</button>
+      <button class="btn-gold" onclick="dupAction('all')" style="flex:1;padding:10px;border-radius:10px;font-size:13px;font-weight:700">全部匯入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD Q Overlay -->
+<div id="add-q-ov" onclick="if(event.target===this)closeAddQ()" style="display:none;position:fixed;inset:0;z-index:810;background:rgba(0,0,0,.6);align-items:flex-end;justify-content:center">
+  <div onclick="event.stopPropagation()" style="background:var(--bg2);border-radius:20px 20px 0 0;padding:0;width:100%;max-width:520px;max-height:92dvh;overflow-y:auto;border-top:1px solid var(--bd2)">
+    <div style="width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:10px auto 0"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px">
+      <div id="add-q-title" style="font-size:17px;font-weight:700">新增題目</div>
+      <button onclick="closeAddQ()" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:14px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="padding:0 16px 16px">
+      <div class="fi-group">
+        <label class="fi-label">題型</label>
+        <div style="display:flex;gap:8px">
+          <button id="fq-mc-btn" onclick="setAddQType('mc')" style="flex:1;padding:10px;border-radius:10px;background:var(--sky);color:#0a0c10;border:none;font-size:14px;font-weight:700">選擇題</button>
+          <button id="fq-es-btn" onclick="setAddQType('es')" style="flex:1;padding:10px;border-radius:10px;background:var(--bg3);color:var(--t2);border:1px solid var(--bd);font-size:14px;font-weight:600">申論題</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="fi-group">
+        <div><label class="fi-label">科目</label><input class="fi allow-select" id="fq-sub" placeholder="警察法規"></div>
+        <div><label class="fi-label">年度</label><input class="fi allow-select" id="fq-yr" placeholder="113"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="fi-group">
+        <div><label class="fi-label">考試別</label>
+          <select class="fi" id="fq-ex"><option value="">選擇</option><option>警佐班</option><option>升官等</option><option>警大二技</option><option>三等考試</option><option>其他</option></select>
+        </div>
+        <div><label class="fi-label">題號</label><input class="fi allow-select" id="fq-num" placeholder="1" type="number"></div>
+      </div>
+      <div class="fi-group">
+        <label class="fi-label">題目內容 *</label>
+        <textarea class="fi allow-select" id="fq-stem" rows="4" placeholder="輸入或貼上題目..." style="resize:none"></textarea>
+      </div>
+      <div id="fq-opts-wrap" class="fi-group">
+        <label class="fi-label">選項（點 ✓ 標記正確答案）</label>
+        <div id="fq-opts-c">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><button id="fq-opt-btn-A" onclick="toggleOptCorrect('A')" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:12px;font-weight:700;flex-shrink:0">A</button><input class="fi allow-select" id="fq-optA" placeholder="選項 A"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><button id="fq-opt-btn-B" onclick="toggleOptCorrect('B')" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:12px;font-weight:700;flex-shrink:0">B</button><input class="fi allow-select" id="fq-optB" placeholder="選項 B"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><button id="fq-opt-btn-C" onclick="toggleOptCorrect('C')" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:12px;font-weight:700;flex-shrink:0">C</button><input class="fi allow-select" id="fq-optC" placeholder="選項 C"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><button id="fq-opt-btn-D" onclick="toggleOptCorrect('D')" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:12px;font-weight:700;flex-shrink:0">D</button><input class="fi allow-select" id="fq-optD" placeholder="選項 D"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><button id="fq-opt-btn-E" onclick="toggleOptCorrect('E')" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:12px;font-weight:700;flex-shrink:0">E</button><input class="fi allow-select" id="fq-optE" placeholder="選項 E"></div>
+        </div>
+      </div>
+      <div id="fq-es-wrap" style="display:none" class="fi-group">
+        <label class="fi-label">參考答案 / 解析</label>
+        <textarea class="fi allow-select" id="fq-es" rows="4" placeholder="參考解析..." style="resize:none"></textarea>
+      </div>
+      <div class="fi-group">
+        <label class="fi-label">關鍵字（逗號分隔）</label>
+        <input class="fi allow-select" id="fq-kw" placeholder="比例原則,臨檢">
+      </div>
+      <div class="fi-group">
+        <label class="fi-label">備註</label>
+        <textarea class="fi allow-select" id="fq-note" rows="2" placeholder="個人筆記..." style="resize:none"></textarea>
+      </div>
+      <div class="fi-group" style="display:flex;align-items:center;gap:10px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="fq-is-number" style="width:18px;height:18px">
+          <span style="font-size:13px;color:var(--t1)">🔢 數字魔鬼題（含重要數字/期限）</span>
+        </label>
+      </div>
+      <div class="fi-group">
+        <label class="fi-label">關聯法條（如：警職法§6）</label>
+        <input class="fi allow-select" id="fq-laws" placeholder="警職法§6">
+      </div>
+      <div id="fq-must-kw-wrap" style="display:none" class="fi-group">
+        <label class="fi-label">申論必寫關鍵字（逗號分隔）</label>
+        <input class="fi allow-select" id="fq-must-kw" placeholder="比例原則,正當法律程序,釋字535號">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-ghost" onclick="closeAddQ()" style="flex:1;padding:13px">取消</button>
+        <button onclick="saveAddQ()" style="flex:2;padding:13px;border-radius:12px;background:var(--sky);color:#0a0c10;font-size:15px;font-weight:700;border:none">儲存題目</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD LAW Overlay -->
+<div id="law-ov" onclick="if(event.target===this)closeLawSh()" style="display:none;position:fixed;inset:0;z-index:810;background:rgba(0,0,0,.6);align-items:flex-end;justify-content:center">
+  <div onclick="event.stopPropagation()" style="background:var(--bg2);border-radius:20px 20px 0 0;padding:0;width:100%;max-width:520px;max-height:92dvh;overflow-y:auto;border-top:1px solid var(--bd2)">
+    <div style="width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:10px auto 0"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px">
+      <div id="law-sh-t" style="font-size:17px;font-weight:700">新增法條</div>
+      <button onclick="closeLawSh()" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:14px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="padding:0 16px 16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="fi-group">
+        <div><label class="fi-label">法律名稱</label><input class="fi allow-select" id="l-name" placeholder="警察職權行使法"></div>
+        <div><label class="fi-label">條號</label><input class="fi allow-select" id="l-art" placeholder="第6條"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="fi-group">
+        <div><label class="fi-label">章節（可空）</label><input class="fi allow-select" id="l-chapter" placeholder="第一章 總則"></div>
+        <div><label class="fi-label">標題（可空）</label><input class="fi allow-select" id="l-title-field" placeholder="臨檢"></div>
+      </div>
+      <div class="fi-group">
+        <label class="fi-label">類別</label>
+        <select class="fi" id="l-cat">
+          <option value="statute">法規條文</option>
+          <option value="sop">SOP</option>
+          <option value="supplement">補充資料</option>
+          <option value="interpretation">函釋</option>
+        </select>
+      </div>
+      <div class="fi-group">
+        <label class="fi-label">內容 *</label>
+        <textarea class="fi allow-select" id="l-content" rows="6" placeholder="法條文字..." style="resize:none"></textarea>
+      </div>
+      <div class="fi-group"><label class="fi-label">關鍵字</label><input class="fi allow-select" id="l-kw" placeholder="臨檢,比例原則"></div>
+      <div class="fi-group"><label class="fi-label">關聯法條（母法/子法）</label><input class="fi allow-select" id="l-related" placeholder="憲法§108,警察法施行細則"></div>
+      <div class="fi-group"><label class="fi-label">來源</label><input class="fi allow-select" id="l-src" placeholder="全國法規資料庫"></div>
+      <div class="fi-group"><label class="fi-label">備註</label><textarea class="fi allow-select" id="l-note" rows="2" placeholder="個人標記、補充說明..." style="resize:none"></textarea></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-ghost" onclick="closeLawSh()" style="flex:1;padding:13px">取消</button>
+        <button onclick="saveLaw()" style="flex:2;padding:13px;border-radius:12px;background:var(--pur);color:#fff;font-size:15px;font-weight:700;border:none">儲存法條</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BULK LAW Overlay -->
+<div id="blaw-ov" onclick="if(event.target===this)closeBulkLaw()" style="display:none;position:fixed;inset:0;z-index:810;background:rgba(0,0,0,.6);align-items:flex-end;justify-content:center">
+  <div onclick="event.stopPropagation()" style="background:var(--bg2);border-radius:20px 20px 0 0;padding:0;width:100%;max-width:520px;max-height:92dvh;overflow-y:auto;border-top:1px solid var(--bd2)">
+    <div style="width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:10px auto 0"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px">
+      <div style="font-size:17px;font-weight:700">批次匯入法條</div>
+      <button onclick="closeBulkLaw()" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:14px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div style="padding:0 16px 16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="fi-group">
+        <div><label class="fi-label">法律名稱</label><input class="fi allow-select" id="bl-name" placeholder="警察職權行使法"></div>
+        <div><label class="fi-label">類別</label>
+          <select class="fi" id="bl-cat">
+            <option value="statute">法規條文</option>
+            <option value="sop">SOP</option>
+            <option value="supplement">補充資料</option>
+            <option value="interpretation">函釋</option>
+          </select>
+        </div>
+      </div>
+      <div class="fi-group"><label class="fi-label">來源</label><input class="fi allow-select" id="bl-src" placeholder="全國法規資料庫"></div>
+      <div class="fi-group">
+        <label class="fi-label">貼入法條文字（自動分條）</label>
+        <textarea class="fi allow-select" id="bl-text" rows="8" placeholder="第 六 條&#10;警察於公共場所...&#10;&#10;第 七 條&#10;警察依前條規定..." style="resize:none"></textarea>
+      </div>
+      <div id="bl-prev" style="font-size:12px;color:var(--t2);min-height:20px;padding:4px 0;line-height:1.8"></div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn-ghost" onclick="prevBulkLaw()" style="flex:1;padding:12px">🔍 預覽</button>
+        <button onclick="importBulkLaw()" style="flex:2;padding:12px;border-radius:12px;background:var(--pur);color:#fff;font-size:14px;font-weight:700;border:none">✓ 批次匯入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BULK Q Overlay (大量貼題) -->
+<div id="bulk-q-ov" onclick="if(event.target===this)closeBulkImportQ()" style="display:none;position:fixed;inset:0;z-index:810;background:rgba(0,0,0,.6);align-items:flex-end;justify-content:center">
+  <div onclick="event.stopPropagation()" style="background:var(--bg2);border-radius:20px 20px 0 0;padding:0;width:100%;max-width:520px;max-height:92dvh;overflow-y:auto;border-top:1px solid var(--bd2)">
+    <div style="width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:10px auto 0"></div>
+    <div style="padding:12px 16px 8px">
+      <div style="font-size:17px;font-weight:700">大量貼題</div>
+      <div style="font-size:12px;color:var(--t3);margin-top:2px">PDF複製文字貼入，自動拆題</div>
+    </div>
+    <div style="padding:8px 16px;background:rgba(232,201,107,.06);border-radius:10px;margin:0 16px 12px;font-size:12px;color:var(--t2);line-height:1.7">
+      💡 建議流程：PDF → 貼到 Word → 從 Word 複製 → 貼在此處，選項符號
+      <span style="background:var(--bg3);padding:1px 6px;border-radius:4px">(A)</span>
+      <span style="background:var(--bg3);padding:1px 6px;border-radius:4px">A.</span>
+      均支援，題號格式：
+      <span style="background:var(--bg3);padding:1px 6px;border-radius:4px">1.</span>
+      <span style="background:var(--bg3);padding:1px 6px;border-radius:4px">1、</span>
+      <span style="background:var(--bg3);padding:1px 6px;border-radius:4px">(1)</span>
+    </div>
+    <div style="padding:0 16px 16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="fi-group">
+        <div><label class="fi-label">科目</label><input class="fi allow-select" id="bi-sub" placeholder="警察法規"></div>
+        <div><label class="fi-label">年度</label><input class="fi allow-select" id="bi-yr" placeholder="民國113年"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="fi-group">
+        <div><label class="fi-label">考試別</label>
+          <select class="fi" id="bi-ex"><option value="">選擇考試</option><option>警佐班</option><option>升官等</option><option>警大二技</option><option>三等考試</option><option>其他</option></select>
+        </div>
+        <div><label class="fi-label">答案列（可空）</label><input class="fi allow-select" id="bi-ans" placeholder="DACB 或 1.D 2.A"></div>
+      </div>
+      <div class="fi-group">
+        <label class="fi-label">貼入考題文字</label>
+        <textarea class="fi allow-select" id="bi-text" rows="8" placeholder="1. 下列何者為警察之任務？&#10;▪ 維持公共秩序&#10;▪ 保護社會安全&#10;▪ 防止一切危害&#10;▪ 以上皆是&#10;&#10;2. 警察法第幾條規定警察任務？" style="resize:none"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn-ghost" onclick="clearBulkQ()" style="flex:1;padding:11px">清除</button>
+        <button onclick="parseBulkQ()" style="flex:2;padding:11px;border-radius:12px;background:var(--sky);color:#0a0c10;font-size:14px;font-weight:700;border:none">🔍 解析預覽</button>
+      </div>
+      <div id="bulk-q-result" class="hide">
+        <div id="bulk-q-stats" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px"></div>
+        <div id="bulk-q-prev-list"></div>
+        <button onclick="importBulkQ()" style="width:100%;padding:13px;border-radius:12px;background:var(--sky);color:#0a0c10;font-size:14px;font-weight:700;border:none;margin-top:8px">
+          ✓ 批次匯入
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Icon Editor -->
+<div id="icon-ov">
+  <div class="icon-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:700;color:var(--t0)">自訂圖示</div>
+      <button class="icon-btn" onclick="closeIconEditor()">✕</button>
+    </div>
+    <div id="icon-list"></div>
+    <button class="btn-danger" onclick="resetAllIcons()" style="width:100%;padding:10px;border-radius:10px;margin-top:10px;font-size:13px">重置全部圖示</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     JAVASCRIPT MODULES
+══════════════════════════════════════════════════ -->
+<script src="app.js"></script>
+<script src="loading.js"></script>
+</body>
+</html>
