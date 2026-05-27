@@ -1,11 +1,13 @@
 /* KnowledgeForce Service Worker */
-const CACHE = 'kf-v1';
+const CACHE = 'kf-v2';
 const ASSETS = [
   './',
   './index.html',
   './app.css',
   './loading.css',
   './app.js',
+  './qlib.js',
+  './dblib.js',
   './loading.js',
   './manifest.json',
   'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap',
@@ -27,9 +29,8 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  /* Network-first for API calls, cache-first for static assets */
   const url = new URL(e.request.url);
-  if (url.hostname === 'accounts.google.com') return; // skip auth
+  if (url.hostname === 'accounts.google.com') return;
   e.respondWith(
     caches.match(e.request).then(cached => {
       const network = fetch(e.request).then(res => {

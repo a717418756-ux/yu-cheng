@@ -1219,7 +1219,7 @@ if('serviceWorker' in navigator){
         <textarea class="fi allow-select" id="bi-text" rows="8"
           placeholder="1. 下列何者為警察之任務？&#10;(A) 維持公共秩序&#10;(B) 保護社會安全&#10;(C) 防止一切危害&#10;(D) 以上皆是&#10;&#10;2. 警察法第幾條規定警察任務？"
           style="resize:none;min-height:160px"
-          oninput="_bqSyncText(this.value)" onchange="_bqSyncText(this.value)" onpaste="var _t=this;setTimeout(function(){_bqSyncText(_t.value);},50)"></textarea>
+          oninput="bqTextSync(this.value)" onchange="bqTextSync(this.value)" onpaste="var _t=this;setTimeout(function(){bqTextSync(_t.value);},50)"></textarea>
       </div>
       <div id="bq-char-count" style="font-size:11px;color:var(--t3);text-align:right;margin:-8px 0 8px"></div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -1253,6 +1253,8 @@ if('serviceWorker' in navigator){
      JAVASCRIPT MODULES
 ══════════════════════════════════════════════════ -->
 <script src="app.js"></script>
+<script src="qlib.js"></script>
+<script src="dblib.js"></script>
 <script src="loading.js"></script>
 </body>
 </html>
