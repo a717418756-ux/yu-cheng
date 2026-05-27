@@ -407,10 +407,10 @@ if('serviceWorker' in navigator){
       <!-- Bulk -->
       <div id="ei-bulk" style="display:none;padding:16px">
         <div class="bi-meta">
-          <div class="fi-group"><label class="fi-label">科目</label><input class="fi allow-select" id="bi-sub" list="bi-subs2" placeholder="警察法規"></div>
-          <div class="fi-group"><label class="fi-label">年度</label><input class="fi allow-select" id="bi-yr" placeholder="114"></div>
-          <div class="fi-group"><label class="fi-label">考試別</label><input class="fi allow-select" id="bi-ex" placeholder="警佐二類"></div>
-          <div class="fi-group"><label class="fi-label">答案串</label><input class="fi allow-select" id="bi-ans" placeholder="ABCDA..."></div>
+          <div class="fi-group"><label class="fi-label">科目</label><input class="fi allow-select" id="eb-sub" list="bi-subs2" placeholder="警察法規"></div>
+          <div class="fi-group"><label class="fi-label">年度</label><input class="fi allow-select" id="eb-yr" placeholder="114"></div>
+          <div class="fi-group"><label class="fi-label">考試別</label><input class="fi allow-select" id="eb-ex" placeholder="警佐二類"></div>
+          <div class="fi-group"><label class="fi-label">答案串</label><input class="fi allow-select" id="eb-ans" placeholder="ABCDA..."></div>
           <div class="fi-group"><label class="fi-label">編</label><input class="fi allow-select" id="bi-part" placeholder="第一編"></div>
           <div class="fi-group"><label class="fi-label">章</label><input class="fi allow-select" id="bi-chapter" placeholder="第一章"></div>
         </div>
@@ -421,7 +421,7 @@ if('serviceWorker' in navigator){
         </div>
         <div class="fi-group">
           <label class="fi-label">題目文字（貼上整段）</label>
-          <textarea class="fi allow-select" id="bi-text" rows="8" placeholder="直接貼上考卷OCR文字..." style="resize:none"></textarea>
+          <textarea class="fi allow-select" id="eb-text" rows="8" placeholder="直接貼上考卷OCR文字..." style="resize:none"></textarea>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <button class="btn-ghost" onclick="clearBulk()" style="flex:1">清除</button>

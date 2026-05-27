@@ -1223,9 +1223,14 @@ async function openLawGroup(lawName){  try{
   const jumpHtml=others.map(n=>'<button class="chip" style="flex-shrink:0;font-size:11px" onclick="openLawGroup(\''+esc(n)+'\')">'+esc(n)+'</button>').join('');
 
   // ── 三層分組（編 > 章 > 節）────────────────────────────────
-  const parts    = [...new Set(laws.map(l=>l.part   ||''))];
-  const chapters = [...new Set(laws.map(l=>l.chapter||''))];
-  const sections = [...new Set(laws.map(l=>l.section||''))];
+  // 依條文順序收集各層唯一值（保持自然出現順序）
+  const _seenPart=new Set(), _seenCh=new Set(), _seenSec=new Set();
+  const parts=[], chapters=[], sections=[];
+  laws.forEach(l=>{
+    if(l.part    && !_seenPart.has(l.part))   { _seenPart.add(l.part);    parts.push(l.part); }
+    if(l.chapter && !_seenCh.has(l.chapter))  { _seenCh.add(l.chapter);   chapters.push(l.chapter); }
+    if(l.section && !_seenSec.has(l.section)) { _seenSec.add(l.section);  sections.push(l.section); }
+  });
 
   const renderArtCard = (l) => {
     const isImg=l.content&&l.content.startsWith('data:image');
@@ -1315,27 +1320,23 @@ async function openLawGroup(lawName){  try{
     });
   };
   renderGroup(()=>true);
-  // 章節列表（快速跳轉用，含編/章/節）
-  const chapterList=[...new Set([
-    ...parts.filter(Boolean),
-    ...chapters.filter(Boolean),
-    ...sections.filter(Boolean),
-  ])];
-    // 章節管理按鈕
+  // 章節列表（快速跳轉用）— 依 編→章→節 分層順序排列
+  const chapterList=[
+    ...parts.map(p=>({text:p,type:'part'})),
+    ...chapters.map(c=>({text:c,type:'chapter'})),
+    ...sections.map(s=>({text:s,type:'section'})),
+  ];
   const chMgrBtn='<button onclick="openChapterMgr(window.currentLawName)" style="background:none;border:1px solid var(--bd);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--t2);margin-left:4px">⚙ 管理章節</button>';
   const chMgrBtnNew='<div style="margin-bottom:6px"><button onclick="openChapterMgr(window.currentLawName)" style="background:none;border:1px solid var(--bd);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--t2)">⚙ 新增章節分類</button></div>';
-  const chTagsHtml=chapterList.map(ch=>{
-    const isP=parts.filter(Boolean).includes(ch);
-    const isS=sections.filter(Boolean).includes(ch);
-    const type=isP?'part':isS?'section':'chapter';
-    const s=LEVEL_STYLE[type];
-    const typeKey=isP?'part':isS?'sec':'ch';
+  const chTagsHtml=chapterList.map(({text,type})=>{
+    const s=LEVEL_STYLE[type]||LEVEL_STYLE.chapter;
+    const typeKey=type==='part'?'part':type==='section'?'sec':'ch';
     return '<span class="tag" style="color:'+s.color+';background:'+s.bg+';border:1px solid '+s.border
       +';cursor:pointer;margin:2px;font-size:11px" '
-      +'onclick="scrollToChapter(this,\''+encodeURIComponent(ch)+'\',\''+type+'\')" title="點擊跳轉">'
+      +'onclick="scrollToChapter(this,\''+encodeURIComponent(text)+'\',\''+type+'\')" title="點擊跳轉">'
       +'<span style="opacity:.65;font-size:9px;border:1px solid '+s.border
         +';border-radius:3px;padding:0 3px;margin-right:3px">'+s.label+'</span>'
-      +esc(ch)+'</span>';
+      +esc(text)+'</span>';
   }).join('');
   const chapterMgmtHtml=chapterList.length
     ?'<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--t2);margin-bottom:4px">章節：'+chTagsHtml+chMgrBtn+'</div></div>'
@@ -2151,12 +2152,10 @@ function _filterBulkDelLaw(laws){
 
 /* ── 大量貼題（題目庫） ── */
 function openBulkImportQ(){
-  $el('bi-text').value='';
-  $el('bi-ans').value=''
-  ;['bi-sub','bi-yr','bi-ex','bi-part','bi-chapter','bi-section'].forEach(id=>{const el=$el(id);if(el)el.value='';});
-  // 清除解析結果（同時相容 bulk-result 和 bulk-q-result 兩種 ID）
-  const r1=$el('bulk-result');if(r1)r1.classList.add('hide');
-  const r2=$el('bulk-q-result');if(r2)r2.classList.add('hide');
+  const t=$el('bi-text');if(t)t.value='';
+  const a=$el('bi-ans');if(a)a.value='';
+  ['bi-sub','bi-yr','bi-ex'].forEach(id=>{const el=$el(id);if(el)el.value='';});
+  const r=$el('bulk-q-result');if(r)r.classList.add('hide');
   S.bulkParsed=[];
   $el('bulk-q-ov').style.display='flex';
 }
@@ -2736,12 +2735,12 @@ function gdSignIn()  { GD.signIn();   }
 function gdSignOut() { GD.signOut();  }
 function gdBackup()  { GD.backup();   }
 function gdRestore() { GD.restore();  }
-/* ══ BULK IMPORT ══ */
+/* ══ BULK IMPORT (ei-bulk tab) ══ */
 function parseBulk(){try{
-  const biEl=$el('bi-text');if(!biEl){Toast.warn('找不到輸入框');return;}
+  const biEl=$el('eb-text');if(!biEl){Toast.warn('找不到輸入框');return;}
   const text=biEl.value||'';if(!text.trim()){Toast.warn('請先貼入題目文字');return;}
   const parsed=parseBulkText(text);S.bulkParsed=parsed;
-  const ansStr=($el('bi-ans')||{}).value||'';const ansMap=parseAnswerStr(ansStr);
+  const ansStr=($el('eb-ans')||{}).value||'';const ansMap=parseAnswerStr(ansStr);
   const biPart=($el('bi-part')||{}).value||'';const biChapter=($el('bi-chapter')||{}).value||'';const biSection=($el('bi-section')||{}).value||'';
   parsed.forEach((q,i)=>{const n=parseInt(q.num)||i+1;if(ansMap[n])q.answer=ansMap[n];if(biPart)q.part=biPart.trim();if(biChapter)q.chapter=biChapter.trim();if(biSection)q.section=biSection.trim();});
   const mc=parsed.filter(q=>q.type==='mc').length;const es=parsed.filter(q=>q.type==='es').length;
@@ -2753,13 +2752,19 @@ function parseBulk(){try{
 
 async function importBulk(){
   if(!S.bulkParsed.length){Toast.warn('請先解析題目');return;}
-  const sub=($el('bi-sub')||{}).value||'';const yr=($el('bi-yr')||{}).value||'';const ex=($el('bi-ex')||{}).value||'';
+  const sub=($el('eb-sub')||{}).value||'';const yr=($el('eb-yr')||{}).value||'';const ex=($el('eb-ex')||{}).value||'';
   const items=S.bulkParsed.map(q=>({...q,subject:sub||q.subject||'',year:yr||q.year||'',exam:ex||q.exam||''}));
   try{await bulkPut('questions',items);Toast.success('已匯入 '+items.length+' 題 ✓');S.bulkParsed=[];$el('bulk-result').classList.add('hide');renderHome();}
   catch(err){Toast.error('匯入失敗：'+err.message);}
 }
 
-function clearBulk(){$el('bi-text').value='';$el('bi-ans').value='';['bi-part','bi-chapter','bi-section'].forEach(id=>{const el=$el(id);if(el)el.value='';});$el('bulk-result').classList.add('hide');S.bulkParsed=[];}
+function clearBulk(){
+  const t=$el('eb-text');if(t)t.value='';
+  const a=$el('eb-ans');if(a)a.value='';
+  ['bi-part','bi-chapter','bi-section'].forEach(id=>{const el=$el(id);if(el)el.value='';});
+  const r=$el('bulk-result');if(r)r.classList.add('hide');
+  S.bulkParsed=[];
+}
 
 /* ── 大量貼題 overlay 的解析/匯入（使用新的 bulk-q-ov 中的元素） ── */
 function parseBulkQ(){try{
