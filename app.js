@@ -211,7 +211,7 @@ var FAB=(function(){
 })();
 
 /* ══ UTILS (PE) ══ */
-const S={page:'home',filter:'all',subF:'all',lawCat:'all',editId:null,editLawId:null,qType:'mc',correct:'A',quiz:{q:[],idx:0,ans:false,res:[],mode:''},curLaw:null,curLawName:'',lawSort:'name',lawSortDir:'asc',bulkParsed:[],aiMd:'',aiJson:''};
+const S={page:'home',filter:'all',subF:'all',lawCat:'all',editId:null,editLawId:null,qType:'mc',correct:'A',quiz:{q:[],idx:0,ans:false,res:[],mode:''},curLaw:null,curLawName:'',lawSort:'name',lawSortDir:'asc',bulkParsed:[],_bulkText:'',aiMd:'',aiJson:''};
 let _lawSortBy='name';
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function br(s){return esc(s||'').split('\n').join('<br>').split('\r').join('');}
@@ -2151,13 +2151,21 @@ function _filterBulkDelLaw(laws){
 
 
 /* ── 大量貼題（題目庫） ── */
+function _bqSyncText(val){
+  S._bulkText=val||'';
+  const cc=$el('bq-char-count');
+  if(cc)cc.textContent=S._bulkText.trim()?('已輸入 '+S._bulkText.length+' 字'):'';
+}
 function openBulkImportQ(){
-  const t=$el('bi-text');if(t)t.value='';
-  const a=$el('bi-ans');if(a)a.value='';
-  ['bi-sub','bi-yr','bi-ex'].forEach(id=>{const el=$el(id);if(el)el.value='';});
+  // 不在開啟時清空 textarea，保留上次內容方便重試
+  // 只重置解析結果與快取
   const r=$el('bulk-q-result');if(r)r.classList.add('hide');
+  const cc=$el('bq-char-count');if(cc)cc.textContent='';
+  const t=$el('bi-text');
+  S._bulkText=(t?t.value:'');  // 同步現有內容
   S.bulkParsed=[];
   $el('bulk-q-ov').style.display='flex';
+  if(t)setTimeout(function(){t.focus();},120);
 }
 function closeBulkImportQ(){$el('bulk-q-ov').style.display='none';}
 
@@ -2766,38 +2774,49 @@ function clearBulk(){
   S.bulkParsed=[];
 }
 
-/* ── 大量貼題 overlay 的解析/匯入（使用新的 bulk-q-ov 中的元素） ── */
+/* ── 大量貼題 overlay 的解析/匯入 ── */
 function parseBulkQ(){try{
-  const biEl=$el('bi-text');if(!biEl){Toast.warn('找不到輸入框');return;}
-  const text=biEl.value||'';if(!text.trim()){Toast.warn('請先貼入題目文字');return;}
+  // 優先用 oninput 即時同步的快取，fallback 才讀 DOM value
+  // （Android Chrome 貼上大量文字時 .value 有時讀不到）
+  const biEl=$el('bi-text');
+  const text=(S._bulkText||'').trim() || (biEl?biEl.value||'':'');
+  if(!text){Toast.warn('請先貼入題目文字');return;}
+  // 反向同步確保一致
+  S._bulkText=text;
+  if(biEl&&!biEl.value)biEl.value=text;
+
   const parsed=parseBulkText(text);S.bulkParsed=parsed;
   const ansStr=($el('bi-ans')||{}).value||'';const ansMap=parseAnswerStr(ansStr);
   parsed.forEach((q,i)=>{const n=parseInt(q.num)||i+1;if(ansMap[n])q.answer=ansMap[n];});
   const sub=($el('bi-sub')||{}).value||'';const yr=($el('bi-yr')||{}).value||'';const ex=($el('bi-ex')||{}).value||'';
   parsed.forEach(q=>{if(sub)q.subject=sub;if(yr)q.year=yr;if(ex)q.exam=ex;});
   const mc=parsed.filter(q=>q.type==='mc').length;const es=parsed.filter(q=>q.type==='es').length;
-  const statsEl=$el('bulk-q-stats');if(statsEl)statsEl.innerHTML='<span class="tag">'+parsed.length+' 題</span><span class="tag">選擇 '+mc+'</span><span class="tag">申論 '+es+'</span>';
+  const statsEl=$el('bulk-q-stats');if(statsEl)statsEl.innerHTML='<span class="tag">'+parsed.length+' 題</span><span class="tag">選擇題 '+mc+'</span><span class="tag">申論題 '+es+'</span>';
   const prevEl=$el('bulk-q-prev-list');if(prevEl)prevEl.innerHTML=parsed.map(q=>'<div class="pi '+(q.answer||q.type==='es'?'ok':'warn')+'"><div class="pi-n">第'+q.num+'題 · '+(q.type==='mc'?'選擇題':'申論題')+(q.answer?' · 答案:'+q.answer:'')+'</div><div class="pi-s">'+esc(q.stem||'')+'</div></div>').join('');
   const resEl=$el('bulk-q-result');if(resEl)resEl.classList.remove('hide');
-  if(!parsed.length)Toast.warn('解析結果為0題');else Toast.success('解析完成：'+parsed.length+' 題 ✓');
-}catch(err){Toast.error('解析錯誤：'+err.message);}}
+  if(!parsed.length)Toast.warn('解析結果為0題，請確認格式（題號需為 1. 或 1、）');
+  else Toast.success('解析完成：'+parsed.length+' 題 ✓');
+}catch(err){Toast.error('解析錯誤：'+err.message);console.error('parseBulkQ',err);}}
 
 async function importBulkQ(){
   if(!S.bulkParsed.length){Toast.warn('請先解析題目');return;}
   try{
     await bulkPut('questions',S.bulkParsed);
     Toast.success('已匯入 '+S.bulkParsed.length+' 題 ✓');
-    S.bulkParsed=[];
+    S.bulkParsed=[];S._bulkText='';
+    const t=$el('bi-text');if(t)t.value='';
     const r=$el('bulk-q-result');if(r)r.classList.add('hide');
+    const cc=$el('bq-char-count');if(cc)cc.textContent='';
     closeBulkImportQ();renderList();renderHome();
   }catch(err){Toast.error('匯入失敗：'+err.message);}
 }
 
 function clearBulkQ(){
-  const biEl=$el('bi-text');if(biEl)biEl.value='';
-  const ansEl=$el('bi-ans');if(ansEl)ansEl.value='';
+  const t=$el('bi-text');if(t)t.value='';
+  const a=$el('bi-ans');if(a)a.value='';
+  S._bulkText='';S.bulkParsed=[];
   const r=$el('bulk-q-result');if(r)r.classList.add('hide');
-  S.bulkParsed=[];
+  const cc=$el('bq-char-count');if(cc)cc.textContent='';
 }
 
 // ═══════════════════════════════════════════════════════════════════
