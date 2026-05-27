@@ -1058,3 +1058,129 @@ a{color:inherit;text-decoration:none}
 .lw-card:active{border-color:rgba(88,180,255,.3)}
 .lw-del{position:absolute;top:8px;right:8px;background:rgba(248,113,113,.12);color:var(--red);border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;opacity:0;transition:opacity .15s}
 .lw-card:hover .lw-del,.lw-card:focus-within .lw-del{opacity:1}
+
+/* ══════════════════════════════════════════════════
+   LAW VIEW OVERLAY — laws.js 新版補充
+   (配合 openLawGroup / lv-name / lv-star / lv-info /
+    lbody / pg-db / law-ov / blaw-ov / l-img-wrap 等)
+══════════════════════════════════════════════════ */
+
+/* ── Law View Header (新版) ─────────────────────── */
+#lv-name{
+  font-size:17px;font-weight:800;color:var(--t0);
+  flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#lv-info{
+  font-size:11px;color:var(--t2);margin-top:3px;
+  display:none;line-height:1.5;
+}
+#lv-star{
+  width:36px;height:36px;border-radius:10px;
+  background:var(--bg3);border:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;color:var(--t3);flex-shrink:0;cursor:pointer;
+  transition:color .15s,background .15s;
+}
+#lv-star:active{background:var(--bg4)}
+
+/* ── Law View Body (新版 lbody) ─────────────────── */
+#lbody{
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:0 16px 80px;
+}
+
+/* ── Law View Search ────────────────────────────── */
+#lv-search{
+  flex:1;padding:8px 12px;border-radius:10px;
+  background:var(--bg3);border:1px solid var(--bd);
+  color:var(--t0);font-size:13px;
+}
+#lv-search:focus{border-color:rgba(232,201,107,.35)}
+
+/* ── DB Count bar ───────────────────────────────── */
+#db-lc{
+  font-size:11px;color:var(--t3);
+  padding:4px 16px 8px;text-align:center;
+}
+
+/* ── DB page scroll container ───────────────────── */
+#pg-db{overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* ── Law Add/Edit Sheet Overlay (law-ov) ────────── */
+#law-ov{
+  position:fixed;inset:0;z-index:760;
+  background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
+  display:none;align-items:flex-end;justify-content:center;
+}
+#law-ov.on{display:flex}
+.law-sh-box{
+  width:100%;max-width:520px;max-height:92dvh;overflow-y:auto;
+  background:var(--bg1);border-radius:var(--r3) var(--r3) 0 0;
+  padding:20px 16px calc(20px + var(--safe-b));
+  border-top:1px solid var(--bd2);
+}
+#law-sh-t{
+  font-size:16px;font-weight:700;color:var(--t0);
+  margin-bottom:16px;
+}
+
+/* ── Law Form Fields ────────────────────────────── */
+#l-content-wrap,#l-img-wrap{transition:none}
+#l-img-toggle-wrap{margin-bottom:10px}
+#l-img-toggle-wrap .chip{font-size:12px;padding:5px 12px}
+#l-img-prev{margin-top:6px;border-radius:8px;overflow:hidden}
+#l-img-prev img{width:100%;border-radius:8px}
+#l-org-list option{background:var(--bg2);color:var(--t0)}
+
+/* ── Bulk Law Import Overlay (blaw-ov) ──────────── */
+#blaw-ov{
+  position:fixed;inset:0;z-index:760;
+  background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
+  display:none;align-items:flex-end;justify-content:center;
+}
+#blaw-ov.on,#blaw-ov[style*="flex"]{display:flex}
+.blaw-box{
+  width:100%;max-width:520px;max-height:92dvh;overflow-y:auto;
+  background:var(--bg1);border-radius:var(--r3) var(--r3) 0 0;
+  padding:20px 16px calc(20px + var(--safe-b));
+  border-top:1px solid var(--bd2);
+}
+#bl-prev{
+  font-size:12px;color:var(--t2);line-height:1.7;
+  padding:10px 12px;border-radius:8px;
+  background:var(--bg2);border:1px solid var(--bd);
+  min-height:36px;
+}
+
+/* ── Law Article Card (laws.js 版) ──────────────── */
+/* 舊版 .lv-article 保留，補充 laws.js 生成的 inline 卡片 */
+.lv-article{position:relative}
+.lv-article mark{
+  background:#d4a438;color:#121212;
+  border-radius:2px;padding:0 2px;
+}
+
+/* ── Chapter / Section / Part Headings ──────────── */
+/* LEVEL_STYLE 由 JS inline style 寫入，CSS 不需要重複，
+   但 .chip 在章節標籤 scrollToChapter 時需要 cursor */
+.lv-ch-tag{cursor:pointer;transition:background .15s}
+.lv-ch-tag:active{opacity:.7}
+
+/* ── DB sort buttons ────────────────────────────── */
+#l-sort-name.on,#l-sort-amend.on,#l-sort-count.on{
+  background:var(--gold3);color:var(--gold);border-color:rgba(232,201,107,.3);
+}
+
+/* ── Law Popup (lawpop) — 補充 related laws row ─── */
+#lawpop-related{margin-top:8px}
+
+/* ── Law Del button (inline style override 兼容) ─── */
+/* laws.js 用 inline style 寫 .lw-del，以下是 hover 補強 */
+@media (hover:hover){
+  .lw-del{opacity:0}
+  .lw-card:hover .lw-del{opacity:1}
+}
+/* touch 裝置：永遠顯示（laws.js inline style 已設定） */
+@media (hover:none){
+  .lw-del{opacity:1!important}
+}
