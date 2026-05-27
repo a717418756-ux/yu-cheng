@@ -282,7 +282,7 @@ async function openLawGroup(lawName){
     const chMgrBtn='<button onclick="openChapterMgr(window.currentLawName)" style="background:none;border:1px solid var(--bd);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--t2);margin-left:4px">⚙ 管理章節</button>';
     const chMgrBtnNew='<div style="margin-bottom:6px"><button onclick="openChapterMgr(window.currentLawName)" style="background:none;border:1px solid var(--bd);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--t2)">⚙ 新增章節分類</button></div>';
     const chapterMgmtHtml=chapterList.length
-      ?'<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--t2);margin-bottom:4px">章節：'+chTagsHtml+chMgrBtn+'</div></div>'
+      ?'<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--t2);margin-bottom:6px">章節</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">'+chTagsHtml+'</div>'+chMgrBtn+'</div>'
       :chMgrBtnNew;
 
     /* ── 其他法規快速跳轉 ── */

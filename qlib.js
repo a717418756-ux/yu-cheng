@@ -205,13 +205,16 @@ function openBulkImportQ(){
   if(t){ QL.rawText=t.value; bqTextSync(t.value); }
   $el('bulk-q-ov').style.display='flex';
   // Android focus
-  if(t) setTimeout(()=>t.focus(),150);
+  // 不強制 focus，讓使用者自行點擊 textarea 貼上
 }
 function closeBulkImportQ(){ $el('bulk-q-ov').style.display='none'; }
 
 /* 解析 */
 function parseBulkQ(){
   try{
+    // 每次解析前強制從 DOM 重讀（最保險）
+    const el=$el('bi-text');
+    if(el && el.value) QL.rawText=el.value;
     const text = _bqGetText();
     if(!text){ Toast.warn('請先貼入題目文字'); return; }
 
@@ -426,7 +429,7 @@ async function openInlineBrowse(){
 }
 
 function switchBrowseTab(tab,btn){
-  document.querySelectorAll('#page-pg-list .chip-row .chip[id^="tab-"]').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('#tab-q-browse,#tab-d-browse').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
   const qP=$el('browse-q-panel'), dP=$el('browse-d-panel');
   if(tab==='q'){
