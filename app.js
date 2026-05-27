@@ -1269,26 +1269,7 @@ async function importBulkLaw(){
     closeBulkLaw();renderDB();
   }catch(e){Toast.error('匯入失敗：'+e.message);}
 }
-function parseLawText(text,lawName,category,source){
-  category=category||'statute';source=source||'';
-  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
-  const arts=[];let cur=null;
-  const artRe=/^第\s*([一二三四五六七八九十百千\d]+)\s*條\s*(.*)$/;
-  for(const line of lines){
-    const m=line.match(artRe);
-    if(m){
-      if(cur)arts.push(cur);
-      const artStr='第'+m[1]+'條';
-      const rest=(m[2]||'').trim();
-      cur={lawName,article:artStr,articleNumber:art2n(artStr),chapter:'',articleTitle:'',
-        category,content:rest,keywords:[],relatedLaws:'',source,note:'',createdAt:Date.now(),updatedAt:Date.now()};
-    }else if(cur){
-      cur.content+=(cur.content?'\n':'')+line;
-    }
-  }
-  if(cur)arts.push(cur);
-  return arts;
-}
+/* parseLawText → 由 laws.js 提供完整版（支援編/章/節三層結構） */
 
 /* ── 大量貼題（題目庫） ── */
 function openBulkImportQ(){
@@ -1934,23 +1915,148 @@ function clearBulkQ(){
   S.bulkParsed=[];
 }
 
-function parseAnswerStr(s){const map={};if(!s)return map;const parts=s.trim().split(/[\s,，]+/);parts.forEach((p,i)=>{const m=p.match(/^(\d+)[.\s]*([A-Ea-e]+)$/);if(m)map[parseInt(m[1])]=m[2].toUpperCase();else if(/^[A-Ea-e]+$/.test(p))map[i+1]=p.toUpperCase();});return map;}
+// ═══════════════════════════════════════════════════════════════════
+// 題目解析（原 parser.js 整合）
+// ═══════════════════════════════════════════════════════════════════
 
-function parseBulkText(text){
-  if(!text||!text.trim())return[];
-  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
-  const questions=[];let curQ=null,curOptKey=null,optIdx=0;
-  const OPT_KEYS=['A','B','C','D','E'];
-  function finishQ(){if(!curQ)return;curQ.stem=curQ.stem.trim();Object.keys(curQ.options).forEach(k=>{curQ.options[k]=curQ.options[k].trim();});curQ.type=Object.keys(curQ.options).length>=2?'mc':'es';if(curQ.stem)questions.push(curQ);curQ=null;curOptKey=null;optIdx=0;}
-  function newQ(num,stemStart){finishQ();curQ={num,stem:stemStart,type:'es',options:{},answer:'',answerEs:'',keywords:[],mustKeywords:[],tags:[],note:'',starred:false,createdAt:Date.now(),reviewLevel:0,nextReview:Date.now(),wrongCount:0,correctStreak:0,difficultyScore:5};}
-  for(const line of lines){
-    const mNum=line.match(/^(\d+)[.、。\s]\s*(.+)/);
-    const mAlpha=line.match(/^[（(]?([A-Ea-e])[）)][.、\s]?\s*(.+)/);
-    if(mNum){newQ(mNum[1],mNum[2]);continue;}
-    if(mAlpha&&curQ){const k=mAlpha[1].toUpperCase();curQ.options[k]=mAlpha[2];curOptKey=k;const ki=OPT_KEYS.indexOf(k);if(ki>=optIdx)optIdx=ki+1;continue;}
-    if(curQ){if(curOptKey&&curQ.options[curOptKey]!==undefined)curQ.options[curOptKey]+=' '+line;else curQ.stem+=' '+line;}
+// ── OPT_SYMBOL_MAP：已知選項符號 → 標準字母 ─────────────────────
+const OPT_SYMBOL_MAP={'①':'A','②':'B','③':'C','④':'D','⑤':'E','Ａ':'A','Ｂ':'B','Ｃ':'C','Ｄ':'D','Ｅ':'E'};
+
+// ── preprocessQuestionText：前置正規化 ────────────────────────────
+function preprocessQuestionText(raw){
+  if(!raw)return'';
+  let t=raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n')
+    .replace(/\u00A0/g,' ').replace(/\u3000/g,' ')
+    .replace(/\u200B/g,'').replace(/\uFEFF/g,'');
+  const lines=t.split('\n');
+  // 統計行首重複符號（出現>=2次且非數字開頭）
+  const headCount={};
+  for(const ln of lines){
+    const m=ln.match(/^([\s\S]{1,2})/);if(!m)continue;
+    const ch=m[1].trim();
+    if(!ch||/^[\d\s]/.test(ch))continue;
+    headCount[ch]=(headCount[ch]||0)+1;
   }
-  finishQ();return questions;
+  const repeatedSymbols=new Set(Object.entries(headCount).filter(([,n])=>n>=2).map(([ch])=>ch));
+  const out=[];
+  for(const ln of lines){
+    let line=ln;
+    // 已知符號 ①②Ａ 等
+    const knownM=line.match(/^([①②③④⑤ＡＢＣＤＥａｂｃｄｅ])[.、\s]?\s*(.*)/);
+    if(knownM){const mapped=OPT_SYMBOL_MAP[knownM[1]];if(mapped){out.push('§'+mapped+'§ '+knownM[2]);continue;}}
+    // 標準 (A)(B) / （A）
+    const stdM=line.match(/^[（(]([A-Ea-e])[）)][.、\s]?\s*(.*)/);
+    if(stdM){out.push('§'+stdM[1].toUpperCase()+'§ '+stdM[2]);continue;}
+    // 行首不明重複符號 → §OPT§
+    let replaced=false;
+    for(const sym of repeatedSymbols){
+      const re=new RegExp('^'+sym.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*');
+      if(re.test(line)){out.push('§OPT§ '+line.replace(re,''));replaced=true;break;}
+    }
+    if(replaced)continue;
+    // 題號行：？/：後緊接選項時自動插換行
+    if(/^\d{1,3}[.、．）)）\s]/.test(line)){
+      const qColonM=line.match(/^(.+?[？?：:])(\s*)([\s\S]+)$/);
+      if(qColonM&&qColonM[3].trim()){
+        const after=qColonM[3].trim();
+        const looksLikeOpt=/^[（(]?[A-Ea-eＡＢＣＤＥ①②③④⑤]/.test(after)||
+          [...repeatedSymbols].some(s=>after.startsWith(s));
+        if(looksLikeOpt){out.push(qColonM[1]);out.push(after);continue;}
+      }
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+function _findQEnd(str){for(let i=0;i<str.length;i++){if(str[i]==='？'||str[i]==='?'||str[i]==='：'||str[i]===':')return i;}return-1;}
+function _tidyText(s){if(!s)return'';return cleanSpaces(s.replace(/\s+/g,' ').replace(/([，。！？、：；,.!?:;])\s+/g,'$1').trim());}
+
+// ── parseQuestions：主解析 ────────────────────────────────────────
+function parseQuestions(rawText){
+  if(!rawText||!rawText.trim())return[];
+  let t=preprocessQuestionText(rawText);
+  const ZH={'一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9','十':'10'};
+  t=t.replace(/^([一二三四五六七八九十]+)[、．。.]/gm,(_,n)=>(ZH[n]||n)+'. ');
+  const allLines=t.split('\n').map(l=>l.trim()).filter(Boolean);
+  const questions=[];let curQ=null,curOptKey=null,optIdx=0;
+  const OPT_KEYS=['A','B','C','D','E','F','G','H'];
+  function finishQ(){
+    if(!curQ)return;
+    curQ.stem=_tidyText(curQ.stem);
+    Object.keys(curQ.options).forEach(k=>{curQ.options[k]=_tidyText(curQ.options[k]);});
+    curQ.type=Object.keys(curQ.options).length>=2?'mc':'es';
+    if(curQ.stem)questions.push(curQ);
+    curQ=null;curOptKey=null;optIdx=0;
+  }
+  function newQ(num,stemStart){
+    finishQ();
+    curQ={num,stem:stemStart,type:'es',options:{},answer:'',answerEs:'',keywords:[],mustKeywords:[],tags:[],
+      note:'',starred:false,createdAt:Date.now(),reviewLevel:0,nextReview:Date.now(),lastReview:null,
+      wrongCount:0,correctStreak:0,difficultyScore:5};
+    curOptKey=null;optIdx=0;
+  }
+  function addOpt(content){
+    if(!curQ||!content.trim())return;
+    const key=OPT_KEYS[optIdx++]||'?';
+    curQ.options[key]=content.trim();curOptKey=key;
+  }
+  function appendLine(text){
+    if(!curQ||!text.trim())return;
+    if(curOptKey&&curQ.options[curOptKey]!==undefined)curQ.options[curOptKey]+=' '+text;
+    else curQ.stem+=(curQ.stem?' ':'')+text;
+  }
+  for(const line of allLines){
+    // §A§ 已知字母選項
+    const mAlpha=line.match(/^§([A-E])§\s*(.*)/);
+    if(mAlpha){
+      if(!curQ)continue;
+      const key=mAlpha[1];
+      if(curQ.options[key]!==undefined)curQ.options[key]+=' '+mAlpha[2];
+      else{curQ.options[key]=mAlpha[2].trim();const ki=OPT_KEYS.indexOf(key);if(ki>=optIdx)optIdx=ki+1;}
+      curOptKey=key;continue;
+    }
+    // §OPT§ 未命名選項
+    const mAnon=line.match(/^§OPT§\s*(.*)/);
+    if(mAnon){if(!curQ)continue;addOpt(mAnon[1]);continue;}
+    // 行首數字 → 新題目
+    const mNum=line.match(/^(\d{1,3})(?:[.、．）)）]\s*|\s+)([\s\S]+)/);
+    const mNumIsQ=mNum&&parseInt(mNum[1])<=500&&(
+      /^(\d{1,3})[.、．）)）]/.test(line)||
+      (mNum[2].trim().length>3&&!/^[年月日時分秒週天個件名條款項元萬千百公里]/.test(mNum[2].trim()))
+    );
+    if(mNumIsQ){
+      const num=mNum[1],rest=mNum[2].trim();
+      const endIdx=_findQEnd(rest);
+      newQ(num,endIdx>=0?rest.slice(0,endIdx+1):rest);
+      if(endIdx>=0&&rest.slice(endIdx+1).trim())appendLine(rest.slice(endIdx+1).trim());
+      continue;
+    }
+    // 中文題號
+    const mZh=line.match(/^([一二三四五六七八九十]+)[、．。]\s*([\s\S]+)/);
+    if(mZh&&ZH[mZh[1]]){const rest=mZh[2].trim();const endIdx=_findQEnd(rest);newQ(ZH[mZh[1]],endIdx>=0?rest.slice(0,endIdx+1):rest);continue;}
+    appendLine(line);
+  }
+  finishQ();
+  return questions.map(q=>({...q,keywords:autoKeywords(q.stem),mustKeywords:[],
+    searchBlob:((q.stem||'')+' '+(autoKeywords(q.stem)||[]).join(' ')).toLowerCase()}));
+}
+
+// ── parseAnswerStr ────────────────────────────────────────────────
+function parseAnswerStr(str){
+  if(!str||!str.trim())return{};
+  const map={};
+  for(const m of str.matchAll(/(\d{1,3})[.、\s]*([A-Ea-e])/g))map[parseInt(m[1])]=m[2].toUpperCase();
+  if(!Object.keys(map).length){
+    const letters=str.replace(/[^A-Ea-e]/g,'').toUpperCase();
+    [...letters].forEach((ch,i)=>{map[i+1]=ch;});
+  }
+  return map;
+}
+
+// ── parseBulkText（相容舊介面）────────────────────────────────────
+function parseBulkText(text){
+  return parseQuestions(text).map(q=>({...q,answer:q.answer||'',answerEs:q.answerEs||''}));
 }
 /* ══ GROUPS ══ */
 const DEFAULT_CONCEPT_GROUPS=[
