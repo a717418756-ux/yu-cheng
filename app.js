@@ -1131,7 +1131,7 @@ async function renderDB(){  try{
   loadMore();
 
   // 移除舊 scroll 監聽
-  const pg = document.getElementById('pg-db');
+  const pg = document.getElementById('pg-db') || document.getElementById('page-pg-db');
   const scroller = pg?.querySelector('.page') || pg;
   if(scroller){
     const old = scroller._dbScroll;
@@ -1197,23 +1197,29 @@ async function openLawGroup(lawName){  try{
   const others=[...new Set(allLaws.map(l=>l.lawName).filter(Boolean))].filter(n=>n!==lawName).slice(0,8);
   const cat=laws[0].category||'statute';
   const icon=cat==='sop'?'📋':cat==='supplement'?'📄':'⚖';
-  document.getElementById('lv-name').textContent=icon+' '+lawName;
+  // 相容：新版用 lv-name，舊版用 lv-title
+  const lvNameEl=document.getElementById('lv-name')||document.getElementById('lv-title');
+  if(lvNameEl) lvNameEl.textContent=icon+' '+lawName;
+  const lvSubEl=document.getElementById('lv-sub');
+  if(lvSubEl) lvSubEl.textContent='共 '+laws.length+' 條';
   // 顯示法規機關/日期資訊
   const lvInfo=document.getElementById('lv-info');
   if(lvInfo){
     const s=laws[0]||{};
-    lvInfo.textContent=(s.org?'🏛 '+s.org:'')+(s.org&&s.amendDate?' · ':'')+(s.amendDate?'📅 '+s.amendDate:'');
+    lvInfo.textContent=(s.org?'🏛 '+s.org:'')+(s.org&&s.amendDate?' · ':'')+( s.amendDate?'📅 '+s.amendDate:'');
     lvInfo.style.display=(s.org||s.amendDate)?'block':'none';
   }
   const sb=document.getElementById('lv-star');
   const favN=laws.filter(l=>l.favorite).length;
-  sb.textContent=favN?'★':'☆';
-  sb.style.color=favN?'var(--org)':'var(--t2)';
-  sb.onclick=async()=>{
-    const nf=laws.filter(l=>l.favorite).length>0;
-    for(const l of laws){l.favorite=!nf;await dp('laws',l);}
-    openLawGroup(lawName);
-  };
+  if(sb){
+    sb.textContent=favN?'★':'☆';
+    sb.style.color=favN?'var(--org)':'var(--t2)';
+    sb.onclick=async()=>{
+      const nf=laws.filter(l=>l.favorite).length>0;
+      for(const l of laws){l.favorite=!nf;await dp('laws',l);}
+      openLawGroup(lawName);
+    };
+  }
   const jumpHtml=others.map(n=>'<button class="chip" style="flex-shrink:0;font-size:11px" onclick="openLawGroup(\''+esc(n)+'\')">'+esc(n)+'</button>').join('');
 
   // ── 三層分組（編 > 章 > 節）────────────────────────────────
@@ -1335,7 +1341,8 @@ async function openLawGroup(lawName){  try{
     ?'<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--t2);margin-bottom:4px">章節：'+chTagsHtml+chMgrBtn+'</div></div>'
     :chMgrBtnNew;
 
-  document.getElementById('lbody').innerHTML=
+  const lbodyEl=document.getElementById('lbody')||document.getElementById('lv-body');
+  if(lbodyEl) lbodyEl.innerHTML=
     '<div style="padding:4px 0 10px">'
     +(others.length?'<div class="sec" style="padding:0 0 4px;font-size:11px">快速跳轉</div><div style="overflow-x:auto;display:flex;gap:6px;padding:6px 0">'+jumpHtml+'</div>':'')
     +'<div class="sec" style="padding:8px 0 6px;font-size:11px">'+esc(lawName)+' · '+laws.length+' 條</div>'
@@ -1491,11 +1498,16 @@ async function showAddLaw(l){
     const dl=document.getElementById('l-org-list');
     if(dl)dl.innerHTML=orgs.map(o=>'<option value="'+esc(o)+'">').join('');
   });
-  document.getElementById('law-ov').classList.add('on');
+  const lawOv=document.getElementById('law-ov');
+  if(lawOv){lawOv.style.display='flex';lawOv.classList.add('on');}
   }catch(e){logError('showAddLaw',e);}
 }
 
-function closeLawSh(){ document.getElementById('law-ov').classList.remove('on');S.editLawId=null; }
+function closeLawSh(){
+  const lawOv=document.getElementById('law-ov');
+  if(lawOv){lawOv.style.display='none';lawOv.classList.remove('on');}
+  S.editLawId=null;
+}
 
 
 function openImgViewer(src){
@@ -1731,8 +1743,14 @@ async function saveLaw(){
   }catch(e){logError('saveLaw',e);toast('saveLaw 發生錯誤');}
 }
 
-function showBulkLaw(){ document.getElementById('blaw-ov').classList.add('on'); }
-function closeBulkLaw(){ document.getElementById('blaw-ov').classList.remove('on'); }
+function showBulkLaw(){
+  const ov=document.getElementById('blaw-ov');
+  if(ov){ov.style.display='flex';ov.classList.add('on');}
+}
+function closeBulkLaw(){
+  const ov=document.getElementById('blaw-ov');
+  if(ov){ov.style.display='none';ov.classList.remove('on');}
+}
 
 function parseLawText(rawText, lawName, category, source){
   if(!rawText||!rawText.trim()) return [];
@@ -2088,7 +2106,6 @@ async function openChapterMgr(lawName){  try{
   }catch(e){ logError('openChapterMgr',e); }}
 
 const _debouncedRenderDB=debounce(renderDB,220);
-function renderLaws(){return renderDB();}
 
 // setLawCat — 相容舊呼叫（overlay 等處使用）
 function setLawCat(cat,btn){S.lawCat=cat;document.querySelectorAll('[onclick*=\"setLawCat\"]').forEach(b=>b.classList.remove('on'));if(btn)btn.classList.add('on');renderDB();}
@@ -2135,9 +2152,11 @@ function _filterBulkDelLaw(laws){
 /* ── 大量貼題（題目庫） ── */
 function openBulkImportQ(){
   $el('bi-text').value='';
-  $el('bi-ans').value='';
-  ['bi-sub','bi-yr','bi-ex','bi-part','bi-chapter','bi-section'].forEach(id=>{const el=$el(id);if(el)el.value='';});
-  const r=$el('bulk-result');if(r)r.classList.add('hide');
+  $el('bi-ans').value=''
+  ;['bi-sub','bi-yr','bi-ex','bi-part','bi-chapter','bi-section'].forEach(id=>{const el=$el(id);if(el)el.value='';});
+  // 清除解析結果（同時相容 bulk-result 和 bulk-q-result 兩種 ID）
+  const r1=$el('bulk-result');if(r1)r1.classList.add('hide');
+  const r2=$el('bulk-q-result');if(r2)r2.classList.add('hide');
   S.bulkParsed=[];
   $el('bulk-q-ov').style.display='flex';
 }
