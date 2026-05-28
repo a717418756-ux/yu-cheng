@@ -814,7 +814,7 @@ async function delLaw(id){  try{
 async function showAddLaw(l){
   try{
   S.editLawId=l?.id||null;
-  document.getElementById('law-sh-t').textContent=l?'編輯法條':'新增法條';
+  document.getElementById('law-sh-t').textContent=l?'編輯資料':'新增資料';
   document.getElementById('l-name').value=l?.lawName||'';
   document.getElementById('l-art').value=l?.article||'';
   const chEl=document.getElementById('l-chapter');
@@ -1075,7 +1075,7 @@ async function saveLaw(){
       }
     }
     closeLawSh();
-    toast(S.editLawId?'法條已更新 ✓':'法條已儲存 ✓');
+    toast(S.editLawId?'資料已更新 ✓':'資料已儲存 ✓');
   }catch(e){
     logError('saveLaw',e);
     toast('儲存失敗，請重試');
