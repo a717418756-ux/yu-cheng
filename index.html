@@ -1115,7 +1115,7 @@ if('serviceWorker' in navigator){
   <div onclick="event.stopPropagation()" style="background:var(--bg2);border-radius:20px 20px 0 0;padding:0;width:100%;max-width:520px;max-height:92dvh;overflow-y:auto;border-top:1px solid var(--bd2)">
     <div style="width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:10px auto 0"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px">
-      <div id="law-sh-t" style="font-size:17px;font-weight:700">新增法條</div>
+      <div id="law-sh-t" style="font-size:17px;font-weight:700">新增資料</div>
       <button onclick="closeLawSh()" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:14px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div style="padding:0 16px 16px">
@@ -1137,8 +1137,24 @@ if('serviceWorker' in navigator){
         </select>
       </div>
       <div class="fi-group">
-        <label class="fi-label">內容 *</label>
-        <textarea class="fi allow-select" id="l-content" rows="6" placeholder="法條文字..." style="resize:none"></textarea>
+        <label class="fi-label">內容類型</label>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button id="lc-txt-btn" onclick="lcSwitch('text')" style="flex:1;padding:8px;border-radius:8px;background:var(--pur);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer">📝 文字</button>
+          <button id="lc-img-btn" onclick="lcSwitch('image')" style="flex:1;padding:8px;border-radius:8px;background:var(--bg3);color:var(--t1);border:1px solid var(--bd);font-size:13px;font-weight:600;cursor:pointer">🖼 圖片</button>
+        </div>
+        <div id="lc-text-area">
+          <label class="fi-label">內容 *</label>
+          <textarea class="fi allow-select" id="l-content" rows="6" placeholder="法條文字、SOP 步驟、補充說明..." style="resize:none"></textarea>
+        </div>
+        <div id="lc-img-area" style="display:none">
+          <label class="fi-label">上傳圖片</label>
+          <div id="lc-img-preview" style="width:100%;min-height:120px;border:2px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;cursor:pointer;background:var(--bg1);margin-bottom:8px" onclick="document.getElementById('lc-img-input').click()">
+            <span style="font-size:28px">📷</span>
+            <span style="font-size:12px;color:var(--t2)">點擊選擇圖片</span>
+          </div>
+          <input type="file" id="lc-img-input" accept="image/*" style="display:none" onchange="lcImgLoad(this)">
+          <div id="lc-img-name" style="font-size:11px;color:var(--t2);margin-bottom:4px"></div>
+        </div>
       </div>
       <div class="fi-group"><label class="fi-label">關鍵字</label><input class="fi allow-select" id="l-kw" placeholder="臨檢,比例原則"></div>
       <div class="fi-group"><label class="fi-label">關聯法條（母法/子法）</label><input class="fi allow-select" id="l-related" placeholder="憲法§108,警察法施行細則"></div>
@@ -1146,7 +1162,7 @@ if('serviceWorker' in navigator){
       <div class="fi-group"><label class="fi-label">備註</label><textarea class="fi allow-select" id="l-note" rows="2" placeholder="個人標記、補充說明..." style="resize:none"></textarea></div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn-ghost" onclick="closeLawSh()" style="flex:1;padding:13px">取消</button>
-        <button onclick="saveLaw()" style="flex:2;padding:13px;border-radius:12px;background:var(--pur);color:#fff;font-size:15px;font-weight:700;border:none">儲存法條</button>
+        <button onclick="saveLaw()" style="flex:2;padding:13px;border-radius:12px;background:var(--pur);color:#fff;font-size:15px;font-weight:700;border:none">儲存資料</button>
       </div>
     </div>
   </div>
@@ -1216,9 +1232,9 @@ if('serviceWorker' in navigator){
       </div>
       <div class="fi-group">
         <label class="fi-label">貼入考題文字</label>
-        <textarea class="fi allow-select" id="bi-text" rows="8" placeholder="1. 下列何者為警察之任務？&#10;(A) 維持公共秩序&#10;(B) 保護社會安全&#10;(C) 防止一切危害&#10;(D) 以上皆是&#10;&#10;2. 警察法第幾條規定警察任務？" style="resize:none;min-height:180px" oninput="window._bqRaw=this.value" onchange="window._bqRaw=this.value" onpaste="var t=this;setTimeout(function(){window._bqRaw=t.value;},80)"></textarea>
+        <textarea class="fi allow-select" id="bi-text" rows="8" placeholder="1. 下列何者為警察之任務？&#10;(A) 維持公共秩序&#10;(B) 保護社會安全&#10;(C) 防止一切危害&#10;(D) 以上皆是&#10;&#10;2. 警察法第幾條規定警察任務？" style="resize:none;min-height:160px" oninput="window._bqRaw=this.value;var cc=document.getElementById('bq-cc');if(cc)cc.textContent=this.value.trim()?'✓ '+this.value.length+' 字':'';" onchange="window._bqRaw=this.value;" onpaste="var _t=this;setTimeout(function(){window._bqRaw=_t.value;var cc=document.getElementById('bq-cc');if(cc)cc.textContent=_t.value.trim()?'✓ '+_t.value.length+' 字':'';},80);"></textarea>
       </div>
-      <div id="bq-cc" style="font-size:11px;color:var(--t3);text-align:right;margin:-6px 0 6px;min-height:14px"></div>
+      <div id="bq-cc" style="font-size:11px;color:var(--t3);text-align:right;margin:-4px 0 8px;min-height:14px"></div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <button class="btn-ghost" onclick="clearBulkQ()" style="flex:1;padding:11px">清除</button>
         <button onclick="parseBulkQ()" style="flex:2;padding:11px;border-radius:12px;background:var(--sky);color:#0a0c10;font-size:14px;font-weight:700;border:none">🔍 解析預覽</button>
@@ -1253,61 +1269,55 @@ if('serviceWorker' in navigator){
 <script src="loading.js"></script>
 
 <script>
-/* ═══════════════════════════════════════════════════════
-   PATCH — 覆蓋所有有問題的函數（題目庫、資料庫、大量貼題）
-   這段放在 app.js / qlib.js / dblib.js 之後，確保覆蓋
-═══════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   PATCH SCRIPT — 載入於 app.js 之後，覆蓋有問題的函數
+   修正：(1)大量貼題 (2)ei-bulk tab (3)新增資料含圖片
+═══════════════════════════════════════════ */
 
-/* ── 大量貼題 overlay：完整重寫，用 window._bqRaw 暫存 ── */
+/* ── 工具：安全取 DOM 值 ── */
+function _gv(id){ var e=document.getElementById(id); return e?e.value||'':''; }
+function _ge(id){ return document.getElementById(id); }
+
+/* ══ 大量貼題 Overlay ══════════════════════ */
 function openBulkImportQ(){
   window._bqRaw = '';
-  var r=document.getElementById('bulk-q-result');
-  if(r) r.classList.add('hide');
-  var cc=document.getElementById('bq-cc');
-  if(cc) cc.textContent='';
-  var resEl=document.getElementById('bulk-q-result');
-  if(resEl) resEl.classList.add('hide');
+  var cc=_ge('bq-cc'); if(cc) cc.textContent='';
+  var r=_ge('bulk-q-result'); if(r) r.classList.add('hide');
   if(typeof S!=='undefined') S.bulkParsed=[];
-  document.getElementById('bulk-q-ov').style.display='flex';
+  _ge('bulk-q-ov').style.display='flex';
 }
-function closeBulkImportQ(){
-  document.getElementById('bulk-q-ov').style.display='none';
-}
+function closeBulkImportQ(){ _ge('bulk-q-ov').style.display='none'; }
 
 function parseBulkQ(){
   try{
-    // 強制讀 DOM（最保險），再用 window._bqRaw 補
-    var el=document.getElementById('bi-text');
-    var text='';
-    if(el && el.value && el.value.trim()) text=el.value;
+    /* 三重讀取：DOM value → window._bqRaw → innerText */
+    var el=_ge('bi-text'), text='';
+    if(el && el.value && el.value.trim())         text=el.value;
     else if(window._bqRaw && window._bqRaw.trim()) text=window._bqRaw;
-    if(!text.trim()){
-      if(typeof Toast!=='undefined') Toast.warn('請先貼入題目文字');
-      else alert('請先貼入題目文字');
-      return;
-    }
-    // 更新計數
-    var cc=document.getElementById('bq-cc');
-    if(cc) cc.textContent='✓ 已讀取 '+text.length+' 字';
+    else if(el && el.innerText && el.innerText.trim()) text=el.innerText;
 
-    if(typeof parseBulkText!=='function'){alert('解析模組未載入');return;}
+    if(!text.trim()){ Toast.warn('請先貼入題目文字'); return; }
+
+    /* 更新快取與字數 */
+    window._bqRaw=text;
+    var cc=_ge('bq-cc');
+    if(cc) cc.textContent='✓ '+text.length+' 字';
+
+    if(typeof parseBulkText!=='function'){ alert('解析模組未載入'); return; }
     var parsed=parseBulkText(text);
     if(typeof S!=='undefined') S.bulkParsed=parsed;
 
-    // 套答案串
-    var ansEl=document.getElementById('bi-ans');
-    var ansStr=ansEl?ansEl.value||'':'';
-    if(ansStr.trim()&&typeof parseAnswerStr==='function'){
+    /* 套答案串 */
+    var ansStr=_gv('bi-ans');
+    if(ansStr.trim() && typeof parseAnswerStr==='function'){
       var ansMap=parseAnswerStr(ansStr);
       parsed.forEach(function(q,i){
         var n=parseInt(q.num)||i+1;
         if(ansMap[n]) q.answer=ansMap[n];
       });
     }
-    // 套科目/年度/考試
-    var sub=(document.getElementById('bi-sub')||{}).value||'';
-    var yr =(document.getElementById('bi-yr') ||{}).value||'';
-    var ex =(document.getElementById('bi-ex') ||{}).value||'';
+    /* 套欄位 */
+    var sub=_gv('bi-sub'), yr=_gv('bi-yr'), ex=_gv('bi-ex');
     parsed.forEach(function(q){
       if(sub) q.subject=sub;
       if(yr)  q.year=yr;
@@ -1316,14 +1326,15 @@ function parseBulkQ(){
 
     var mc=parsed.filter(function(q){return q.type==='mc';}).length;
     var es=parsed.filter(function(q){return q.type==='es';}).length;
-    var statsEl=document.getElementById('bulk-q-stats');
-    if(statsEl) statsEl.innerHTML=
+
+    var st=_ge('bulk-q-stats');
+    if(st) st.innerHTML=
       '<span class="tag">共 '+parsed.length+' 題</span>'+
       '<span class="tag" style="color:var(--sky)">選擇 '+mc+'</span>'+
       '<span class="tag" style="color:var(--grn)">申論 '+es+'</span>';
 
-    var prevEl=document.getElementById('bulk-q-prev-list');
-    if(prevEl) prevEl.innerHTML=parsed.map(function(q){
+    var pv=_ge('bulk-q-prev-list');
+    if(pv) pv.innerHTML=parsed.map(function(q){
       return '<div class="pi '+(q.answer||q.type==='es'?'ok':'warn')+'">'+
         '<div class="pi-n">第'+q.num+'題 · '+(q.type==='mc'?'選擇':'申論')+
         (q.answer?' · <b style="color:var(--grn)">'+q.answer+'</b>':
@@ -1331,293 +1342,198 @@ function parseBulkQ(){
         '</div><div class="pi-s">'+(q.stem||'').slice(0,80)+'</div></div>';
     }).join('');
 
-    var resEl=document.getElementById('bulk-q-result');
-    if(resEl) resEl.classList.remove('hide');
-
-    if(!parsed.length){
-      if(typeof Toast!=='undefined') Toast.warn('解析 0 題 — 格式需有題號（1. 或 1、）');
-    } else {
-      if(typeof Toast!=='undefined') Toast.success('解析完成：'+parsed.length+' 題 ✓');
-    }
-  }catch(err){
-    if(typeof Toast!=='undefined') Toast.error('解析錯誤：'+err.message);
-    console.error('[parseBulkQ]',err);
-  }
+    var r=_ge('bulk-q-result'); if(r) r.classList.remove('hide');
+    if(!parsed.length) Toast.warn('解析 0 題 — 題號格式需為 1. 或 1、');
+    else Toast.success('解析完成：'+parsed.length+' 題 ✓');
+  }catch(err){ Toast.error('解析錯誤：'+err.message); console.error(err); }
 }
 
 async function importBulkQ(){
-  var parsed=(typeof S!=='undefined')?S.bulkParsed:[];
-  if(!parsed||!parsed.length){
-    if(typeof Toast!=='undefined') Toast.warn('請先解析題目');
-    return;
-  }
+  var parsed=(typeof S!=='undefined'&&S.bulkParsed)||[];
+  if(!parsed.length){ Toast.warn('請先解析題目'); return; }
   try{
     await bulkPut('questions',parsed);
-    if(typeof Toast!=='undefined') Toast.success('已匯入 '+parsed.length+' 題 ✓');
+    Toast.success('已匯入 '+parsed.length+' 題 ✓');
     if(typeof S!=='undefined') S.bulkParsed=[];
     window._bqRaw='';
-    var t=document.getElementById('bi-text'); if(t) t.value='';
-    var a=document.getElementById('bi-ans');  if(a) a.value='';
-    var cc=document.getElementById('bq-cc');  if(cc) cc.textContent='';
-    var r=document.getElementById('bulk-q-result'); if(r) r.classList.add('hide');
+    var t=_ge('bi-text'); if(t) t.value='';
+    var a=_ge('bi-ans');  if(a) a.value='';
+    var cc=_ge('bq-cc');  if(cc) cc.textContent='';
+    var r=_ge('bulk-q-result'); if(r) r.classList.add('hide');
     closeBulkImportQ();
     if(typeof renderList==='function') renderList();
     if(typeof renderHome==='function') renderHome();
-  }catch(err){
-    if(typeof Toast!=='undefined') Toast.error('匯入失敗：'+err.message);
-  }
+  }catch(err){ Toast.error('匯入失敗：'+err.message); }
 }
 
 function clearBulkQ(){
-  var t=document.getElementById('bi-text'); if(t) t.value='';
-  var a=document.getElementById('bi-ans');  if(a) a.value='';
+  var t=_ge('bi-text'); if(t) t.value='';
+  var a=_ge('bi-ans');  if(a) a.value='';
   window._bqRaw='';
   if(typeof S!=='undefined') S.bulkParsed=[];
-  var r=document.getElementById('bulk-q-result'); if(r) r.classList.add('hide');
-  var cc=document.getElementById('bq-cc'); if(cc) cc.textContent='';
+  var r=_ge('bulk-q-result'); if(r) r.classList.add('hide');
+  var cc=_ge('bq-cc'); if(cc) cc.textContent='';
 }
 
-/* ── ei-bulk tab 的函數（讀 eb-* ID）── */
+/* ══ ei-bulk tab（讀 eb-* ID）══════════════ */
 function parseBulk(){
   try{
-    var el=document.getElementById('eb-text');
-    if(!el){if(typeof Toast!=='undefined')Toast.warn('找不到輸入框');return;}
-    var text=el.value||'';
-    if(!text.trim()){if(typeof Toast!=='undefined')Toast.warn('請先貼入題目文字');return;}
-    var parsed=parseBulkText(text);
+    var el=_ge('eb-text');
+    if(!el||!el.value.trim()){ Toast.warn('請先貼入題目文字'); return; }
+    var parsed=parseBulkText(el.value);
     if(typeof S!=='undefined') S.bulkParsed=parsed;
-    var ansMap=typeof parseAnswerStr==='function'?parseAnswerStr((document.getElementById('eb-ans')||{}).value||''):{};
-    var part=(document.getElementById('bi-part')||{}).value||'';
-    var chap=(document.getElementById('bi-chapter')||{}).value||'';
-    var sect=(document.getElementById('bi-section')||{}).value||'';
+    var ansMap=typeof parseAnswerStr==='function'?parseAnswerStr(_gv('eb-ans')):{};
+    var part=_gv('bi-part'),chap=_gv('bi-chapter'),sect=_gv('bi-section');
     parsed.forEach(function(q,i){
       var n=parseInt(q.num)||i+1;
       if(ansMap[n]) q.answer=ansMap[n];
-      if(part) q.part=part.trim();
-      if(chap) q.chapter=chap.trim();
-      if(sect) q.section=sect.trim();
+      if(part) q.part=part; if(chap) q.chapter=chap; if(sect) q.section=sect;
     });
     var mc=parsed.filter(function(q){return q.type==='mc';}).length;
     var es=parsed.filter(function(q){return q.type==='es';}).length;
-    var st=document.getElementById('bulk-stats');
+    var st=_ge('bulk-stats');
     if(st) st.innerHTML='<span class="tag">'+parsed.length+' 題</span><span class="tag">選擇 '+mc+'</span><span class="tag">申論 '+es+'</span>';
-    var pv=document.getElementById('prev-list');
+    var pv=_ge('prev-list');
     if(pv) pv.innerHTML=parsed.map(function(q){
       return '<div class="pi '+(q.answer||q.type==='es'?'ok':'warn')+'"><div class="pi-n">第'+q.num+'題 · '+(q.type==='mc'?'選擇':'申論')+(q.answer?' · '+q.answer:'')+'</div><div class="pi-s">'+(q.stem||'').slice(0,60)+'</div></div>';
     }).join('');
-    var r=document.getElementById('bulk-result');
-    if(r) r.classList.remove('hide');
+    var r=_ge('bulk-result'); if(r) r.classList.remove('hide');
     if(!parsed.length) Toast.warn('解析0題'); else Toast.success('解析完成：'+parsed.length+' 題 ✓');
-  }catch(err){if(typeof Toast!=='undefined')Toast.error('解析錯誤：'+err.message);}
+  }catch(err){ Toast.error('解析錯誤：'+err.message); }
 }
 async function importBulk(){
-  if(!S||!S.bulkParsed||!S.bulkParsed.length){Toast.warn('請先解析');return;}
-  var sub=(document.getElementById('eb-sub')||{}).value||'';
-  var yr =(document.getElementById('eb-yr') ||{}).value||'';
-  var ex =(document.getElementById('eb-ex') ||{}).value||'';
-  var items=S.bulkParsed.map(function(q){return Object.assign({},q,{subject:sub||q.subject||'',year:yr||q.year||'',exam:ex||q.exam||''});});
+  if(typeof S==='undefined'||!S.bulkParsed||!S.bulkParsed.length){ Toast.warn('請先解析'); return; }
+  var sub=_gv('eb-sub'),yr=_gv('eb-yr'),ex=_gv('eb-ex');
+  var items=S.bulkParsed.map(function(q){
+    return Object.assign({},q,{subject:sub||q.subject||'',year:yr||q.year||'',exam:ex||q.exam||''});
+  });
   try{
     await bulkPut('questions',items);
     Toast.success('已匯入 '+items.length+' 題 ✓');
     S.bulkParsed=[];
-    var r=document.getElementById('bulk-result'); if(r) r.classList.add('hide');
-    renderHome();
-  }catch(err){Toast.error('匯入失敗：'+err.message);}
+    var r=_ge('bulk-result'); if(r) r.classList.add('hide');
+    if(typeof renderHome==='function') renderHome();
+  }catch(err){ Toast.error('匯入失敗：'+err.message); }
 }
 function clearBulk(){
-  ['eb-text','eb-ans'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-  ['bi-part','bi-chapter','bi-section'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['eb-text','eb-ans'].forEach(function(id){var e=_ge(id);if(e)e.value='';});
+  ['bi-part','bi-chapter','bi-section'].forEach(function(id){var e=_ge(id);if(e)e.value='';});
   if(typeof S!=='undefined') S.bulkParsed=[];
-  var r=document.getElementById('bulk-result'); if(r) r.classList.add('hide');
+  var r=_ge('bulk-result'); if(r) r.classList.add('hide');
 }
 
-/* ── 題目/資料閱覽 tab 切換 ── */
+/* ══ 新增資料 sheet — 文字/圖片切換 ══════ */
+window._lcMode='text';   /* 目前模式 */
+window._lcImgData='';    /* base64 圖片 */
+
+function lcSwitch(mode){
+  window._lcMode=mode;
+  var ta=_ge('lc-text-area'), ia=_ge('lc-img-area');
+  var tb=_ge('lc-txt-btn'),   ib=_ge('lc-img-btn');
+  if(mode==='text'){
+    if(ta) ta.style.display='';
+    if(ia) ia.style.display='none';
+    if(tb){ tb.style.background='var(--pur)'; tb.style.color='#fff'; tb.style.border='none'; }
+    if(ib){ ib.style.background='var(--bg3)'; ib.style.color='var(--t1)'; ib.style.border='1px solid var(--bd)'; }
+  }else{
+    if(ta) ta.style.display='none';
+    if(ia) ia.style.display='';
+    if(tb){ tb.style.background='var(--bg3)'; tb.style.color='var(--t1)'; tb.style.border='1px solid var(--bd)'; }
+    if(ib){ ib.style.background='var(--pur)'; ib.style.color='#fff'; ib.style.border='none'; }
+  }
+}
+
+function lcImgLoad(input){
+  var file=input.files[0]; if(!file) return;
+  if(file.size>5*1024*1024){ Toast.warn('圖片請小於 5MB'); return; }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    window._lcImgData=e.target.result;
+    var prev=_ge('lc-img-preview');
+    if(prev) prev.innerHTML='<img src="'+e.target.result+'" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain">';
+    var nm=_ge('lc-img-name'); if(nm) nm.textContent=file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* 覆蓋 saveLaw，支援圖片模式 */
+async function saveLaw(){
+  try{
+    var name=_gv('l-name').trim();
+    if(!name){ Toast.warn('請填寫名稱'); return; }
+    var art=_gv('l-art').trim();
+    var content='';
+    if(window._lcMode==='image'){
+      if(!window._lcImgData){ Toast.warn('請選擇圖片'); return; }
+      content=window._lcImgData;
+    }else{
+      content=_gv('l-content').trim();
+      if(!content){ Toast.warn('請填寫內容'); return; }
+    }
+    var kwStr=_gv('l-kw').trim();
+    var relStr=_gv('l-related').trim();
+    var editId=typeof S!=='undefined'?S.editLawId:null;
+    var rec={
+      lawName:   name,
+      article:   art,
+      articleNumber: parseInt((art.match(/\d+/)||[])[0])||0,
+      title:     _gv('l-title-field').trim(),
+      chapter:   _gv('l-chapter').trim(),
+      content:   content,
+      contentType: window._lcMode,
+      category:  _gv('l-cat')||'statute',
+      keywords:  kwStr?kwStr.split(/[,，、]+/).map(function(k){return k.trim();}).filter(Boolean):[],
+      relatedLaws: relStr?relStr.split(/[,，、]+/).map(function(r){return {ref:r.trim()};}).filter(function(r){return r.ref;}):[],
+      source:    _gv('l-src').trim(),
+      note:      _gv('l-note').trim(),
+      updatedAt: Date.now(),
+    };
+    if(editId){ rec.id=editId; await dp('laws',rec); Toast.success('已更新 ✓'); }
+    else{ rec.createdAt=Date.now(); await dc('laws',rec); Toast.success('已新增 ✓'); }
+    closeLawSh();
+    if(typeof renderDB==='function') renderDB();
+    else if(typeof renderLaws==='function') renderLaws();
+  }catch(err){ Toast.error('儲存失敗：'+err.message); console.error(err); }
+}
+
+/* showAddLaw 覆蓋：重置圖片狀態 */
+var _origShowAddLaw=typeof showAddLaw==='function'?showAddLaw:null;
+function showAddLaw(q){
+  /* 重置 */
+  window._lcMode='text'; window._lcImgData='';
+  var prev=_ge('lc-img-preview');
+  if(prev) prev.innerHTML='<span style="font-size:28px">📷</span><span style="font-size:12px;color:var(--t2)">點擊選擇圖片</span>';
+  var nm=_ge('lc-img-name'); if(nm) nm.textContent='';
+  var inp=_ge('lc-img-input'); if(inp) inp.value='';
+  lcSwitch('text');
+  /* 呼叫原始函數 */
+  if(_origShowAddLaw) _origShowAddLaw(q);
+}
+
+/* ══ 資料庫卡片點擊（switchBrowseTab）══════ */
 function switchBrowseTab(tab,btn){
-  // 只切換這兩個 tab 按鈕
-  var tq=document.getElementById('tab-q-browse');
-  var td=document.getElementById('tab-d-browse');
+  var tq=_ge('tab-q-browse'), td=_ge('tab-d-browse');
   if(tq) tq.classList.remove('on');
   if(td) td.classList.remove('on');
   if(btn) btn.classList.add('on');
-  var qP=document.getElementById('browse-q-panel');
-  var dP=document.getElementById('browse-d-panel');
+  var qP=_ge('browse-q-panel'), dP=_ge('browse-d-panel');
   if(tab==='q'){
-    if(qP) qP.style.display='';
-    if(dP) dP.style.display='none';
+    if(qP) qP.style.display=''; if(dP) dP.style.display='none';
     if(typeof renderInlineList==='function') renderInlineList();
   }else{
-    if(qP) qP.style.display='none';
-    if(dP) dP.style.display='';
-    // 重新載入法條資料
+    if(qP) qP.style.display='none'; if(dP) dP.style.display='';
     (async function(){
       try{
-        if(typeof da==='function') window._inlineLaws=await da('laws');
-        if(typeof _buildInlineLawChips==='function') _buildInlineLawChips();
-        if(typeof renderInlineLawList==='function') renderInlineLawList();
-      }catch(e){console.error(e);}
+        if(typeof da==='function'){
+          window._inlineLaws=await da('laws');
+          if(typeof _buildInlineLawChips==='function') _buildInlineLawChips();
+          if(typeof renderInlineLawList==='function') renderInlineLawList();
+        }
+      }catch(e){ console.error(e); }
     })();
   }
 }
 
-/* ── openLawGroup 完整覆蓋（修正章節 tag 排列、資料頁點擊） ── */
-const LEVEL_STYLE = {
-  part:    { color:'#1f6feb', border:'#1f6feb', bg:'rgba(31,111,235,0.18)',  size:'14px', fw:'800', pt:'10px', pb:'4px',  mt:'16px', ml:'0',   br:'0 8px 8px 0', bw:'4px', label:'編' },
-  chapter: { color:'#58a6ff', border:'#58a6ff', bg:'rgba(88,166,255,0.13)',  size:'13px', fw:'700', pt:'7px',  pb:'3px',  mt:'10px', ml:'0',   br:'0 6px 6px 0', bw:'3px', label:'章' },
-  section: { color:'#a5d6ff', border:'#a5d6ff', bg:'rgba(165,214,255,0.08)', size:'12px', fw:'600', pt:'4px',  pb:'2px',  mt:'5px',  ml:'18px',br:'0 4px 4px 0', bw:'2px', label:'節' },
-};
-
-async function openLawGroup(lawName){
-  try{
-    const allLaws = await da('laws');
-    const kw = ($el('lsi')?.value||'').toLowerCase().trim();
-    let kwLaw2='', kwArt2='', kwText2=kw;
-    const sm = kw.match(/^(.*?)§\s*(\d+)\s*$/);
-    if(sm){ kwLaw2=sm[1].trim().toLowerCase(); kwArt2=sm[2]; kwText2=''; }
-
-    const laws = allLaws.filter(l=>{
-      if(l.lawName!==lawName) return false;
-      if(!kw) return true;
-      if(kwArt2) return String(l.articleNumber||'')===kwArt2;
-      const h=((l.article||'')+(l.title||'')+(l.content||'')).toLowerCase();
-      return h.includes(kwText2);
-    }).sort((a,b)=>(a.articleNumber||0)-(b.articleNumber||0));
-
-    if(!laws.length) return;
-
-    /* ── header ── */
-    const cat=laws[0].category||'statute';
-    const icon=cat==='sop'?'📋':cat==='supplement'?'📄':'⚖';
-    const lvNameEl=$el('lv-name')||$el('lv-title');
-    if(lvNameEl) lvNameEl.textContent=icon+' '+lawName;
-    const lvSubEl=$el('lv-sub'); if(lvSubEl) lvSubEl.textContent='共 '+laws.length+' 條';
-    const lvInfo=$el('lv-info');
-    if(lvInfo){
-      const s=laws[0]||{};
-      lvInfo.textContent=(s.org?'🏛 '+s.org:'')+(s.org&&s.amendDate?' · ':'')+( s.amendDate?'📅 '+s.amendDate:'');
-      lvInfo.style.display=(s.org||s.amendDate)?'block':'none';
-    }
-    const sb=$el('lv-star');
-    if(sb){
-      const favN=laws.filter(l=>l.favorite).length;
-      sb.textContent=favN?'★':'☆';
-      sb.style.color=favN?'var(--org)':'var(--t2)';
-      sb.onclick=async()=>{
-        const nf=laws.filter(l=>l.favorite).length>0;
-        for(const l of laws){l.favorite=!nf;await dp('laws',l);}
-        openLawGroup(lawName);
-      };
-    }
-
-    /* ── 章節分組（有序） ── */
-    const _seenP=new Set(),_seenC=new Set(),_seenS=new Set();
-    const parts=[],chapters=[],sections=[];
-    laws.forEach(l=>{
-      if(l.part    &&!_seenP.has(l.part))   {_seenP.add(l.part);    parts.push(l.part);}
-      if(l.chapter &&!_seenC.has(l.chapter)){_seenC.add(l.chapter); chapters.push(l.chapter);}
-      if(l.section &&!_seenS.has(l.section)){_seenS.add(l.section); sections.push(l.section);}
-    });
-    const hasPart=parts.length>0, hasCh=chapters.length>0, hasSec=sections.length>0;
-
-    /* ── 搜尋關鍵字高亮 ── */
-    const _hlKw=($el('lsi')?.value||'').trim();
-    const _hlRe=_hlKw&&!_hlKw.includes('§')
-      ?new RegExp('('+_hlKw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi')
-      :null;
-    const _hl=text=>{
-      const escaped=esc(text||'');
-      if(!_hlRe) return escaped.replace(/\n/g,'<br>');
-      return escaped.replace(_hlRe,m=>'<mark style="background:#d4a438;color:#121212;border-radius:2px;padding:0 2px">'+m+'</mark>').replace(/\n/g,'<br>');
-    };
-
-    /* ── 渲染標題 ── */
-    const mkHeading=(type,text)=>{
-      if(!text) return '';
-      const s=LEVEL_STYLE[type]||LEVEL_STYLE.chapter;
-      const id='ch-'+encodeURIComponent(type+'-'+text);
-      return '<div id="'+id+'" style="font-size:'+s.size+';font-weight:'+s.fw+';color:'+s.color+
-        ';padding:'+s.pt+' 14px '+s.pb+';margin-top:'+s.mt+';margin-left:'+s.ml+
-        ';border-left:'+s.bw+' solid '+s.border+';background:'+s.bg+
-        ';border-radius:'+s.br+';display:flex;align-items:center;gap:6px;letter-spacing:.4px;line-height:1.4">'+
-        '<span style="opacity:.7;font-size:10px;font-weight:400;border:1px solid '+s.border+
-          ';border-radius:3px;padding:0 4px;margin-right:2px">'+s.label+'</span>'+
-        esc(text)+'</div>';
-    };
-
-    /* ── 渲染條文卡片 ── */
-    const mkArtCard=l=>{
-      const isImg=l.content&&l.content.startsWith('data:image');
-      const contentHtml=isImg
-        ?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px;cursor:zoom-in" onclick="openImgViewer(this.src)">'
-        :_hl(l.content||'');
-      const kwHtml=(l.keywords||[]).length?'<div style="margin-top:8px">'+l.keywords.map(k=>'<span class="tag">'+esc(k)+'</span>').join('')+'</div>':'';
-      const relHtml=(l.relatedLaws||[]).length
-        ?'<div style="margin-top:9px;font-size:11px;color:var(--t2)">🔗 關聯法條：</div>'+
-          l.relatedLaws.map(r=>'<button class="chip" style="font-size:11px;margin:2px" onclick="showLawPop(\''+esc(r.ref||r.lawName||'')+'\')">⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('')
-        :'';
-      return '<div style="margin-bottom:12px;padding:12px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--pur2)">'+
-        '<div style="font-size:14px;font-weight:700;color:var(--acc);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">'+
-          '<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'+
-          '<div style="display:flex;gap:6px">'+
-            '<button onclick="editLawInView('+l.id+')" style="background:none;border:none;color:var(--t2);font-size:12px;cursor:pointer">✏</button>'+
-            '<button onclick="delLaw('+l.id+')" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">🗑</button>'+
-          '</div>'+
-        '</div>'+
-        '<div style="font-size:14px;line-height:1.85;color:var(--t1)">'+contentHtml+'</div>'+
-        kwHtml+relHtml+
-      '</div>';
-    };
-
-    /* ── 主要渲染（一次遍歷） ── */
-    let arts='';
-    let lastP='__', lastC='__', lastS='__';
-    laws.forEach(l=>{
-      const p=l.part||'', c=l.chapter||'', s=l.section||'';
-      if(hasPart  && p!==lastP){ if(p) arts+=mkHeading('part',p);    lastP=p; lastC='__'; lastS='__'; }
-      if(hasCh    && c!==lastC){ if(c) arts+=mkHeading('chapter',c); lastC=c; lastS='__'; }
-      if(hasSec   && s!==lastS){ if(s) arts+=mkHeading('section',s); lastS=s; }
-      arts+=mkArtCard(l);
-    });
-
-    /* ── 章節快速跳轉列 ── */
-    const chapterList=[
-      ...parts.map(t=>({text:t,type:'part'})),
-      ...chapters.map(t=>({text:t,type:'chapter'})),
-      ...sections.map(t=>({text:t,type:'section'})),
-    ];
-    const chTagsHtml=chapterList.map(({text,type})=>{
-      const s=LEVEL_STYLE[type]||LEVEL_STYLE.chapter;
-      return '<span class="tag" style="color:'+s.color+';background:'+s.bg+';border:1px solid '+s.border+
-        ';cursor:pointer;margin:2px;font-size:11px" onclick="scrollToChapter(this,\''+encodeURIComponent(text)+'\',\''+type+'\')">'+
-        '<span style="opacity:.65;font-size:9px;border:1px solid '+s.border+';border-radius:3px;padding:0 3px;margin-right:3px">'+s.label+'</span>'+
-        esc(text)+'</span>';
-    }).join('');
-
-    const chMgrBtn='<button onclick="openChapterMgr(window.currentLawName)" style="background:none;border:1px solid var(--bd);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--t2);margin-left:4px">⚙ 管理章節</button>';
-    const chMgrBtnNew='<div style="margin-bottom:6px"><button onclick="openChapterMgr(window.currentLawName)" style="background:none;border:1px solid var(--bd);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--t2)">⚙ 新增章節分類</button></div>';
-    const chapterMgmtHtml=chapterList.length
-      ?'<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--t2);margin-bottom:6px">章節</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">'+chTagsHtml+'</div>'+chMgrBtn+'</div>'
-      :chMgrBtnNew;
-
-    /* ── 其他法規快速跳轉 ── */
-    const others=[...new Set(allLaws.map(l=>l.lawName).filter(Boolean))].filter(n=>n!==lawName).slice(0,8);
-    const jumpHtml=others.map(n=>'<button class="chip" style="flex-shrink:0;font-size:11px" onclick="openLawGroup(\''+esc(n)+'\')">'+esc(n)+'</button>').join('');
-
-    const lbodyEl=$el('lbody')||$el('lv-body');
-    if(lbodyEl) lbodyEl.innerHTML=
-      '<div style="padding:4px 0 10px">'+
-      (others.length?'<div class="sec" style="padding:0 0 4px;font-size:11px">快速跳轉</div><div style="overflow-x:auto;display:flex;gap:6px;padding:6px 0">'+jumpHtml+'</div>':'')+
-      '<div class="sec" style="padding:8px 0 6px;font-size:11px">'+esc(lawName)+' · '+laws.length+' 條</div>'+
-      chapterMgmtHtml+
-      arts+
-      '</div>';
-
-    window.currentLawName=lawName;
-    window.currentLawContent=laws.map(l=>l.article+' '+l.content).join('\n');
-    S.curLawName=lawName;
-    $el('lv').style.display='flex';
-
-  }catch(e){ logError('openLawGroup',e); }
-}
 </script>
 
 </body>
