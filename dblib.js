@@ -132,7 +132,7 @@ const _debouncedRenderDB = debounce(renderDB, 220);
 /* ── 篩選 / 排序 ─────────────────────────────────────────────── */
 function setLawCat(cat,btn){
   DB_STATE.lawCat=cat;
-  document.querySelectorAll('[onclick*="setLawCat"]').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('#lchips .chip').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
   renderDB();
 }

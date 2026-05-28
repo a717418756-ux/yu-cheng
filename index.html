@@ -1119,46 +1119,54 @@ if('serviceWorker' in navigator){
       <button onclick="closeLawSh()" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:14px;display:flex;align-items:center;justify-content:center">✕</button>
     </div>
     <div style="padding:0 16px 16px">
+      <!-- 基本資訊 -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="fi-group">
-        <div><label class="fi-label">法律名稱</label><input class="fi allow-select" id="l-name" placeholder="警察職權行使法"></div>
+        <div><label class="fi-label">名稱／法律名稱 *</label><input class="fi allow-select" id="l-name" placeholder="警察職權行使法"></div>
         <div><label class="fi-label">條號</label><input class="fi allow-select" id="l-art" placeholder="第6條"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="fi-group">
         <div><label class="fi-label">章節（可空）</label><input class="fi allow-select" id="l-chapter" placeholder="第一章 總則"></div>
-        <div><label class="fi-label">標題（可空）</label><input class="fi allow-select" id="l-title-field" placeholder="臨檢"></div>
+        <div><label class="fi-label">標題（可空）</label><input class="fi allow-select" id="l-title" placeholder="臨檢"></div>
       </div>
+      <!-- 類別 -->
       <div class="fi-group">
         <label class="fi-label">類別</label>
-        <select class="fi" id="l-cat">
-          <option value="statute">法規條文</option>
-          <option value="sop">SOP</option>
-          <option value="supplement">補充資料</option>
-          <option value="interpretation">函釋</option>
+        <select class="fi" id="l-cat" onchange="toggleSOPMode()">
+          <option value="statute">⚖ 法規條文（文字）</option>
+          <option value="sop">📋 SOP（圖片）</option>
+          <option value="supplement">📄 補充資料（文字或圖片）</option>
+          <option value="interpretation">📝 函釋（文字或圖片）</option>
         </select>
       </div>
-      <div class="fi-group">
-        <label class="fi-label">內容類型</label>
-        <div style="display:flex;gap:8px;margin-bottom:8px">
-          <button id="lc-txt-btn" onclick="lcSwitch('text')" style="flex:1;padding:8px;border-radius:8px;background:var(--pur);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer">📝 文字</button>
-          <button id="lc-img-btn" onclick="lcSwitch('image')" style="flex:1;padding:8px;border-radius:8px;background:var(--bg3);color:var(--t1);border:1px solid var(--bd);font-size:13px;font-weight:600;cursor:pointer">🖼 圖片</button>
-        </div>
-        <div id="lc-text-area">
-          <label class="fi-label">內容 *</label>
-          <textarea class="fi allow-select" id="l-content" rows="6" placeholder="法條文字、SOP 步驟、補充說明..." style="resize:none"></textarea>
-        </div>
-        <div id="lc-img-area" style="display:none">
-          <label class="fi-label">上傳圖片</label>
-          <div id="lc-img-preview" style="width:100%;min-height:120px;border:2px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;cursor:pointer;background:var(--bg1);margin-bottom:8px" onclick="document.getElementById('lc-img-input').click()">
-            <span style="font-size:28px">📷</span>
-            <span style="font-size:12px;color:var(--t2)">點擊選擇圖片</span>
-          </div>
-          <input type="file" id="lc-img-input" accept="image/*" style="display:none" onchange="lcImgLoad(this)">
-          <div id="lc-img-name" style="font-size:11px;color:var(--t2);margin-bottom:4px"></div>
+      <!-- 文字/圖片切換（supplement / interpretation 才顯示） -->
+      <div id="l-img-toggle-wrap" class="fi-group" style="display:none">
+        <div style="display:flex;gap:8px">
+          <button onclick="switchLawMode('text')" style="flex:1;padding:8px;border-radius:8px;background:var(--bg3);border:1px solid var(--bd);color:var(--t1);font-size:13px;cursor:pointer">📝 文字</button>
+          <button onclick="switchLawMode('img')"  style="flex:1;padding:8px;border-radius:8px;background:var(--bg3);border:1px solid var(--bd);color:var(--t1);font-size:13px;cursor:pointer">🖼 圖片</button>
         </div>
       </div>
+      <!-- 文字內容 -->
+      <div id="l-content-wrap" class="fi-group">
+        <label class="fi-label">內容 *</label>
+        <textarea class="fi allow-select" id="l-content" rows="6" placeholder="法條文字、SOP步驟、補充說明..." style="resize:none"></textarea>
+      </div>
+      <!-- 圖片上傳 -->
+      <div id="l-img-wrap" class="fi-group hide">
+        <label class="fi-label">上傳圖片</label>
+        <div id="l-img-prev" style="width:100%;min-height:100px;border:2px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;cursor:pointer;background:var(--bg1);margin-bottom:8px;overflow:hidden" onclick="document.getElementById('l-img-input').click()">
+          <span style="font-size:28px;pointer-events:none">📷</span>
+          <span style="font-size:12px;color:var(--t2);pointer-events:none">點擊選擇圖片（JPG / PNG）</span>
+        </div>
+        <input type="file" id="l-img-input" accept="image/*" style="display:none" onchange="onLawImgSelect(event)">
+      </div>
+      <!-- 其他欄位 -->
       <div class="fi-group"><label class="fi-label">關鍵字</label><input class="fi allow-select" id="l-kw" placeholder="臨檢,比例原則"></div>
-      <div class="fi-group"><label class="fi-label">關聯法條（母法/子法）</label><input class="fi allow-select" id="l-related" placeholder="憲法§108,警察法施行細則"></div>
-      <div class="fi-group"><label class="fi-label">來源</label><input class="fi allow-select" id="l-src" placeholder="全國法規資料庫"></div>
+      <div class="fi-group"><label class="fi-label">關聯法條</label><input class="fi allow-select" id="l-related" placeholder="憲法§108,警察法施行細則"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" class="fi-group">
+        <div><label class="fi-label">來源</label><input class="fi allow-select" id="l-src" placeholder="全國法規資料庫"></div>
+        <div><label class="fi-label">制定機關</label><input class="fi allow-select" id="l-org" list="l-org-list" placeholder="內政部警政署"><datalist id="l-org-list"></datalist></div>
+      </div>
+      <div class="fi-group"><label class="fi-label">修正日期</label><input class="fi allow-select" id="l-amend" placeholder="民國113年1月1日"></div>
       <div class="fi-group"><label class="fi-label">備註</label><textarea class="fi allow-select" id="l-note" rows="2" placeholder="個人標記、補充說明..." style="resize:none"></textarea></div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn-ghost" onclick="closeLawSh()" style="flex:1;padding:13px">取消</button>
@@ -1232,9 +1240,9 @@ if('serviceWorker' in navigator){
       </div>
       <div class="fi-group">
         <label class="fi-label">貼入考題文字</label>
-        <textarea class="fi allow-select" id="bi-text" rows="8" placeholder="1. 下列何者為警察之任務？&#10;(A) 維持公共秩序&#10;(B) 保護社會安全&#10;(C) 防止一切危害&#10;(D) 以上皆是&#10;&#10;2. 警察法第幾條規定警察任務？" style="resize:none;min-height:160px" oninput="window._bqRaw=this.value;var cc=document.getElementById('bq-cc');if(cc)cc.textContent=this.value.trim()?'✓ '+this.value.length+' 字':'';" onchange="window._bqRaw=this.value;" onpaste="var _t=this;setTimeout(function(){window._bqRaw=_t.value;var cc=document.getElementById('bq-cc');if(cc)cc.textContent=_t.value.trim()?'✓ '+_t.value.length+' 字':'';},80);"></textarea>
+        <textarea class="fi allow-select" id="bi-text" rows="8" placeholder="1. 下列何者為警察之任務？&#10;(A) 維持公共秩序&#10;(B) 保護社會安全&#10;(C) 防止一切危害&#10;(D) 以上皆是&#10;&#10;2. 警察法第幾條規定警察任務？" style="resize:none;min-height:160px" oninput="window._bqRaw=this.value;var cc=document.getElementById('bq-char-count');if(cc)cc.textContent=this.value.trim()?'✓ '+this.value.length+' 字':'';" onpaste="var _t=this;setTimeout(function(){window._bqRaw=_t.value;var cc=document.getElementById('bq-char-count');if(cc)cc.textContent=_t.value.trim()?'✓ '+_t.value.length+' 字':'';},80);"></textarea>
       </div>
-      <div id="bq-cc" style="font-size:11px;color:var(--t3);text-align:right;margin:-4px 0 8px;min-height:14px"></div>
+      <div id="bq-char-count" style="font-size:11px;color:var(--t3);text-align:right;margin:-4px 0 8px;min-height:14px"></div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <button class="btn-ghost" onclick="clearBulkQ()" style="flex:1;padding:11px">清除</button>
         <button onclick="parseBulkQ()" style="flex:2;padding:11px;border-radius:12px;background:var(--sky);color:#0a0c10;font-size:14px;font-weight:700;border:none">🔍 解析預覽</button>
@@ -1266,275 +1274,8 @@ if('serviceWorker' in navigator){
      JAVASCRIPT MODULES
 ══════════════════════════════════════════════════ -->
 <script src="app.js"></script>
+<script src="qlib.js"></script>
+<script src="dblib.js"></script>
 <script src="loading.js"></script>
-
-<script>
-/* ═══════════════════════════════════════════
-   PATCH SCRIPT — 載入於 app.js 之後，覆蓋有問題的函數
-   修正：(1)大量貼題 (2)ei-bulk tab (3)新增資料含圖片
-═══════════════════════════════════════════ */
-
-/* ── 工具：安全取 DOM 值 ── */
-function _gv(id){ var e=document.getElementById(id); return e?e.value||'':''; }
-function _ge(id){ return document.getElementById(id); }
-
-/* ══ 大量貼題 Overlay ══════════════════════ */
-function openBulkImportQ(){
-  window._bqRaw = '';
-  var cc=_ge('bq-cc'); if(cc) cc.textContent='';
-  var r=_ge('bulk-q-result'); if(r) r.classList.add('hide');
-  if(typeof S!=='undefined') S.bulkParsed=[];
-  _ge('bulk-q-ov').style.display='flex';
-}
-function closeBulkImportQ(){ _ge('bulk-q-ov').style.display='none'; }
-
-function parseBulkQ(){
-  try{
-    /* 三重讀取：DOM value → window._bqRaw → innerText */
-    var el=_ge('bi-text'), text='';
-    if(el && el.value && el.value.trim())         text=el.value;
-    else if(window._bqRaw && window._bqRaw.trim()) text=window._bqRaw;
-    else if(el && el.innerText && el.innerText.trim()) text=el.innerText;
-
-    if(!text.trim()){ Toast.warn('請先貼入題目文字'); return; }
-
-    /* 更新快取與字數 */
-    window._bqRaw=text;
-    var cc=_ge('bq-cc');
-    if(cc) cc.textContent='✓ '+text.length+' 字';
-
-    if(typeof parseBulkText!=='function'){ alert('解析模組未載入'); return; }
-    var parsed=parseBulkText(text);
-    if(typeof S!=='undefined') S.bulkParsed=parsed;
-
-    /* 套答案串 */
-    var ansStr=_gv('bi-ans');
-    if(ansStr.trim() && typeof parseAnswerStr==='function'){
-      var ansMap=parseAnswerStr(ansStr);
-      parsed.forEach(function(q,i){
-        var n=parseInt(q.num)||i+1;
-        if(ansMap[n]) q.answer=ansMap[n];
-      });
-    }
-    /* 套欄位 */
-    var sub=_gv('bi-sub'), yr=_gv('bi-yr'), ex=_gv('bi-ex');
-    parsed.forEach(function(q){
-      if(sub) q.subject=sub;
-      if(yr)  q.year=yr;
-      if(ex)  q.exam=ex;
-    });
-
-    var mc=parsed.filter(function(q){return q.type==='mc';}).length;
-    var es=parsed.filter(function(q){return q.type==='es';}).length;
-
-    var st=_ge('bulk-q-stats');
-    if(st) st.innerHTML=
-      '<span class="tag">共 '+parsed.length+' 題</span>'+
-      '<span class="tag" style="color:var(--sky)">選擇 '+mc+'</span>'+
-      '<span class="tag" style="color:var(--grn)">申論 '+es+'</span>';
-
-    var pv=_ge('bulk-q-prev-list');
-    if(pv) pv.innerHTML=parsed.map(function(q){
-      return '<div class="pi '+(q.answer||q.type==='es'?'ok':'warn')+'">'+
-        '<div class="pi-n">第'+q.num+'題 · '+(q.type==='mc'?'選擇':'申論')+
-        (q.answer?' · <b style="color:var(--grn)">'+q.answer+'</b>':
-         q.type==='mc'?'<span style="color:var(--red)"> ⚠ 無答案</span>':'')+
-        '</div><div class="pi-s">'+(q.stem||'').slice(0,80)+'</div></div>';
-    }).join('');
-
-    var r=_ge('bulk-q-result'); if(r) r.classList.remove('hide');
-    if(!parsed.length) Toast.warn('解析 0 題 — 題號格式需為 1. 或 1、');
-    else Toast.success('解析完成：'+parsed.length+' 題 ✓');
-  }catch(err){ Toast.error('解析錯誤：'+err.message); console.error(err); }
-}
-
-async function importBulkQ(){
-  var parsed=(typeof S!=='undefined'&&S.bulkParsed)||[];
-  if(!parsed.length){ Toast.warn('請先解析題目'); return; }
-  try{
-    await bulkPut('questions',parsed);
-    Toast.success('已匯入 '+parsed.length+' 題 ✓');
-    if(typeof S!=='undefined') S.bulkParsed=[];
-    window._bqRaw='';
-    var t=_ge('bi-text'); if(t) t.value='';
-    var a=_ge('bi-ans');  if(a) a.value='';
-    var cc=_ge('bq-cc');  if(cc) cc.textContent='';
-    var r=_ge('bulk-q-result'); if(r) r.classList.add('hide');
-    closeBulkImportQ();
-    if(typeof renderList==='function') renderList();
-    if(typeof renderHome==='function') renderHome();
-  }catch(err){ Toast.error('匯入失敗：'+err.message); }
-}
-
-function clearBulkQ(){
-  var t=_ge('bi-text'); if(t) t.value='';
-  var a=_ge('bi-ans');  if(a) a.value='';
-  window._bqRaw='';
-  if(typeof S!=='undefined') S.bulkParsed=[];
-  var r=_ge('bulk-q-result'); if(r) r.classList.add('hide');
-  var cc=_ge('bq-cc'); if(cc) cc.textContent='';
-}
-
-/* ══ ei-bulk tab（讀 eb-* ID）══════════════ */
-function parseBulk(){
-  try{
-    var el=_ge('eb-text');
-    if(!el||!el.value.trim()){ Toast.warn('請先貼入題目文字'); return; }
-    var parsed=parseBulkText(el.value);
-    if(typeof S!=='undefined') S.bulkParsed=parsed;
-    var ansMap=typeof parseAnswerStr==='function'?parseAnswerStr(_gv('eb-ans')):{};
-    var part=_gv('bi-part'),chap=_gv('bi-chapter'),sect=_gv('bi-section');
-    parsed.forEach(function(q,i){
-      var n=parseInt(q.num)||i+1;
-      if(ansMap[n]) q.answer=ansMap[n];
-      if(part) q.part=part; if(chap) q.chapter=chap; if(sect) q.section=sect;
-    });
-    var mc=parsed.filter(function(q){return q.type==='mc';}).length;
-    var es=parsed.filter(function(q){return q.type==='es';}).length;
-    var st=_ge('bulk-stats');
-    if(st) st.innerHTML='<span class="tag">'+parsed.length+' 題</span><span class="tag">選擇 '+mc+'</span><span class="tag">申論 '+es+'</span>';
-    var pv=_ge('prev-list');
-    if(pv) pv.innerHTML=parsed.map(function(q){
-      return '<div class="pi '+(q.answer||q.type==='es'?'ok':'warn')+'"><div class="pi-n">第'+q.num+'題 · '+(q.type==='mc'?'選擇':'申論')+(q.answer?' · '+q.answer:'')+'</div><div class="pi-s">'+(q.stem||'').slice(0,60)+'</div></div>';
-    }).join('');
-    var r=_ge('bulk-result'); if(r) r.classList.remove('hide');
-    if(!parsed.length) Toast.warn('解析0題'); else Toast.success('解析完成：'+parsed.length+' 題 ✓');
-  }catch(err){ Toast.error('解析錯誤：'+err.message); }
-}
-async function importBulk(){
-  if(typeof S==='undefined'||!S.bulkParsed||!S.bulkParsed.length){ Toast.warn('請先解析'); return; }
-  var sub=_gv('eb-sub'),yr=_gv('eb-yr'),ex=_gv('eb-ex');
-  var items=S.bulkParsed.map(function(q){
-    return Object.assign({},q,{subject:sub||q.subject||'',year:yr||q.year||'',exam:ex||q.exam||''});
-  });
-  try{
-    await bulkPut('questions',items);
-    Toast.success('已匯入 '+items.length+' 題 ✓');
-    S.bulkParsed=[];
-    var r=_ge('bulk-result'); if(r) r.classList.add('hide');
-    if(typeof renderHome==='function') renderHome();
-  }catch(err){ Toast.error('匯入失敗：'+err.message); }
-}
-function clearBulk(){
-  ['eb-text','eb-ans'].forEach(function(id){var e=_ge(id);if(e)e.value='';});
-  ['bi-part','bi-chapter','bi-section'].forEach(function(id){var e=_ge(id);if(e)e.value='';});
-  if(typeof S!=='undefined') S.bulkParsed=[];
-  var r=_ge('bulk-result'); if(r) r.classList.add('hide');
-}
-
-/* ══ 新增資料 sheet — 文字/圖片切換 ══════ */
-window._lcMode='text';   /* 目前模式 */
-window._lcImgData='';    /* base64 圖片 */
-
-function lcSwitch(mode){
-  window._lcMode=mode;
-  var ta=_ge('lc-text-area'), ia=_ge('lc-img-area');
-  var tb=_ge('lc-txt-btn'),   ib=_ge('lc-img-btn');
-  if(mode==='text'){
-    if(ta) ta.style.display='';
-    if(ia) ia.style.display='none';
-    if(tb){ tb.style.background='var(--pur)'; tb.style.color='#fff'; tb.style.border='none'; }
-    if(ib){ ib.style.background='var(--bg3)'; ib.style.color='var(--t1)'; ib.style.border='1px solid var(--bd)'; }
-  }else{
-    if(ta) ta.style.display='none';
-    if(ia) ia.style.display='';
-    if(tb){ tb.style.background='var(--bg3)'; tb.style.color='var(--t1)'; tb.style.border='1px solid var(--bd)'; }
-    if(ib){ ib.style.background='var(--pur)'; ib.style.color='#fff'; ib.style.border='none'; }
-  }
-}
-
-function lcImgLoad(input){
-  var file=input.files[0]; if(!file) return;
-  if(file.size>5*1024*1024){ Toast.warn('圖片請小於 5MB'); return; }
-  var reader=new FileReader();
-  reader.onload=function(e){
-    window._lcImgData=e.target.result;
-    var prev=_ge('lc-img-preview');
-    if(prev) prev.innerHTML='<img src="'+e.target.result+'" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain">';
-    var nm=_ge('lc-img-name'); if(nm) nm.textContent=file.name;
-  };
-  reader.readAsDataURL(file);
-}
-
-/* 覆蓋 saveLaw，支援圖片模式 */
-async function saveLaw(){
-  try{
-    var name=_gv('l-name').trim();
-    if(!name){ Toast.warn('請填寫名稱'); return; }
-    var art=_gv('l-art').trim();
-    var content='';
-    if(window._lcMode==='image'){
-      if(!window._lcImgData){ Toast.warn('請選擇圖片'); return; }
-      content=window._lcImgData;
-    }else{
-      content=_gv('l-content').trim();
-      if(!content){ Toast.warn('請填寫內容'); return; }
-    }
-    var kwStr=_gv('l-kw').trim();
-    var relStr=_gv('l-related').trim();
-    var editId=typeof S!=='undefined'?S.editLawId:null;
-    var rec={
-      lawName:   name,
-      article:   art,
-      articleNumber: parseInt((art.match(/\d+/)||[])[0])||0,
-      title:     _gv('l-title-field').trim(),
-      chapter:   _gv('l-chapter').trim(),
-      content:   content,
-      contentType: window._lcMode,
-      category:  _gv('l-cat')||'statute',
-      keywords:  kwStr?kwStr.split(/[,，、]+/).map(function(k){return k.trim();}).filter(Boolean):[],
-      relatedLaws: relStr?relStr.split(/[,，、]+/).map(function(r){return {ref:r.trim()};}).filter(function(r){return r.ref;}):[],
-      source:    _gv('l-src').trim(),
-      note:      _gv('l-note').trim(),
-      updatedAt: Date.now(),
-    };
-    if(editId){ rec.id=editId; await dp('laws',rec); Toast.success('已更新 ✓'); }
-    else{ rec.createdAt=Date.now(); await dc('laws',rec); Toast.success('已新增 ✓'); }
-    closeLawSh();
-    if(typeof renderDB==='function') renderDB();
-    else if(typeof renderLaws==='function') renderLaws();
-  }catch(err){ Toast.error('儲存失敗：'+err.message); console.error(err); }
-}
-
-/* showAddLaw 覆蓋：重置圖片狀態 */
-var _origShowAddLaw=typeof showAddLaw==='function'?showAddLaw:null;
-function showAddLaw(q){
-  /* 重置 */
-  window._lcMode='text'; window._lcImgData='';
-  var prev=_ge('lc-img-preview');
-  if(prev) prev.innerHTML='<span style="font-size:28px">📷</span><span style="font-size:12px;color:var(--t2)">點擊選擇圖片</span>';
-  var nm=_ge('lc-img-name'); if(nm) nm.textContent='';
-  var inp=_ge('lc-img-input'); if(inp) inp.value='';
-  lcSwitch('text');
-  /* 呼叫原始函數 */
-  if(_origShowAddLaw) _origShowAddLaw(q);
-}
-
-/* ══ 資料庫卡片點擊（switchBrowseTab）══════ */
-function switchBrowseTab(tab,btn){
-  var tq=_ge('tab-q-browse'), td=_ge('tab-d-browse');
-  if(tq) tq.classList.remove('on');
-  if(td) td.classList.remove('on');
-  if(btn) btn.classList.add('on');
-  var qP=_ge('browse-q-panel'), dP=_ge('browse-d-panel');
-  if(tab==='q'){
-    if(qP) qP.style.display=''; if(dP) dP.style.display='none';
-    if(typeof renderInlineList==='function') renderInlineList();
-  }else{
-    if(qP) qP.style.display='none'; if(dP) dP.style.display='';
-    (async function(){
-      try{
-        if(typeof da==='function'){
-          window._inlineLaws=await da('laws');
-          if(typeof _buildInlineLawChips==='function') _buildInlineLawChips();
-          if(typeof renderInlineLawList==='function') renderInlineLawList();
-        }
-      }catch(e){ console.error(e); }
-    })();
-  }
-}
-
-</script>
-
 </body>
 </html>
