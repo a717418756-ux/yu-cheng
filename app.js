@@ -1,15 +1,20 @@
 'use strict';
-/* ══ HELPERS ══ */
-function $el(id){return document.getElementById(id);}
-function $qs(s){return document.querySelector(s);}
-function $all(s){return document.querySelectorAll(s);}
-function $bind(id,ev,fn){var el=$el(id);if(!el){console.error('[DOM] missing #'+id);return;}el.addEventListener(ev,fn);}
-function uuid(){return'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});}
-function fmtTime(s){if(!s||isNaN(s))return'0:00';s=Math.floor(s);var m=Math.floor(s/60),ss=s%60;return m+':'+(ss<10?'0':'')+ss;}
-function fmtDate(ts){if(!ts)return'';var d=new Date(ts);return d.getFullYear()+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getDate().toString().padStart(2,'0');}
-function debounce(fn,ms){var t;return function(){clearTimeout(t);t=setTimeout(fn,ms);};}
 
-/* ══ TOAST ══ */
+/* ═══════════════════════════════════════════════
+   警察考題庫 Pro — app.js
+   Architecture:
+   1. B-modules: Toast, Modal, DB(KF), Store, Spaced, WaveUI
+   2. B-modules: Router, FAB
+   3. B-modules: HomePage, ImportPage, PlayerPage, ReviewPage, SLibrary
+   4. B-modules: GD (Google Drive)
+   5. A-core:    Full exam/quiz/law/stats logic (authoritative)
+   6. Patches:   switchHomeTab, filterLvArts, goKfPage, icons, etc.
+   7. B-extra:   switchStatTab, buildExportText, buildAI, GD fns
+   8. B-utils:   openBulkImportQ, setBrTab, setBrType, etc.
+   9. BOOT
+═══════════════════════════════════════════════ */
+
+/* ── 1. Toast & Modal ── */
 var Toast=(function(){
   function show(msg,type){
     type=type||'info';
@@ -22,8 +27,6 @@ var Toast=(function(){
   }
   return{success:function(m){show(m,'success');},error:function(m){show(m,'error');},warn:function(m){show(m,'warn');},info:function(m){show(m,'info');}};
 })();
-
-/* ══ MODAL ══ */
 var Modal=(function(){
   var ov,cb;
   function init(){
@@ -41,7 +44,60 @@ var Modal=(function(){
   return{init:init,show:show};
 })();
 
-/* ══ ROUTER ══ */
+/* ── 2. KF Learning DB ── */
+var DB=(function(){
+  var db;var NAME='KnowledgeForceDB',VER=1;
+  function open(){
+    return new Promise(function(res,rej){
+      var req=indexedDB.open(NAME,VER);
+      req.onupgradeneeded=function(e){
+        var d=e.target.result;
+        function mk(name,opts){if(!d.objectStoreNames.contains(name))return d.createObjectStore(name,opts);return req.transaction.objectStore(name);}
+        var questions=mk('questions',{keyPath:'id'});
+        mk('laws',{keyPath:'id'});mk('chunks',{keyPath:'id'});mk('reviews',{keyPath:'id'});
+        mk('attempts',{keyPath:'id'});mk('analytics',{keyPath:'id'});mk('settings',{keyPath:'key'});mk('courses',{keyPath:'id'});
+        try{questions.createIndex('subject','subject',{unique:false});}catch(e){}
+        try{questions.createIndex('nextReview','nextReview',{unique:false});}catch(e){}
+      };
+      req.onsuccess=function(e){db=e.target.result;res(db);};
+      req.onerror=function(){rej(req.error);};
+    });
+  }
+  function tx(store,mode){return db.transaction(store,mode).objectStore(store);}
+  function getAll(store){return new Promise(function(res,rej){var r=tx(store,'readonly').getAll();r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
+  function get(store,key){return new Promise(function(res,rej){var r=tx(store,'readonly').get(key);r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
+  function put(store,item){return new Promise(function(res,rej){var r=tx(store,'readwrite').put(item);r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
+  function del(store,key){return new Promise(function(res,rej){var r=tx(store,'readwrite').delete(key);r.onsuccess=function(){res();};r.onerror=function(){rej(r.error);};});}
+  function clear(store){return new Promise(function(res,rej){var t=db.transaction(store,'readwrite');var req=t.objectStore(store).clear();req.onsuccess=function(){res();};req.onerror=function(e){rej(e.target.error);};});}
+  return{open:open,getAll:getAll,get:get,put:put,del:del,clear:clear};
+})();
+
+/* ── 3. Store & Spaced & WaveUI ── */
+var Store=(function(){
+  var s={apiKey:'',examName:'警察升官等',examDate:null,dailyLimit:20,skipSec:10,defaultSpeed:1.0,homeSection:'study'};
+  async function load(){for(var k in s){try{var r=await DB.get('settings',k);if(r&&r.value!==undefined)s[k]=r.value;}catch(e){}}}
+  async function save(k,v){s[k]=v;try{await DB.put('settings',{key:k,value:v});}catch(e){}}
+  function get(k){return s[k];}
+  return{load:load,save:save,get:get,state:s};
+})();
+var Spaced=(function(){
+  var IVLS=[1,2,4,7,14,30];
+  function next(level,result){if(result==='pass')level=Math.min(5,level+1);else level=0;return{level:level,nextReviewAt:Date.now()+IVLS[level]*86400000};}
+  function isDue(item){return!item.nextReviewAt||Date.now()>=item.nextReviewAt;}
+  return{next:next,isDue:isDue,IVLS:IVLS};
+})();
+var WaveUI=(function(){
+  var canvas,ctx,audio,wave=[],raf;
+  function init(audioEl){canvas=$el('waveform');if(!canvas)return;ctx=canvas.getContext('2d');audio=audioEl;genWave();canvas.addEventListener('touchstart',function(e){var touch=e.touches[0];var rect=canvas.getBoundingClientRect();var x=(touch.clientX-rect.left)/rect.width;if(audio&&audio.duration)audio.currentTime=x*audio.duration;},{passive:true});canvas.addEventListener('click',function(e){var rect=canvas.getBoundingClientRect();var x=(e.clientX-rect.left)/rect.width;if(audio&&audio.duration)audio.currentTime=x*audio.duration;});}
+  function genWave(){wave=[];for(var i=0;i<180;i++){wave.push(Math.abs(0.1+Math.random()*0.9*Math.sin(i*0.14+Math.random())));}}
+  function draw(){if(!canvas||!ctx)return;var W=canvas.offsetWidth,H=canvas.height;if(canvas.width!==W)canvas.width=W;ctx.clearRect(0,0,W,H);var prog=(audio&&audio.duration)?audio.currentTime/audio.duration:0;var n=wave.length,bw=W/n;for(var i=0;i<n;i++){var amp=wave[i]*H*0.44;var x=i*bw;ctx.fillStyle=(i/n)<=prog?'rgba(232,201,107,.92)':'rgba(255,255,255,.15)';ctx.beginPath();ctx.roundRect(x+bw*.1,H/2-amp,bw*.82,amp*2,2);ctx.fill();}}
+  function startAnim(){cancelAnimationFrame(raf);tick();}
+  function stopAnim(){cancelAnimationFrame(raf);draw();}
+  function tick(){draw();if(audio&&!audio.paused)raf=requestAnimationFrame(tick);}
+  return{init:init,draw:draw,startAnim:startAnim,stopAnim:stopAnim};
+})();
+
+/* ── 4. Router ── */
 var Router=(function(){
   var current='home',hist=[],cbs={},homeSection='study';
   function _pageEl(id){return $el(id.startsWith('page-')?id:'page-'+id);}
@@ -75,118 +131,7 @@ var Router=(function(){
   return{go:go,back:back,onEnter:onEnter,initNav:initNav,setHomeSection:setHomeSection,current:function(){return current;}};
 })();
 
-/* ══ DB ══ */
-var DB=(function(){
-  var db;var NAME='KnowledgeForceDB',VER=1;
-  function open(){
-    return new Promise(function(res,rej){
-      var req=indexedDB.open(NAME,VER);
-      req.onupgradeneeded=function(e){
-        var d=e.target.result;
-        function mk(name,opts){if(!d.objectStoreNames.contains(name))return d.createObjectStore(name,opts);return req.transaction.objectStore(name);}
-        var questions=mk('questions',{keyPath:'id'});
-        mk('laws',{keyPath:'id'});mk('chunks',{keyPath:'id'});mk('reviews',{keyPath:'id'});
-        mk('attempts',{keyPath:'id'});mk('analytics',{keyPath:'id'});mk('settings',{keyPath:'key'});mk('courses',{keyPath:'id'});
-        try{questions.createIndex('subject','subject',{unique:false});}catch(e){}
-        try{questions.createIndex('nextReview','nextReview',{unique:false});}catch(e){}
-      };
-      req.onsuccess=function(e){db=e.target.result;res(db);};
-      req.onerror=function(){rej(req.error);};
-    });
-  }
-  function tx(store,mode){return db.transaction(store,mode).objectStore(store);}
-  function getAll(store){return new Promise(function(res,rej){var r=tx(store,'readonly').getAll();r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
-  function get(store,key){return new Promise(function(res,rej){var r=tx(store,'readonly').get(key);r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
-  function put(store,item){return new Promise(function(res,rej){var r=tx(store,'readwrite').put(item);r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});}
-  function del(store,key){return new Promise(function(res,rej){var r=tx(store,'readwrite').delete(key);r.onsuccess=function(){res();};r.onerror=function(){rej(r.error);};});}
-  function clear(store){return new Promise(function(res,rej){var t=db.transaction(store,'readwrite');var req=t.objectStore(store).clear();req.onsuccess=function(){res();};req.onerror=function(e){rej(e.target.error);};});}
-  return{open:open,getAll:getAll,get:get,put:put,del:del,clear:clear};
-})();
-
-/* ══ PE DB (PoliceExamPro IndexedDB - merged) ══ */
-const DB_NAME='PoliceExamPro',DB_VER=3;
-let _peDb;
-const REVIEW_INTERVALS=[1,3,7,14,30,60,180];
-function initDB(){
-  return new Promise((res,rej)=>{
-    const r=indexedDB.open(DB_NAME,DB_VER);
-    r.onupgradeneeded=e=>{
-      const d=e.target.result,oldVer=e.oldVersion;
-      if(!d.objectStoreNames.contains('questions')){
-        const s=d.createObjectStore('questions',{keyPath:'id',autoIncrement:true});
-        ['subject','createdAt','nextReview','reviewLevel','difficultyScore','type','starred'].forEach(idx=>{try{s.createIndex(idx,idx,{unique:false});}catch(e){}});
-      }
-      if(!d.objectStoreNames.contains('laws')){
-        const s=d.createObjectStore('laws',{keyPath:'id',autoIncrement:true});
-        ['lawName','category','articleNumber'].forEach(idx=>{try{s.createIndex(idx,idx,{unique:false});}catch(e){}});
-      }
-      if(!d.objectStoreNames.contains('attempts')){
-        const s=d.createObjectStore('attempts',{keyPath:'id',autoIncrement:true});
-        ['qid','date','responseTime'].forEach(idx=>{try{s.createIndex(idx,idx,{unique:false});}catch(e){}});
-      }
-      if(!d.objectStoreNames.contains('conceptGroups'))d.createObjectStore('conceptGroups',{keyPath:'id',autoIncrement:true});
-    };
-    r.onsuccess=e=>{_peDb=e.target.result;res(_peDb);};
-    r.onerror=e=>rej(e.target.error);
-  });
-}
-const _cache={},_CACHE_TTL=30000;
-function _cacheGet(key){const c=_cache[key];if(!c)return null;if(Date.now()-c.ts>_CACHE_TTL){delete _cache[key];return null;}return c.data;}
-function _cacheSet(key,data){_cache[key]={data,ts:Date.now()};}
-function _cacheInvalidate(st){delete _cache[st];}
-const dg=(st,k)=>new Promise((r,j)=>{if(!_peDb)return j(new Error('DB not ready'));const t=_peDb.transaction(st,'readonly');const q=t.objectStore(st).get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>j();});
-const da=(st,idx,qry)=>{
-  if(!idx&&!qry){const ckey=st;const cached=_cacheGet(ckey);if(cached)return Promise.resolve(cached);return new Promise((r,j)=>{if(!_peDb)return j(new Error('DB not ready'));const t=_peDb.transaction(st,'readonly');const q=t.objectStore(st).getAll();q.onsuccess=()=>{_cacheSet(ckey,q.result);r(q.result);};q.onerror=()=>j([]);});}
-  return new Promise((r,j)=>{if(!_peDb)return j(new Error('DB not ready'));const t=_peDb.transaction(st,'readonly');const o=t.objectStore(st);const q=idx?o.index(idx).getAll(qry):o.getAll();q.onsuccess=()=>r(q.result);q.onerror=()=>j([]);});
-};
-const dp=(st,data)=>new Promise((r,j)=>{if(!_peDb)return j(new Error('DB not ready'));const t=_peDb.transaction(st,'readwrite');const q=t.objectStore(st).put(data);q.onsuccess=()=>{_cacheInvalidate(st);r(q.result);};q.onerror=e=>j(e.target.error||new Error('dp failed'));t.onerror=e=>j(e.target.error||new Error('tx failed'));});
-const dd=(st,k)=>new Promise((r,j)=>{if(!_peDb)return j(new Error('DB not ready'));const t=_peDb.transaction(st,'readwrite');const req=t.objectStore(st).delete(k);req.onsuccess=()=>{_cacheInvalidate(st);r();};req.onerror=()=>j();});
-const dc=(st)=>new Promise((r,j)=>{if(!_peDb)return j(new Error('DB not ready'));const t=_peDb.transaction(st,'readwrite');const req=t.objectStore(st).clear();req.onsuccess=()=>{_cacheInvalidate(st);r();};req.onerror=()=>j();});
-function bulkPut(st,items){
-  return new Promise((res,rej)=>{
-    if(!_peDb)return rej(new Error('DB not ready'));
-    const tx=_peDb.transaction(st,'readwrite');const os=tx.objectStore(st);let n=0;
-    tx.oncomplete=()=>{_cacheInvalidate(st);res(n);};tx.onerror=e=>rej(e);
-    items.forEach(it=>{os.put(it).onsuccess=()=>n++;});
-  });
-}
-const _errLog=[];
-function logError(context,err){const entry={t:new Date().toISOString(),ctx:context,msg:err?.message||String(err)};_errLog.push(entry);if(_errLog.length>50)_errLog.shift();console.error('[PoliceExam]',context,err);}
-function calcNextReview(level,correct){if(!correct){return{level:Math.max(0,level-1),next:Date.now()+86400000};}const newLevel=Math.min(level+1,REVIEW_INTERVALS.length-1);const days=REVIEW_INTERVALS[newLevel];return{level:newLevel,next:Date.now()+days*86400000};}
-function getDangerLevel(q,recentAts){const qa=recentAts.filter(a=>a.qid===q.id).sort((a,b)=>b.date-a.date);const last3=qa.slice(0,3);const wrongStreak=last3.length>=2&&last3.every(a=>!a.correct);const lastWrong=last3.length>0&&!last3[0].correct;const hesitant=last3.some(a=>a.responseTime>40000);if(wrongStreak)return'🔴';if(lastWrong)return'🟠';if(hesitant)return'🟡';return'🟢';}
-async function getPriorityPool(mode='all'){try{const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);if(!qs.length)return[];const now=Date.now();const mcQs=qs.filter(q=>q.type==='mc');let pool=mcQs;if(mode==='wrong'){const ws=getWrong(qs,ats);pool=mcQs.filter(q=>ws.has(q.id));}else if(mode==='star'){pool=mcQs.filter(q=>q.starred);}else if(mode==='review'){pool=mcQs.filter(q=>(q.nextReview||0)<=now);}else if(mode==='new'){pool=mcQs.filter(q=>!q.reviewLevel&&q.reviewLevel!==0);}const levelOrder={'🔴':0,'🟠':1,'🟡':2,'🟢':3};pool.sort((a,b)=>{const da_=getDangerLevel(a,ats);const db_=getDangerLevel(b,ats);return(levelOrder[da_]||3)-(levelOrder[db_]||3);});return pool;}catch(e){logError('getPriorityPool',e);return[];}}
-const APP_VER='V1150527-3';
-
-/* ══ STORE ══ */
-var Store=(function(){
-  var s={apiKey:'',examName:'警察升官等',examDate:null,dailyLimit:20,skipSec:10,defaultSpeed:1.0,homeSection:'study'};
-  async function load(){for(var k in s){try{var r=await DB.get('settings',k);if(r&&r.value!==undefined)s[k]=r.value;}catch(e){}}}
-  async function save(k,v){s[k]=v;try{await DB.put('settings',{key:k,value:v});}catch(e){}}
-  function get(k){return s[k];}
-  return{load:load,save:save,get:get,state:s};
-})();
-
-/* ══ SPACED REP ══ */
-var Spaced=(function(){
-  var IVLS=[1,2,4,7,14,30];
-  function next(level,result){if(result==='pass')level=Math.min(5,level+1);else level=0;return{level:level,nextReviewAt:Date.now()+IVLS[level]*86400000};}
-  function isDue(item){return!item.nextReviewAt||Date.now()>=item.nextReviewAt;}
-  return{next:next,isDue:isDue,IVLS:IVLS};
-})();
-
-/* ══ WAVEUI ══ */
-var WaveUI=(function(){
-  var canvas,ctx,audio,wave=[],raf;
-  function init(audioEl){canvas=$el('waveform');if(!canvas)return;ctx=canvas.getContext('2d');audio=audioEl;genWave();canvas.addEventListener('touchstart',function(e){var touch=e.touches[0];var rect=canvas.getBoundingClientRect();var x=(touch.clientX-rect.left)/rect.width;if(audio&&audio.duration)audio.currentTime=x*audio.duration;},{passive:true});canvas.addEventListener('click',function(e){var rect=canvas.getBoundingClientRect();var x=(e.clientX-rect.left)/rect.width;if(audio&&audio.duration)audio.currentTime=x*audio.duration;});}
-  function genWave(){wave=[];for(var i=0;i<180;i++){wave.push(Math.abs(0.1+Math.random()*0.9*Math.sin(i*0.14+Math.random())));}}
-  function draw(){if(!canvas||!ctx)return;var W=canvas.offsetWidth,H=canvas.height;if(canvas.width!==W)canvas.width=W;ctx.clearRect(0,0,W,H);var prog=(audio&&audio.duration)?audio.currentTime/audio.duration:0;var n=wave.length,bw=W/n;for(var i=0;i<n;i++){var amp=wave[i]*H*0.44;var x=i*bw;ctx.fillStyle=(i/n)<=prog?'rgba(232,201,107,.92)':'rgba(255,255,255,.15)';ctx.beginPath();ctx.roundRect(x+bw*.1,H/2-amp,bw*.82,amp*2,2);ctx.fill();}}
-  function startAnim(){cancelAnimationFrame(raf);tick();}
-  function stopAnim(){cancelAnimationFrame(raf);draw();}
-  function tick(){draw();if(audio&&!audio.paused)raf=requestAnimationFrame(tick);}
-  return{init:init,draw:draw,startAnim:startAnim,stopAnim:stopAnim};
-})();
-
-/* ══ FAB ══ */
+/* ── 5. FAB ── */
 var FAB=(function(){
   var wrap,scrim,mainBtn,isOpen=false;
   var menus={
@@ -210,26 +155,7 @@ var FAB=(function(){
   return{init:init,close:close,update:update,updateBadge:updateBadge};
 })();
 
-/* ══ UTILS (PE) ══ */
-const S={page:'home',filter:'all',subF:'all',lawCat:'all',editId:null,editLawId:null,qType:'mc',correct:'A',quiz:{q:[],idx:0,ans:false,res:[],mode:''},curLaw:null,curLawName:'',lawSort:'name',lawSortDir:'asc',bulkParsed:[],_bulkText:'',aiMd:'',aiJson:''};
-let _lawSortBy='name';
-function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function br(s){return esc(s||'').split('\n').join('<br>').split('\r').join('');}
-function toast(m,d=2200){Toast.info(m);}
-function today(){return new Date().toISOString().slice(0,10);}
-function dl(c,fn,t='text/plain'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=fn;a.click();}
-function kwArr(s){return(s||'').split(/[,，、\s]+/).map(k=>k.trim()).filter(Boolean);}
-function cleanSpaces(text){if(!text)return text;let t=text;t=t.replace(/\u00A0/g,' ').replace(/\u200B/g,'').replace(/\uFEFF/g,'').replace(/\u3000/g,' ');t=t.replace(/[ \t]{2,}/g,' ');let prev='';while(prev!==t){prev=t;t=t.replace(/([\u4e00-\u9fff\uff00-\uffef，。！？、：；「」【】（）]) ([\u4e00-\u9fff\uff00-\uffef，。！？、：；「」【】（）])/g,'$1$2');}return t.replace(/[ \t]+$/gm,'').trim();}
-const KW_POOL=['比例原則','正當法律程序','臨檢','身分查證','即時強制','行政裁量','警械使用','強制力','合理懷疑','現行犯','通知到場','管束','扣留','警察職權','公共秩序','社會安全','行政救濟','陳述意見','書面告知','告知義務','蒐集資料','偵查','搜索','扣押','逮捕','拘提','通訊監察','秘密蒐證','釣魚偵查','控制下交付','陷害教唆','法律保留','裁量怠惰','裁量濫用','警察補充性','緊急危難','正當防衛','緊急避難','正當理由','警察勤務','勤區查察','巡邏','守望','值班','備勤','社維法','集遊法','警職法','警察法','警勤條例','警械條例'];
-function autoKeywords(text){return KW_POOL.filter(kw=>(text||'').includes(kw));}
-const ZHN={'零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000};
-function zh2n(s){let n=0,c=0;for(const ch of s){const v=ZHN[ch];if(v===undefined)continue;if(v>=10){if(c===0)c=1;n+=c*v;c=0;}else c=v;}return n+c;}
-function art2n(art){const m=art.match(/第([一二三四五六七八九十百千\d]+)條/);if(!m)return 0;const s=m[1];return/^\d+$/.test(s)?parseInt(s):zh2n(s);}
-function getWrong(qs,ats){const s=new Set();for(const q of qs){const qa=ats.filter(a=>a.qid===q.id&&a.correct!==null).sort((a,b)=>b.date>a.date?1:-1);if(!qa.length)continue;const r=qa.slice(0,3);if(r.every(a=>!a.correct)||(qa.filter(a=>!a.correct).length/qa.length>0.5&&qa.length>=2))s.add(q.id);}return s;}
-let _cfmCb=null;
-function cfm(t,s,cb){_cfmCb=cb;$el('cfm-t').textContent=t;$el('cfm-s').textContent=s;$el('cfm-ov').style.display='flex';}
-$el('cfm-ok').onclick=function(){$el('cfm-ov').style.display='none';if(_cfmCb)_cfmCb();};
-/* ══ HOME PAGE ══ */
+/* ── 6. Page modules ── */
 var HomePage=(function(){
   async function render(){
     setGreeting();setCountdown();
@@ -274,17 +200,6 @@ var HomePage=(function(){
   function setText(id,v){var el=$el(id);if(el)el.textContent=v;}
   return{render:render};
 })();
-
-function editMottoPrompt(){
-  var cur=localStorage.getItem('kfMotto')||'';
-  var val=prompt('設定主標題勉勵詞（空白=恢復預設）：',cur);
-  if(val===null)return;
-  localStorage.setItem('kfMotto',val.trim());
-  var el=$el('greetName');if(el)el.textContent=val.trim()||'加油';
-  var tag=prompt('設定副標語（可空白）：',localStorage.getItem('kfTagline')||'');
-  if(tag!==null){localStorage.setItem('kfTagline',tag.trim());var me=$el('homeMotto');if(me)me.textContent=tag.trim();}
-}
-/* ══ IMPORT PAGE ══ */
 var ImportPage=(function(){
   var pages=[],audioFile=null,tags=[];
   function init(){
@@ -321,8 +236,6 @@ var ImportPage=(function(){
   function reset(){pages=[];audioFile=null;tags=[];}
   return{init:init,reset:reset};
 })();
-$el('imgPrevOv').addEventListener('click',function(){this.classList.remove('open');});
-/* ══ PLAYER PAGE ══ */
 var PlayerPage=(function(){
   var courseId=null,currentSlide=0,playState=false;
   var audio=null;
@@ -382,7 +295,6 @@ var PlayerPage=(function(){
   }
   return{init:init,load:load};
 })();
-/* ══ REVIEW PAGE ══ */
 var ReviewPage=(function(){
   async function render(){
     try{
@@ -408,7 +320,6 @@ var ReviewPage=(function(){
   async function start(){Toast.info('複習功能開發中');}
   return{render:render,start:start};
 })();
-/* ══ S LIBRARY ══ */
 var SLibrary=(function(){
   function init(){}
   async function render(){
@@ -421,57 +332,217 @@ var SLibrary=(function(){
   }
   return{init:init,render:render};
 })();
-/* ══ SETTINGS PAGE ══ */
-var SettingsPage=(function(){
+
+/* ── 7. Google Drive ── */
+const GD = (function(){
+  const BACKUP_FILENAME = 'KnowledgeForce_backup.json';
+  const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+  let _token = null;
+  let _tokenClient = null;
+  let _userInfo = null;
+
+  /* ── 讀取 client id ── */
+  function _getClientId(){
+    const el = $el('gd-client-id');
+    const saved = localStorage.getItem('gdClientId');
+    if(el && el.value.trim()) return el.value.trim();
+    return saved || '';
+  }
+  function _saveClientId(id){ localStorage.setItem('gdClientId', id); }
+
+  /* ── UI state helpers ── */
+  function _setStatus(text, cls){
+    const pill = $el('gd-status-pill');
+    if(!pill) return;
+    pill.textContent = text;
+    pill.className = 'gd-status ' + (cls || 'gd-idle');
+  }
+  function _setLoading(btnId, loading){
+    const btn = $el(btnId);
+    if(!btn) return;
+    btn.disabled = loading;
+  }
+  function _showAuth(authed){
+    const ua = $el('gd-unauth'), aa = $el('gd-auth');
+    if(ua) ua.style.display = authed ? 'none' : '';
+    if(aa) aa.style.display = authed ? '' : 'none';
+  }
+  function _setLastSync(text){
+    const el = $el('gd-last-sync');
+    if(el) el.textContent = text;
+  }
+
+  /* ── 初始化（每次進設定頁呼叫） ── */
   function init(){
-    var en=$el('examNameInput');var ed=$el('examDateInput');var ak=$el('apiKeyInput');
-    var savedName=Store.get('examName');var savedDate=Store.get('examDate');var savedKey=Store.get('apiKey');
-    if(en&&savedName)en.value=savedName;
-    if(ed&&savedDate)ed.value=savedDate;
-    if(ak&&savedKey)ak.value=savedKey;
-    var sname=$el('setExamName');if(sname&&savedName)sname.textContent=savedName;
-    renderDbInfo();
-    if(typeof GD!=='undefined') GD.init();
+    const savedId = localStorage.getItem('gdClientId');
+    const clientIdEl = $el('gd-client-id');
+    if(savedId && clientIdEl) clientIdEl.value = savedId;
+    const lastSync = localStorage.getItem('gdLastSync');
+    if(lastSync) _setLastSync('上次同步：' + lastSync);
+    if(_token){
+      _showAuth(true);
+      _setStatus('已連線', 'gd-ok');
+    } else {
+      _showAuth(false);
+      _setStatus('未連線', 'gd-idle');
+    }
   }
-  async function renderDbInfo(){
+
+  /* ── 登入 ── */
+  async function signIn(){
+    const clientId = _getClientId();
+    if(!clientId || !clientId.includes('.apps.googleusercontent.com')){
+      Toast.warn('請先填入正確的 Client ID');
+      return;
+    }
+    _saveClientId(clientId);
+    /* 確認 GSI 已載入 */
+    if(typeof google === 'undefined' || !google.accounts){
+      Toast.error('Google Identity 函式庫尚未載入，請稍候再試');
+      return;
+    }
+    _tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: SCOPES,
+      callback: async (resp) => {
+        if(resp.error){ Toast.error('授權失敗：' + resp.error); return; }
+        _token = resp.access_token;
+        /* 取得使用者資訊 */
+        try{
+          const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: 'Bearer ' + _token }
+          });
+          _userInfo = await r.json();
+          const nameEl = $el('gd-user-name');
+          const emailEl = $el('gd-user-email');
+          const avatarEl = $el('gd-user-avatar');
+          if(nameEl) nameEl.textContent = _userInfo.name || '使用者';
+          if(emailEl) emailEl.textContent = _userInfo.email || '';
+          if(avatarEl){
+            if(_userInfo.picture) avatarEl.innerHTML = '<img src="'+_userInfo.picture+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover">';
+            else avatarEl.textContent = (_userInfo.name||'U')[0];
+          }
+        }catch(e){ /* 不影響主流程 */ }
+        _showAuth(true);
+        _setStatus('已連線 ✓', 'gd-ok');
+        Toast.success('Google 帳號授權成功 ✓');
+      }
+    });
+    _tokenClient.requestAccessToken({ prompt: 'consent' });
+  }
+
+  /* ── 登出 ── */
+  function signOut(){
+    if(_token && typeof google !== 'undefined'){
+      try{ google.accounts.oauth2.revoke(_token, ()=>{}); }catch(e){}
+    }
+    _token = null; _userInfo = null;
+    _showAuth(false);
+    _setStatus('未連線', 'gd-idle');
+    Toast.info('已登出 Google');
+  }
+
+  /* ── 找到已存在的備份檔 ID ── */
+  async function _findFileId(){
+    const r = await fetch(
+      'https://www.googleapis.com/drive/v3/files?q=name%3D%22'+encodeURIComponent(BACKUP_FILENAME)+'%22+and+trashed%3Dfalse&fields=files(id,name,modifiedTime)',
+      { headers: { Authorization: 'Bearer ' + _token } }
+    );
+    const data = await r.json();
+    return (data.files && data.files.length) ? data.files[0] : null;
+  }
+
+  /* ── 備份 ── */
+  async function backup(){
+    if(!_token){ Toast.warn('請先登入 Google'); return; }
+    _setLoading('gd-btn-backup', true);
+    _setStatus('備份中…', 'gd-warn');
     try{
-      var[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
-      var subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
-      $el('db-info').innerHTML='題目：'+qs.length+'<br>法條：'+ls.length+'<br>作答：'+ats.length+'<br>科目：'+(subs.join('、')||'（無）')+'<br>題型：選擇 '+qs.filter(q=>q.type==='mc').length+' / 申論 '+qs.filter(q=>q.type==='es').length;
-      $el('exp-info').textContent=qs.length+' 題・'+ls.length+' 條・'+ats.length+' 筆';
-    }catch(e){}
+      const [qs, ats, ls] = await Promise.all([da('questions'), da('attempts'), da('laws')]);
+      const payload = JSON.stringify({
+        version: 2, exportedAt: new Date().toISOString(),
+        questions: qs, laws: ls, attempts: ats
+      }, null, 2);
+      const existing = await _findFileId();
+      let url, method;
+      const meta = { name: BACKUP_FILENAME, mimeType: 'application/json' };
+      if(existing){
+        url = 'https://www.googleapis.com/upload/drive/v3/files/'+existing.id+'?uploadType=multipart';
+        method = 'PATCH';
+      } else {
+        url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+        method = 'POST';
+      }
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+      form.append('file', new Blob([payload], { type: 'application/json' }));
+      const r = await fetch(url, {
+        method, headers: { Authorization: 'Bearer ' + _token }, body: form
+      });
+      if(!r.ok){ const e = await r.json(); throw new Error(e.error?.message || r.status); }
+      const now = new Date().toLocaleString('zh-TW');
+      localStorage.setItem('gdLastSync', now);
+      _setLastSync('上次同步：' + now);
+      _setStatus('已備份 ✓', 'gd-ok');
+      Toast.success('已備份至 Google Drive ✓（'+qs.length+' 題・'+ls.length+' 條）');
+    }catch(e){
+      _setStatus('備份失敗', 'gd-err');
+      Toast.error('備份失敗：' + (e.message || String(e)));
+      logError('gdBackup', e);
+    }finally{
+      _setLoading('gd-btn-backup', false);
+      setTimeout(()=>_setStatus('已連線', 'gd-ok'), 3000);
+    }
   }
-  return{init:init};
+
+  /* ── 還原 ── */
+  async function restore(){
+    if(!_token){ Toast.warn('請先登入 Google'); return; }
+    cfm('從雲端還原', '將覆蓋寫入現有資料（題目不重複），確定繼續？', async function(){
+      _setLoading('gd-btn-restore', true);
+      _setStatus('還原中…', 'gd-warn');
+      try{
+        const file = await _findFileId();
+        if(!file){ Toast.warn('雲端尚無備份檔案'); _setStatus('已連線', 'gd-ok'); return; }
+        const r = await fetch('https://www.googleapis.com/drive/v3/files/'+file.id+'?alt=media', {
+          headers: { Authorization: 'Bearer ' + _token }
+        });
+        if(!r.ok) throw new Error('下載失敗 ' + r.status);
+        const data = await r.json();
+        const qs = Array.isArray(data.questions) ? data.questions.map(({id,...x})=>x) : [];
+        const ls = Array.isArray(data.laws) ? data.laws.map(({id,...x})=>x) : [];
+        const as_ = Array.isArray(data.attempts) ? data.attempts.map(({id,...x})=>x) : [];
+        await bulkPut('questions', qs);
+        if(ls.length) await bulkPut('laws', ls);
+        if(as_.length) await bulkPut('attempts', as_);
+        const now = new Date().toLocaleString('zh-TW');
+        localStorage.setItem('gdLastSync', now);
+        _setLastSync('上次同步：' + now);
+        _setStatus('已還原 ✓', 'gd-ok');
+        Toast.success('已從雲端還原 ✓（'+qs.length+' 題・'+ls.length+' 條）');
+        renderHome(); SettingsPage.init();
+      }catch(e){
+        _setStatus('還原失敗', 'gd-err');
+        Toast.error('還原失敗：' + (e.message || String(e)));
+        logError('gdRestore', e);
+      }finally{
+        _setLoading('gd-btn-restore', false);
+        setTimeout(()=>{ if(_token) _setStatus('已連線', 'gd-ok'); }, 3000);
+      }
+    });
+  }
+
+  return { init, signIn, signOut, backup, restore };
 })();
 
-async function saveExamSettings(){
-  var name=($el('examNameInput').value||'').trim();var date=$el('examDateInput').value;
-  if(!name){Toast.warn('請輸入考試名稱');return;}
-  await Store.save('examName',name);if(date)await Store.save('examDate',date);
-  var sname=$el('setExamName');if(sname)sname.textContent=name;
-  Toast.success('考試設定已儲存 ✓');
-  await HomePage.render();
-}
-async function saveApiKey(){
-  var key=($el('apiKeyInput').value||'').trim();
-  if(!key){Toast.warn('請輸入 API Key');return;}
-  await Store.save('apiKey',key);Toast.success('API Key 已儲存 ✓');
-}
-/* ══ EXAM (PE Quiz) ══ */
-let _qStart=0;
-const peQuiz={q:[],idx:0,ans:false,res:[],mode:'',_selected:new Set()};
-
-function goKfPage(id){Router.go(id.startsWith('page-')?id:'page-'+id);}
-function openExamMenu(){const el=$el('exam-menu');if(el){el.style.display='flex';}}
-function closeExamMenu(){const el=$el('exam-menu');if(el){el.style.display='none';}}
-
+/* ── 8. A-core (exam/quiz/law/stats — complete & authoritative) ── */
 
 // ══ db.js — IndexedDB 核心 v3 ═══════════════════════════════
-// DB_NAME, DB_VER already declared above
+const DB_NAME='PoliceExamPro', DB_VER=3;
 let db;
 
 // 遺忘曲線複習間隔（天）
-// REVIEW_INTERVALS already declared above
+const REVIEW_INTERVALS=[1,3,7,14,30,60,180];
 
 function initDB(){
   return new Promise((res,rej)=>{
@@ -531,20 +602,48 @@ function initDB(){
   });
 }
 
-// already declared above (with _peDb safety check)
-// const da already declared above (with cache + _peDb check)
+const dg=(st,k)=>new Promise((r,j)=>{const t=db.transaction(st,'readonly');const q=t.objectStore(st).get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>j();});
+const da=(st,idx,qry)=>{
+  // 無 idx/qry 的全量讀取才快取
+  if(!idx&&!qry){
+    const ckey=st;
+    const cached=_cacheGet(ckey);
+    if(cached)return Promise.resolve(cached);
+    return new Promise((r,j)=>{
+      const t=db.transaction(st,'readonly');
+      const q=t.objectStore(st).getAll();
+      q.onsuccess=()=>{_cacheSet(ckey,q.result);r(q.result);};
+      q.onerror=()=>j([]);
+    });
+  }
+  return new Promise((r,j)=>{const t=db.transaction(st,'readonly');const o=t.objectStore(st);const q=idx?o.index(idx).getAll(qry):o.getAll();q.onsuccess=()=>r(q.result);q.onerror=()=>j([]);});
+};
+const dp=(st,data)=>new Promise((r,j)=>{const t=db.transaction(st,'readwrite');const q=t.objectStore(st).put(data);q.onsuccess=()=>{_cacheInvalidate(st);r(q.result);};q.onerror=e=>j(e.target.error||new Error('dp failed'));t.onerror=e=>j(e.target.error||new Error('tx failed'));});
+const dd=(st,k)=>new Promise((r,j)=>{const t=db.transaction(st,'readwrite');const req=t.objectStore(st).delete(k);req.onsuccess=()=>{_cacheInvalidate(st);r();};req.onerror=()=>j();});
+const dc=(st)=>new Promise((r,j)=>{const t=db.transaction(st,'readwrite');const req=t.objectStore(st).clear();req.onsuccess=()=>{_cacheInvalidate(st);r();};req.onerror=()=>j();});
 
-// already declared above (with _peDb safety check)
-// already declared above (with _peDb safety check)
-// already declared above (with _peDb safety check)
+function bulkPut(st,items){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(st,'readwrite');
+    const os=tx.objectStore(st);
+    let n=0;
+    tx.oncomplete=()=>{_cacheInvalidate(st);res(n);};
+    tx.onerror=e=>rej(e);
+    items.forEach(it=>{os.put(it).onsuccess=()=>n++;});
+  });
+}
 
-// bulkPut already declared above (using _peDb)
 // ── 錯誤記錄（輕量版，避免無聲失敗）────────────────────────
-// const _errLog=[]; -- already declared above
-// logError already declared above
+const _errLog=[];
+function logError(context, err){
+  const entry={t:new Date().toISOString(),ctx:context,msg:err?.message||String(err)};
+  _errLog.push(entry);
+  if(_errLog.length>50)_errLog.shift(); // 最多保留50筆
+  console.error('[PoliceExam]',context,err);
+}
 // ── 輕量快取（避免重複全量讀取）────────────────────────────
-// _cache already declared above
-// _CACHE_TTL already declared above
+const _cache={};
+const _CACHE_TTL=30000; // 30秒 TTL（操作後自動失效）
 
 function _cacheGet(key){
   const c=_cache[key];
@@ -556,17 +655,65 @@ function _cacheSet(key,data){ _cache[key]={data,ts:Date.now()}; }
 function _cacheInvalidate(st){ delete _cache[st]; }
 
 // ── 遺忘曲線核心 ────────────────────────────────────────────
-// calcNextReview already declared above
+function calcNextReview(level, correct){
+  if(!correct){
+    // 答錯：降級，明天再複習
+    return {level:Math.max(0,level-1), next:Date.now()+86400000};
+  }
+  const newLevel=Math.min(level+1, REVIEW_INTERVALS.length-1);
+  const days=REVIEW_INTERVALS[newLevel];
+  return {level:newLevel, next:Date.now()+days*86400000};
+}
 
 // ── 取今日待複習題目 ────────────────────────────────────────
 // ── 取今日新題（從未複習）────────────────────────────────────
 // ── 危險等級計算 ─────────────────────────────────────────────
-// getDangerLevel already declared above
+function getDangerLevel(q, recentAts){
+  const qa=recentAts.filter(a=>a.qid===q.id).sort((a,b)=>b.date-a.date);
+  const last3=qa.slice(0,3);
+  const wrongStreak=last3.length>=2&&last3.every(a=>!a.correct);
+  const lastWrong=last3.length>0&&!last3[0].correct;
+  const hesitant=last3.some(a=>a.responseTime>40000);
+  if(wrongStreak) return '🔴';  // 連錯2次以上
+  if(lastWrong) return '🟠';   // 最近答錯
+  if(hesitant) return '🟡';    // 猶豫超過40秒
+  return '🟢';                  // 穩定
+}
 
-// APP_VER already declared above
+// ── 優先排序：危險題優先 ─────────────────────────────────────
+async function getPriorityPool(mode='all'){  try{
+  const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
+  if(!qs.length) return [];
+  const now=Date.now();
+
+  // 測驗只取選擇題（申論題在題目閱覽瀏覽，不進測驗模式）
+  const mcQs=qs.filter(q=>q.type==='mc');
+  let pool=mcQs;
+  if(mode==='wrong'){const ws=getWrong(qs,ats);pool=mcQs.filter(q=>ws.has(q.id));}
+  else if(mode==='star'){pool=mcQs.filter(q=>q.starred);}
+  else if(mode==='review'){pool=mcQs.filter(q=>(q.nextReview||0)<=now);}
+  else if(mode==='new'){pool=mcQs.filter(q=>!q.reviewLevel&&q.reviewLevel!==0);}
+
+  // 按危險等級排序
+  const levelOrder={'🔴':0,'🟠':1,'🟡':2,'🟢':3};
+  pool.sort((a,b)=>{
+    const da_=getDangerLevel(a,ats);
+    const db_=getDangerLevel(b,ats);
+    return (levelOrder[da_]||3)-(levelOrder[db_]||3);
+  });
+  return pool;
+  }catch(e){ logError('getPriorityPool',e); return []; }}
+
+const APP_VER = 'v115052401';
 // ══ utils.js — 工具函式 ═════════════════════════════════════
 // 全域狀態
-// S already declared above
+const S = {
+  page:'home', filter:'all', subF:'all', lawCat:'all',
+  editId:null, editLawId:null,
+  qType:'mc', correct:'A',
+  quiz:{q:[],idx:0,ans:false,res:[],mode:''},
+  curLaw:null, curLawName:'', lawSort:'name', bulkParsed:[], aiMd:'', aiJson:''
+};
 
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function br(s){ return esc(s||'').split('\n').join('<br>').split('\r').join(''); }
@@ -597,11 +744,18 @@ function cleanSpaces(text){
 }
 
 // 關鍵字自動提取
-// KW_POOL already declared above
+const KW_POOL = ['比例原則','正當法律程序','臨檢','身分查證','即時強制','行政裁量',
+  '警械使用','強制力','合理懷疑','現行犯','通知到場','管束','扣留',
+  '警察職權','公共秩序','社會安全','行政救濟','陳述意見','書面告知',
+  '告知義務','蒐集資料','偵查','搜索','扣押','逮捕','拘提',
+  '通訊監察','秘密蒐證','釣魚偵查','控制下交付','陷害教唆',
+  '法律保留','裁量怠惰','裁量濫用','警察補充性','緊急危難','正當防衛',
+  '緊急避難','正當理由','警察勤務','勤區查察','巡邏','臨檢','守望',
+  '值班','備勤','社維法','集遊法','警職法','警察法','警勤條例','警械條例'];
 function autoKeywords(text){ return KW_POOL.filter(kw=>(text||'').includes(kw)); }
 
 // 條號轉數字
-// ZHN already declared above
+const ZHN = {'零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000};
 function zh2n(s){ let n=0,c=0;for(const ch of s){const v=ZHN[ch];if(v===undefined)continue;if(v>=10){if(c===0)c=1;n+=c*v;c=0;}else c=v;}return n+c; }
 function art2n(art){ const m=art.match(/第([一二三四五六七八九十百千\d]+)條/);if(!m)return 0;const s=m[1];return /^\d+$/.test(s)?parseInt(s):zh2n(s); }
 
@@ -627,6 +781,7 @@ function debounce(fn, delay=200){
 }
 
 // Confirm dialog
+let _cfmCb=null;
 function cfm(t,s,cb){
   _cfmCb=cb;
   document.getElementById('cfm-t').textContent=t;
@@ -965,6 +1120,7 @@ function parseBulkText(text){
 // ══ quiz.js — 刷題模式（含遺忘曲線、計時、危險等級）══════
 // 依賴：db.js, utils.js
 
+let _qStart=0; // 題目開始時間
 
 function openExamMenu(){
   const el=document.getElementById('exam-menu');
@@ -1558,6 +1714,8 @@ function setCorr(k){
   });
 }
 
+const _debouncedRenderList=debounce(renderList,200);
+const _debouncedRenderDB=debounce(renderDB,220);
 
 async function saveQ(){
   try{
@@ -1893,7 +2051,24 @@ function setLSort(el,sort){
   el.classList.add('on');S.lawSort=sort;renderDB();
 }
 
-// LEVEL_STYLE is defined in the boot section below
+const LEVEL_STYLE = {
+  // ── 由外而內：深藍(編) > 藍(章) > 淺藍(節) ───────────────
+  part: {
+    color:'#1f6feb', border:'#1f6feb', bg:'rgba(31,111,235,0.18)',
+    size:'14px', fw:'800', pt:'10px', pb:'4px', mt:'16px', ml:'0',
+    br:'0 8px 8px 0', bw:'4px', label:'編',
+  },
+  chapter: {
+    color:'#58a6ff', border:'#58a6ff', bg:'rgba(88,166,255,0.13)',
+    size:'13px', fw:'700', pt:'7px', pb:'3px', mt:'10px', ml:'0',
+    br:'0 6px 6px 0', bw:'3px', label:'章',
+  },
+  section: {
+    color:'#a5d6ff', border:'#a5d6ff', bg:'rgba(165,214,255,0.08)',
+    size:'12px', fw:'600', pt:'4px', pb:'2px', mt:'5px', ml:'18px',
+    br:'0 4px 4px 0', bw:'2px', label:'節',
+  },
+};
 
 async function openLawGroup(lawName){  try{
   const allLaws=await da('laws');
@@ -2849,6 +3024,7 @@ function setBrType(el, typeFilter){
 }
 
 function browseSearch(){ renderBrowseList(); }
+const _debouncedBrowseSearch=debounce(browseSearch,200);
 
 function renderBrowseList(){
   const kw=(document.getElementById('br-search')?.value||'').toLowerCase().trim();
@@ -3804,7 +3980,348 @@ function delCountdown(id){
 // ══ nav.js — 導覽與初始化 ══════════════════════════════
 // 依賴：全部模組
 
+function goPage(pg,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.add('hide'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  const el=document.getElementById('pg-'+pg);if(el)el.classList.remove('hide');
+  if(btn)btn.classList.add('on');
+  else{const b=document.querySelector(`.nb[onclick*="'${pg}'"]`);if(b)b.classList.add('on');}
+  S.page=pg;
+  ({home:renderHome,list:renderList,laws:renderDB,db:renderDB,stats:renderStats,set:renderSet,bulk:()=>{},groups:renderGroups})[pg]?.();
+}
 
+async function init(){  try{
+  await initDB();
+  buildOpts({});
+  goPage('home',document.querySelector('.nb'));
+  if(typeof applyIconSettings==='function') applyIconSettings();
+  }catch(e){logError('init',e);document.body.innerHTML='<div style="padding:20px;color:red">⚠ 初始化失敗：'+e.message+'</div>';}
+}
+init().then(()=>{
+  if(typeof applyCustomIcons==="function") applyCustomIcons();
+  // 填入版本號
+  const verEl=document.getElementById('app-ver');
+  if(verEl) verEl.textContent=typeof APP_VER!=='undefined'?APP_VER:'';
+});
+
+
+
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{});});}
+
+
+/* ── 9. Patches & new helpers ── */
+
+/* ── Home tab switch ── */
+function switchHomeTab(tab, btn) {
+  document.querySelectorAll('.sec-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  var sp = document.getElementById('study-panel');
+  var ep = document.getElementById('exam-panel');
+  if (sp) sp.style.display = tab === 'study' ? '' : 'none';
+  if (ep) ep.style.display = tab === 'exam'  ? '' : 'none';
+  if (tab === 'study' && typeof HomePage !== 'undefined') HomePage.render();
+}
+
+/* ── Page router alias ── */
+function goKfPage(id) { goPage(id.replace(/^page-pg-/,'').replace(/^page-/,'').replace(/^pg-/,'')); }
+
+/* ── Icon customisation ── */
+function openIconEditor() {
+  var ov = document.getElementById('icon-ov');
+  if (!ov) return;
+  var icons = JSON.parse(localStorage.getItem('customIcons') || '{}');
+  var defs = [
+    {key:'home',label:'首頁',def:'🏠'},{key:'list',label:'題目',def:'📚'},
+    {key:'db',label:'資料庫',def:'🗄'},{key:'stats',label:'統計',def:'📊'},
+    {key:'groups',label:'群組',def:'🧩'},{key:'set',label:'設定',def:'⚙️'}
+  ];
+  var el = document.getElementById('icon-list');
+  if (el) {
+    el.innerHTML = '';
+    defs.forEach(function(d) {
+      var row = document.createElement('div');
+      row.className = 'icon-row';
+      var btn = document.createElement('button');
+      btn.className = 'icon-btn-edit';
+      btn.textContent = icons[d.key] || d.def;
+      btn.dataset.iconKey = d.key;
+      btn.onclick = function() { promptIconEdit(d.key, btn); };
+      var lbl = document.createElement('div');
+      lbl.className = 'icon-label';
+      lbl.textContent = d.label;
+      row.appendChild(btn);
+      row.appendChild(lbl);
+      el.appendChild(row);
+    });
+  }
+  ov.classList.add('on');
+}
+function closeIconEditor() { var ov=document.getElementById('icon-ov'); if(ov)ov.classList.remove('on'); }
+function promptIconEdit(key, btn) {
+  var cur = btn.textContent;
+  var v = prompt('輸入新 emoji 圖示：', cur);
+  if (!v) return;
+  var icons = JSON.parse(localStorage.getItem('customIcons') || '{}');
+  icons[key] = v;
+  localStorage.setItem('customIcons', JSON.stringify(icons));
+  btn.textContent = v;
+}
+function resetAllIcons() {
+  if (!confirm('確定重置所有圖示？')) return;
+  localStorage.removeItem('customIcons');
+  toast('已重置，重新整理頁面生效');
+}
+function applyIconSettings() { /* icons applied via openIconEditor */ }
+function applyCustomIcons()  { /* icons applied via openIconEditor */ }
+
+/* ── Save exam settings ── */
+function saveExamSettings() {
+  var name = (document.getElementById('examNameInput') || {}).value || '';
+  var date = (document.getElementById('examDateInput') || {}).value || '';
+  if (name) localStorage.setItem('examName', name);
+  if (date) localStorage.setItem('examDate', date);
+  toast('考試設定已儲存 ✓');
+  renderCountdown();
+}
+function saveApiKey() {
+  var key = (document.getElementById('apiKeyInput') || {}).value || '';
+  if (key) { localStorage.setItem('aiApiKey', key); toast('API Key 已儲存 ✓'); }
+}
+
+/* ── filterLvArts ── */
+function filterLvArts() {
+  var kw = ((document.getElementById('lv-search') || {}).value || '').trim().toLowerCase();
+  var el = document.getElementById('lbody');
+  if (!el) return;
+  el.querySelectorAll('[style*="margin-bottom:12px"]').forEach(function(row) {
+    row.style.display = (!kw || row.textContent.toLowerCase().includes(kw)) ? '' : 'none';
+  });
+}
+
+/* ── Toast stack (for B's Modal.init) ── */
+if (!document.getElementById('toast-stack')) {
+  var _ts = document.createElement('div');
+  _ts.id = 'toast-stack';
+  document.body.appendChild(_ts);
+}
+
+
+/* ── 10. B-extra: stat tabs, export, AI, GD proxies ── */
+function switchStatTab(tab,btn){
+  document.querySelectorAll('[id^="stab-"]').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  ['overview','export','ai'].forEach(t=>{
+    const el=document.getElementById('stat-'+t+'-panel');
+    if(el)el.style.display=t===tab?'':'none';
+  });
+}
+function setExportLimit(n,btn){
+  _exportLimit=n;
+  document.querySelectorAll('[id^="elim-"]').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+}
+function setAIModel(m,btn){
+  _aiModel=m;
+  document.querySelectorAll('[id^="aimodel-"]').forEach(b=>b.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+}
+
+async function renderStats(){try{
+  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
+  const total=qs.length,totalAts=ats.length,correct=ats.filter(a=>a.correct).length;
+  const rate=totalAts?Math.round(correct/totalAts*100):0;
+  setText2('st-q',total);setText2('st-a',totalAts);setText2('st-r',totalAts?rate+'%':'—');
+  const subMap={};
+  qs.forEach(q=>{const s=q.subject||'未分類';if(!subMap[s])subMap[s]={total:0,correct:0};subMap[s].total++;});
+  ats.forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';if(!subMap[s])return;if(a.correct!==null&&a.correct)subMap[s].correct++;});
+  const bars=document.getElementById('subj-bars');
+  if(bars)bars.innerHTML=Object.entries(subMap).sort((a,b)=>{const ra=a[1].total?a[1].correct/a[1].total:1;const rb=b[1].total?b[1].correct/b[1].total:1;return ra-rb;}).map(([s,d])=>{const r=d.total?Math.round(d.correct/d.total*100):0;const color=r>=80?'var(--grn)':r>=60?'var(--org)':'var(--red)';return'<div class="sr"><div class="sn" title="'+s.replace(/"/g,"&quot;")+'">'+s+'</div><div class="sbw"><div class="sbar" style="width:'+r+'%;background:'+color+'"></div></div><div class="sp">'+r+'%</div></div>';}).join('');
+  const days=7;const labels=[],data=[];
+  for(let i=days-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);labels.push(ds.slice(5));data.push(ats.filter(a=>a.date===ds).length);}
+  const ctx=document.getElementById('dchart');if(_dchart)_dchart.destroy();
+  _dchart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,backgroundColor:'rgba(232,201,107,.25)',borderColor:'var(--gold)',borderWidth:1,borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'#7a869e',font:{size:11}},grid:{color:'rgba(255,255,255,.05)'}},x:{ticks:{color:'#7a869e',font:{size:11}},grid:{display:false}}}}});
+  const wrongEl=document.getElementById('wrong-subs');const dangerMap={'🔴':0,'🟠':0,'🟡':0,'🟢':0};
+  qs.forEach(q=>{const lv=getDangerLevel(q,ats);dangerMap[lv]++;});
+  if(wrongEl)wrongEl.innerHTML=Object.entries(dangerMap).map(([lv,cnt])=>'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="font-size:16px;width:24px">'+lv+'</span><div style="flex:1;background:var(--bg3);border-radius:3px;height:7px;overflow:hidden"><div style="height:7px;border-radius:3px;background:var(--gold);width:'+(qs.length?cnt/qs.length*100:0)+'%"></div></div><span style="font-size:12px;color:var(--t2);font-weight:600;width:42px;text-align:right">'+cnt+' 題</span></div>').join('');
+  const kwMap={};ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
+  const kwCloud=document.getElementById('kw-cloud');
+  if(kwCloud)kwCloud.innerHTML=Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([kw,cnt])=>'<span class="tag" style="font-size:'+Math.min(14,10+cnt)+'px;cursor:default">'+kw+' <b style="color:var(--red)">'+cnt+'</b></span>').join('');
+}catch(e){logError('renderStats',e);}}
+
+async function buildExportText(){try{
+  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
+  const incWrong=document.getElementById('eo-wrong')?.checked;
+  const incWeak=document.getElementById('eo-weak')?.checked;
+  const incKw=document.getElementById('eo-kw')?.checked;
+  const incStem=document.getElementById('eo-stem')?.checked;
+  const limit=_exportLimit||10;
+  const lines=[];
+  const now=new Date().toLocaleString('zh-TW');
+  lines.push('# KnowledgeForce 學習弱點報告');
+  lines.push('產生時間：'+now+'  |  總題數：'+qs.length+'  |  總作答：'+ats.length);
+  lines.push('');
+  if(incWrong){
+    const dangerQs=qs.filter(q=>getDangerLevel(q,ats)==='🔴');
+    const show=limit>0?dangerQs.slice(0,limit):dangerQs;
+    lines.push('## 🔴 高危險錯題（連錯 2 次以上）');
+    if(!show.length)lines.push('（暫無）');
+    else show.forEach((q,i)=>{
+      lines.push((i+1)+'. ['+(q.subject||'')+(q.year?' '+q.year:'')+'] 第'+(q.num||'?')+'題');
+      if(incStem&&q.stem)lines.push('   題目：'+(q.stem||'').slice(0,80)+(q.stem.length>80?'…':''));
+      if(q.answer)lines.push('   答案：'+q.answer);
+    });
+    lines.push('');
+  }
+  if(incWeak){
+    const subErr={};
+    ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
+    lines.push('## 📉 最弱科目排行');
+    Object.entries(subErr).sort((a,b)=>b[1]-a[1]).slice(0,8).forEach(([s,n],i)=>{lines.push((i+1)+'. '+s+'：錯誤 '+n+' 次');});
+    lines.push('');
+  }
+  if(incKw){
+    const kwMap={};
+    ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
+    const topKws=Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([kw,n])=>kw+'('+n+')');
+    lines.push('## 🔑 高頻錯誤關鍵字');
+    lines.push(topKws.join('、')||'（暫無）');
+    lines.push('');
+  }
+  lines.push('---');
+  lines.push('請協助分析以上弱點，並：');
+  lines.push('1. 指出最需優先加強的主題');
+  lines.push('2. 針對高危錯題說明正確觀念');
+  lines.push('3. 提供具體複習建議');
+  _exportText=lines.join('\n');
+  _exportJsonData={generatedAt:now,questions:qs,attempts:ats};
+  const ta=document.getElementById('export-textarea');if(ta)ta.value=_exportText;
+  const cc=document.getElementById('export-char-count');if(cc)cc.textContent=_exportText.length;
+  const res=document.getElementById('export-result');if(res)res.style.display='';
+  Toast.success('已產生 '+_exportText.length+' 字摘要 ✓');
+}catch(e){logError('buildExportText',e);Toast.error('產生失敗');}}
+
+function updateExportPreview(){}
+
+async function copyExportText(){try{
+  const ta=document.getElementById('export-textarea');
+  const text=ta?ta.value:_exportText;
+  await navigator.clipboard.writeText(text);
+  Toast.success('已複製 '+text.length+' 字 ✓');
+}catch(e){Toast.warn('請手動選取複製');}}
+
+function dlExportText(){
+  if(!_exportText){Toast.warn('請先產生摘要');return;}
+  dl(_exportText,'弱點報告_'+today()+'.txt','text/plain');
+}
+function dlExportJson(){
+  if(!_exportJsonData){Toast.warn('請先產生摘要');return;}
+  dl(JSON.stringify(_exportJsonData,null,2),'弱點報告_'+today()+'.json','application/json');
+}
+
+async function buildAI(){try{
+  const key=Store.get('apiKey');
+  const btn=document.getElementById('ai-call-btn');
+  const icon=document.getElementById('ai-call-icon');
+  const lbl=document.getElementById('ai-call-label');
+  if(!key){Toast.info('未設定 API Key，改為本地產生報告');await _buildAILocal();return;}
+  if(btn)btn.disabled=true;
+  if(icon)icon.textContent='⏳';
+  if(lbl)lbl.textContent='分析中…';
+  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
+  const subErr={};
+  ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
+  const dangerQs=qs.filter(q=>getDangerLevel(q,ats)==='🔴').slice(0,10);
+  const kwMap={};
+  ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
+  const prompt='你是警察特考輔導專家，以下是考生學習弱點資料，請給出具體實用建議（繁體中文）。\n\n'
+    +'總題數：'+qs.length+'  作答：'+ats.length+'  正確率：'+(ats.length?Math.round(ats.filter(a=>a.correct).length/ats.length*100):0)+'%\n\n'
+    +'最弱科目：\n'+Object.entries(subErr).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,n])=>'- '+s+'：錯'+n+'次').join('\n')+'\n\n'
+    +'高危錯題：\n'+dangerQs.map(q=>'- ['+q.subject+'] '+(q.stem||'').slice(0,50)).join('\n')+'\n\n'
+    +'高頻錯誤關鍵字：'+Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,n])=>k+'('+n+')').join('、')+'\n\n'
+    +'請提供：1.優先加強主題 2.正確法律觀念 3.複習策略 4.容易混淆考點';
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+      body:JSON.stringify({model:_aiModel,max_tokens:1200,messages:[{role:'user',content:prompt}]})
+    });
+    const data=await resp.json();
+    if(!resp.ok)throw new Error(data.error?.message||'API 錯誤 '+resp.status);
+    const text=data.content?.map(c=>c.text||'').join('')||'（無回應）';
+    _aiMd=text;
+    const mdEl=document.getElementById('ai-md');if(mdEl)mdEl.textContent=text;
+    const aiOut=document.getElementById('ai-out');if(aiOut)aiOut.classList.remove('hide');
+    Toast.success('AI 分析完成 ✓');
+  }catch(apiErr){
+    logError('buildAI-API',apiErr);
+    Toast.warn('API 呼叫失敗（'+apiErr.message+'），改為本地產生');
+    await _buildAILocal();
+  }
+}catch(e){logError('buildAI',e);Toast.error('分析失敗');}
+finally{
+  const btn=document.getElementById('ai-call-btn');if(btn)btn.disabled=false;
+  const icon=document.getElementById('ai-call-icon');if(icon)icon.textContent='✨';
+  const lbl=document.getElementById('ai-call-label');if(lbl)lbl.textContent='呼叫 AI 分析';
+}}
+
+async function _buildAILocal(){
+  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
+  const subErr={};ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
+  const dangerQs=qs.filter(q=>getDangerLevel(q,ats)==='🔴').slice(0,10);
+  const lines=['# 警察特考弱點分析報告（本地）',
+    '> 產生時間：'+new Date().toLocaleString('zh-TW')+' | 總題數：'+qs.length+' | 總作答：'+ats.length,'',
+    '## 🔴 高危險錯題',
+    ...dangerQs.map(q=>'- Q'+(q.num||'?')+' ['+q.subject+'] '+(q.stem||'').slice(0,40)+'…'),'',
+    '## 📊 最弱科目',
+    ...Object.entries(subErr).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,n])=>'- '+s+'：錯誤 '+n+' 次'),'',
+    '> 提示：在設定頁儲存 AI API Key 後，可取得更深入的 AI 分析。'];
+  _aiMd=lines.join('\n');
+  const mdEl=document.getElementById('ai-md');if(mdEl)mdEl.textContent=_aiMd;
+  const aiOut=document.getElementById('ai-out');if(aiOut)aiOut.classList.remove('hide');
+  Toast.success('本地報告已產生 ✓');
+}
+
+async function copyAI(){try{await navigator.clipboard.writeText(_aiMd);Toast.success('已複製 ✓');}catch(e){Toast.warn('請手動選取複製');}}
+function dlAI(type){
+  if(!_aiMd){Toast.warn('請先執行分析');return;}
+  if(type==='md')dl(_aiMd,'弱點分析_'+today()+'.md','text/markdown');
+  else dl(JSON.stringify({generatedAt:new Date().toISOString(),report:_aiMd},null,2),'弱點分析_'+today()+'.json','application/json');
+}
+/* ══ SETTINGS FUNCTIONS ══ */
+async function expJSON(){try{
+  const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
+  dl(JSON.stringify({version:2,exportedAt:new Date().toISOString(),questions:qs,laws:ls,attempts:ats},null,2),'警察考題庫_'+today()+'.json','application/json');
+  Toast.success('已匯出 JSON');
+}catch(e){logError('expJSON',e);}}
+
+async function impJSON(e){
+  const file=e.target.files[0];if(!file)return;
+  try{
+    let data;try{data=JSON.parse(await file.text());}catch(pe){Toast.error('JSON 格式錯誤');return;}
+    const qs=Array.isArray(data)?data:Array.isArray(data.questions)?data.questions:null;
+    if(!qs){Toast.error('找不到 questions 欄位');return;}
+    const qItems=qs.map(({id,...r})=>r);
+    const lawItems=Array.isArray(data.laws)?data.laws.map(({id,...r})=>r):[];
+    const attItems=Array.isArray(data.attempts)?data.attempts.map(({id,...r})=>r):[];
+    await bulkPut('questions',qItems);
+    if(lawItems.length)await bulkPut('laws',lawItems);
+    if(attItems.length)await bulkPut('attempts',attItems);
+    Toast.success('已匯入 '+qItems.length+' 題'+(lawItems.length?' · '+lawItems.length+' 條法條':'')+'✓');
+    e.target.value='';renderHome();SettingsPage.init();
+  }catch(err){logError('impJSON',err);Toast.error('匯入失敗：'+(err?.message||String(err)));}}
+
+async function expWrong(){try{
+  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);const wids=getWrong(qs,ats);const wqs=qs.filter(q=>wids.has(q.id));
+  if(!wqs.length){Toast.info('目前沒有錯題');return;}
+  const grp={};wqs.forEach(q=>{const s=q.subject||'未分類';if(!grp[s])grp[s]=[];grp[s].push(q);});
+  let out='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>錯題整理</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px;line-height:1.8}h1{border-bottom:2px solid #333;padding-bottom:7px}h2{color:#1f6feb}.q{margin:14px 0;padding:14px;border:1px solid #ddd;border-radius:8px}.ans{color:#1f6feb;font-weight:600}</style></head><body><h1>錯題整理</h1>';
+  Object.entries(grp).forEach(([sub,sqs])=>{out+='<h2>'+sub+'</h2>';sqs.forEach((q,i)=>{out+='<div class="q"><div style="font-size:14px;font-weight:600;margin-bottom:8px">'+(i+1)+'. '+esc(q.stem||'')+'</div>';if(q.type==='mc')Object.entries(q.options||{}).forEach(([k,v])=>{out+='<div>('+k+') '+esc(v)+'</div>';});if(q.answer)out+='<div class="ans">答案：'+esc(q.answer)+'</div>';out+='</div>';});});
+  out+='</body></html>';
+  dl(out,'警察考題_錯題_'+today()+'.html','text/html');Toast.success('匯出 '+wqs.length+' 題');
+}catch(e){logError('expWrong',e);}}
+
+async function clearAts(){try{await dc('attempts');Toast.success('作答記錄已清除');SettingsPage.init();}catch(e){logError('clearAts',e);}}
+async function delAll(){try{await dc('questions');await dc('attempts');await dc('laws');Toast.success('已全部刪除');SettingsPage.init();renderHome();}catch(e){logError('delAll',e);}}
 /* ══ GOOGLE DRIVE SYNC ══
    流程：
    1. 使用者填入 OAuth Client ID → 存 localStorage
@@ -3813,907 +4330,15 @@ function delCountdown(id){
    4. gdRestore() → 從 Drive 下載 JSON → 寫入 IndexedDB
    注意：token 有效期 1 小時，重整頁面後需重新登入（標準 OAuth implicit 流程）
 ══ */
-const GD = (function(){
-  const BACKUP_FILENAME = 'KnowledgeForce_backup.json';
-  const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-  let _token = null;
-  let _tokenClient = null;
-  let _userInfo = null;
-
-  /* ── 讀取 client id ── */
-  function _getClientId(){
-    const el = $el('gd-client-id');
-    const saved = localStorage.getItem('gdClientId');
-    if(el && el.value.trim()) return el.value.trim();
-    return saved || '';
-  }
-  function _saveClientId(id){ localStorage.setItem('gdClientId', id); }
-
-  /* ── UI state helpers ── */
-  function _setStatus(text, cls){
-    const pill = $el('gd-status-pill');
-    if(!pill) return;
-    pill.textContent = text;
-    pill.className = 'gd-status ' + (cls || 'gd-idle');
-  }
-  function _setLoading(btnId, loading){
-    const btn = $el(btnId);
-    if(!btn) return;
-    btn.disabled = loading;
-  }
-  function _showAuth(authed){
-    const ua = $el('gd-unauth'), aa = $el('gd-auth');
-    if(ua) ua.style.display = authed ? 'none' : '';
-    if(aa) aa.style.display = authed ? '' : 'none';
-  }
-  function _setLastSync(text){
-    const el = $el('gd-last-sync');
-    if(el) el.textContent = text;
-  }
-
-  /* ── 初始化（每次進設定頁呼叫） ── */
-  function init(){
-    const savedId = localStorage.getItem('gdClientId');
-    const clientIdEl = $el('gd-client-id');
-    if(savedId && clientIdEl) clientIdEl.value = savedId;
-    const lastSync = localStorage.getItem('gdLastSync');
-    if(lastSync) _setLastSync('上次同步：' + lastSync);
-    if(_token){
-      _showAuth(true);
-      _setStatus('已連線', 'gd-ok');
-    } else {
-      _showAuth(false);
-      _setStatus('未連線', 'gd-idle');
-    }
-  }
-
-  /* ── 登入 ── */
-  async function signIn(){
-    const clientId = _getClientId();
-    if(!clientId || !clientId.includes('.apps.googleusercontent.com')){
-      Toast.warn('請先填入正確的 Client ID');
-      return;
-    }
-    _saveClientId(clientId);
-    /* 確認 GSI 已載入 */
-    if(typeof google === 'undefined' || !google.accounts){
-      Toast.error('Google Identity 函式庫尚未載入，請稍候再試');
-      return;
-    }
-    _tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: SCOPES,
-      callback: async (resp) => {
-        if(resp.error){ Toast.error('授權失敗：' + resp.error); return; }
-        _token = resp.access_token;
-        /* 取得使用者資訊 */
-        try{
-          const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: 'Bearer ' + _token }
-          });
-          _userInfo = await r.json();
-          const nameEl = $el('gd-user-name');
-          const emailEl = $el('gd-user-email');
-          const avatarEl = $el('gd-user-avatar');
-          if(nameEl) nameEl.textContent = _userInfo.name || '使用者';
-          if(emailEl) emailEl.textContent = _userInfo.email || '';
-          if(avatarEl){
-            if(_userInfo.picture) avatarEl.innerHTML = '<img src="'+_userInfo.picture+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover">';
-            else avatarEl.textContent = (_userInfo.name||'U')[0];
-          }
-        }catch(e){ /* 不影響主流程 */ }
-        _showAuth(true);
-        _setStatus('已連線 ✓', 'gd-ok');
-        Toast.success('Google 帳號授權成功 ✓');
-      }
-    });
-    _tokenClient.requestAccessToken({ prompt: 'consent' });
-  }
-
-  /* ── 登出 ── */
-  function signOut(){
-    if(_token && typeof google !== 'undefined'){
-      try{ google.accounts.oauth2.revoke(_token, ()=>{}); }catch(e){}
-    }
-    _token = null; _userInfo = null;
-    _showAuth(false);
-    _setStatus('未連線', 'gd-idle');
-    Toast.info('已登出 Google');
-  }
-
-  /* ── 找到已存在的備份檔 ID ── */
-  async function _findFileId(){
-    const r = await fetch(
-      'https://www.googleapis.com/drive/v3/files?q=name%3D%22'+encodeURIComponent(BACKUP_FILENAME)+'%22+and+trashed%3Dfalse&fields=files(id,name,modifiedTime)',
-      { headers: { Authorization: 'Bearer ' + _token } }
-    );
-    const data = await r.json();
-    return (data.files && data.files.length) ? data.files[0] : null;
-  }
-
-  /* ── 備份 ── */
-  async function backup(){
-    if(!_token){ Toast.warn('請先登入 Google'); return; }
-    _setLoading('gd-btn-backup', true);
-    _setStatus('備份中…', 'gd-warn');
-    try{
-      const [qs, ats, ls] = await Promise.all([da('questions'), da('attempts'), da('laws')]);
-      const payload = JSON.stringify({
-        version: 2, exportedAt: new Date().toISOString(),
-        questions: qs, laws: ls, attempts: ats
-      }, null, 2);
-      const existing = await _findFileId();
-      let url, method;
-      const meta = { name: BACKUP_FILENAME, mimeType: 'application/json' };
-      if(existing){
-        url = 'https://www.googleapis.com/upload/drive/v3/files/'+existing.id+'?uploadType=multipart';
-        method = 'PATCH';
-      } else {
-        url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-        method = 'POST';
-      }
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-      form.append('file', new Blob([payload], { type: 'application/json' }));
-      const r = await fetch(url, {
-        method, headers: { Authorization: 'Bearer ' + _token }, body: form
-      });
-      if(!r.ok){ const e = await r.json(); throw new Error(e.error?.message || r.status); }
-      const now = new Date().toLocaleString('zh-TW');
-      localStorage.setItem('gdLastSync', now);
-      _setLastSync('上次同步：' + now);
-      _setStatus('已備份 ✓', 'gd-ok');
-      Toast.success('已備份至 Google Drive ✓（'+qs.length+' 題・'+ls.length+' 條）');
-    }catch(e){
-      _setStatus('備份失敗', 'gd-err');
-      Toast.error('備份失敗：' + (e.message || String(e)));
-      logError('gdBackup', e);
-    }finally{
-      _setLoading('gd-btn-backup', false);
-      setTimeout(()=>_setStatus('已連線', 'gd-ok'), 3000);
-    }
-  }
-
-  /* ── 還原 ── */
-  async function restore(){
-    if(!_token){ Toast.warn('請先登入 Google'); return; }
-    cfm('從雲端還原', '將覆蓋寫入現有資料（題目不重複），確定繼續？', async function(){
-      _setLoading('gd-btn-restore', true);
-      _setStatus('還原中…', 'gd-warn');
-      try{
-        const file = await _findFileId();
-        if(!file){ Toast.warn('雲端尚無備份檔案'); _setStatus('已連線', 'gd-ok'); return; }
-        const r = await fetch('https://www.googleapis.com/drive/v3/files/'+file.id+'?alt=media', {
-          headers: { Authorization: 'Bearer ' + _token }
-        });
-        if(!r.ok) throw new Error('下載失敗 ' + r.status);
-        const data = await r.json();
-        const qs = Array.isArray(data.questions) ? data.questions.map(({id,...x})=>x) : [];
-        const ls = Array.isArray(data.laws) ? data.laws.map(({id,...x})=>x) : [];
-        const as_ = Array.isArray(data.attempts) ? data.attempts.map(({id,...x})=>x) : [];
-        await bulkPut('questions', qs);
-        if(ls.length) await bulkPut('laws', ls);
-        if(as_.length) await bulkPut('attempts', as_);
-        const now = new Date().toLocaleString('zh-TW');
-        localStorage.setItem('gdLastSync', now);
-        _setLastSync('上次同步：' + now);
-        _setStatus('已還原 ✓', 'gd-ok');
-        Toast.success('已從雲端還原 ✓（'+qs.length+' 題・'+ls.length+' 條）');
-        renderHome(); SettingsPage.init();
-      }catch(e){
-        _setStatus('還原失敗', 'gd-err');
-        Toast.error('還原失敗：' + (e.message || String(e)));
-        logError('gdRestore', e);
-      }finally{
-        _setLoading('gd-btn-restore', false);
-        setTimeout(()=>{ if(_token) _setStatus('已連線', 'gd-ok'); }, 3000);
-      }
-    });
-  }
-
-  return { init, signIn, signOut, backup, restore };
-})();
+/* GD already declared above */
 
 /* 全域代理函式（HTML onclick 使用） */
 function gdSignIn()  { GD.signIn();   }
 function gdSignOut() { GD.signOut();  }
 function gdBackup()  { GD.backup();   }
 function gdRestore() { GD.restore();  }
-/* ══ BULK IMPORT (ei-bulk tab) ══ */
-// ═══════════════════════════════════════════════════════════════════
-// 題目解析（原 parser.js 整合）
-// ═══════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════
 
-// ── OPT_SYMBOL_MAP：已知選項符號 → 標準字母 ─────────────────────
-// OPT_SYMBOL_MAP already declared above
-
-
-// ── preprocessQuestionText：前置正規化 ────────────────────────────
-function preprocessQuestionText(raw){
-  if(!raw)return'';
-  let t=raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n')
-    .replace(/\u00A0/g,' ').replace(/\u3000/g,' ')
-    .replace(/\u200B/g,'').replace(/\uFEFF/g,'');
-  const lines=t.split('\n');
-  // 統計行首重複符號（出現>=2次且非數字開頭）
-  const headCount={};
-  for(const ln of lines){
-    const m=ln.match(/^([\s\S]{1,2})/);if(!m)continue;
-    const ch=m[1].trim();
-    if(!ch||/^[\d\s]/.test(ch))continue;
-    headCount[ch]=(headCount[ch]||0)+1;
-  }
-  const repeatedSymbols=new Set(Object.entries(headCount).filter(([,n])=>n>=2).map(([ch])=>ch));
-  const out=[];
-  for(const ln of lines){
-    let line=ln;
-    // 已知符號 ①②Ａ 等
-    const knownM=line.match(/^([①②③④⑤ＡＢＣＤＥａｂｃｄｅ])[.、\s]?\s*(.*)/);
-    if(knownM){const mapped=OPT_SYMBOL_MAP[knownM[1]];if(mapped){out.push('§'+mapped+'§ '+knownM[2]);continue;}}
-    // 標準 (A)(B) / （A）
-    const stdM=line.match(/^[（(]([A-Ea-e])[）)][.、\s]?\s*(.*)/);
-    if(stdM){out.push('§'+stdM[1].toUpperCase()+'§ '+stdM[2]);continue;}
-    // 行首不明重複符號 → §OPT§
-    let replaced=false;
-    for(const sym of repeatedSymbols){
-      const re=new RegExp('^'+sym.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*');
-      if(re.test(line)){out.push('§OPT§ '+line.replace(re,''));replaced=true;break;}
-    }
-    if(replaced)continue;
-    // 題號行：？/：後緊接選項時自動插換行
-    if(/^\d{1,3}[.、．）)）\s]/.test(line)){
-      const qColonM=line.match(/^(.+?[？?：:])(\s*)([\s\S]+)$/);
-      if(qColonM&&qColonM[3].trim()){
-        const after=qColonM[3].trim();
-        const looksLikeOpt=/^[（(]?[A-Ea-eＡＢＣＤＥ①②③④⑤]/.test(after)||
-          [...repeatedSymbols].some(s=>after.startsWith(s));
-        if(looksLikeOpt){out.push(qColonM[1]);out.push(after);continue;}
-      }
-    }
-    out.push(line);
-  }
-  return out.join('\n');
-}
-
-function _findQEnd(str){for(let i=0;i<str.length;i++){if(str[i]==='？'||str[i]==='?'||str[i]==='：'||str[i]===':')return i;}return-1;}
-function _tidyText(s){if(!s)return'';return cleanSpaces(s.replace(/\s+/g,' ').replace(/([，。！？、：；,.!?:;])\s+/g,'$1').trim());}
-
-// ── parseQuestions：主解析 ────────────────────────────────────────
-function parseQuestions(rawText){
-  if(!rawText||!rawText.trim())return[];
-  let t=preprocessQuestionText(rawText);
-  const ZH={'一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9','十':'10'};
-  t=t.replace(/^([一二三四五六七八九十]+)[、．。.]/gm,(_,n)=>(ZH[n]||n)+'. ');
-  const allLines=t.split('\n').map(l=>l.trim()).filter(Boolean);
-  const questions=[];let curQ=null,curOptKey=null,optIdx=0;
-  const OPT_KEYS=['A','B','C','D','E','F','G','H'];
-  function finishQ(){
-    if(!curQ)return;
-    curQ.stem=_tidyText(curQ.stem);
-    Object.keys(curQ.options).forEach(k=>{curQ.options[k]=_tidyText(curQ.options[k]);});
-    curQ.type=Object.keys(curQ.options).length>=2?'mc':'es';
-    if(curQ.stem)questions.push(curQ);
-    curQ=null;curOptKey=null;optIdx=0;
-  }
-  function newQ(num,stemStart){
-    finishQ();
-    curQ={num,stem:stemStart,type:'es',options:{},answer:'',answerEs:'',keywords:[],mustKeywords:[],tags:[],
-      note:'',starred:false,createdAt:Date.now(),reviewLevel:0,nextReview:Date.now(),lastReview:null,
-      wrongCount:0,correctStreak:0,difficultyScore:5};
-    curOptKey=null;optIdx=0;
-  }
-  function addOpt(content){
-    if(!curQ||!content.trim())return;
-    const key=OPT_KEYS[optIdx++]||'?';
-    curQ.options[key]=content.trim();curOptKey=key;
-  }
-  function appendLine(text){
-    if(!curQ||!text.trim())return;
-    if(curOptKey&&curQ.options[curOptKey]!==undefined)curQ.options[curOptKey]+=' '+text;
-    else curQ.stem+=(curQ.stem?' ':'')+text;
-  }
-  for(const line of allLines){
-    // §A§ 已知字母選項
-    const mAlpha=line.match(/^§([A-E])§\s*(.*)/);
-    if(mAlpha){
-      if(!curQ)continue;
-      const key=mAlpha[1];
-      if(curQ.options[key]!==undefined)curQ.options[key]+=' '+mAlpha[2];
-      else{curQ.options[key]=mAlpha[2].trim();const ki=OPT_KEYS.indexOf(key);if(ki>=optIdx)optIdx=ki+1;}
-      curOptKey=key;continue;
-    }
-    // §OPT§ 未命名選項
-    const mAnon=line.match(/^§OPT§\s*(.*)/);
-    if(mAnon){if(!curQ)continue;addOpt(mAnon[1]);continue;}
-    // 行首數字 → 新題目
-    const mNum=line.match(/^(\d{1,3})(?:[.、．）)）]\s*|\s+)([\s\S]+)/);
-    const mNumIsQ=mNum&&parseInt(mNum[1])<=500&&(
-      /^(\d{1,3})[.、．）)）]/.test(line)||
-      (mNum[2].trim().length>3&&!/^[年月日時分秒週天個件名條款項元萬千百公里]/.test(mNum[2].trim()))
-    );
-    if(mNumIsQ){
-      const num=mNum[1],rest=mNum[2].trim();
-      const endIdx=_findQEnd(rest);
-      newQ(num,endIdx>=0?rest.slice(0,endIdx+1):rest);
-      if(endIdx>=0&&rest.slice(endIdx+1).trim())appendLine(rest.slice(endIdx+1).trim());
-      continue;
-    }
-    // 中文題號
-    const mZh=line.match(/^([一二三四五六七八九十]+)[、．。]\s*([\s\S]+)/);
-    if(mZh&&ZH[mZh[1]]){const rest=mZh[2].trim();const endIdx=_findQEnd(rest);newQ(ZH[mZh[1]],endIdx>=0?rest.slice(0,endIdx+1):rest);continue;}
-    appendLine(line);
-  }
-  finishQ();
-  return questions.map(q=>({...q,keywords:autoKeywords(q.stem),mustKeywords:[],
-    searchBlob:((q.stem||'')+' '+(autoKeywords(q.stem)||[]).join(' ')).toLowerCase()}));
-}
-
-// ── parseAnswerStr ────────────────────────────────────────────────
-function parseAnswerStr(str){
-  if(!str||!str.trim())return{};
-  const map={};
-  for(const m of str.matchAll(/(\d{1,3})[.、\s]*([A-Ea-e])/g))map[parseInt(m[1])]=m[2].toUpperCase();
-  if(!Object.keys(map).length){
-    const letters=str.replace(/[^A-Ea-e]/g,'').toUpperCase();
-    [...letters].forEach((ch,i)=>{map[i+1]=ch;});
-  }
-  return map;
-}
-
-// ── parseBulkText（相容舊介面）────────────────────────────────────
-function parseBulkText(text){
-  return parseQuestions(text).map(q=>({...q,answer:q.answer||'',answerEs:q.answerEs||''}));
-}
-/* ══ GROUPS ══ */
-// DEFAULT_CONCEPT_GROUPS already declared above
-
-
-async function renderGroups(){try{
-  const el=$el('groups-list');if(!el)return;
-  const[qs,groups]=await Promise.all([da('questions'),da('conceptGroups').catch(()=>[])]);
-  const allGroups=[...DEFAULT_CONCEPT_GROUPS,...groups];
-  el.innerHTML=allGroups.map(g=>'<div class="group-card fu">'+
-    '<div class="group-icon">'+g.icon+'</div>'+
-    '<div class="group-name">'+esc(g.name)+'</div>'+
-    '<div class="group-desc">'+esc(g.desc||'')+'</div>'+
-    '<div class="group-laws">'+((g.laws||[]).map(l=>'<span class="tag" style="color:var(--pur);cursor:pointer" onclick="showLawPop(\''+esc(l)+'\')">⚖ '+esc(l)+'</span>').join(''))+'</div>'+
-    '<div class="group-kws">'+((g.keywords||[]).map(kw=>'<span class="tag">'+esc(kw)+'</span>').join(''))+'</div>'+
-    '<div style="margin-top:8px">'+
-      '<button class="chip" style="font-size:11px" onclick="startGroupQ(\''+esc(JSON.stringify(g.keywords))+'\')">▶ 練習相關題目</button>'+
-    '</div>'+
-  '</div>').join('');
-}catch(e){logError('renderGroups',e);}}
-
-async function startGroupQ(kwsJson){try{
-  const kws=JSON.parse(kwsJson);const qs=await da('questions');
-  const pool=qs.filter(q=>q.type==='mc'&&kws.some(kw=>(q.stem||'').includes(kw)||(q.keywords||[]).includes(kw)));
-  if(!pool.length){Toast.info('找不到相關題目');return;}
-  startQWithPool(pool,'group');
-}catch(e){}}
-
-/* ══ ICON EDITOR ══ */
-function openIconEditor(){const ov=$el('icon-ov');if(ov){ov.classList.add('on');}}
-function closeIconEditor(){const ov=$el('icon-ov');if(ov){ov.classList.remove('on');}}
-function resetAllIcons(){if(!confirm('確定重置所有圖示？'))return;localStorage.removeItem('customIcons');Toast.info('已重置，重新整理頁面生效');}
-function setExportLimit(n,btn){
-  _exportLimit=n;
-  document.querySelectorAll('[id^="elim-"]').forEach(b=>b.classList.remove('on'));
-  if(btn)btn.classList.add('on');
-}
-function setAIModel(m,btn){
-  _aiModel=m;
-  document.querySelectorAll('[id^="aimodel-"]').forEach(b=>b.classList.remove('on'));
-  if(btn)btn.classList.add('on');
-}
-
-async function renderStats(){try{
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const total=qs.length,totalAts=ats.length,correct=ats.filter(a=>a.correct).length;
-  const rate=totalAts?Math.round(correct/totalAts*100):0;
-  setText2('st-q',total);setText2('st-a',totalAts);setText2('st-r',totalAts?rate+'%':'—');
-  const subMap={};
-  qs.forEach(q=>{const s=q.subject||'未分類';if(!subMap[s])subMap[s]={total:0,correct:0};subMap[s].total++;});
-  ats.forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';if(!subMap[s])return;if(a.correct!==null&&a.correct)subMap[s].correct++;});
-  const bars=document.getElementById('subj-bars');
-  if(bars)bars.innerHTML=Object.entries(subMap).sort((a,b)=>{const ra=a[1].total?a[1].correct/a[1].total:1;const rb=b[1].total?b[1].correct/b[1].total:1;return ra-rb;}).map(([s,d])=>{const r=d.total?Math.round(d.correct/d.total*100):0;const color=r>=80?'var(--grn)':r>=60?'var(--org)':'var(--red)';return'<div class="sr"><div class="sn" title="'+s.replace(/"/g,"&quot;")+'">'+s+'</div><div class="sbw"><div class="sbar" style="width:'+r+'%;background:'+color+'"></div></div><div class="sp">'+r+'%</div></div>';}).join('');
-  const days=7;const labels=[],data=[];
-  for(let i=days-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);labels.push(ds.slice(5));data.push(ats.filter(a=>a.date===ds).length);}
-  const ctx=document.getElementById('dchart');if(_dchart)_dchart.destroy();
-  _dchart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,backgroundColor:'rgba(232,201,107,.25)',borderColor:'var(--gold)',borderWidth:1,borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'#7a869e',font:{size:11}},grid:{color:'rgba(255,255,255,.05)'}},x:{ticks:{color:'#7a869e',font:{size:11}},grid:{display:false}}}}});
-  const wrongEl=document.getElementById('wrong-subs');const dangerMap={'🔴':0,'🟠':0,'🟡':0,'🟢':0};
-  qs.forEach(q=>{const lv=getDangerLevel(q,ats);dangerMap[lv]++;});
-  if(wrongEl)wrongEl.innerHTML=Object.entries(dangerMap).map(([lv,cnt])=>'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="font-size:16px;width:24px">'+lv+'</span><div style="flex:1;background:var(--bg3);border-radius:3px;height:7px;overflow:hidden"><div style="height:7px;border-radius:3px;background:var(--gold);width:'+(qs.length?cnt/qs.length*100:0)+'%"></div></div><span style="font-size:12px;color:var(--t2);font-weight:600;width:42px;text-align:right">'+cnt+' 題</span></div>').join('');
-  const kwMap={};ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
-  const kwCloud=document.getElementById('kw-cloud');
-  if(kwCloud)kwCloud.innerHTML=Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([kw,cnt])=>'<span class="tag" style="font-size:'+Math.min(14,10+cnt)+'px;cursor:default">'+kw+' <b style="color:var(--red)">'+cnt+'</b></span>').join('');
-}catch(e){logError('renderStats',e);}}
-
-async function buildExportText(){try{
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const incWrong=document.getElementById('eo-wrong')?.checked;
-  const incWeak=document.getElementById('eo-weak')?.checked;
-  const incKw=document.getElementById('eo-kw')?.checked;
-  const incStem=document.getElementById('eo-stem')?.checked;
-  const limit=_exportLimit||10;
-  const lines=[];
-  const now=new Date().toLocaleString('zh-TW');
-  lines.push('# KnowledgeForce 學習弱點報告');
-  lines.push('產生時間：'+now+'  |  總題數：'+qs.length+'  |  總作答：'+ats.length);
-  lines.push('');
-  if(incWrong){
-    const dangerQs=qs.filter(q=>getDangerLevel(q,ats)==='🔴');
-    const show=limit>0?dangerQs.slice(0,limit):dangerQs;
-    lines.push('## 🔴 高危險錯題（連錯 2 次以上）');
-    if(!show.length)lines.push('（暫無）');
-    else show.forEach((q,i)=>{
-      lines.push((i+1)+'. ['+(q.subject||'')+(q.year?' '+q.year:'')+'] 第'+(q.num||'?')+'題');
-      if(incStem&&q.stem)lines.push('   題目：'+(q.stem||'').slice(0,80)+(q.stem.length>80?'…':''));
-      if(q.answer)lines.push('   答案：'+q.answer);
-    });
-    lines.push('');
-  }
-  if(incWeak){
-    const subErr={};
-    ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
-    lines.push('## 📉 最弱科目排行');
-    Object.entries(subErr).sort((a,b)=>b[1]-a[1]).slice(0,8).forEach(([s,n],i)=>{lines.push((i+1)+'. '+s+'：錯誤 '+n+' 次');});
-    lines.push('');
-  }
-  if(incKw){
-    const kwMap={};
-    ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
-    const topKws=Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([kw,n])=>kw+'('+n+')');
-    lines.push('## 🔑 高頻錯誤關鍵字');
-    lines.push(topKws.join('、')||'（暫無）');
-    lines.push('');
-  }
-  lines.push('---');
-  lines.push('請協助分析以上弱點，並：');
-  lines.push('1. 指出最需優先加強的主題');
-  lines.push('2. 針對高危錯題說明正確觀念');
-  lines.push('3. 提供具體複習建議');
-  _exportText=lines.join('\n');
-  _exportJsonData={generatedAt:now,questions:qs,attempts:ats};
-  const ta=document.getElementById('export-textarea');if(ta)ta.value=_exportText;
-  const cc=document.getElementById('export-char-count');if(cc)cc.textContent=_exportText.length;
-  const res=document.getElementById('export-result');if(res)res.style.display='';
-  Toast.success('已產生 '+_exportText.length+' 字摘要 ✓');
-}catch(e){logError('buildExportText',e);Toast.error('產生失敗');}}
-
-function updateExportPreview(){}
-
-async function copyExportText(){try{
-  const ta=document.getElementById('export-textarea');
-  const text=ta?ta.value:_exportText;
-  await navigator.clipboard.writeText(text);
-  Toast.success('已複製 '+text.length+' 字 ✓');
-}catch(e){Toast.warn('請手動選取複製');}}
-
-function dlExportText(){
-  if(!_exportText){Toast.warn('請先產生摘要');return;}
-  dl(_exportText,'弱點報告_'+today()+'.txt','text/plain');
-}
-function dlExportJson(){
-  if(!_exportJsonData){Toast.warn('請先產生摘要');return;}
-  dl(JSON.stringify(_exportJsonData,null,2),'弱點報告_'+today()+'.json','application/json');
-}
-
-async function buildAI(){try{
-  const key=Store.get('apiKey');
-  const btn=document.getElementById('ai-call-btn');
-  const icon=document.getElementById('ai-call-icon');
-  const lbl=document.getElementById('ai-call-label');
-  if(!key){Toast.info('未設定 API Key，改為本地產生報告');await _buildAILocal();return;}
-  if(btn)btn.disabled=true;
-  if(icon)icon.textContent='⏳';
-  if(lbl)lbl.textContent='分析中…';
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const subErr={};
-  ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
-  const dangerQs=qs.filter(q=>getDangerLevel(q,ats)==='🔴').slice(0,10);
-  const kwMap={};
-  ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
-  const prompt='你是警察特考輔導專家，以下是考生學習弱點資料，請給出具體實用建議（繁體中文）。\n\n'
-    +'總題數：'+qs.length+'  作答：'+ats.length+'  正確率：'+(ats.length?Math.round(ats.filter(a=>a.correct).length/ats.length*100):0)+'%\n\n'
-    +'最弱科目：\n'+Object.entries(subErr).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,n])=>'- '+s+'：錯'+n+'次').join('\n')+'\n\n'
-    +'高危錯題：\n'+dangerQs.map(q=>'- ['+q.subject+'] '+(q.stem||'').slice(0,50)).join('\n')+'\n\n'
-    +'高頻錯誤關鍵字：'+Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,n])=>k+'('+n+')').join('、')+'\n\n'
-    +'請提供：1.優先加強主題 2.正確法律觀念 3.複習策略 4.容易混淆考點';
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:_aiModel,max_tokens:1200,messages:[{role:'user',content:prompt}]})
-    });
-    const data=await resp.json();
-    if(!resp.ok)throw new Error(data.error?.message||'API 錯誤 '+resp.status);
-    const text=data.content?.map(c=>c.text||'').join('')||'（無回應）';
-    _aiMd=text;
-    const mdEl=document.getElementById('ai-md');if(mdEl)mdEl.textContent=text;
-    const aiOut=document.getElementById('ai-out');if(aiOut)aiOut.classList.remove('hide');
-    Toast.success('AI 分析完成 ✓');
-  }catch(apiErr){
-    logError('buildAI-API',apiErr);
-    Toast.warn('API 呼叫失敗（'+apiErr.message+'），改為本地產生');
-    await _buildAILocal();
-  }
-}catch(e){logError('buildAI',e);Toast.error('分析失敗');}
-finally{
-  const btn=document.getElementById('ai-call-btn');if(btn)btn.disabled=false;
-  const icon=document.getElementById('ai-call-icon');if(icon)icon.textContent='✨';
-  const lbl=document.getElementById('ai-call-label');if(lbl)lbl.textContent='呼叫 AI 分析';
-}}
-
-async function _buildAILocal(){
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const subErr={};ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
-  const dangerQs=qs.filter(q=>getDangerLevel(q,ats)==='🔴').slice(0,10);
-  const lines=['# 警察特考弱點分析報告（本地）',
-    '> 產生時間：'+new Date().toLocaleString('zh-TW')+' | 總題數：'+qs.length+' | 總作答：'+ats.length,'',
-    '## 🔴 高危險錯題',
-    ...dangerQs.map(q=>'- Q'+(q.num||'?')+' ['+q.subject+'] '+(q.stem||'').slice(0,40)+'…'),'',
-    '## 📊 最弱科目',
-    ...Object.entries(subErr).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,n])=>'- '+s+'：錯誤 '+n+' 次'),'',
-    '> 提示：在設定頁儲存 AI API Key 後，可取得更深入的 AI 分析。'];
-  _aiMd=lines.join('\n');
-  const mdEl=document.getElementById('ai-md');if(mdEl)mdEl.textContent=_aiMd;
-  const aiOut=document.getElementById('ai-out');if(aiOut)aiOut.classList.remove('hide');
-  Toast.success('本地報告已產生 ✓');
-}
-
-async function copyAI(){try{await navigator.clipboard.writeText(_aiMd);Toast.success('已複製 ✓');}catch(e){Toast.warn('請手動選取複製');}}
-function dlAI(type){
-  if(!_aiMd){Toast.warn('請先執行分析');return;}
-  if(type==='md')dl(_aiMd,'弱點分析_'+today()+'.md','text/markdown');
-  else dl(JSON.stringify({generatedAt:new Date().toISOString(),report:_aiMd},null,2),'弱點分析_'+today()+'.json','application/json');
-}
-/* ══ SETTINGS FUNCTIONS ══ */
-async function expJSON(){try{
-  const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
-  dl(JSON.stringify({version:2,exportedAt:new Date().toISOString(),questions:qs,laws:ls,attempts:ats},null,2),'警察考題庫_'+today()+'.json','application/json');
-  Toast.success('已匯出 JSON');
-}catch(e){logError('expJSON',e);}}
-
-async function impJSON(e){
-  const file=e.target.files[0];if(!file)return;
-  try{
-    let data;try{data=JSON.parse(await file.text());}catch(pe){Toast.error('JSON 格式錯誤');return;}
-    const qs=Array.isArray(data)?data:Array.isArray(data.questions)?data.questions:null;
-    if(!qs){Toast.error('找不到 questions 欄位');return;}
-    const qItems=qs.map(({id,...r})=>r);
-    const lawItems=Array.isArray(data.laws)?data.laws.map(({id,...r})=>r):[];
-    const attItems=Array.isArray(data.attempts)?data.attempts.map(({id,...r})=>r):[];
-    await bulkPut('questions',qItems);
-    if(lawItems.length)await bulkPut('laws',lawItems);
-    if(attItems.length)await bulkPut('attempts',attItems);
-    Toast.success('已匯入 '+qItems.length+' 題'+(lawItems.length?' · '+lawItems.length+' 條法條':'')+'✓');
-    e.target.value='';renderHome();SettingsPage.init();
-  }catch(err){logError('impJSON',err);Toast.error('匯入失敗：'+(err?.message||String(err)));}}
-
-async function expWrong(){try{
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);const wids=getWrong(qs,ats);const wqs=qs.filter(q=>wids.has(q.id));
-  if(!wqs.length){Toast.info('目前沒有錯題');return;}
-  const grp={};wqs.forEach(q=>{const s=q.subject||'未分類';if(!grp[s])grp[s]=[];grp[s].push(q);});
-  let out='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>錯題整理</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px;line-height:1.8}h1{border-bottom:2px solid #333;padding-bottom:7px}h2{color:#1f6feb}.q{margin:14px 0;padding:14px;border:1px solid #ddd;border-radius:8px}.ans{color:#1f6feb;font-weight:600}</style></head><body><h1>錯題整理</h1>';
-  Object.entries(grp).forEach(([sub,sqs])=>{out+='<h2>'+sub+'</h2>';sqs.forEach((q,i)=>{out+='<div class="q"><div style="font-size:14px;font-weight:600;margin-bottom:8px">'+(i+1)+'. '+esc(q.stem||'')+'</div>';if(q.type==='mc')Object.entries(q.options||{}).forEach(([k,v])=>{out+='<div>('+k+') '+esc(v)+'</div>';});if(q.answer)out+='<div class="ans">答案：'+esc(q.answer)+'</div>';out+='</div>';});});
-  out+='</body></html>';
-  dl(out,'警察考題_錯題_'+today()+'.html','text/html');Toast.success('匯出 '+wqs.length+' 題');
-}catch(e){logError('expWrong',e);}}
-
-async function clearAts(){try{await dc('attempts');Toast.success('作答記錄已清除');SettingsPage.init();}catch(e){logError('clearAts',e);}}
-async function delAll(){try{await dc('questions');await dc('attempts');await dc('laws');Toast.success('已全部刪除');SettingsPage.init();renderHome();}catch(e){logError('delAll',e);}}
-/* ══ GOOGLE DRIVE SYNC ══
-   流程：
-   1. 使用者填入 OAuth Client ID → 存 localStorage
-// ═══════════════════════════════════════════════════════════════════
-
-// ── OPT_SYMBOL_MAP：已知選項符號 → 標準字母 ─────────────────────
-// OPT_SYMBOL_MAP already declared above
-
-// ── preprocessQuestionText：前置正規化 ────────────────────────────
-function preprocessQuestionText(raw){
-  if(!raw)return'';
-  let t=raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n')
-    .replace(/\u00A0/g,' ').replace(/\u3000/g,' ')
-    .replace(/\u200B/g,'').replace(/\uFEFF/g,'');
-  const lines=t.split('\n');
-  // 統計行首重複符號（出現>=2次且非數字開頭）
-  const headCount={};
-  for(const ln of lines){
-    const m=ln.match(/^([\s\S]{1,2})/);if(!m)continue;
-    const ch=m[1].trim();
-    if(!ch||/^[\d\s]/.test(ch))continue;
-    headCount[ch]=(headCount[ch]||0)+1;
-  }
-  const repeatedSymbols=new Set(Object.entries(headCount).filter(([,n])=>n>=2).map(([ch])=>ch));
-  const out=[];
-  for(const ln of lines){
-    let line=ln;
-    // 已知符號 ①②Ａ 等
-    const knownM=line.match(/^([①②③④⑤ＡＢＣＤＥａｂｃｄｅ])[.、\s]?\s*(.*)/);
-    if(knownM){const mapped=OPT_SYMBOL_MAP[knownM[1]];if(mapped){out.push('§'+mapped+'§ '+knownM[2]);continue;}}
-    // 標準 (A)(B) / （A）
-    const stdM=line.match(/^[（(]([A-Ea-e])[）)][.、\s]?\s*(.*)/);
-    if(stdM){out.push('§'+stdM[1].toUpperCase()+'§ '+stdM[2]);continue;}
-    // 行首不明重複符號 → §OPT§
-    let replaced=false;
-    for(const sym of repeatedSymbols){
-      const re=new RegExp('^'+sym.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*');
-      if(re.test(line)){out.push('§OPT§ '+line.replace(re,''));replaced=true;break;}
-    }
-    if(replaced)continue;
-    // 題號行：？/：後緊接選項時自動插換行
-    if(/^\d{1,3}[.、．）)）\s]/.test(line)){
-      const qColonM=line.match(/^(.+?[？?：:])(\s*)([\s\S]+)$/);
-      if(qColonM&&qColonM[3].trim()){
-        const after=qColonM[3].trim();
-        const looksLikeOpt=/^[（(]?[A-Ea-eＡＢＣＤＥ①②③④⑤]/.test(after)||
-          [...repeatedSymbols].some(s=>after.startsWith(s));
-        if(looksLikeOpt){out.push(qColonM[1]);out.push(after);continue;}
-      }
-    }
-    out.push(line);
-  }
-  return out.join('\n');
-}
-
-function _findQEnd(str){for(let i=0;i<str.length;i++){if(str[i]==='？'||str[i]==='?'||str[i]==='：'||str[i]===':')return i;}return-1;}
-function _tidyText(s){if(!s)return'';return cleanSpaces(s.replace(/\s+/g,' ').replace(/([，。！？、：；,.!?:;])\s+/g,'$1').trim());}
-
-// ── parseQuestions：主解析 ────────────────────────────────────────
-function parseQuestions(rawText){
-  if(!rawText||!rawText.trim())return[];
-  let t=preprocessQuestionText(rawText);
-  const ZH={'一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9','十':'10'};
-  t=t.replace(/^([一二三四五六七八九十]+)[、．。.]/gm,(_,n)=>(ZH[n]||n)+'. ');
-  const allLines=t.split('\n').map(l=>l.trim()).filter(Boolean);
-  const questions=[];let curQ=null,curOptKey=null,optIdx=0;
-  const OPT_KEYS=['A','B','C','D','E','F','G','H'];
-  function finishQ(){
-    if(!curQ)return;
-    curQ.stem=_tidyText(curQ.stem);
-    Object.keys(curQ.options).forEach(k=>{curQ.options[k]=_tidyText(curQ.options[k]);});
-    curQ.type=Object.keys(curQ.options).length>=2?'mc':'es';
-    if(curQ.stem)questions.push(curQ);
-    curQ=null;curOptKey=null;optIdx=0;
-  }
-  function newQ(num,stemStart){
-    finishQ();
-    curQ={num,stem:stemStart,type:'es',options:{},answer:'',answerEs:'',keywords:[],mustKeywords:[],tags:[],
-      note:'',starred:false,createdAt:Date.now(),reviewLevel:0,nextReview:Date.now(),lastReview:null,
-      wrongCount:0,correctStreak:0,difficultyScore:5};
-    curOptKey=null;optIdx=0;
-  }
-  function addOpt(content){
-    if(!curQ||!content.trim())return;
-    const key=OPT_KEYS[optIdx++]||'?';
-    curQ.options[key]=content.trim();curOptKey=key;
-  }
-  function appendLine(text){
-    if(!curQ||!text.trim())return;
-    if(curOptKey&&curQ.options[curOptKey]!==undefined)curQ.options[curOptKey]+=' '+text;
-    else curQ.stem+=(curQ.stem?' ':'')+text;
-  }
-  for(const line of allLines){
-    // §A§ 已知字母選項
-    const mAlpha=line.match(/^§([A-E])§\s*(.*)/);
-    if(mAlpha){
-      if(!curQ)continue;
-      const key=mAlpha[1];
-      if(curQ.options[key]!==undefined)curQ.options[key]+=' '+mAlpha[2];
-      else{curQ.options[key]=mAlpha[2].trim();const ki=OPT_KEYS.indexOf(key);if(ki>=optIdx)optIdx=ki+1;}
-      curOptKey=key;continue;
-    }
-    // §OPT§ 未命名選項
-    const mAnon=line.match(/^§OPT§\s*(.*)/);
-    if(mAnon){if(!curQ)continue;addOpt(mAnon[1]);continue;}
-    // 行首數字 → 新題目
-    const mNum=line.match(/^(\d{1,3})(?:[.、．）)）]\s*|\s+)([\s\S]+)/);
-    const mNumIsQ=mNum&&parseInt(mNum[1])<=500&&(
-      /^(\d{1,3})[.、．）)）]/.test(line)||
-      (mNum[2].trim().length>3&&!/^[年月日時分秒週天個件名條款項元萬千百公里]/.test(mNum[2].trim()))
-    );
-    if(mNumIsQ){
-      const num=mNum[1],rest=mNum[2].trim();
-      const endIdx=_findQEnd(rest);
-      newQ(num,endIdx>=0?rest.slice(0,endIdx+1):rest);
-      if(endIdx>=0&&rest.slice(endIdx+1).trim())appendLine(rest.slice(endIdx+1).trim());
-      continue;
-    }
-    // 中文題號
-    const mZh=line.match(/^([一二三四五六七八九十]+)[、．。]\s*([\s\S]+)/);
-    if(mZh&&ZH[mZh[1]]){const rest=mZh[2].trim();const endIdx=_findQEnd(rest);newQ(ZH[mZh[1]],endIdx>=0?rest.slice(0,endIdx+1):rest);continue;}
-    appendLine(line);
-  }
-  finishQ();
-  return questions.map(q=>({...q,keywords:autoKeywords(q.stem),mustKeywords:[],
-    searchBlob:((q.stem||'')+' '+(autoKeywords(q.stem)||[]).join(' ')).toLowerCase()}));
-}
-
-// ── parseAnswerStr ────────────────────────────────────────────────
-function parseAnswerStr(str){
-  if(!str||!str.trim())return{};
-  const map={};
-  for(const m of str.matchAll(/(\d{1,3})[.、\s]*([A-Ea-e])/g))map[parseInt(m[1])]=m[2].toUpperCase();
-  if(!Object.keys(map).length){
-    const letters=str.replace(/[^A-Ea-e]/g,'').toUpperCase();
-    [...letters].forEach((ch,i)=>{map[i+1]=ch;});
-  }
-  return map;
-}
-
-// ── parseBulkText（相容舊介面）────────────────────────────────────
-function parseBulkText(text){
-  return parseQuestions(text).map(q=>({...q,answer:q.answer||'',answerEs:q.answerEs||''}));
-}
-/* ══ GROUPS ══ */
-// DEFAULT_CONCEPT_GROUPS already declared above
-
-async function renderGroups(){try{
-  const el=$el('groups-list');if(!el)return;
-  const[qs,groups]=await Promise.all([da('questions'),da('conceptGroups').catch(()=>[])]);
-  const allGroups=[...DEFAULT_CONCEPT_GROUPS,...groups];
-  el.innerHTML=allGroups.map(g=>'<div class="group-card fu">'+
-    '<div class="group-icon">'+g.icon+'</div>'+
-    '<div class="group-name">'+esc(g.name)+'</div>'+
-    '<div class="group-desc">'+esc(g.desc||'')+'</div>'+
-    '<div class="group-laws">'+((g.laws||[]).map(l=>'<span class="tag" style="color:var(--pur);cursor:pointer" onclick="showLawPop(\''+esc(l)+'\')">⚖ '+esc(l)+'</span>').join(''))+'</div>'+
-    '<div class="group-kws">'+((g.keywords||[]).map(kw=>'<span class="tag">'+esc(kw)+'</span>').join(''))+'</div>'+
-    '<div style="margin-top:8px">'+
-      '<button class="chip" style="font-size:11px" onclick="startGroupQ(\''+esc(JSON.stringify(g.keywords))+'\')">▶ 練習相關題目</button>'+
-    '</div>'+
-  '</div>').join('');
-}catch(e){logError('renderGroups',e);}}
-
-async function startGroupQ(kwsJson){try{
-  const kws=JSON.parse(kwsJson);const qs=await da('questions');
-  const pool=qs.filter(q=>q.type==='mc'&&kws.some(kw=>(q.stem||'').includes(kw)||(q.keywords||[]).includes(kw)));
-  if(!pool.length){Toast.info('找不到相關題目');return;}
-  startQWithPool(pool,'group');
-}catch(e){}}
-
-/* ══ ICON EDITOR ══ */
-function openIconEditor(){const ov=$el('icon-ov');if(ov){ov.classList.add('on');}}
-function closeIconEditor(){const ov=$el('icon-ov');if(ov){ov.classList.remove('on');}}
-function resetAllIcons(){if(!confirm('確定重置所有圖示？'))return;localStorage.removeItem('customIcons');Toast.info('已重置，重新整理頁面生效');}
-/* ══ BOOT ══ */
-(function boot(){
-  // Splash + app reveal handled by loading.js
-
-  // Init
-  function safe(name,fn){try{fn();}catch(e){console.error('[INIT] '+name+':',e.message);}}
-  safe('Modal',   function(){Modal.init();});
-  safe('Router',  function(){Router.initNav();});
-  safe('FAB',     function(){FAB.init();FAB.update('home-study');});
-  safe('Import',  function(){ImportPage.init();});
-  safe('Player',  function(){PlayerPage.init();});
-  safe('SLib',    function(){SLibrary.init();});
-
-  // Router hooks
-  Router.onEnter('home',           function(){HomePage.render();});
-  Router.onEnter('page-s-library', function(){SLibrary.render();});
-  Router.onEnter('page-review',    function(){ReviewPage.render();});
-  Router.onEnter('page-settings',  function(){SettingsPage.init();});
-  Router.onEnter('page-q-library', function(){renderList();});
-  Router.onEnter('page-pg-db',     function(){renderDB();});
-  Router.onEnter('page-pg-stats',  function(){renderStats();});
-  Router.onEnter('page-pg-groups', function(){renderGroups();});
-  Router.onEnter('page-pg-list',   function(){openInlineBrowse();});
-
-  // Home section tabs
-  document.querySelectorAll('.sec-tab').forEach(function(t){
-    t.addEventListener('click',function(){
-      document.querySelectorAll('.sec-tab').forEach(function(x){
-        x.classList.remove('active');
-        x.setAttribute('aria-selected','false');
-      });
-      t.classList.add('active');
-      t.setAttribute('aria-selected','true');
-      var sec=t.id==='tab-study'?'study':'exam';
-      Router.setHomeSection(sec);
-      var sp=$el('study-panel'),ep=$el('exam-panel');
-      if(sp)sp.classList.toggle('active',sec==='study');
-      if(ep)ep.classList.toggle('active',sec==='exam');
-    });
-  });
-
-  // Global back button delegation
-  document.addEventListener('click',function(e){
-    var btn=e.target.closest('[data-action="back"]');if(btn)Router.back();
-  });
-
-  // Async init
-  (async function(){
-    try{
-      await Promise.all([DB.open(),initDB()]);
-      await Store.load();
-      await HomePage.render();
-      await renderHome();
-      var verEl=$el('app-ver');if(verEl)verEl.textContent=APP_VER;
-    }catch(e){console.error('[DATA]',e);}
-  })();
-})();
-
-
-/* ══ 移植功能：題庫·資料庫·解析·統計·設定·導覽 ══ */
-
-f
-
-a
-
-a
-
-f
-
-f
-
-f
-
-f
-
-a
-
-f
-
-a
-
-a
-
-a
-
-a
-
-a
-
-a
-
-f
-
-f
-
-a
-
-f
-
-f
-
-f
-
-f
-
-f
-
-f
-
-f
-
-f
-
-const _debouncedRenderList = debounce(()=>qlSearch($el('si')?.value||''), 200);
-
-const _debouncedRenderDB    = debounce(renderDB, 220);
-
-const _debouncedBrowseSearch=debounce(browseSearch,200);
-
-const LEVEL_STYLE = {
-  part:    { color:'#1f6feb', border:'#1f6feb', bg:'rgba(31,111,235,0.18)',  size:'14px', fw:'800', pt:'10px', pb:'4px',  mt:'16px', ml:'0',   br:'0 8px 8px 0', bw:'4px', label:'編' },
-  chapter: { color:'#58a6ff', border:'#58a6ff', bg:'rgba(88,166,255,0.13)',  size:'13px', fw:'700', pt:'7px',  pb:'3px',  mt:'10px', ml:'0',   br:'0 6px 6px 0', bw:'3px', label:'章' },
-  section: { color:'#a5d6ff', border:'#a5d6ff', bg:'rgba(165,214,255,0.08)', size:'12px', fw:'600', pt:'4px',  pb:'2px',  mt:'5px',  ml:'18px',br:'0 4px 4px 0', bw:'2px', label:'節' },
-};
-
-// _browseQs already declared above
-
-/* ── 必要補充（pool 未含）── */
-function setF(el,f){document.querySelectorAll('#fchips .chip').forEach(c=>c.classList.remove('on'));if(el)el.classList.add('on');if(typeof S!=='undefined')S.filter=f;if(typeof renderList==='function')renderList();}
-function setLC(el,cat){document.querySelectorAll('#lchips .chip').forEach(c=>c.classList.remove('on'));if(el)el.classList.add('on');if(typeof S!=='undefined')S.lawCat=cat;if(typeof renderDB==='function')renderDB();}
-function toggleLawSort(){if(typeof S!=='undefined'){S.lawSort=S.lawSort==='name'?'amend':'name';}if(typeof renderDB==='function')renderDB();}
-function dupAction(action){var ov=document.getElementById('dup-ov');if(ov)ov.style.display='none';if(window._dupResolve){window._dupResolve(action);window._dupResolve=null;}}
-function setBrType(el,v){document.querySelectorAll('#br-type-all,#br-type-mc,#br-type-es').forEach(b=>{if(b)b.classList.remove('on');});if(el)el.classList.add('on');window._brType=v;if(typeof renderBrowseList==='function')renderBrowseList();}
-function closeBrowse(){var ov=document.getElementById('browse-ov');if(ov)ov.style.display='none';}
-function clearBulk(){['bi-text','bi-ans','bi-part','bi-chapter','bi-section'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});if(typeof S!=='undefined')S.bulkParsed=[];const r=document.getElementById('bulk-result');if(r)r.classList.add('hide');}
-function parseBulk(){try{const biEl=document.getElementById('bi-text');if(!biEl||!biEl.value.trim()){toast('請先貼入題目文字');return;}const parsed=parseBulkText(biEl.value);if(typeof S!=='undefined')S.bulkParsed=parsed;const ansMap=document.getElementById('bi-ans')?.value?parseAnswerStr(document.getElementById('bi-ans').value):{};const biPart=(document.getElementById('bi-part')||{}).value||'';const biChapter=(document.getElementById('bi-chapter')||{}).value||'';const biSection=(document.getElementById('bi-section')||{}).value||'';parsed.forEach((q,i)=>{const n=parseInt(q.num)||i+1;if(ansMap[n])q.answer=ansMap[n];if(biPart)q.part=biPart;if(biChapter)q.chapter=biChapter;if(biSection)q.section=biSection;});const mc=parsed.filter(q=>q.type==='mc').length;const st=document.getElementById('bulk-stats');if(st)st.innerHTML=`<span class="tag">共 ${parsed.length} 題</span><span class="tag">選擇 ${mc}</span><span class="tag">申論 ${parsed.length-mc}</span>`;const pv=document.getElementById('prev-list');if(pv)pv.innerHTML=parsed.map(q=>`<div class="pi ${q.answer||q.type==='es'?'ok':'warn'}"><div class="pi-n">第${q.num}題·${q.type==='mc'?'選擇':'申論'}${q.answer?'·'+q.answer:''}</div><div class="pi-s">${(q.stem||'').slice(0,60)}</div></div>`).join('');const r=document.getElementById('bulk-result');if(r)r.classList.remove('hide');if(!parsed.length)toast('解析0題');else toast(`解析完成：${parsed.length} 題 ✓`);}catch(err){toast('解析錯誤：'+err.message);}}
-async function importBulk(){if(typeof S==='undefined'||!S.bulkParsed?.length){toast('請先解析');return;}const sub=document.getElementById('bi-sub')?.value||'';const yr=document.getElementById('bi-yr')?.value||'';const ex=document.getElementById('bi-ex')?.value||'';const items=S.bulkParsed.map(q=>({...q,subject:sub||q.subject||'',year:yr||q.year||'',exam:ex||q.exam||''}));try{await bulkPut('questions',items);toast(`已匯入 ${items.length} 題 ✓`);S.bulkParsed=[];const r=document.getElementById('bulk-result');if(r)r.classList.add('hide');if(typeof renderHome==='function')renderHome();}catch(err){toast('匯入失敗：'+err.message);}}
+/* ── 11. B-utils: bulk Q overlay, browse, etc. ── */
 function openBulkImportQ(){window._bqRaw='';if(typeof S!=='undefined')S.bulkParsed=[];['bi-text','bi-ans'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});const r=document.getElementById('bulk-q-result');if(r)r.classList.add('hide');const ov=document.getElementById('bulk-q-ov');if(ov)ov.style.display='flex';}
 function closeBulkImportQ(){const ov=document.getElementById('bulk-q-ov');if(ov)ov.style.display='none';}
 function parseBulkQ(){try{const el=document.getElementById('bi-text');const text=window._bqRaw?.trim()||el?.value?.trim()||'';if(!text){toast('請先貼入題目文字');return;}const parsed=parseBulkText(text);if(typeof S!=='undefined')S.bulkParsed=parsed;const ansMap=document.getElementById('bi-ans')?.value?parseAnswerStr(document.getElementById('bi-ans').value):{};const sub=document.getElementById('bi-sub')?.value||'';const yr=document.getElementById('bi-yr')?.value||'';const ex=document.getElementById('bi-ex')?.value||'';parsed.forEach((q,i)=>{const n=parseInt(q.num)||i+1;if(ansMap[n])q.answer=ansMap[n];if(sub)q.subject=sub;if(yr)q.year=yr;if(ex)q.exam=ex;});const mc=parsed.filter(q=>q.type==='mc').length;const st=document.getElementById('bulk-q-stats');if(st)st.innerHTML=`<span class="tag">共 ${parsed.length} 題</span><span class="tag">選擇 ${mc}</span><span class="tag">申論 ${parsed.length-mc}</span>`;const pv=document.getElementById('bulk-q-prev-list');if(pv)pv.innerHTML=parsed.map(q=>`<div class="pi ${q.answer||q.type==='es'?'ok':'warn'}"><div class="pi-n">${q.num}·${q.type==='mc'?'選擇':'申論'}${q.answer?'·'+q.answer:''}</div><div class="pi-s">${(q.stem||'').slice(0,80)}</div></div>`).join('');const r=document.getElementById('bulk-q-result');if(r)r.classList.remove('hide');if(!parsed.length)toast('解析0題');else toast(`解析完成：${parsed.length} 題 ✓`);}catch(err){toast('解析錯誤：'+err.message);console.error(err);}}
@@ -4729,735 +4354,59 @@ function generateCloze(text,ratio){if(!text)return'';ratio=ratio||0.35;const mat
 async function openBulkDelQ(){try{const qs=await da('questions');if(!qs.length){toast('目前無題目');return;}const years=[...new Set(qs.map(q=>q.year||'').filter(Boolean))].sort().reverse();const subs=[...new Set(qs.map(q=>q.subject||'').filter(Boolean))].sort();const old=document.getElementById('bulk-del-q-modal');if(old)old.remove();const m=document.createElement('div');m.id='bulk-del-q-modal';m.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.7);display:flex;align-items:flex-end';const inner=document.createElement('div');inner.onclick=e=>e.stopPropagation();inner.style.cssText='width:100%;max-width:520px;margin:0 auto;background:var(--bg1,#1b1b1b);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto';inner.innerHTML=`<div style="width:36px;height:4px;background:var(--bg4,#2d2d2d);border-radius:2px;margin:0 auto 16px"></div><div style="font-size:15px;font-weight:700;margin-bottom:14px">🗑 題目大量刪除</div><div style="display:flex;flex-direction:column;gap:10px"><div><label style="font-size:12px;color:var(--t2)">年度</label><input id="bdq-year" list="bdq-yl" placeholder="留空不限" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:14px;margin-top:4px"><datalist id="bdq-yl">${years.map(y=>`<option value="${y}">`).join('')}</datalist></div><div><label style="font-size:12px;color:var(--t2)">科目</label><input id="bdq-sub" list="bdq-sl" placeholder="留空不限" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:14px;margin-top:4px"><datalist id="bdq-sl">${subs.map(s=>`<option value="${s}">`).join('')}</datalist></div></div><div id="bdq-preview" style="margin-top:12px;font-size:12px;color:var(--t2)"></div><div style="display:flex;gap:8px;margin-top:16px"><button onclick="document.getElementById('bulk-del-q-modal').remove()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t1);font-size:13px;cursor:pointer">取消</button><button onclick="previewBulkDelQ()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:13px;cursor:pointer">預覽</button><button onclick="confirmBulkDelQ()" style="flex:1;padding:12px;border-radius:10px;background:#e05c57;color:#fff;font-size:13px;cursor:pointer;border:none">確認刪除</button></div>`;m.appendChild(inner);document.body.appendChild(m);}catch(e){console.error(e);}}
 async function openBulkDelLaw(){try{const ls=await da('laws');if(!ls.length){toast('目前無法條');return;}const names=[...new Set(ls.map(l=>l.lawName||'').filter(Boolean))].sort();const old=document.getElementById('bulk-del-law-modal');if(old)old.remove();const m=document.createElement('div');m.id='bulk-del-law-modal';m.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.7);display:flex;align-items:flex-end';const inner=document.createElement('div');inner.onclick=e=>e.stopPropagation();inner.style.cssText='width:100%;max-width:520px;margin:0 auto;background:var(--bg1,#1b1b1b);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto';inner.innerHTML=`<div style="width:36px;height:4px;background:var(--bg4,#2d2d2d);border-radius:2px;margin:0 auto 16px"></div><div style="font-size:15px;font-weight:700;margin-bottom:14px">🗑 法條大量刪除</div><div><label style="font-size:12px;color:var(--t2)">法律名稱</label><input id="bdl-name" list="bdl-nl" placeholder="留空不限" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:14px;margin-top:4px"><datalist id="bdl-nl">${names.map(n=>`<option value="${n}">`).join('')}</datalist></div><div id="bdl-preview" style="margin-top:12px;font-size:12px;color:var(--t2)"></div><div style="display:flex;gap:8px;margin-top:16px"><button onclick="document.getElementById('bulk-del-law-modal').remove()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t1);font-size:13px;cursor:pointer">取消</button><button onclick="previewBulkDelLaw()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:13px;cursor:pointer">預覽</button><button onclick="confirmBulkDelLaw()" style="flex:1;padding:12px;border-radius:10px;background:#e05c57;color:#fff;font-size:13px;cursor:pointer;border:none">確認刪除</button></div>`;m.appendChild(inner);document.body.appendChild(m);}catch(e){console.error(e);}}
 
-
-/* ── filterLvArts: filter law articles by lv-search keyword ── */
-function filterLvArts(){
-  var kw=(document.getElementById('lv-search')||{}).value||'';
-  kw=kw.trim().toLowerCase();
-  var el=document.getElementById('lbody');
-  if(!el)return;
-  el.querySelectorAll('.la,.law-art,.law-row').forEach(function(row){
-    if(!kw){row.style.display='';return;}
-    var text=(row.textContent||'').toLowerCase();
-    row.style.display=text.includes(kw)?'':'none';
-  });
-}
-
-/* ══ BOOT ══ */
-(function boot(){
-  // Splash + app reveal handled by loading.js
-
-  // Init
-  function safe(name,fn){try{fn();}catch(e){console.error('[INIT] '+name+':',e.message);}}
-  safe('Modal',   function(){Modal.init();});
-  safe('Router',  function(){Router.initNav();});
-  safe('FAB',     function(){FAB.init();FAB.update('home-study');});
-  safe('Import',  function(){ImportPage.init();});
-  safe('Player',  function(){PlayerPage.init();});
-  safe('SLib',    function(){SLibrary.init();});
-
-  // Router hooks
-  Router.onEnter('home',           function(){HomePage.render();});
-  Router.onEnter('page-s-library', function(){SLibrary.render();});
-  Router.onEnter('page-review',    function(){ReviewPage.render();});
-  Router.onEnter('page-settings',  function(){SettingsPage.init();});
-  Router.onEnter('page-q-library', function(){renderList();});
-  Router.onEnter('page-pg-db',     function(){renderDB();});
-  Router.onEnter('page-pg-stats',  function(){renderStats();});
-  Router.onEnter('page-pg-groups', function(){renderGroups();});
-  Router.onEnter('page-pg-list',   function(){openInlineBrowse();});
-
-  // Home section tabs
-  document.querySelectorAll('.sec-tab').forEach(function(t){
-    t.addEventListener('click',function(){
-      document.querySelectorAll('.sec-tab').forEach(function(x){
-        x.classList.remove('active');
-        x.setAttribute('aria-selected','false');
-      });
-      t.classList.add('active');
-      t.setAttribute('aria-selected','true');
-      var sec=t.id==='tab-study'?'study':'exam';
-      Router.setHomeSection(sec);
-      var sp=$el('study-panel'),ep=$el('exam-panel');
-      if(sp)sp.classList.toggle('active',sec==='study');
-      if(ep)ep.classList.toggle('active',sec==='exam');
-    });
-  });
-
-  // Global back button delegation
-  document.addEventListener('click',function(e){
-    var btn=e.target.closest('[data-action="back"]');if(btn)Router.back();
-  });
-
-  // Async init
-  (async function(){
-    try{
-      await Promise.all([DB.open(),initDB()]);
-      await Store.load();
-      await HomePage.render();
-      await renderHome();
-      var verEl=$el('app-ver');if(verEl)verEl.textContent=APP_VER;
-    }catch(e){console.error('[DATA]',e);}
-  })();
-})();
-
-
-/* ══ 移植功能：題庫·資料庫·解析·統計·設定·導覽 ══ */
-
-f
-
-a
-
-a
-
-f
-
-f
-
-f
-
-f
-
-a
-
-f
-
-a
-
-a
-
-a
-
-a
-
-a
-
-a
-
-f
-
-f
-
-a
-
-f
-
-f
-
-f
-
-f
-
-f
-
-f
-
-f
-
-f
-
-
-
-function setExportLimit(n,btn){
-  _exportLimit=n;
-  document.querySelectorAll('[id^="elim-"]').forEach(b=>b.classList.remove('on'));
-  if(btn)btn.classList.add('on');
-}
-function setAIModel(m,btn){
-  _aiModel=m;
-  document.querySelectorAll('[id^="aimodel-"]').forEach(b=>b.classList.remove('on'));
-  if(btn)btn.classList.add('on');
-}
-
-async function renderStats(){try{
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const total=qs.length,totalAts=ats.length,correct=ats.filter(a=>a.correct).length;
-  const rate=totalAts?Math.round(correct/totalAts*100):0;
-  setText2('st-q',total);setText2('st-a',totalAts);setText2('st-r',totalAts?rate+'%':'—');
-  const subMap={};
-  qs.forEach(q=>{const s=q.subject||'未分類';if(!subMap[s])subMap[s]={total:0,correct:0};subMap[s].total++;});
-  ats.forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';if(!subMap[s])return;if(a.correct!==null&&a.correct)subMap[s].correct++;});
-  const bars=document.getElementById('subj-bars');
-  if(bars)bars.innerHTML=Object.entries(subMap).sort((a,b)=>{const ra=a[1].total?a[1].correct/a[1].total:1;const rb=b[1].total?b[1].correct/b[1].total:1;return ra-rb;}).map(([s,d])=>{const r=d.total?Math.round(d.correct/d.total*100):0;const color=r>=80?'var(--grn)':r>=60?'var(--org)':'var(--red)';return'<div class="sr"><div class="sn" title="'+s.replace(/"/g,"&quot;")+'">'+s+'</div><div class="sbw"><div class="sbar" style="width:'+r+'%;background:'+color+'"></div></div><div class="sp">'+r+'%</div></div>';}).join('');
-  const days=7;const labels=[],data=[];
-  for(let i=days-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);labels.push(ds.slice(5));data.push(ats.filter(a=>a.date===ds).length);}
-  const ctx=document.getElementById('dchart');if(_dchart)_dchart.destroy();
-  _dchart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,backgroundColor:'rgba(232,201,107,.25)',borderColor:'var(--gold)',borderWidth:1,borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'#7a869e',font:{size:11}},grid:{color:'rgba(255,255,255,.05)'}},x:{ticks:{color:'#7a869e',font:{size:11}},grid:{display:false}}}}});
-  const wrongEl=document.getElementById('wrong-subs');const dangerMap={'🔴':0,'🟠':0,'🟡':0,'🟢':0};
-  qs.forEach(q=>{const lv=getDangerLevel(q,ats);dangerMap[lv]++;});
-  if(wrongEl)wrongEl.innerHTML=Object.entries(dangerMap).map(([lv,cnt])=>'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="font-size:16px;width:24px">'+lv+'</span><div style="flex:1;background:var(--bg3);border-radius:3px;height:7px;overflow:hidden"><div style="height:7px;border-radius:3px;background:var(--gold);width:'+(qs.length?cnt/qs.length*100:0)+'%"></div></div><span style="font-size:12px;color:var(--t2);font-weight:600;width:42px;text-align:right">'+cnt+' 題</span></div>').join('');
-  const kwMap={};ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
-  const kwCloud=document.getElementById('kw-cloud');
-  if(kwCloud)kwCloud.innerHTML=Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([kw,cnt])=>'<span class="tag" style="font-size:'+Math.min(14,10+cnt)+'px;cursor:default">'+kw+' <b style="color:var(--red)">'+cnt+'</b></span>').join('');
-}catch(e){logError('renderStats',e);}}
-
-async function buildExportText(){try{
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const incWrong=document.getElementById('eo-wrong')?.checked;
-  const incWeak=document.getElementById('eo-weak')?.checked;
-  const incKw=document.getElementById('eo-kw')?.checked;
-  const incStem=document.getElementById('eo-stem')?.checked;
-  const limit=_exportLimit||10;
-  const lines=[];
-  const now=new Date().toLocaleString('zh-TW');
-  lines.push('# KnowledgeForce 學習弱點報告');
-  lines.push('產生時間：'+now+'  |  總題數：'+qs.length+'  |  總作答：'+ats.length);
-  lines.push('');
-  if(incWrong){
-    const dangerQs=qs.filter(q=>getDangerLevel(q,ats)==='🔴');
-    const show=limit>0?dangerQs.slice(0,limit):dangerQs;
-    lines.push('## 🔴 高危險錯題（連錯 2 次以上）');
-    if(!show.length)lines.push('（暫無）');
-    else show.forEach((q,i)=>{
-      lines.push((i+1)+'. ['+(q.subject||'')+(q.year?' '+q.year:'')+'] 第'+(q.num||'?')+'題');
-      if(incStem&&q.stem)lines.push('   題目：'+(q.stem||'').slice(0,80)+(q.stem.length>80?'…':''));
-      if(q.answer)lines.push('   答案：'+q.answer);
-    });
-    lines.push('');
-  }
-  if(incWeak){
-    const subErr={};
-    ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
-    lines.push('## 📉 最弱科目排行');
-    Object.entries(subErr).sort((a,b)=>b[1]-a[1]).slice(0,8).forEach(([s,n],i)=>{lines.push((i+1)+'. '+s+'：錯誤 '+n+' 次');});
-    lines.push('');
-  }
-  if(incKw){
-    const kwMap={};
-    ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
-    const topKws=Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([kw,n])=>kw+'('+n+')');
-    lines.push('## 🔑 高頻錯誤關鍵字');
-    lines.push(topKws.join('、')||'（暫無）');
-    lines.push('');
-  }
-  lines.push('---');
-  lines.push('請協助分析以上弱點，並：');
-  lines.push('1. 指出最需優先加強的主題');
-  lines.push('2. 針對高危錯題說明正確觀念');
-  lines.push('3. 提供具體複習建議');
-  _exportText=lines.join('\n');
-  _exportJsonData={generatedAt:now,questions:qs,attempts:ats};
-  const ta=document.getElementById('export-textarea');if(ta)ta.value=_exportText;
-  const cc=document.getElementById('export-char-count');if(cc)cc.textContent=_exportText.length;
-  const res=document.getElementById('export-result');if(res)res.style.display='';
-  Toast.success('已產生 '+_exportText.length+' 字摘要 ✓');
-}catch(e){logError('buildExportText',e);Toast.error('產生失敗');}}
-
-function updateExportPreview(){}
-
-async function copyExportText(){try{
-  const ta=document.getElementById('export-textarea');
-  const text=ta?ta.value:_exportText;
-  await navigator.clipboard.writeText(text);
-  Toast.success('已複製 '+text.length+' 字 ✓');
-}catch(e){Toast.warn('請手動選取複製');}}
-
-function dlExportText(){
-  if(!_exportText){Toast.warn('請先產生摘要');return;}
-  dl(_exportText,'弱點報告_'+today()+'.txt','text/plain');
-}
-function dlExportJson(){
-  if(!_exportJsonData){Toast.warn('請先產生摘要');return;}
-  dl(JSON.stringify(_exportJsonData,null,2),'弱點報告_'+today()+'.json','application/json');
-}
-
-async function buildAI(){try{
-  const key=Store.get('apiKey');
-  const btn=document.getElementById('ai-call-btn');
-  const icon=document.getElementById('ai-call-icon');
-  const lbl=document.getElementById('ai-call-label');
-  if(!key){Toast.info('未設定 API Key，改為本地產生報告');await _buildAILocal();return;}
-  if(btn)btn.disabled=true;
-  if(icon)icon.textContent='⏳';
-  if(lbl)lbl.textContent='分析中…';
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const subErr={};
-  ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
-  const dangerQs=qs.filter(q=>getDangerLevel(q,ats)==='🔴').slice(0,10);
-  const kwMap={};
-  ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
-  const prompt='你是警察特考輔導專家，以下是考生學習弱點資料，請給出具體實用建議（繁體中文）。\n\n'
-    +'總題數：'+qs.length+'  作答：'+ats.length+'  正確率：'+(ats.length?Math.round(ats.filter(a=>a.correct).length/ats.length*100):0)+'%\n\n'
-    +'最弱科目：\n'+Object.entries(subErr).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,n])=>'- '+s+'：錯'+n+'次').join('\n')+'\n\n'
-    +'高危錯題：\n'+dangerQs.map(q=>'- ['+q.subject+'] '+(q.stem||'').slice(0,50)).join('\n')+'\n\n'
-    +'高頻錯誤關鍵字：'+Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,n])=>k+'('+n+')').join('、')+'\n\n'
-    +'請提供：1.優先加強主題 2.正確法律觀念 3.複習策略 4.容易混淆考點';
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:_aiModel,max_tokens:1200,messages:[{role:'user',content:prompt}]})
-    });
-    const data=await resp.json();
-    if(!resp.ok)throw new Error(data.error?.message||'API 錯誤 '+resp.status);
-    const text=data.content?.map(c=>c.text||'').join('')||'（無回應）';
-    _aiMd=text;
-    const mdEl=document.getElementById('ai-md');if(mdEl)mdEl.textContent=text;
-    const aiOut=document.getElementById('ai-out');if(aiOut)aiOut.classList.remove('hide');
-    Toast.success('AI 分析完成 ✓');
-  }catch(apiErr){
-    logError('buildAI-API',apiErr);
-    Toast.warn('API 呼叫失敗（'+apiErr.message+'），改為本地產生');
-    await _buildAILocal();
-  }
-}catch(e){logError('buildAI',e);Toast.error('分析失敗');}
-finally{
-  const btn=document.getElementById('ai-call-btn');if(btn)btn.disabled=false;
-  const icon=document.getElementById('ai-call-icon');if(icon)icon.textContent='✨';
-  const lbl=document.getElementById('ai-call-label');if(lbl)lbl.textContent='呼叫 AI 分析';
-}}
-
-async function _buildAILocal(){
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const subErr={};ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
-  const dangerQs=qs.filter(q=>getDangerLevel(q,ats)==='🔴').slice(0,10);
-  const lines=['# 警察特考弱點分析報告（本地）',
-    '> 產生時間：'+new Date().toLocaleString('zh-TW')+' | 總題數：'+qs.length+' | 總作答：'+ats.length,'',
-    '## 🔴 高危險錯題',
-    ...dangerQs.map(q=>'- Q'+(q.num||'?')+' ['+q.subject+'] '+(q.stem||'').slice(0,40)+'…'),'',
-    '## 📊 最弱科目',
-    ...Object.entries(subErr).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,n])=>'- '+s+'：錯誤 '+n+' 次'),'',
-    '> 提示：在設定頁儲存 AI API Key 後，可取得更深入的 AI 分析。'];
-  _aiMd=lines.join('\n');
-  const mdEl=document.getElementById('ai-md');if(mdEl)mdEl.textContent=_aiMd;
-  const aiOut=document.getElementById('ai-out');if(aiOut)aiOut.classList.remove('hide');
-  Toast.success('本地報告已產生 ✓');
-}
-
-async function copyAI(){try{await navigator.clipboard.writeText(_aiMd);Toast.success('已複製 ✓');}catch(e){Toast.warn('請手動選取複製');}}
-function dlAI(type){
-  if(!_aiMd){Toast.warn('請先執行分析');return;}
-  if(type==='md')dl(_aiMd,'弱點分析_'+today()+'.md','text/markdown');
-  else dl(JSON.stringify({generatedAt:new Date().toISOString(),report:_aiMd},null,2),'弱點分析_'+today()+'.json','application/json');
-}
-/* ══ SETTINGS FUNCTIONS ══ */
-async function expJSON(){try{
-  const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
-  dl(JSON.stringify({version:2,exportedAt:new Date().toISOString(),questions:qs,laws:ls,attempts:ats},null,2),'警察考題庫_'+today()+'.json','application/json');
-  Toast.success('已匯出 JSON');
-}catch(e){logError('expJSON',e);}}
-
-async function impJSON(e){
-  const file=e.target.files[0];if(!file)return;
-  try{
-    let data;try{data=JSON.parse(await file.text());}catch(pe){Toast.error('JSON 格式錯誤');return;}
-    const qs=Array.isArray(data)?data:Array.isArray(data.questions)?data.questions:null;
-    if(!qs){Toast.error('找不到 questions 欄位');return;}
-    const qItems=qs.map(({id,...r})=>r);
-    const lawItems=Array.isArray(data.laws)?data.laws.map(({id,...r})=>r):[];
-    const attItems=Array.isArray(data.attempts)?data.attempts.map(({id,...r})=>r):[];
-    await bulkPut('questions',qItems);
-    if(lawItems.length)await bulkPut('laws',lawItems);
-    if(attItems.length)await bulkPut('attempts',attItems);
-    Toast.success('已匯入 '+qItems.length+' 題'+(lawItems.length?' · '+lawItems.length+' 條法條':'')+'✓');
-    e.target.value='';renderHome();SettingsPage.init();
-  }catch(err){logError('impJSON',err);Toast.error('匯入失敗：'+(err?.message||String(err)));}}
-
-async function expWrong(){try{
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);const wids=getWrong(qs,ats);const wqs=qs.filter(q=>wids.has(q.id));
-  if(!wqs.length){Toast.info('目前沒有錯題');return;}
-  const grp={};wqs.forEach(q=>{const s=q.subject||'未分類';if(!grp[s])grp[s]=[];grp[s].push(q);});
-  let out='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>錯題整理</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px;line-height:1.8}h1{border-bottom:2px solid #333;padding-bottom:7px}h2{color:#1f6feb}.q{margin:14px 0;padding:14px;border:1px solid #ddd;border-radius:8px}.ans{color:#1f6feb;font-weight:600}</style></head><body><h1>錯題整理</h1>';
-  Object.entries(grp).forEach(([sub,sqs])=>{out+='<h2>'+sub+'</h2>';sqs.forEach((q,i)=>{out+='<div class="q"><div style="font-size:14px;font-weight:600;margin-bottom:8px">'+(i+1)+'. '+esc(q.stem||'')+'</div>';if(q.type==='mc')Object.entries(q.options||{}).forEach(([k,v])=>{out+='<div>('+k+') '+esc(v)+'</div>';});if(q.answer)out+='<div class="ans">答案：'+esc(q.answer)+'</div>';out+='</div>';});});
-  out+='</body></html>';
-  dl(out,'警察考題_錯題_'+today()+'.html','text/html');Toast.success('匯出 '+wqs.length+' 題');
-}catch(e){logError('expWrong',e);}}
-
-async function clearAts(){try{await dc('attempts');Toast.success('作答記錄已清除');SettingsPage.init();}catch(e){logError('clearAts',e);}}
-async function delAll(){try{await dc('questions');await dc('attempts');await dc('laws');Toast.success('已全部刪除');SettingsPage.init();renderHome();}catch(e){logError('delAll',e);}}
-/* ══ GOOGLE DRIVE SYNC ══
-   流程：
-   1. 使用者填入 OAuth Client ID → 存 localStorage
-// ═══════════════════════════════════════════════════════════════════
-
-// ── OPT_SYMBOL_MAP：已知選項符號 → 標準字母 ─────────────────────
-// OPT_SYMBOL_MAP already declared above
-
-// ── preprocessQuestionText：前置正規化 ────────────────────────────
-function preprocessQuestionText(raw){
-  if(!raw)return'';
-  let t=raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n')
-    .replace(/\u00A0/g,' ').replace(/\u3000/g,' ')
-    .replace(/\u200B/g,'').replace(/\uFEFF/g,'');
-  const lines=t.split('\n');
-  // 統計行首重複符號（出現>=2次且非數字開頭）
-  const headCount={};
-  for(const ln of lines){
-    const m=ln.match(/^([\s\S]{1,2})/);if(!m)continue;
-    const ch=m[1].trim();
-    if(!ch||/^[\d\s]/.test(ch))continue;
-    headCount[ch]=(headCount[ch]||0)+1;
-  }
-  const repeatedSymbols=new Set(Object.entries(headCount).filter(([,n])=>n>=2).map(([ch])=>ch));
-  const out=[];
-  for(const ln of lines){
-    let line=ln;
-    // 已知符號 ①②Ａ 等
-    const knownM=line.match(/^([①②③④⑤ＡＢＣＤＥａｂｃｄｅ])[.、\s]?\s*(.*)/);
-    if(knownM){const mapped=OPT_SYMBOL_MAP[knownM[1]];if(mapped){out.push('§'+mapped+'§ '+knownM[2]);continue;}}
-    // 標準 (A)(B) / （A）
-    const stdM=line.match(/^[（(]([A-Ea-e])[）)][.、\s]?\s*(.*)/);
-    if(stdM){out.push('§'+stdM[1].toUpperCase()+'§ '+stdM[2]);continue;}
-    // 行首不明重複符號 → §OPT§
-    let replaced=false;
-    for(const sym of repeatedSymbols){
-      const re=new RegExp('^'+sym.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*');
-      if(re.test(line)){out.push('§OPT§ '+line.replace(re,''));replaced=true;break;}
-    }
-    if(replaced)continue;
-    // 題號行：？/：後緊接選項時自動插換行
-    if(/^\d{1,3}[.、．）)）\s]/.test(line)){
-      const qColonM=line.match(/^(.+?[？?：:])(\s*)([\s\S]+)$/);
-      if(qColonM&&qColonM[3].trim()){
-        const after=qColonM[3].trim();
-        const looksLikeOpt=/^[（(]?[A-Ea-eＡＢＣＤＥ①②③④⑤]/.test(after)||
-          [...repeatedSymbols].some(s=>after.startsWith(s));
-        if(looksLikeOpt){out.push(qColonM[1]);out.push(after);continue;}
-      }
-    }
-    out.push(line);
-  }
-  return out.join('\n');
-}
-
-function _findQEnd(str){for(let i=0;i<str.length;i++){if(str[i]==='？'||str[i]==='?'||str[i]==='：'||str[i]===':')return i;}return-1;}
-function _tidyText(s){if(!s)return'';return cleanSpaces(s.replace(/\s+/g,' ').replace(/([，。！？、：；,.!?:;])\s+/g,'$1').trim());}
-
-// ── parseQuestions：主解析 ────────────────────────────────────────
-function parseQuestions(rawText){
-  if(!rawText||!rawText.trim())return[];
-  let t=preprocessQuestionText(rawText);
-  const ZH={'一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9','十':'10'};
-  t=t.replace(/^([一二三四五六七八九十]+)[、．。.]/gm,(_,n)=>(ZH[n]||n)+'. ');
-  const allLines=t.split('\n').map(l=>l.trim()).filter(Boolean);
-  const questions=[];let curQ=null,curOptKey=null,optIdx=0;
-  const OPT_KEYS=['A','B','C','D','E','F','G','H'];
-  function finishQ(){
-    if(!curQ)return;
-    curQ.stem=_tidyText(curQ.stem);
-    Object.keys(curQ.options).forEach(k=>{curQ.options[k]=_tidyText(curQ.options[k]);});
-    curQ.type=Object.keys(curQ.options).length>=2?'mc':'es';
-    if(curQ.stem)questions.push(curQ);
-    curQ=null;curOptKey=null;optIdx=0;
-  }
-  function newQ(num,stemStart){
-    finishQ();
-    curQ={num,stem:stemStart,type:'es',options:{},answer:'',answerEs:'',keywords:[],mustKeywords:[],tags:[],
-      note:'',starred:false,createdAt:Date.now(),reviewLevel:0,nextReview:Date.now(),lastReview:null,
-      wrongCount:0,correctStreak:0,difficultyScore:5};
-    curOptKey=null;optIdx=0;
-  }
-  function addOpt(content){
-    if(!curQ||!content.trim())return;
-    const key=OPT_KEYS[optIdx++]||'?';
-    curQ.options[key]=content.trim();curOptKey=key;
-  }
-  function appendLine(text){
-    if(!curQ||!text.trim())return;
-    if(curOptKey&&curQ.options[curOptKey]!==undefined)curQ.options[curOptKey]+=' '+text;
-    else curQ.stem+=(curQ.stem?' ':'')+text;
-  }
-  for(const line of allLines){
-    // §A§ 已知字母選項
-    const mAlpha=line.match(/^§([A-E])§\s*(.*)/);
-    if(mAlpha){
-      if(!curQ)continue;
-      const key=mAlpha[1];
-      if(curQ.options[key]!==undefined)curQ.options[key]+=' '+mAlpha[2];
-      else{curQ.options[key]=mAlpha[2].trim();const ki=OPT_KEYS.indexOf(key);if(ki>=optIdx)optIdx=ki+1;}
-      curOptKey=key;continue;
-    }
-    // §OPT§ 未命名選項
-    const mAnon=line.match(/^§OPT§\s*(.*)/);
-    if(mAnon){if(!curQ)continue;addOpt(mAnon[1]);continue;}
-    // 行首數字 → 新題目
-    const mNum=line.match(/^(\d{1,3})(?:[.、．）)）]\s*|\s+)([\s\S]+)/);
-    const mNumIsQ=mNum&&parseInt(mNum[1])<=500&&(
-      /^(\d{1,3})[.、．）)）]/.test(line)||
-      (mNum[2].trim().length>3&&!/^[年月日時分秒週天個件名條款項元萬千百公里]/.test(mNum[2].trim()))
-    );
-    if(mNumIsQ){
-      const num=mNum[1],rest=mNum[2].trim();
-      const endIdx=_findQEnd(rest);
-      newQ(num,endIdx>=0?rest.slice(0,endIdx+1):rest);
-      if(endIdx>=0&&rest.slice(endIdx+1).trim())appendLine(rest.slice(endIdx+1).trim());
-      continue;
-    }
-    // 中文題號
-    const mZh=line.match(/^([一二三四五六七八九十]+)[、．。]\s*([\s\S]+)/);
-    if(mZh&&ZH[mZh[1]]){const rest=mZh[2].trim();const endIdx=_findQEnd(rest);newQ(ZH[mZh[1]],endIdx>=0?rest.slice(0,endIdx+1):rest);continue;}
-    appendLine(line);
-  }
-  finishQ();
-  return questions.map(q=>({...q,keywords:autoKeywords(q.stem),mustKeywords:[],
-    searchBlob:((q.stem||'')+' '+(autoKeywords(q.stem)||[]).join(' ')).toLowerCase()}));
-}
-
-// ── parseAnswerStr ────────────────────────────────────────────────
-function parseAnswerStr(str){
-  if(!str||!str.trim())return{};
-  const map={};
-  for(const m of str.matchAll(/(\d{1,3})[.、\s]*([A-Ea-e])/g))map[parseInt(m[1])]=m[2].toUpperCase();
-  if(!Object.keys(map).length){
-    const letters=str.replace(/[^A-Ea-e]/g,'').toUpperCase();
-    [...letters].forEach((ch,i)=>{map[i+1]=ch;});
-  }
-  return map;
-}
-
-// ── parseBulkText（相容舊介面）────────────────────────────────────
-function parseBulkText(text){
-  return parseQuestions(text).map(q=>({...q,answer:q.answer||'',answerEs:q.answerEs||''}));
-}
-/* ══ GROUPS ══ */
-// DEFAULT_CONCEPT_GROUPS already declared above
-
-async function renderGroups(){try{
-  const el=$el('groups-list');if(!el)return;
-  const[qs,groups]=await Promise.all([da('questions'),da('conceptGroups').catch(()=>[])]);
-  const allGroups=[...DEFAULT_CONCEPT_GROUPS,...groups];
-  el.innerHTML=allGroups.map(g=>'<div class="group-card fu">'+
-    '<div class="group-icon">'+g.icon+'</div>'+
-    '<div class="group-name">'+esc(g.name)+'</div>'+
-    '<div class="group-desc">'+esc(g.desc||'')+'</div>'+
-    '<div class="group-laws">'+((g.laws||[]).map(l=>'<span class="tag" style="color:var(--pur);cursor:pointer" onclick="showLawPop(\''+esc(l)+'\')">⚖ '+esc(l)+'</span>').join(''))+'</div>'+
-    '<div class="group-kws">'+((g.keywords||[]).map(kw=>'<span class="tag">'+esc(kw)+'</span>').join(''))+'</div>'+
-    '<div style="margin-top:8px">'+
-      '<button class="chip" style="font-size:11px" onclick="startGroupQ(\''+esc(JSON.stringify(g.keywords))+'\')">▶ 練習相關題目</button>'+
-    '</div>'+
-  '</div>').join('');
-}catch(e){logError('renderGroups',e);}}
-
-async function startGroupQ(kwsJson){try{
-  const kws=JSON.parse(kwsJson);const qs=await da('questions');
-  const pool=qs.filter(q=>q.type==='mc'&&kws.some(kw=>(q.stem||'').includes(kw)||(q.keywords||[]).includes(kw)));
-  if(!pool.length){Toast.info('找不到相關題目');return;}
-  startQWithPool(pool,'group');
-}catch(e){}}
-
-/* ══ ICON EDITOR ══ */
-function openIconEditor(){const ov=$el('icon-ov');if(ov){ov.classList.add('on');}}
-function closeIconEditor(){const ov=$el('icon-ov');if(ov){ov.classList.remove('on');}}
-function resetAllIcons(){if(!confirm('確定重置所有圖示？'))return;localStorage.removeItem('customIcons');Toast.info('已重置，重新整理頁面生效');}
-/* ══ BOOT ══ */
-(function boot(){
-  // Splash + app reveal handled by loading.js
-
-  // Init
-  function safe(name,fn){try{fn();}catch(e){console.error('[INIT] '+name+':',e.message);}}
-  safe('Modal',   function(){Modal.init();});
-  safe('Router',  function(){Router.initNav();});
-  safe('FAB',     function(){FAB.init();FAB.update('home-study');});
-  safe('Import',  function(){ImportPage.init();});
-  safe('Player',  function(){PlayerPage.init();});
-  safe('SLib',    function(){SLibrary.init();});
-
-  // Router hooks
-  Router.onEnter('home',           function(){HomePage.render();});
-  Router.onEnter('page-s-library', function(){SLibrary.render();});
-  Router.onEnter('page-review',    function(){ReviewPage.render();});
-  Router.onEnter('page-settings',  function(){SettingsPage.init();});
-  Router.onEnter('page-q-library', function(){renderList();});
-  Router.onEnter('page-pg-db',     function(){renderDB();});
-  Router.onEnter('page-pg-stats',  function(){renderStats();});
-  Router.onEnter('page-pg-groups', function(){renderGroups();});
-  Router.onEnter('page-pg-list',   function(){openInlineBrowse();});
-
-  // Home section tabs
-  document.querySelectorAll('.sec-tab').forEach(function(t){
-    t.addEventListener('click',function(){
-      document.querySelectorAll('.sec-tab').forEach(function(x){
-        x.classList.remove('active');
-        x.setAttribute('aria-selected','false');
-      });
-      t.classList.add('active');
-      t.setAttribute('aria-selected','true');
-      var sec=t.id==='tab-study'?'study':'exam';
-      Router.setHomeSection(sec);
-      var sp=$el('study-panel'),ep=$el('exam-panel');
-      if(sp)sp.classList.toggle('active',sec==='study');
-      if(ep)ep.classList.toggle('active',sec==='exam');
-    });
-  });
-
-  // Global back button delegation
-  document.addEventListener('click',function(e){
-    var btn=e.target.closest('[data-action="back"]');if(btn)Router.back();
-  });
-
-  // Async init
-  (async function(){
-    try{
-      await Promise.all([DB.open(),initDB()]);
-      await Store.load();
-      await HomePage.render();
-      await renderHome();
-      var verEl=$el('app-ver');if(verEl)verEl.textContent=APP_VER;
-    }catch(e){console.error('[DATA]',e);}
-  })();
-})();
-
-
-/* ══ 移植功能：題庫·資料庫·解析·統計·設定·導覽 ══ */
-
-f
-
-a
-
-a
-
-f
-
-f
-
-f
-
-f
-
-a
-
-f
-
-a
-
-a
-
-a
-
-a
-
-a
-
-a
-
-f
-
-f
-
-a
-
-f
-
-f
-
-f
-
-f
-
-f
-
-f
-
-f
-
-f
-
-// _debouncedRenderList already declared above
-
-// _debouncedRenderDB already declared above
-
-// _debouncedBrowseSearch already declared above
-
-// LEVEL_STYLE already declared above
-
-// _browseQs already declared above
-
-/* ── 必要補充（pool 未含）── */
-function setF(el,f){document.querySelectorAll('#fchips .chip').forEach(c=>c.classList.remove('on'));if(el)el.classList.add('on');if(typeof S!=='undefined')S.filter=f;if(typeof renderList==='function')renderList();}
-function setLC(el,cat){document.querySelectorAll('#lchips .chip').forEach(c=>c.classList.remove('on'));if(el)el.classList.add('on');if(typeof S!=='undefined')S.lawCat=cat;if(typeof renderDB==='function')renderDB();}
-function toggleLawSort(){if(typeof S!=='undefined'){S.lawSort=S.lawSort==='name'?'amend':'name';}if(typeof renderDB==='function')renderDB();}
-function dupAction(action){var ov=document.getElementById('dup-ov');if(ov)ov.style.display='none';if(window._dupResolve){window._dupResolve(action);window._dupResolve=null;}}
-function setBrType(el,v){document.querySelectorAll('#br-type-all,#br-type-mc,#br-type-es').forEach(b=>{if(b)b.classList.remove('on');});if(el)el.classList.add('on');window._brType=v;if(typeof renderBrowseList==='function')renderBrowseList();}
-function closeBrowse(){var ov=document.getElementById('browse-ov');if(ov)ov.style.display='none';}
-function clearBulk(){['bi-text','bi-ans','bi-part','bi-chapter','bi-section'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});if(typeof S!=='undefined')S.bulkParsed=[];const r=document.getElementById('bulk-result');if(r)r.classList.add('hide');}
-function parseBulk(){try{const biEl=document.getElementById('bi-text');if(!biEl||!biEl.value.trim()){toast('請先貼入題目文字');return;}const parsed=parseBulkText(biEl.value);if(typeof S!=='undefined')S.bulkParsed=parsed;const ansMap=document.getElementById('bi-ans')?.value?parseAnswerStr(document.getElementById('bi-ans').value):{};const biPart=(document.getElementById('bi-part')||{}).value||'';const biChapter=(document.getElementById('bi-chapter')||{}).value||'';const biSection=(document.getElementById('bi-section')||{}).value||'';parsed.forEach((q,i)=>{const n=parseInt(q.num)||i+1;if(ansMap[n])q.answer=ansMap[n];if(biPart)q.part=biPart;if(biChapter)q.chapter=biChapter;if(biSection)q.section=biSection;});const mc=parsed.filter(q=>q.type==='mc').length;const st=document.getElementById('bulk-stats');if(st)st.innerHTML=`<span class="tag">共 ${parsed.length} 題</span><span class="tag">選擇 ${mc}</span><span class="tag">申論 ${parsed.length-mc}</span>`;const pv=document.getElementById('prev-list');if(pv)pv.innerHTML=parsed.map(q=>`<div class="pi ${q.answer||q.type==='es'?'ok':'warn'}"><div class="pi-n">第${q.num}題·${q.type==='mc'?'選擇':'申論'}${q.answer?'·'+q.answer:''}</div><div class="pi-s">${(q.stem||'').slice(0,60)}</div></div>`).join('');const r=document.getElementById('bulk-result');if(r)r.classList.remove('hide');if(!parsed.length)toast('解析0題');else toast(`解析完成：${parsed.length} 題 ✓`);}catch(err){toast('解析錯誤：'+err.message);}}
-async function importBulk(){if(typeof S==='undefined'||!S.bulkParsed?.length){toast('請先解析');return;}const sub=document.getElementById('bi-sub')?.value||'';const yr=document.getElementById('bi-yr')?.value||'';const ex=document.getElementById('bi-ex')?.value||'';const items=S.bulkParsed.map(q=>({...q,subject:sub||q.subject||'',year:yr||q.year||'',exam:ex||q.exam||''}));try{await bulkPut('questions',items);toast(`已匯入 ${items.length} 題 ✓`);S.bulkParsed=[];const r=document.getElementById('bulk-result');if(r)r.classList.add('hide');if(typeof renderHome==='function')renderHome();}catch(err){toast('匯入失敗：'+err.message);}}
-function openBulkImportQ(){window._bqRaw='';if(typeof S!=='undefined')S.bulkParsed=[];['bi-text','bi-ans'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});const r=document.getElementById('bulk-q-result');if(r)r.classList.add('hide');const ov=document.getElementById('bulk-q-ov');if(ov)ov.style.display='flex';}
-function closeBulkImportQ(){const ov=document.getElementById('bulk-q-ov');if(ov)ov.style.display='none';}
-function parseBulkQ(){try{const el=document.getElementById('bi-text');const text=window._bqRaw?.trim()||el?.value?.trim()||'';if(!text){toast('請先貼入題目文字');return;}const parsed=parseBulkText(text);if(typeof S!=='undefined')S.bulkParsed=parsed;const ansMap=document.getElementById('bi-ans')?.value?parseAnswerStr(document.getElementById('bi-ans').value):{};const sub=document.getElementById('bi-sub')?.value||'';const yr=document.getElementById('bi-yr')?.value||'';const ex=document.getElementById('bi-ex')?.value||'';parsed.forEach((q,i)=>{const n=parseInt(q.num)||i+1;if(ansMap[n])q.answer=ansMap[n];if(sub)q.subject=sub;if(yr)q.year=yr;if(ex)q.exam=ex;});const mc=parsed.filter(q=>q.type==='mc').length;const st=document.getElementById('bulk-q-stats');if(st)st.innerHTML=`<span class="tag">共 ${parsed.length} 題</span><span class="tag">選擇 ${mc}</span><span class="tag">申論 ${parsed.length-mc}</span>`;const pv=document.getElementById('bulk-q-prev-list');if(pv)pv.innerHTML=parsed.map(q=>`<div class="pi ${q.answer||q.type==='es'?'ok':'warn'}"><div class="pi-n">${q.num}·${q.type==='mc'?'選擇':'申論'}${q.answer?'·'+q.answer:''}</div><div class="pi-s">${(q.stem||'').slice(0,80)}</div></div>`).join('');const r=document.getElementById('bulk-q-result');if(r)r.classList.remove('hide');if(!parsed.length)toast('解析0題');else toast(`解析完成：${parsed.length} 題 ✓`);}catch(err){toast('解析錯誤：'+err.message);console.error(err);}}
-async function importBulkQ(){const parsed=(typeof S!=='undefined'&&S.bulkParsed)||[];if(!parsed.length){toast('請先解析題目');return;}try{await bulkPut('questions',parsed);toast(`已匯入 ${parsed.length} 題 ✓`);if(typeof S!=='undefined')S.bulkParsed=[];window._bqRaw='';const t=document.getElementById('bi-text');if(t)t.value='';const r=document.getElementById('bulk-q-result');if(r)r.classList.add('hide');closeBulkImportQ();if(typeof renderList==='function')renderList();if(typeof renderHome==='function')renderHome();}catch(err){toast('匯入失敗：'+err.message);}}
-function clearBulkQ(){['bi-text','bi-ans'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});window._bqRaw='';if(typeof S!=='undefined')S.bulkParsed=[];const r=document.getElementById('bulk-q-result');if(r)r.classList.add('hide');}
-function switchBrowseTab(tab,btn){['tab-q-browse','tab-d-browse'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.remove('on');});if(btn)btn.classList.add('on');const qP=document.getElementById('browse-q-panel'),dP=document.getElementById('browse-d-panel');if(tab==='q'){if(qP)qP.style.display='';if(dP)dP.style.display='none';if(typeof renderInlineList==='function')renderInlineList();}else{if(qP)qP.style.display='none';if(dP)dP.style.display='';(async()=>{try{if(typeof da==='function'){window._inlineLaws=await da('laws');if(typeof _buildInlineLawChips==='function')_buildInlineLawChips();if(typeof renderInlineLawList==='function')renderInlineLawList();}}catch(e){console.error(e);}})();}}
-function setBrTab(el,v){document.querySelectorAll('[id^="brtab-"]').forEach(b=>b.classList.remove('on'));if(el)el.classList.add('on');}
-function setBrowseQType(v,btn){document.querySelectorAll('#bq-type-chips .chip').forEach(b=>b.classList.remove('on'));if(btn)btn.classList.add('on');if(typeof renderInlineList==='function')renderInlineList();}
-function setBrowseLawCat(v,btn){document.querySelectorAll('#bd-cat-chips .chip').forEach(b=>b.classList.remove('on'));if(btn)btn.classList.add('on');if(typeof renderInlineLawList==='function')renderInlineLawList();}
-function start(mode){if(typeof startQ==='function')startQ(mode);}
-function formatYearInput(el){const v=(el.value||'').trim();if(/^\d{2,3}$/.test(v)&&+v<200)el.value='民國'+v+'年';}
-function generateCloze(text,ratio){if(!text)return'';ratio=ratio||0.35;const matches=[...text.matchAll(/[\u4e00-\u9fff]{2,4}/g)];const step=Math.max(1,Math.floor(matches.length/Math.round(matches.length*ratio)));const toBlank=matches.filter((_,i)=>i%step===0).reverse();let r=text;for(const m of toBlank)r=r.slice(0,m.index)+'【　　】'+r.slice(m.index+m[0].length);return r;}
-async function openBulkDelQ(){try{const qs=await da('questions');if(!qs.length){toast('目前無題目');return;}const years=[...new Set(qs.map(q=>q.year||'').filter(Boolean))].sort().reverse();const subs=[...new Set(qs.map(q=>q.subject||'').filter(Boolean))].sort();const old=document.getElementById('bulk-del-q-modal');if(old)old.remove();const m=document.createElement('div');m.id='bulk-del-q-modal';m.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.7);display:flex;align-items:flex-end';const inner=document.createElement('div');inner.onclick=e=>e.stopPropagation();inner.style.cssText='width:100%;max-width:520px;margin:0 auto;background:var(--bg1,#1b1b1b);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto';inner.innerHTML=`<div style="width:36px;height:4px;background:var(--bg4,#2d2d2d);border-radius:2px;margin:0 auto 16px"></div><div style="font-size:15px;font-weight:700;margin-bottom:14px">🗑 題目大量刪除</div><div style="display:flex;flex-direction:column;gap:10px"><div><label style="font-size:12px;color:var(--t2)">年度</label><input id="bdq-year" list="bdq-yl" placeholder="留空不限" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:14px;margin-top:4px"><datalist id="bdq-yl">${years.map(y=>`<option value="${y}">`).join('')}</datalist></div><div><label style="font-size:12px;color:var(--t2)">科目</label><input id="bdq-sub" list="bdq-sl" placeholder="留空不限" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:14px;margin-top:4px"><datalist id="bdq-sl">${subs.map(s=>`<option value="${s}">`).join('')}</datalist></div></div><div id="bdq-preview" style="margin-top:12px;font-size:12px;color:var(--t2)"></div><div style="display:flex;gap:8px;margin-top:16px"><button onclick="document.getElementById('bulk-del-q-modal').remove()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t1);font-size:13px;cursor:pointer">取消</button><button onclick="previewBulkDelQ()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:13px;cursor:pointer">預覽</button><button onclick="confirmBulkDelQ()" style="flex:1;padding:12px;border-radius:10px;background:#e05c57;color:#fff;font-size:13px;cursor:pointer;border:none">確認刪除</button></div>`;m.appendChild(inner);document.body.appendChild(m);}catch(e){console.error(e);}}
-async function openBulkDelLaw(){try{const ls=await da('laws');if(!ls.length){toast('目前無法條');return;}const names=[...new Set(ls.map(l=>l.lawName||'').filter(Boolean))].sort();const old=document.getElementById('bulk-del-law-modal');if(old)old.remove();const m=document.createElement('div');m.id='bulk-del-law-modal';m.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.7);display:flex;align-items:flex-end';const inner=document.createElement('div');inner.onclick=e=>e.stopPropagation();inner.style.cssText='width:100%;max-width:520px;margin:0 auto;background:var(--bg1,#1b1b1b);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto';inner.innerHTML=`<div style="width:36px;height:4px;background:var(--bg4,#2d2d2d);border-radius:2px;margin:0 auto 16px"></div><div style="font-size:15px;font-weight:700;margin-bottom:14px">🗑 法條大量刪除</div><div><label style="font-size:12px;color:var(--t2)">法律名稱</label><input id="bdl-name" list="bdl-nl" placeholder="留空不限" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:14px;margin-top:4px"><datalist id="bdl-nl">${names.map(n=>`<option value="${n}">`).join('')}</datalist></div><div id="bdl-preview" style="margin-top:12px;font-size:12px;color:var(--t2)"></div><div style="display:flex;gap:8px;margin-top:16px"><button onclick="document.getElementById('bulk-del-law-modal').remove()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t1);font-size:13px;cursor:pointer">取消</button><button onclick="previewBulkDelLaw()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:13px;cursor:pointer">預覽</button><button onclick="confirmBulkDelLaw()" style="flex:1;padding:12px;border-radius:10px;background:#e05c57;color:#fff;font-size:13px;cursor:pointer;border:none">確認刪除</button></div>`;m.appendChild(inner);document.body.appendChild(m);}catch(e){console.error(e);}}
-
-
-/* ── filterLvArts: filter law articles by lv-search keyword ── */
-function filterLvArts(){
-  var kw=(document.getElementById('lv-search')||{}).value||'';
-  kw=kw.trim().toLowerCase();
-  var el=document.getElementById('lbody');
-  if(!el)return;
-  el.querySelectorAll('.la,.law-art,.law-row').forEach(function(row){
-    if(!kw){row.style.display='';return;}
-    var text=(row.textContent||'').toLowerCase();
-    row.style.display=text.includes(kw)?'':'none';
-  });
-}
-
-/* ══ BOOT ══ */
+/* ── 12. BOOT ── */
 (function boot(){
   'use strict';
 
-  function safe(name, fn){ try{ fn(); }catch(e){ console.error('[INIT] '+name+':', e.message); } }
+  function safe(fn){ try{ fn(); }catch(e){ console.error('[BOOT]',e); } }
 
-  // Initialize sync modules
-  safe('Modal',  function(){ Modal.init(); });
-  safe('Router', function(){ Router.initNav(); });
-  safe('FAB',    function(){ FAB.init(); FAB.update('home-exam'); });
-  safe('Import', function(){ ImportPage.init(); });
-  safe('Player', function(){ PlayerPage.init(); });
-  safe('SLib',   function(){ SLibrary.init(); });
+  safe(function(){ Toast.init && Toast.init(); });
+  safe(function(){ Modal.init && Modal.init(); });
+  safe(function(){ Router.initNav && Router.initNav(); });
+  safe(function(){ FAB.init && FAB.init(); FAB.update && FAB.update('home'); });
+  safe(function(){ ImportPage.init && ImportPage.init(); });
+  safe(function(){ PlayerPage.init && PlayerPage.init(); });
 
-  // cfm-ok button handler
-  var cfmOkBtn = document.getElementById('cfm-ok');
-  if(cfmOkBtn){ cfmOkBtn.onclick = function(){ document.getElementById('cfm-ov').style.display='none'; if(typeof _cfmCb==='function'){ var cb=_cfmCb; _cfmCb=null; cb(); } }; }
+  // Page enter hooks
+  var hooks = {
+    home:       function(){ renderHome(); },
+    'pg-list':  function(){ renderList(); },
+    'pg-db':    function(){ renderDB();   },
+    'pg-stats': function(){ renderStats(); },
+    'pg-groups':function(){ renderGroups(); },
+    'pg-set':   function(){ renderSet(); },
+    'page-s-library': function(){ SLibrary.render && SLibrary.render(); },
+    'page-review':    function(){ ReviewPage.render && ReviewPage.render(); },
+  };
+  if (typeof Router !== 'undefined' && Router.onEnter) {
+    Object.keys(hooks).forEach(function(k){ Router.onEnter(k, hooks[k]); });
+  }
 
-  // Router page hooks
-  Router.onEnter('home',           function(){ renderHome(); HomePage.render(); });
-  Router.onEnter('page-s-library', function(){ SLibrary.render(); });
-  Router.onEnter('page-review',    function(){ ReviewPage.render(); });
-  Router.onEnter('page-settings',  function(){ SettingsPage.init(); });
-  Router.onEnter('page-q-library', function(){ renderList(); });
-  Router.onEnter('page-pg-db',     function(){ renderDB(); });
-  Router.onEnter('page-pg-stats',  function(){ renderStats(); });
-  Router.onEnter('page-pg-groups', function(){ renderGroups(); });
-
-  // Global back-button delegation
+  // Global back button
   document.addEventListener('click', function(e){
     var btn = e.target.closest('[data-action="back"]');
-    if(btn) Router.back();
+    if (btn) { if (typeof Router !== 'undefined') Router.back(); else history.back(); }
   });
+
+  // cfm-ok button
+  var cfmOk = document.getElementById('cfm-ok');
+  if (cfmOk) cfmOk.onclick = function(){
+    document.getElementById('cfm-ov').style.display = 'none';
+    if (typeof _cfmCb === 'function') { var cb = _cfmCb; _cfmCb = null; cb(); }
+  };
 
   // Async init
   (async function(){
-    try{
-      await Promise.all([ DB.open(), initDB() ]);
+    try {
+      await Promise.all([DB.open(), initDB()]);
       await Store.load();
-      // Build opts for add-q form
-      if(typeof buildOpts === 'function') buildOpts({});
-      // Render home
+      buildOpts({});
+      switchHomeTab('exam', document.getElementById('tab-exam'));
       await renderHome();
-      await HomePage.render();
-      // Apply custom icons
-      if(typeof applyIconSettings === 'function') applyIconSettings();
-      if(typeof applyCustomIcons  === 'function') applyCustomIcons();
+      renderSet();
       var verEl = document.getElementById('app-ver');
-      if(verEl) verEl.textContent = typeof APP_VER !== 'undefined' ? APP_VER : '';
-    }catch(e){ console.error('[DATA]', e); }
+      if (verEl) verEl.textContent = typeof APP_VER !== 'undefined' ? APP_VER : '';
+      if (typeof GD !== 'undefined') GD.init();
+    } catch(e) { console.error('[DATA]', e); }
   })();
 })();
-
-/* ══ DEBOUNCED HELPERS ══ */
-// _debouncedRenderList already declared above
-// _debouncedRenderDB already declared above
-// _debouncedBrowseSearch already declared above
-
-/* ══ LEVEL STYLE (Law hierarchy) ══ */
-// LEVEL_STYLE already declared above
