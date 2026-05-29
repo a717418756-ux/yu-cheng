@@ -1,5 +1,3 @@
-'use strict';
-
 /* ═══════════════════════════════════════════════
    警察考題庫 Pro — app.js
    Architecture:
@@ -610,7 +608,8 @@ const da=(st,idx,qry)=>{
     const cached=_cacheGet(ckey);
     if(cached)return Promise.resolve(cached);
     return new Promise((r,j)=>{
-      const t=db.transaction(st,'readonly');
+      if(!db){j(new Error('DB未就緒'));return;}
+    const t=db.transaction(st,'readonly');
       const q=t.objectStore(st).getAll();
       q.onsuccess=()=>{_cacheSet(ckey,q.result);r(q.result);};
       q.onerror=()=>j([]);
@@ -618,12 +617,16 @@ const da=(st,idx,qry)=>{
   }
   return new Promise((r,j)=>{const t=db.transaction(st,'readonly');const o=t.objectStore(st);const q=idx?o.index(idx).getAll(qry):o.getAll();q.onsuccess=()=>r(q.result);q.onerror=()=>j([]);});
 };
-const dp=(st,data)=>new Promise((r,j)=>{const t=db.transaction(st,'readwrite');const q=t.objectStore(st).put(data);q.onsuccess=()=>{_cacheInvalidate(st);r(q.result);};q.onerror=e=>j(e.target.error||new Error('dp failed'));t.onerror=e=>j(e.target.error||new Error('tx failed'));});
-const dd=(st,k)=>new Promise((r,j)=>{const t=db.transaction(st,'readwrite');const req=t.objectStore(st).delete(k);req.onsuccess=()=>{_cacheInvalidate(st);r();};req.onerror=()=>j();});
-const dc=(st)=>new Promise((r,j)=>{const t=db.transaction(st,'readwrite');const req=t.objectStore(st).clear();req.onsuccess=()=>{_cacheInvalidate(st);r();};req.onerror=()=>j();});
+const dp=(st,data)=>new Promise((r,j)=>{if(!db){j(new Error('DB未就緒'));return;}
+    const t=db.transaction(st,'readwrite');const q=t.objectStore(st).put(data);q.onsuccess=()=>{_cacheInvalidate(st);r(q.result);};q.onerror=e=>j(e.target.error||new Error('dp failed'));t.onerror=e=>j(e.target.error||new Error('tx failed'));});
+const dd=(st,k)=>new Promise((r,j)=>{if(!db){j(new Error('DB未就緒'));return;}
+    const t=db.transaction(st,'readwrite');const req=t.objectStore(st).delete(k);req.onsuccess=()=>{_cacheInvalidate(st);r();};req.onerror=()=>j();});
+const dc=(st)=>new Promise((r,j)=>{if(!db){j(new Error('DB未就緒'));return;}
+    const t=db.transaction(st,'readwrite');const req=t.objectStore(st).clear();req.onsuccess=()=>{_cacheInvalidate(st);r();};req.onerror=()=>j();});
 
 function bulkPut(st,items){
   return new Promise((res,rej)=>{
+    if(!db){rej(new Error('DB尚未初始化，請稍後再試'));return;}
     const tx=db.transaction(st,'readwrite');
     const os=tx.objectStore(st);
     let n=0;
@@ -3075,91 +3078,11 @@ function renderBrowseList(){
 }
 
 // ── 概念群組預設資料 ────────────────────────────────────────
-const DEFAULT_CONCEPT_GROUPS=[
-  {name:'臨檢群組',icon:'🔍',keywords:['臨檢','身分查證','查證身分','公共場所','合法進入','管制站'],laws:['警職法§6','警職法§7','警職法§8'],desc:'警察職權行使法臨檢相關規定'},
-  {name:'比例原則',icon:'⚖',keywords:['比例原則','適當性','必要性','相當性','過度禁止'],laws:['警職法§3','警察法§2'],desc:'比例原則三子原則及適用'},
-  {name:'即時強制',icon:'⚡',keywords:['即時強制','管束','扣留','使用警械','驅離'],laws:['警職法§19','警職法§20','警械條例§4'],desc:'即時強制類型及要件'},
-  {name:'集會遊行',icon:'📢',keywords:['集會','遊行','申請許可','不許可','解散'],laws:['集遊法§8','集遊法§11','集遊法§26'],desc:'集會遊行法重點規定'},
-  {name:'警察勤務',icon:'📋',keywords:['勤區查察','巡邏','臨檢','守望','值班','備勤'],laws:['警勤條例§9','警勤條例§11'],desc:'警察六大勤務方式'},
-  {name:'社維法',icon:'🏘',keywords:['妨害安寧秩序','妨害善良風俗','妨害公務','罰鍰','申誡'],laws:['社維法§63','社維法§67','社維法§85'],desc:'社會秩序維護法重點條文'},
-];
+
 // ── 群組資料讀寫（localStorage）──────────────────────────────
-function _loadGroups(){
-  try{
-    const stored=localStorage.getItem('conceptGroups');
-    if(stored){
-      const parsed=JSON.parse(stored);
-      if(Array.isArray(parsed)&&parsed.length>0) return parsed;
-    }
-  }catch(e){}
-  return DEFAULT_CONCEPT_GROUPS.map(g=>({...g}));
-}
-function _saveGroups(groups){
-  try{ localStorage.setItem('conceptGroups',JSON.stringify(groups)); }catch(e){}
-}
-
-async function saveConceptGroup(g){  try{
-  await dp('conceptGroups',g);
-  }catch(e){ logError('saveConceptGroup',e); }}
-
 async function deleteConceptGroup(id){  try{
   await dd('conceptGroups',id);
   }catch(e){ logError('deleteConceptGroup',e); }}
-
-async function openConceptGroup(groupId){  try{
-  const groups=_loadGroups();
-  const group=groups.find(g=>g.id===groupId)||groups[groupId];
-  if(!group)return;
-  const qs=await da('questions');
-  const pool=qs.filter(q=>{
-    const text=(q.stem||'')+Object.values(q.options||{}).join('')+(q.keywords||[]).join('');
-    return (group.keywords||[]).some(kw=>text.includes(kw));
-  });
-  if(!pool.length){toast('此群組尚無相關題目，請先匯入題目');return;}
-  toast(group.name+': 找到 '+pool.length+' 題');
-  startQWithPool(pool, group.name);
-  }catch(e){ logError('openConceptGroup',e); }}
-
-async function renderGroups(){  try{
-  const groups=_loadGroups();
-  const qs=await da('questions');
-  const el=document.getElementById('group-list');
-  if(!el)return;
-
-  const toolHtml='<div style="padding:0 12px 10px;display:flex;gap:8px;align-items:center">'
-    +'<button class="btn bp" style="padding:10px;font-size:13px;flex:1" onclick="addGroupItem()">＋ 新增群組</button>'
-    +'<button class="btn bg" style="padding:10px;font-size:13px" onclick="editGroupList()">✏ 管理</button>'
-  +'</div>';
-
-  if(!groups.length){
-    el.innerHTML=toolHtml+'<div class="empty" style="margin:20px 0"><span class="ic">🧩</span><span>尚無群組，點上方「＋ 新增群組」建立</span></div>';
-    return;
-  }
-
-  const cardsHtml=groups.map((g,i)=>{
-    const count=qs.filter(q=>{
-      const text=(q.stem||'')+Object.values(q.options||{}).join('')+(q.keywords||[]).join('');
-      return (g.keywords||[]).some(kw=>text.includes(kw));
-    }).length;
-    return '<div class="card" style="margin:5px 12px;cursor:pointer" onclick="openConceptGroup('+i+')">'
-      +'<div style="display:flex;align-items:center;gap:10px">'
-        +'<span style="font-size:24px">'+(g.icon||'🧩')+'</span>'
-        +'<div style="flex:1">'
-          +'<div style="font-size:14px;font-weight:700">'+esc(g.name)+'</div>'
-          +(g.desc?'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+esc(g.desc)+'</div>':'')
-          +((g.laws||[]).length?'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">'+(g.laws||[]).map(l=>'<span class="tag" style="color:var(--pur)">'+esc(l)+'</span>').join('')+'</div>':'')
-        +'</div>'
-        +'<div style="text-align:right">'
-          +'<div style="font-size:18px;font-weight:700;color:var(--acc)">'+count+'</div>'
-          +'<div style="font-size:10px;color:var(--t2)">相關題</div>'
-        +'</div>'
-      +'</div>'
-    +'</div>';
-  }).join('');
-
-  el.innerHTML=toolHtml+cardsHtml;
-  }catch(e){ logError('renderGroups',e); }}
-
 
 async function startNumberMode(){  try{
   const qs=await da('questions');
@@ -3193,34 +3116,6 @@ function startClozeLaw(content, lawName){
   el.appendChild(btn);
 }
 
-function addConceptGroup(){
-  showConceptGroupSheet(null);
-}
-
-async function editConceptGroup(id){  try{
-  const groups=_loadGroups();
-  const g=groups.find(g=>g.id===id);
-  if(g) showConceptGroupSheet(g);
-  }catch(e){logError('editConceptGroup',e);}
-}
-
-async function delConceptGroupById(id){  try{
-  if(!confirm('確定刪除此群組？'))return;
-  await deleteConceptGroup(id);
-  toast('已刪除');
-  renderGroups();
-  }catch(e){ logError('delConceptGroupById',e); }}
-
-function showConceptGroupSheet(g){
-  S._editGroupId=g?.id||null;
-  document.getElementById('cg-name').value=g?.name||'';
-  document.getElementById('cg-icon').value=g?.icon||'📌';
-  document.getElementById('cg-desc').value=g?.desc||'';
-  document.getElementById('cg-keywords').value=(g?.keywords||[]).join(',');
-  document.getElementById('cg-laws').value=(g?.laws||[]).join(',');
-  document.getElementById('cg-ov').classList.add('on');
-}
-
 // closeCGSheet 已移除（整合到 closeGroupAdd）
 
 async function saveCGSheet(){  try{
@@ -3241,25 +3136,6 @@ async function saveCGSheet(){  try{
   }catch(e){ logError('saveCGSheet',e); }}
 
 // ── 概念群組管理 ─────────────────────────────────────────────
-function editGroupList(){
-  const groups=_loadGroups();
-  const el=document.getElementById('group-list');
-  if(!el)return;
-  el.innerHTML='<div style="padding:0 12px 10px">'
-    +'<div style="font-size:13px;font-weight:700;margin-bottom:8px">群組管理</div>'
-    +groups.map((g,i)=>
-      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;padding:8px;background:var(--bg2);border-radius:8px">'
-        +'<span style="font-size:18px">'+g.icon+'</span>'
-        +'<span style="flex:1;font-size:13px">'+esc(g.name)+'</span>'
-        +'<button class="btn bg" style="padding:4px 8px;font-size:11px" onclick="addGroupItem('+i+')">✏</button>'
-        +'<button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" onclick="delGroupItem('+i+')">🗑</button>'
-      +'</div>'
-    ).join('')
-    +'<button class="btn bp bw" style="padding:10px;font-size:13px;margin-top:6px" onclick="addGroupItem()">＋ 新增群組</button>'
-    +'<button class="btn bg bw" style="padding:10px;font-size:13px;margin-top:6px" onclick="renderGroups()">← 返回</button>'
-  +'</div>';
-}
-
 function addGroupItem(editIdx){
   const groups=_loadGroups();
   const isEdit=editIdx!==undefined&&editIdx>=0;
@@ -3282,58 +3158,9 @@ function addGroupItem(editIdx){
     if(t)t.textContent=isEdit?'編輯概念群組':'新增概念群組';
   };
   setVals(); // 立即設一次
-  const ov=document.getElementById('group-add-ov');
-  if(ov) ov.classList.add('on');
+  const ov = document.getElementById('group-add-ov'); if(ov) ov.classList.add('on');
   // overlay 動畫結束後再設一次（保險）
   setTimeout(setVals, 250);
-}
-
-function closeGroupAdd(){
-  const ov=document.getElementById('group-add-ov');
-  if(ov) ov.classList.remove('on');
-}
-
-function saveGroupItem(){
-  // 先強制從 DOM 更新 _groupForm（如果 DOM 有值就覆蓋）
-  const gf=window._groupForm||{};
-  const sync=(id,key)=>{const el=document.getElementById(id);if(el&&el.value)gf[key]=el.value;};
-  sync('cg-icon','icon'); sync('cg-name','name');
-  sync('cg-desc','desc'); sync('cg-kw','kw'); sync('cg-laws','laws');
-  const icon=(gf.icon||'📌').trim();
-  const name=(gf.name||'').trim();
-  if(!name){toast('請填寫群組名稱');return;}
-  const desc=(gf.desc||'').trim();
-  const kwStr=gf.kw||'';
-  const lawStr=gf.laws||'';
-  const groups=_loadGroups();
-  const item={
-    id:'g_'+Date.now(),
-    name,icon,desc,
-    keywords:kwStr.split(/[,，]/).map(s=>s.trim()).filter(Boolean),
-    laws:lawStr.split(/[,，]/).map(s=>s.trim()).filter(Boolean)
-  };
-  const idx=window._editGroupIdx;
-  if(idx>=0&&idx<groups.length){
-    item.id=groups[idx].id;
-    groups[idx]=item;
-    toast('群組已更新');
-  } else {
-    groups.push(item);
-    toast('群組「'+name+'」已新增');
-  }
-  _saveGroups(groups);
-  closeGroupAdd();
-  renderGroups();
-}
-
-function delGroupItem(i){
-  const groups=_loadGroups();
-  const g=groups[i];if(!g)return;
-  if(!confirm('確定刪除「'+g.name+'」？'))return;
-  groups.splice(i,1);
-  _saveGroups(groups);
-  toast('已刪除');
-  editGroupList();
 }
 
 // ══ bulk.js — 大量貼題 ════════════════════════════════
@@ -3987,7 +3814,7 @@ function goPage(pg,btn){
   if(btn)btn.classList.add('on');
   else{const b=document.querySelector(`.nb[onclick*="'${pg}'"]`);if(b)b.classList.add('on');}
   S.page=pg;
-  ({home:renderHome,list:renderList,laws:renderDB,db:renderDB,stats:renderStats,set:renderSet,bulk:()=>{},groups:renderGroups})[pg]?.();
+  ({home:renderHome,list:renderList,laws:renderDB,db:renderDB,stats:renderStats,set:renderSet,bulk:()=>{}})[pg]?.();
 }
 
 async function init(){  try{
@@ -3997,12 +3824,7 @@ async function init(){  try{
   if(typeof applyIconSettings==='function') applyIconSettings();
   }catch(e){logError('init',e);document.body.innerHTML='<div style="padding:20px;color:red">⚠ 初始化失敗：'+e.message+'</div>';}
 }
-init().then(()=>{
-  if(typeof applyCustomIcons==="function") applyCustomIcons();
-  // 填入版本號
-  const verEl=document.getElementById('app-ver');
-  if(verEl) verEl.textContent=typeof APP_VER!=='undefined'?APP_VER:'';
-});
+// init() replaced by boot()
 
 
 
@@ -4026,37 +3848,6 @@ function switchHomeTab(tab, btn) {
 function goKfPage(id) { goPage(id.replace(/^page-pg-/,'').replace(/^page-/,'').replace(/^pg-/,'')); }
 
 /* ── Icon customisation ── */
-function openIconEditor() {
-  var ov = document.getElementById('icon-ov');
-  if (!ov) return;
-  var icons = JSON.parse(localStorage.getItem('customIcons') || '{}');
-  var defs = [
-    {key:'home',label:'首頁',def:'🏠'},{key:'list',label:'題目',def:'📚'},
-    {key:'db',label:'資料庫',def:'🗄'},{key:'stats',label:'統計',def:'📊'},
-    {key:'groups',label:'群組',def:'🧩'},{key:'set',label:'設定',def:'⚙️'}
-  ];
-  var el = document.getElementById('icon-list');
-  if (el) {
-    el.innerHTML = '';
-    defs.forEach(function(d) {
-      var row = document.createElement('div');
-      row.className = 'icon-row';
-      var btn = document.createElement('button');
-      btn.className = 'icon-btn-edit';
-      btn.textContent = icons[d.key] || d.def;
-      btn.dataset.iconKey = d.key;
-      btn.onclick = function() { promptIconEdit(d.key, btn); };
-      var lbl = document.createElement('div');
-      lbl.className = 'icon-label';
-      lbl.textContent = d.label;
-      row.appendChild(btn);
-      row.appendChild(lbl);
-      el.appendChild(row);
-    });
-  }
-  ov.classList.add('on');
-}
-function closeIconEditor() { var ov=document.getElementById('icon-ov'); if(ov)ov.classList.remove('on'); }
 function promptIconEdit(key, btn) {
   var cur = btn.textContent;
   var v = prompt('輸入新 emoji 圖示：', cur);
@@ -4066,14 +3857,6 @@ function promptIconEdit(key, btn) {
   localStorage.setItem('customIcons', JSON.stringify(icons));
   btn.textContent = v;
 }
-function resetAllIcons() {
-  if (!confirm('確定重置所有圖示？')) return;
-  localStorage.removeItem('customIcons');
-  toast('已重置，重新整理頁面生效');
-}
-function applyIconSettings() { /* icons applied via openIconEditor */ }
-function applyCustomIcons()  { /* icons applied via openIconEditor */ }
-
 /* ── Save exam settings ── */
 function saveExamSettings() {
   var name = (document.getElementById('examNameInput') || {}).value || '';
@@ -4125,28 +3908,6 @@ function setAIModel(m,btn){
   document.querySelectorAll('[id^="aimodel-"]').forEach(b=>b.classList.remove('on'));
   if(btn)btn.classList.add('on');
 }
-
-async function renderStats(){try{
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const total=qs.length,totalAts=ats.length,correct=ats.filter(a=>a.correct).length;
-  const rate=totalAts?Math.round(correct/totalAts*100):0;
-  setText2('st-q',total);setText2('st-a',totalAts);setText2('st-r',totalAts?rate+'%':'—');
-  const subMap={};
-  qs.forEach(q=>{const s=q.subject||'未分類';if(!subMap[s])subMap[s]={total:0,correct:0};subMap[s].total++;});
-  ats.forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';if(!subMap[s])return;if(a.correct!==null&&a.correct)subMap[s].correct++;});
-  const bars=document.getElementById('subj-bars');
-  if(bars)bars.innerHTML=Object.entries(subMap).sort((a,b)=>{const ra=a[1].total?a[1].correct/a[1].total:1;const rb=b[1].total?b[1].correct/b[1].total:1;return ra-rb;}).map(([s,d])=>{const r=d.total?Math.round(d.correct/d.total*100):0;const color=r>=80?'var(--grn)':r>=60?'var(--org)':'var(--red)';return'<div class="sr"><div class="sn" title="'+s.replace(/"/g,"&quot;")+'">'+s+'</div><div class="sbw"><div class="sbar" style="width:'+r+'%;background:'+color+'"></div></div><div class="sp">'+r+'%</div></div>';}).join('');
-  const days=7;const labels=[],data=[];
-  for(let i=days-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);labels.push(ds.slice(5));data.push(ats.filter(a=>a.date===ds).length);}
-  const ctx=document.getElementById('dchart');if(_dchart)_dchart.destroy();
-  _dchart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,backgroundColor:'rgba(232,201,107,.25)',borderColor:'var(--gold)',borderWidth:1,borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'#7a869e',font:{size:11}},grid:{color:'rgba(255,255,255,.05)'}},x:{ticks:{color:'#7a869e',font:{size:11}},grid:{display:false}}}}});
-  const wrongEl=document.getElementById('wrong-subs');const dangerMap={'🔴':0,'🟠':0,'🟡':0,'🟢':0};
-  qs.forEach(q=>{const lv=getDangerLevel(q,ats);dangerMap[lv]++;});
-  if(wrongEl)wrongEl.innerHTML=Object.entries(dangerMap).map(([lv,cnt])=>'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="font-size:16px;width:24px">'+lv+'</span><div style="flex:1;background:var(--bg3);border-radius:3px;height:7px;overflow:hidden"><div style="height:7px;border-radius:3px;background:var(--gold);width:'+(qs.length?cnt/qs.length*100:0)+'%"></div></div><span style="font-size:12px;color:var(--t2);font-weight:600;width:42px;text-align:right">'+cnt+' 題</span></div>').join('');
-  const kwMap={};ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
-  const kwCloud=document.getElementById('kw-cloud');
-  if(kwCloud)kwCloud.innerHTML=Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([kw,cnt])=>'<span class="tag" style="font-size:'+Math.min(14,10+cnt)+'px;cursor:default">'+kw+' <b style="color:var(--red)">'+cnt+'</b></span>').join('');
-}catch(e){logError('renderStats',e);}}
 
 async function buildExportText(){try{
   const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
@@ -4218,52 +3979,6 @@ function dlExportJson(){
   dl(JSON.stringify(_exportJsonData,null,2),'弱點報告_'+today()+'.json','application/json');
 }
 
-async function buildAI(){try{
-  const key=Store.get('apiKey');
-  const btn=document.getElementById('ai-call-btn');
-  const icon=document.getElementById('ai-call-icon');
-  const lbl=document.getElementById('ai-call-label');
-  if(!key){Toast.info('未設定 API Key，改為本地產生報告');await _buildAILocal();return;}
-  if(btn)btn.disabled=true;
-  if(icon)icon.textContent='⏳';
-  if(lbl)lbl.textContent='分析中…';
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const subErr={};
-  ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
-  const dangerQs=qs.filter(q=>getDangerLevel(q,ats)==='🔴').slice(0,10);
-  const kwMap={};
-  ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;(q.keywords||[]).forEach(kw=>{kwMap[kw]=(kwMap[kw]||0)+1;});});
-  const prompt='你是警察特考輔導專家，以下是考生學習弱點資料，請給出具體實用建議（繁體中文）。\n\n'
-    +'總題數：'+qs.length+'  作答：'+ats.length+'  正確率：'+(ats.length?Math.round(ats.filter(a=>a.correct).length/ats.length*100):0)+'%\n\n'
-    +'最弱科目：\n'+Object.entries(subErr).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,n])=>'- '+s+'：錯'+n+'次').join('\n')+'\n\n'
-    +'高危錯題：\n'+dangerQs.map(q=>'- ['+q.subject+'] '+(q.stem||'').slice(0,50)).join('\n')+'\n\n'
-    +'高頻錯誤關鍵字：'+Object.entries(kwMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,n])=>k+'('+n+')').join('、')+'\n\n'
-    +'請提供：1.優先加強主題 2.正確法律觀念 3.複習策略 4.容易混淆考點';
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:_aiModel,max_tokens:1200,messages:[{role:'user',content:prompt}]})
-    });
-    const data=await resp.json();
-    if(!resp.ok)throw new Error(data.error?.message||'API 錯誤 '+resp.status);
-    const text=data.content?.map(c=>c.text||'').join('')||'（無回應）';
-    _aiMd=text;
-    const mdEl=document.getElementById('ai-md');if(mdEl)mdEl.textContent=text;
-    const aiOut=document.getElementById('ai-out');if(aiOut)aiOut.classList.remove('hide');
-    Toast.success('AI 分析完成 ✓');
-  }catch(apiErr){
-    logError('buildAI-API',apiErr);
-    Toast.warn('API 呼叫失敗（'+apiErr.message+'），改為本地產生');
-    await _buildAILocal();
-  }
-}catch(e){logError('buildAI',e);Toast.error('分析失敗');}
-finally{
-  const btn=document.getElementById('ai-call-btn');if(btn)btn.disabled=false;
-  const icon=document.getElementById('ai-call-icon');if(icon)icon.textContent='✨';
-  const lbl=document.getElementById('ai-call-label');if(lbl)lbl.textContent='呼叫 AI 分析';
-}}
-
 async function _buildAILocal(){
   const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const subErr={};ats.filter(a=>!a.correct).forEach(a=>{const q=qs.find(q=>q.id===a.qid);if(!q)return;const s=q.subject||'未分類';subErr[s]=(subErr[s]||0)+1;});
@@ -4281,47 +3996,7 @@ async function _buildAILocal(){
   Toast.success('本地報告已產生 ✓');
 }
 
-async function copyAI(){try{await navigator.clipboard.writeText(_aiMd);Toast.success('已複製 ✓');}catch(e){Toast.warn('請手動選取複製');}}
-function dlAI(type){
-  if(!_aiMd){Toast.warn('請先執行分析');return;}
-  if(type==='md')dl(_aiMd,'弱點分析_'+today()+'.md','text/markdown');
-  else dl(JSON.stringify({generatedAt:new Date().toISOString(),report:_aiMd},null,2),'弱點分析_'+today()+'.json','application/json');
-}
 /* ══ SETTINGS FUNCTIONS ══ */
-async function expJSON(){try{
-  const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
-  dl(JSON.stringify({version:2,exportedAt:new Date().toISOString(),questions:qs,laws:ls,attempts:ats},null,2),'警察考題庫_'+today()+'.json','application/json');
-  Toast.success('已匯出 JSON');
-}catch(e){logError('expJSON',e);}}
-
-async function impJSON(e){
-  const file=e.target.files[0];if(!file)return;
-  try{
-    let data;try{data=JSON.parse(await file.text());}catch(pe){Toast.error('JSON 格式錯誤');return;}
-    const qs=Array.isArray(data)?data:Array.isArray(data.questions)?data.questions:null;
-    if(!qs){Toast.error('找不到 questions 欄位');return;}
-    const qItems=qs.map(({id,...r})=>r);
-    const lawItems=Array.isArray(data.laws)?data.laws.map(({id,...r})=>r):[];
-    const attItems=Array.isArray(data.attempts)?data.attempts.map(({id,...r})=>r):[];
-    await bulkPut('questions',qItems);
-    if(lawItems.length)await bulkPut('laws',lawItems);
-    if(attItems.length)await bulkPut('attempts',attItems);
-    Toast.success('已匯入 '+qItems.length+' 題'+(lawItems.length?' · '+lawItems.length+' 條法條':'')+'✓');
-    e.target.value='';renderHome();SettingsPage.init();
-  }catch(err){logError('impJSON',err);Toast.error('匯入失敗：'+(err?.message||String(err)));}}
-
-async function expWrong(){try{
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);const wids=getWrong(qs,ats);const wqs=qs.filter(q=>wids.has(q.id));
-  if(!wqs.length){Toast.info('目前沒有錯題');return;}
-  const grp={};wqs.forEach(q=>{const s=q.subject||'未分類';if(!grp[s])grp[s]=[];grp[s].push(q);});
-  let out='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>錯題整理</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px;line-height:1.8}h1{border-bottom:2px solid #333;padding-bottom:7px}h2{color:#1f6feb}.q{margin:14px 0;padding:14px;border:1px solid #ddd;border-radius:8px}.ans{color:#1f6feb;font-weight:600}</style></head><body><h1>錯題整理</h1>';
-  Object.entries(grp).forEach(([sub,sqs])=>{out+='<h2>'+sub+'</h2>';sqs.forEach((q,i)=>{out+='<div class="q"><div style="font-size:14px;font-weight:600;margin-bottom:8px">'+(i+1)+'. '+esc(q.stem||'')+'</div>';if(q.type==='mc')Object.entries(q.options||{}).forEach(([k,v])=>{out+='<div>('+k+') '+esc(v)+'</div>';});if(q.answer)out+='<div class="ans">答案：'+esc(q.answer)+'</div>';out+='</div>';});});
-  out+='</body></html>';
-  dl(out,'警察考題_錯題_'+today()+'.html','text/html');Toast.success('匯出 '+wqs.length+' 題');
-}catch(e){logError('expWrong',e);}}
-
-async function clearAts(){try{await dc('attempts');Toast.success('作答記錄已清除');SettingsPage.init();}catch(e){logError('clearAts',e);}}
-async function delAll(){try{await dc('questions');await dc('attempts');await dc('laws');Toast.success('已全部刪除');SettingsPage.init();renderHome();}catch(e){logError('delAll',e);}}
 /* ══ GOOGLE DRIVE SYNC ══
    流程：
    1. 使用者填入 OAuth Client ID → 存 localStorage
@@ -4351,12 +4026,8 @@ function setBrowseLawCat(v,btn){document.querySelectorAll('#bd-cat-chips .chip')
 function start(mode){if(typeof startQ==='function')startQ(mode);}
 function formatYearInput(el){const v=(el.value||'').trim();if(/^\d{2,3}$/.test(v)&&+v<200)el.value='民國'+v+'年';}
 function generateCloze(text,ratio){if(!text)return'';ratio=ratio||0.35;const matches=[...text.matchAll(/[\u4e00-\u9fff]{2,4}/g)];const step=Math.max(1,Math.floor(matches.length/Math.round(matches.length*ratio)));const toBlank=matches.filter((_,i)=>i%step===0).reverse();let r=text;for(const m of toBlank)r=r.slice(0,m.index)+'【　　】'+r.slice(m.index+m[0].length);return r;}
-async function openBulkDelQ(){try{const qs=await da('questions');if(!qs.length){toast('目前無題目');return;}const years=[...new Set(qs.map(q=>q.year||'').filter(Boolean))].sort().reverse();const subs=[...new Set(qs.map(q=>q.subject||'').filter(Boolean))].sort();const old=document.getElementById('bulk-del-q-modal');if(old)old.remove();const m=document.createElement('div');m.id='bulk-del-q-modal';m.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.7);display:flex;align-items:flex-end';const inner=document.createElement('div');inner.onclick=e=>e.stopPropagation();inner.style.cssText='width:100%;max-width:520px;margin:0 auto;background:var(--bg1,#1b1b1b);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto';inner.innerHTML=`<div style="width:36px;height:4px;background:var(--bg4,#2d2d2d);border-radius:2px;margin:0 auto 16px"></div><div style="font-size:15px;font-weight:700;margin-bottom:14px">🗑 題目大量刪除</div><div style="display:flex;flex-direction:column;gap:10px"><div><label style="font-size:12px;color:var(--t2)">年度</label><input id="bdq-year" list="bdq-yl" placeholder="留空不限" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:14px;margin-top:4px"><datalist id="bdq-yl">${years.map(y=>`<option value="${y}">`).join('')}</datalist></div><div><label style="font-size:12px;color:var(--t2)">科目</label><input id="bdq-sub" list="bdq-sl" placeholder="留空不限" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:14px;margin-top:4px"><datalist id="bdq-sl">${subs.map(s=>`<option value="${s}">`).join('')}</datalist></div></div><div id="bdq-preview" style="margin-top:12px;font-size:12px;color:var(--t2)"></div><div style="display:flex;gap:8px;margin-top:16px"><button onclick="document.getElementById('bulk-del-q-modal').remove()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t1);font-size:13px;cursor:pointer">取消</button><button onclick="previewBulkDelQ()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:13px;cursor:pointer">預覽</button><button onclick="confirmBulkDelQ()" style="flex:1;padding:12px;border-radius:10px;background:#e05c57;color:#fff;font-size:13px;cursor:pointer;border:none">確認刪除</button></div>`;m.appendChild(inner);document.body.appendChild(m);}catch(e){console.error(e);}}
-async function openBulkDelLaw(){try{const ls=await da('laws');if(!ls.length){toast('目前無法條');return;}const names=[...new Set(ls.map(l=>l.lawName||'').filter(Boolean))].sort();const old=document.getElementById('bulk-del-law-modal');if(old)old.remove();const m=document.createElement('div');m.id='bulk-del-law-modal';m.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.7);display:flex;align-items:flex-end';const inner=document.createElement('div');inner.onclick=e=>e.stopPropagation();inner.style.cssText='width:100%;max-width:520px;margin:0 auto;background:var(--bg1,#1b1b1b);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto';inner.innerHTML=`<div style="width:36px;height:4px;background:var(--bg4,#2d2d2d);border-radius:2px;margin:0 auto 16px"></div><div style="font-size:15px;font-weight:700;margin-bottom:14px">🗑 法條大量刪除</div><div><label style="font-size:12px;color:var(--t2)">法律名稱</label><input id="bdl-name" list="bdl-nl" placeholder="留空不限" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:14px;margin-top:4px"><datalist id="bdl-nl">${names.map(n=>`<option value="${n}">`).join('')}</datalist></div><div id="bdl-preview" style="margin-top:12px;font-size:12px;color:var(--t2)"></div><div style="display:flex;gap:8px;margin-top:16px"><button onclick="document.getElementById('bulk-del-law-modal').remove()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t1);font-size:13px;cursor:pointer">取消</button><button onclick="previewBulkDelLaw()" style="flex:1;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);color:var(--t2);font-size:13px;cursor:pointer">預覽</button><button onclick="confirmBulkDelLaw()" style="flex:1;padding:12px;border-radius:10px;background:#e05c57;color:#fff;font-size:13px;cursor:pointer;border:none">確認刪除</button></div>`;m.appendChild(inner);document.body.appendChild(m);}catch(e){console.error(e);}}
-
 /* ── 12. BOOT ── */
 (function boot(){
-  'use strict';
 
   function safe(fn){ try{ fn(); }catch(e){ console.error('[BOOT]',e); } }
 
@@ -4373,7 +4044,6 @@ async function openBulkDelLaw(){try{const ls=await da('laws');if(!ls.length){toa
     'pg-list':  function(){ renderList(); },
     'pg-db':    function(){ renderDB();   },
     'pg-stats': function(){ renderStats(); },
-    'pg-groups':function(){ renderGroups(); },
     'pg-set':   function(){ renderSet(); },
     'page-s-library': function(){ SLibrary.render && SLibrary.render(); },
     'page-review':    function(){ ReviewPage.render && ReviewPage.render(); },
@@ -4401,6 +4071,8 @@ async function openBulkDelLaw(){try{const ls=await da('laws');if(!ls.length){toa
       await Promise.all([DB.open(), initDB()]);
       await Store.load();
       buildOpts({});
+      document.getElementById('app').classList.add('ready');
+      goPage('home');
       switchHomeTab('exam', document.getElementById('tab-exam'));
       await renderHome();
       renderSet();
