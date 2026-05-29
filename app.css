@@ -1184,3 +1184,186 @@ a{color:inherit;text-decoration:none}
 @media (hover:none){
   .lw-del{opacity:1!important}
 }
+
+
+/* ═══════════════════════════════════════════════════════
+   SUPPLEMENT — A-origin classes used by JS-generated HTML
+   (quiz overlays, list cards, sheet overlays, etc.)
+═══════════════════════════════════════════════════════ */
+
+/* ── Nav bar (A-style, hidden - Router handles navigation) ── */
+.nav{display:flex;background:var(--bg1);border-top:1px solid var(--bd);position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;z-index:100;padding-bottom:env(safe-area-inset-bottom,0)}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 4px 7px;gap:3px;color:var(--t2);font-size:10px;font-weight:600;background:none;transition:color var(--tr);position:relative}
+.nb.on{color:var(--acc)}.nb .ic{font-size:20px;line-height:1}
+
+/* ── Legacy section header ── */
+.hd{display:flex;align-items:center;justify-content:space-between;height:52px;min-height:52px;padding:0 14px;background:rgba(18,18,18,0.92);border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:50;gap:8px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);flex-shrink:0}
+.hdt{font-size:15px;font-weight:700;line-height:1.2;white-space:nowrap;letter-spacing:.2px}
+.hds{font-size:10px;color:var(--t2);margin-top:1px;line-height:1}
+
+/* ── Generic button ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:9px 14px;border-radius:var(--rs);font-size:13px;font-weight:600;transition:all var(--tr);cursor:pointer;border:none}
+.bp{background:var(--sky2,rgba(88,180,255,.15));color:var(--sky)}.br{background:rgba(232,73,68,.15);color:var(--red);border:1px solid var(--red)}.bw{width:100%}
+
+/* ── Section label ── */
+.sec{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.8px;padding:13px 12px 5px}
+
+/* ── Stat card small ── */
+.sc{background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r);padding:11px;text-align:center}
+.sc .n{font-size:24px;font-weight:700;color:var(--acc)}.sc .l{font-size:11px;color:var(--t2);margin-top:2px}
+
+/* ── Search bar ── */
+.sb{margin:8px 12px;position:relative}.sb input{padding-left:33px}
+.sb .ic{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--t2);pointer-events:none}
+
+/* ── Chip row ── */
+.chips{display:flex;gap:6px;padding:5px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar{display:none}
+
+/* ── Question card (list) ── */
+.qc{background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r);padding:12px 14px;margin:0 12px 10px}
+.qc.wrong{border-left:3px solid var(--red)}.qc.star{border-left:3px solid var(--org,#f0883e)}
+.qch{display:flex;align-items:center;gap:5px;margin-bottom:6px;flex-wrap:wrap}
+.qst{font-size:15px;line-height:1.8;color:var(--t0);word-break:break-word;margin:8px 0 10px;padding-bottom:10px;border-bottom:1px solid var(--bd)}
+.qa{display:flex;gap:6px;margin-top:2px;flex-wrap:wrap}
+.qabn{padding:5px 11px;border-radius:6px;font-size:12px;font-weight:500;background:var(--bg2);color:var(--t1);border:1px solid var(--bd);transition:all var(--tr)}
+
+/* ── Options layout ── */
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.oi{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.cb{width:27px;height:27px;border-radius:50%;background:var(--bg3);color:var(--t2);font-size:12px;border:1px solid var(--bd);flex-shrink:0;transition:all var(--tr)}
+.cb.sel,.cb.on{background:var(--grn2,rgba(74,222,128,.15));color:var(--grn,#4ade80);border-color:var(--grn,#4ade80)}
+
+/* ── QV inner elements ── */
+.qbody{flex:1;overflow-y:auto;padding:14px 12px}
+.qstemb{font-size:16px;line-height:1.85;color:var(--t0);margin-bottom:16px;font-weight:500}
+.qpb{height:5px;background:var(--sky,#58b4ff);border-radius:3px;transition:width .4s}
+.qopt.missed{background:rgba(240,136,62,.12);border-color:var(--org,#f0883e);color:var(--org,#f0883e)}
+.qopt.wrong{background:rgba(232,73,68,.14);border-color:var(--red)}
+.qopt.selected-opt,.qopt.selected{border-color:var(--sky);background:rgba(88,180,255,.12)}
+.qopt.dim{opacity:.5}
+.qstar.on{background:rgba(240,136,62,.15);border-color:var(--org,#f0883e);color:var(--org,#f0883e)}
+.qfb{flex:1;padding:14px;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;transition:all var(--tr)}
+.qnxt-btn{background:var(--sky2,rgba(88,180,255,.15));color:var(--sky)}
+.qdone{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:28px 20px;text-align:center;gap:13px}
+
+/* ── Law body ── */
+.lb{flex:1;overflow-y:auto;padding:12px 12px 80px}
+
+/* ── Overlay/Sheet ── */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:flex-end;justify-content:center}
+.ov.on{display:flex}
+.sh{background:var(--bg1);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:94vh;overflow-y:auto;padding-bottom:env(safe-area-inset-bottom,16px)}
+.shdl{width:36px;height:4px;background:var(--bg3);border-radius:2px;margin:10px auto 6px}
+.sht{font-size:17px;font-weight:700;padding:6px 16px 13px;display:flex;align-items:center;justify-content:space-between}
+.shx{background:var(--bg2);border:none;color:var(--t2);width:27px;height:27px;border-radius:50%;font-size:14px;cursor:pointer}
+.cov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:center;justify-content:center;padding:16px}
+.cov.on{display:flex}
+.cbox{background:var(--bg1);border:1px solid var(--bd);border-radius:13px;padding:20px 17px;width:100%;max-width:290px;text-align:center}
+.cbt{font-size:15px;font-weight:700;margin-bottom:6px}.cbs{font-size:13px;color:var(--t2);margin-bottom:16px}
+.cbn{display:flex;gap:7px}
+
+/* ── Previous-list (bulk parse preview) ── */
+.prev-list{display:flex;flex-direction:column;gap:5px;max-height:360px;overflow-y:auto}
+
+/* ── Stats grid 3-col ── */
+.st3{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 12px}
+
+/* ── Misc ── */
+.cc{margin:0 12px 9px;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r);padding:12px}
+.ct{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:9px}
+.ait{font-size:14px;font-weight:700;margin-bottom:8px}
+.fl{display:flex;align-items:center;gap:8px}
+.sel,.selected{background:var(--sky2,rgba(88,180,255,.15)) !important;border-color:var(--sky) !important}
+.star.on,.qstar.on{color:var(--org,#f0883e)}
+.missed{opacity:.6}
+
+/* ── Bulk import preview items ── */
+.pi{padding:8px 12px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);margin-bottom:5px}
+.pi.ok{border-color:rgba(74,222,128,.3)}.pi.warn{border-color:rgba(248,113,113,.3)}
+.pi-n{font-size:11px;color:var(--t2);margin-bottom:3px}
+.pi-s{font-size:13px;color:var(--t1);line-height:1.5}
+
+/* ── Done screen score display ── */
+.done-score{font-size:52px;font-weight:800;color:var(--sky);line-height:1}
+.done-pct{font-size:15px;color:var(--t2);margin-top:4px}
+.done-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:300px}
+.done-card{background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:12px;text-align:center}
+.done-card .v{font-size:22px;font-weight:700}.done-card .l{font-size:11px;color:var(--t2);margin-top:2px}
+
+/* ── Number game ── */
+.num-q{font-size:18px;font-weight:700;color:var(--t0);margin-bottom:20px;line-height:1.6;padding:0 16px}
+.num-input{width:140px;padding:12px 16px;border-radius:12px;background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:20px;font-weight:700;text-align:center;outline:none}
+.num-input:focus{border-color:var(--sky)}
+.num-ans{font-size:15px;font-weight:600;margin-top:10px;min-height:24px}
+
+/* ── Dup box ── */
+.dup-box{background:var(--bg2);border:1px solid var(--bd);border-radius:16px;padding:20px;width:90%;max-width:320px}
+
+/* ── Tag (bulk parse stats) ── */
+.tag{padding:3px 10px;border-radius:6px;background:var(--bg3);border:1px solid var(--bd);font-size:12px;color:var(--t1)}
+
+/* ── Icon editor ── */
+.icon-box{background:var(--bg2);border-radius:20px 20px 0 0;padding:20px 16px 32px;width:100%;max-width:520px}
+.icon-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd)}
+.icon-btn-edit{width:40px;height:40px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.icon-label{flex:1;font-size:13px;color:var(--t1)}
+
+/* ── Subj bar (stats page) ── */
+.subj-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.subj-bar-name{font-size:12px;color:var(--t2);width:80px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.subj-bar-track{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.subj-bar-fill{height:100%;border-radius:4px;transition:width .5s}
+.subj-bar-pct{font-size:11px;color:var(--t2);width:36px;text-align:right;flex-shrink:0}
+
+/* ── Export opts card ── */
+.export-opt-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;background:var(--bg2);border:1px solid var(--bd);border-radius:12px;cursor:pointer;transition:all var(--tr)}
+.export-opt-card input{display:none}
+.export-opt-card:has(input:checked){border-color:var(--sky);background:var(--sky2,rgba(88,180,255,.1))}
+.eopt-icon{font-size:22px}.eopt-label{font-size:12px;font-weight:700;color:var(--t0)}.eopt-desc{font-size:10px;color:var(--t3)}
+
+/* ── AI output ── */
+.ai-out{padding:0 16px 20px}
+.ai-pre{font-size:12px;line-height:1.7;color:var(--t1);white-space:pre-wrap;word-break:break-word;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:12px;font-family:var(--font)}
+
+/* ── Countdown pill ── */
+.countdown-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;background:rgba(232,201,107,.08);border:1px solid rgba(232,201,107,.2);font-size:12px;color:var(--t2)}
+.countdown-days{font-size:16px;font-weight:800;color:var(--gold,#e8c96b)}
+
+/* ── Law group list item ── */
+.lg-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background var(--tr)}
+.lg-row:hover,.lg-row:active{background:var(--bg2)}
+.lg-ic{width:40px;height:40px;border-radius:12px;background:var(--bg3);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.lg-name{font-size:14px;font-weight:700;color:var(--t0)}.lg-sub{font-size:11px;color:var(--t2);margin-top:2px}
+
+/* ── Concept group card ── */
+.cg-card{margin:0 12px 10px;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r);padding:14px;cursor:pointer;transition:all var(--tr)}
+.cg-card:hover,.cg-card:active{border-color:var(--sky)}
+.cg-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.cg-icon{font-size:22px}.cg-name{font-size:14px;font-weight:700;color:var(--t0);flex:1}
+.cg-desc{font-size:12px;color:var(--t2);line-height:1.5}
+.cg-meta{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+
+/* ── Law article (inside lv-body) ── */
+.la{padding:10px 14px;border-bottom:1px solid var(--bd)}
+.la-art{font-size:13px;font-weight:700;color:var(--sky);margin-bottom:4px}
+.la-txt{font-size:13px;color:var(--t1);line-height:1.75;white-space:pre-wrap;word-break:break-word}
+.la-img{width:100%;border-radius:8px;margin-top:6px}
+.la-kw{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+
+/* ── Group add overlay ── */
+.ga-ov{position:fixed;inset:0;z-index:820;background:rgba(0,0,0,.7);display:none;align-items:flex-end;justify-content:center}
+.ga-ov.on{display:flex}
+
+/* ── DB info box ── */
+.db-info-box{margin:0 16px 12px;padding:12px 14px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--r2);font-size:12px;color:var(--t2);line-height:2}
+
+/* ── Danger section ── */
+.set-section-label-danger,.set-section.danger-section .set-label.danger-label{color:var(--red)}
+
+/* ── Misc helpers used by JS ── */
+.hide{display:none !important}
+.on.hide{display:none !important}
+.bmc{background:rgba(88,180,255,.15);color:var(--sky);border-color:rgba(88,180,255,.3)}
+.bes{background:rgba(167,139,250,.15);color:var(--pur);border-color:rgba(167,139,250,.3)}
+.fl-col{display:flex;flex-direction:column;gap:8px}
