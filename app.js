@@ -2749,10 +2749,9 @@ function parseBulkQ(){try{
     if(biSection)q.section=biSection.trim();
   });
   const mc=parsed.filter(q=>q.type==='mc').length;const es=parsed.filter(q=>q.type==='es').length;
-  // 相容新舊兩種統計/預覽 element ID
-  ['bulk-q-stats','bulk-stats'].forEach(id=>{const el=$el(id);if(el)el.innerHTML='<span class="tag">'+parsed.length+' 題</span><span class="tag">選擇 '+mc+'</span><span class="tag">申論 '+es+'</span>';});
-  ['bulk-q-prev-list','prev-list'].forEach(id=>{const el=$el(id);if(el)el.innerHTML=parsed.map(q=>'<div class="pi '+(q.answer||q.type==='es'?'ok':'warn')+'"><div class="pi-n">第'+q.num+'題 · '+(q.type==='mc'?'選擇題':'申論題')+(q.answer?' · 答案:'+q.answer:'')+'</div><div class="pi-s">'+esc(q.stem||'')+'</div></div>').join('');});
-  ['bulk-q-result','bulk-result'].forEach(id=>{const el=$el(id);if(el)el.classList.remove('hide');});
+  const _bqStats=$el('bulk-q-stats');if(_bqStats)_bqStats.innerHTML='<span class="tag">'+parsed.length+' 題</span><span class="tag">選擇 '+mc+'</span><span class="tag">申論 '+es+'</span>';
+  const _bqPrev=$el('bulk-q-prev-list');if(_bqPrev)_bqPrev.innerHTML=parsed.map(q=>'<div class="pi '+(q.answer||q.type==='es'?'ok':'warn')+'"><div class="pi-n">第'+q.num+'題 · '+(q.type==='mc'?'選擇題':'申論題')+(q.answer?' · 答案:'+q.answer:'')+'</div><div class="pi-s">'+esc(q.stem||'')+'</div></div>').join('');
+  const _bqRes=$el('bulk-q-result');if(_bqRes)_bqRes.classList.remove('hide');
   if(!parsed.length)Toast.warn('解析結果為0題');else Toast.success('解析完成：'+parsed.length+' 題 ✓');
 }catch(err){Toast.error('解析錯誤：'+err.message);}}
 // 舊版名稱相容
@@ -2773,7 +2772,7 @@ function importBulk(){importBulkQ();}
 /* ── 大量貼題：清除 ── */
 function clearBulkQ(){
   ['bi-text','bi-ans','bi-sub','bi-yr','bi-ex','bi-part','bi-chapter','bi-section'].forEach(id=>{const el=$el(id);if(el)el.value='';});
-  ['bulk-q-result','bulk-result'].forEach(id=>{const el=$el(id);if(el)el.classList.add('hide');});
+  const _cr=$el('bulk-q-result');if(_cr)_cr.classList.add('hide');
   S.bulkParsed=[];
 }
 function clearBulk(){clearBulkQ();}
@@ -3012,5 +3011,15 @@ function resetAllIcons(){if(!confirm('確定重置所有圖示？'))return;local
       await renderHome();
       var verEl=$el('app-ver');if(verEl)verEl.textContent=APP_VER;
     }catch(e){console.error('[DATA]',e);}
+    finally{
+      // 保底：loading.js 動畫結束後若 overlay 未移除，強制清除
+      ['splash','app-splash','loading','app-loading','splash-ov','loading-ov'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(el){el.style.display='none';el.style.opacity='0';el.style.pointerEvents='none';}
+      });
+      document.querySelectorAll('.splash-screen,.loading-screen,.app-loading,.app-splash,[data-splash]').forEach(function(el){
+        el.style.display='none';el.style.opacity='0';el.style.pointerEvents='none';
+      });
+    }
   })();
 })();
