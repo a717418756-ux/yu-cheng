@@ -30,10 +30,10 @@ async function renderHome(){  try{
   const estMin=Math.ceil((reviewDue*avgTime||reviewDue*45)/60);
 
   document.getElementById('h-date').textContent=new Date().toLocaleDateString('zh-TW',{weekday:'long',month:'long',day:'numeric'});
-  // 勉勵語：從 localStorage 讀取
+  // 勉勵語：從 IndexedDB 讀取
   const mottoEl=document.getElementById('h-motto');
   if(mottoEl){
-    const saved=localStorage.getItem('examMotto');
+    const saved=await getSetting('examMotto','');
     if(saved) mottoEl.textContent=saved;
   }
   // 今日任務 badges（精緻橫排）

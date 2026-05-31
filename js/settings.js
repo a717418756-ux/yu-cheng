@@ -4,15 +4,15 @@
 
 // ══════════════════════════════════════════════════════════════
 // Google Drive 雲端同步
-// Client ID 由使用者在設定頁輸入，存於 localStorage
+// Client ID 由使用者在設定頁輸入，存於 IndexedDB settings store
 // ══════════════════════════════════════════════════════════════
 const GDRIVE_SCOPES      = 'https://www.googleapis.com/auth/drive.file';
 const GDRIVE_BACKUP_FILE = '警察考題庫_backup.json';
 const GDRIVE_CID_KEY     = 'gdriveClientId';
 
-// 讀取 Client ID（優先從 localStorage）
-function getGDriveClientId(){
-  return (localStorage.getItem(GDRIVE_CID_KEY)||'').trim();
+// 讀取 Client ID
+async function getGDriveClientId(){
+  return (await getSetting(GDRIVE_CID_KEY, '')).trim();
 }
 
 let _gToken = null;   // access token
@@ -21,10 +21,10 @@ let _gToken = null;   // access token
 function gdriveClientIdChanged(){
   // 即時存入（每次輸入都先暫存，按儲存才正式存）
 }
-function saveClientId(){
+async function saveClientId(){
   const val=(document.getElementById('gdrive-client-id-input')?.value||'').trim();
   if(!val){ toast('請輸入 Client ID'); return; }
-  try{ localStorage.setItem(GDRIVE_CID_KEY,val); }catch(e){}
+  await setSetting(GDRIVE_CID_KEY, val);
   toast('Client ID 已儲存 ✓');
   // 如果已有 token，重設（可能換了 ID）
   if(_gToken){ gdriveLogout(); }
@@ -34,8 +34,8 @@ function toggleClientIdHelp(){
   if(el) el.style.display=el.style.display==='none'?'':'none';
 }
 // 載入已儲存的 Client ID 到輸入框
-function _gdriveLoadSavedId(){
-  const saved=getGDriveClientId();
+async function _gdriveLoadSavedId(){
+  const saved=await getGDriveClientId();
   const el=document.getElementById('gdrive-client-id-input');
   if(el&&saved) el.value=saved;
 }
@@ -53,7 +53,7 @@ function _loadGIS(){
 
 // ── 登入 ─────────────────────────────────────────────────────
 async function gdriveLogin(){
-  const cid=getGDriveClientId();
+  const cid=await getGDriveClientId();
   if(!cid){
     toast('請先在設定頁填入並儲存 Google Client ID');return;
   }

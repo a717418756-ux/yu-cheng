@@ -52,6 +52,16 @@ function initDB(){
       if(!d.objectStoreNames.contains('conceptGroups')){
         d.createObjectStore('conceptGroups',{keyPath:'id',autoIncrement:true});
       }
+
+      // ── settings store（key-value，存 motto / gdriveClientId 等）
+      if(!d.objectStoreNames.contains('settings')){
+        d.createObjectStore('settings',{keyPath:'key'});
+      }
+
+      // ── countdowns store（考試倒數列表）─────────────────
+      if(!d.objectStoreNames.contains('countdowns')){
+        d.createObjectStore('countdowns',{keyPath:'id',autoIncrement:true});
+      }
     };
 
     r.onsuccess = e => { db = e.target.result; res(db); };
@@ -186,5 +196,27 @@ async function getPriorityPool(mode='all'){  try{
   });
   return pool;
   }catch(e){ logError('getPriorityPool',e); return []; }}
+
+// ── settings store helpers ────────────────────────────────────
+async function getSetting(key, fallback=''){
+  try{
+    const r = await dg('settings', key);
+    return (r && r.value !== undefined) ? r.value : fallback;
+  }catch(e){ return fallback; }
+}
+async function setSetting(key, value){
+  try{ await dp('settings', {key, value}); }catch(e){ logError('setSetting',e); }
+}
+
+// ── countdowns store helpers ──────────────────────────────────
+async function getCountdowns(){
+  try{ return await da('countdowns'); }catch(e){ return []; }
+}
+async function saveCountdowns(list){
+  try{
+    await dc('countdowns');
+    if(list.length) await bulkPut('countdowns', list);
+  }catch(e){ logError('saveCountdowns',e); }
+}
 
 const APP_VER = 'v114053101';

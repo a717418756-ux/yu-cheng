@@ -1,17 +1,6 @@
 // ── countdown.js：考試倒數功能 ──────────────────────────────────────
-// 依賴：utils.js（esc, today）
-// 儲存：localStorage 'examCountdowns' = [{id, name, date}]
-
-const COUNTDOWN_KEY = 'examCountdowns';
-
-function _loadCountdowns(){
-  try{ return JSON.parse(localStorage.getItem(COUNTDOWN_KEY)||'[]'); }
-  catch(e){ return []; }
-}
-function _saveCountdowns(list){
-  try{ localStorage.setItem(COUNTDOWN_KEY, JSON.stringify(list)); }
-  catch(e){}
-}
+// 依賴：db.js（getCountdowns, saveCountdowns, getSetting, setSetting）, utils.js（esc）
+// 儲存：IndexedDB 'countdowns' store / 'settings' store
 
 // 計算距離考試的天數
 function _daysUntil(dateStr){
@@ -20,11 +9,11 @@ function _daysUntil(dateStr){
   return Math.round((exam - now) / 86400000);
 }
 
-// 渲染倒數區塊（首頁：無框純文字樣式）
-function renderCountdown(){
+// 渲染倒數區塊（首頁）
+async function renderCountdown(){
   const el = document.getElementById('h-countdown');
   if(!el) return;
-  const list = _loadCountdowns().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const list = (await getCountdowns()).sort((a,b)=>new Date(a.date)-new Date(b.date));
 
   if(!list.length){
     el.innerHTML = '<div class="hcd-hint">尚未新增考試，可至設定頁新增 →</div>';
@@ -50,10 +39,10 @@ function renderCountdown(){
 }
 
 // 渲染設定頁的考試倒數區塊
-function renderSetCountdown(){
+async function renderSetCountdown(){
   const el=document.getElementById('set-countdown');
   if(!el)return;
-  const list=_loadCountdowns().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const list=(await getCountdowns()).sort((a,b)=>new Date(a.date)-new Date(b.date));
   if(!list.length){
     el.innerHTML='<div style="color:var(--t2);font-size:13px;padding:4px 0 2px">尚未新增考試</div>';
     return;
@@ -77,11 +66,11 @@ function renderSetCountdown(){
   }).join('');
 }
 
-function delCountdownSet(id){
-  const list=_loadCountdowns().filter(i=>i.id!==id);
-  _saveCountdowns(list);
-  renderCountdown();      // 更新首頁
-  renderSetCountdown();   // 更新設定頁
+async function delCountdownSet(id){
+  const list=(await getCountdowns()).filter(i=>String(i.id)!==String(id));
+  await saveCountdowns(list);
+  renderCountdown();
+  renderSetCountdown();
   toast('已刪除');
 }
 
@@ -116,29 +105,28 @@ function openCountdownMgr(){
   setTimeout(()=>document.getElementById('cd-name')?.focus(),300);
 }
 
-function _saveCountdownFromModal(){
+async function _saveCountdownFromModal(){
   const name=(document.getElementById('cd-name')?.value||'').trim();
   const dateStr=(document.getElementById('cd-date')?.value||'').trim();
   if(!name){toast('請填寫考試名稱');return;}
   if(!dateStr){toast('請選擇考試日期');return;}
-  const list=_loadCountdowns();
-  list.push({id:Date.now().toString(),name,date:dateStr});
-  _saveCountdowns(list);
+  const list=await getCountdowns();
+  list.push({name, date:dateStr});
+  await saveCountdowns(list);
   document.getElementById('countdown-add-modal')?.remove();
   renderCountdown();
   renderSetCountdown();
   toast('已新增「'+name+'」');
 }
 
-// 刪除考試
-function delCountdown(id){
-  const list = _loadCountdowns().filter(i=>i.id!==id);
-  _saveCountdowns(list);
+async function delCountdown(id){
+  const list=(await getCountdowns()).filter(i=>String(i.id)!==String(id));
+  await saveCountdowns(list);
   renderCountdown();
 }
 
 // ── 勉勵語編輯 ──────────────────────────────────────────────
-function editMotto(){
+async function editMotto(){
   const el=document.getElementById('h-motto');
   if(!el)return;
   const cur=el.textContent.trim();
@@ -146,8 +134,6 @@ function editMotto(){
   if(nv===null)return;
   const val=nv.trim()||'備考如磨刃，臨陣方知銳';
   el.textContent=val;
-  try{ localStorage.setItem('examMotto',val); }catch(e){}
+  await setSetting('examMotto', val);
   toast('勉勵語已更新 ✓');
 }
-
-
