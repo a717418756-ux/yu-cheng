@@ -187,3 +187,4 @@ async function getPriorityPool(mode='all'){  try{
   return pool;
   }catch(e){ logError('getPriorityPool',e); return []; }}
 
+const APP_VER = 'v114053101';

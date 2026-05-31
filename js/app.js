@@ -1,86 +1,286 @@
-const APP_VER = 'v114053101';
-// ══ utils.js — 工具函式 ═════════════════════════════════════
-// 全域狀態
-const S = {
-  page:'home', filter:'all', subF:'all', lawCat:'all',
-  editId:null, editLawId:null,
-  qType:'mc', correct:'A',
-  quiz:{q:[],idx:0,ans:false,res:[],mode:''},
-  curLaw:null, curLawName:'', lawSort:'name', bulkParsed:[], aiMd:'', aiJson:''
-};
+// ── 閱覽區子選單（題目閱覽 / 資料閱覽）────────────────────────
+let _browsSubOpen = false;
+function toggleBrowseSub(){
+  _browsSubOpen = !_browsSubOpen;
+  const menu  = document.getElementById('browse-sub-menu');
+  const arrow = document.getElementById('browse-sub-arrow');
+  if(menu)  menu.classList.toggle('open', _browsSubOpen);
+  if(arrow) arrow.classList.toggle('open', _browsSubOpen);
+}
 
-function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function br(s){ return esc(s||'').split('\n').join('<br>').split('\r').join(''); }
-function toast(m,d=2200){ const e=document.getElementById('toast');if(!e)return;e.textContent=m;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),d); }
-function today(){ return new Date().toISOString().slice(0,10); }
-function dl(c,fn,t='text/plain'){ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=fn;a.click(); }
-function kwArr(s){ return (s||'').split(/[,，、\s]+/).map(k=>k.trim()).filter(Boolean); }
+// ── 資料閱覽 overlay ─────────────────────────────────────────
+let _lbCat = 'all';
+let _lbAllLaws = [];
 
-// ── 空格清理（PDF/OCR 常見問題）──────────────────────────────
-function cleanSpaces(text){
-  if(!text)return text;
-  let t=text;
-  // 1. 不可見字元
-  t=t.replace(/\u00A0/g,' ').replace(/\u200B/g,'').replace(/\uFEFF/g,'').replace(/\u3000/g,' ');
-  // 2. 連續空格 → 單一
-  t=t.replace(/[ \t]{2,}/g,' ');
-  // 3. 中文字/標點之間的空格 → 直接合併（數字間空格保留）
-  let prev='';
-  while(prev!==t){
-    prev=t;
-    t=t.replace(/([\u4e00-\u9fff\uff00-\uffef，。！？、：；「」【】（）]) ([\u4e00-\u9fff\uff00-\uffef，。！？、：；「」【】（）])/g,'$1$2');
+async function openLawBrowse(){  try{
+  _lbAllLaws = await da('laws');
+  _lbCat = 'all';
+  // reset chips
+  document.querySelectorAll('#lb-cat-chips .chip').forEach(c=>c.classList.remove('on'));
+  const first = document.querySelector('#lb-cat-chips .chip');
+  if(first) first.classList.add('on');
+  const srEl = document.getElementById('lb-search');
+  if(srEl) srEl.value = '';
+  renderLawBrowse();
+  const ov = document.getElementById('law-browse-ov');
+  if(ov){ ov.style.display='flex'; }
+}catch(e){ logError('openLawBrowse',e); }}
+
+function closeLawBrowse(){
+  const ov = document.getElementById('law-browse-ov');
+  if(ov) ov.style.display = 'none';
+}
+
+function setLBCat(el, cat){
+  document.querySelectorAll('#lb-cat-chips .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  _lbCat = cat;
+  renderLawBrowse();
+}
+
+function renderLawBrowse(){
+  const kw = (document.getElementById('lb-search')?.value||'').toLowerCase().trim();
+  let fl = _lbAllLaws.filter(l=>{
+    if(_lbCat!=='all' && l.category!==_lbCat) return false;
+    if(kw){
+      const h = ((l.lawName||'')+(l.article||'')+(l.content||'')+(l.keywords||[]).join(' ')+(l.title||'')).toLowerCase();
+      return h.includes(kw);
+    }
+    return true;
+  }).sort((a,b)=>{
+    if((a.lawName||'') < (b.lawName||'')) return -1;
+    if((a.lawName||'') > (b.lawName||'')) return 1;
+    return (a.articleNumber||0)-(b.articleNumber||0);
+  });
+  const el = document.getElementById('lb-list');
+  if(!el) return;
+  if(!fl.length){
+    el.innerHTML='<div class="empty"><span class="ic">📂</span><span>查無資料</span></div>';
+    return;
   }
-  // 4. 中文行中換行 → 合併（非段落換行）
-  t=t.replace(/([\u4e00-\u9fff，。！？、：；])\n([\u4e00-\u9fff，。！？])/g,'$1$2');
-  // 5. 行尾空白
-  t=t.replace(/[ \t]+$/gm,'');
-  return t.trim();
+  el.innerHTML = fl.map(l=>{
+    const isImg = l.content && l.content.startsWith('data:image');
+    const preview = isImg ? '🖼 圖片內容' : _hl((l.content||'').slice(0,80),kw);
+    const kwTags=(l.keywords||[]).length
+      ?'<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">'
+        +(l.keywords||[]).map(k=>'<span class="tag" style="color:var(--pur);font-size:10px">'+_hl(k,kw)+'</span>').join('')
+        +'</div>':'';
+    return `<div class="card" style="margin:5px 12px;cursor:pointer" onclick="openLawGroup('${esc(l.lawName||'')}')">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;flex-wrap:wrap">
+        <span class="tag" style="color:var(--pur)">${_hl(l.lawName||'未命名',kw)}</span>
+        ${l.article?`<span class="tag">${_hl(l.article,kw)}</span>`:''}
+        ${l.title?`<span class="tag">${_hl(l.title,kw)}</span>`:''}
+        <span class="tag">${l.category==='statute'?'法規':l.category==='sop'?'SOP':l.category==='supplement'?'補充':l.category==='interpretation'?'函釋':'其他'}</span>
+      </div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.6">${preview}${!isImg&&(l.content||'').length>80?'…':''}</div>
+      ${kwTags}
+    </div>`;
+  }).join('');
 }
+const _debouncedLawBrowseSearch = debounce(renderLawBrowse, 200);
 
-// 關鍵字自動提取
-const KW_POOL = ['比例原則','正當法律程序','臨檢','身分查證','即時強制','行政裁量',
-  '警械使用','強制力','合理懷疑','現行犯','通知到場','管束','扣留',
-  '警察職權','公共秩序','社會安全','行政救濟','陳述意見','書面告知',
-  '告知義務','蒐集資料','偵查','搜索','扣押','逮捕','拘提',
-  '通訊監察','秘密蒐證','釣魚偵查','控制下交付','陷害教唆',
-  '法律保留','裁量怠惰','裁量濫用','警察補充性','緊急危難','正當防衛',
-  '緊急避難','正當理由','警察勤務','勤區查察','巡邏','臨檢','守望',
-  '值班','備勤','社維法','集遊法','警職法','警察法','警勤條例','警械條例'];
-function autoKeywords(text){ return KW_POOL.filter(kw=>(text||'').includes(kw)); }
+// ── 首頁兩大區塊展開/收合 ────────────────────────────────────
+window._activeZone = null;  // 'exam' | 'study' | null
+let _zoneQuizOpen = false;
 
-// 條號轉數字
-const ZHN = {'零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000};
-function zh2n(s){ let n=0,c=0;for(const ch of s){const v=ZHN[ch];if(v===undefined)continue;if(v>=10){if(c===0)c=1;n+=c*v;c=0;}else c=v;}return n+c; }
-function art2n(art){ const m=art.match(/第([一二三四五六七八九十百千\d]+)條/);if(!m)return 0;const s=m[1];return /^\d+$/.test(s)?parseInt(s):zh2n(s); }
+function toggleZone(zone){
+  const examCard  = document.getElementById('zone-exam');
+  const studyCard = document.getElementById('zone-study');
+  const examPanel = document.getElementById('panel-exam');
+  const studyPanel= document.getElementById('panel-study');
 
-// 錯題演算法
-function getWrong(qs,ats){
-  const s=new Set();
-  for(const q of qs){
-    const qa=ats.filter(a=>a.qid===q.id&&a.correct!==null).sort((a,b)=>b.date>a.date?1:-1);
-    if(!qa.length)continue;
-    const r=qa.slice(0,3);
-    if(r.every(a=>!a.correct)||(qa.filter(a=>!a.correct).length/qa.length>0.5&&qa.length>=2))s.add(q.id);
+  if(window._activeZone === zone){
+    // 同區再點 → 收合
+    window._activeZone = null;
+    [examCard,studyCard].forEach(c=>{
+      c.classList.remove('zone-active','zone-shrink');
+    });
+    [examPanel,studyPanel].forEach(p=>p.classList.remove('open'));
+    if(zone==='exam') _closeZoneQuiz();
+  } else {
+    window._activeZone = zone;
+    const isExam = zone==='exam';
+    // 目標區：放大
+    (isExam?examCard:studyCard).classList.add('zone-active');
+    (isExam?examCard:studyCard).classList.remove('zone-shrink');
+    // 另一區：縮小
+    (isExam?studyCard:examCard).classList.add('zone-shrink');
+    (isExam?studyCard:examCard).classList.remove('zone-active');
+    // 面板
+    (isExam?examPanel:studyPanel).classList.add('open');
+    (isExam?studyPanel:examPanel).classList.remove('open');
+    if(!isExam) _closeZoneQuiz();
   }
-  return s;
 }
 
-// debounce：防止高頻觸發（用於 oninput 搜尋）
-function debounce(fn, delay=200){
-  let timer=null;
-  return function(...args){
-    clearTimeout(timer);
-    timer=setTimeout(()=>fn.apply(this,args), delay);
-  };
+function toggleZoneQuiz(){
+  _zoneQuizOpen=!_zoneQuizOpen;
+  const menu=document.getElementById('zone-quiz-menu');
+  const arrow=document.getElementById('zone-quiz-arrow');
+  if(menu)  menu.classList.toggle('open',_zoneQuizOpen);
+  if(arrow) arrow.classList.toggle('open',_zoneQuizOpen);
 }
 
-// Confirm dialog
-let _cfmCb=null;
-function cfm(t,s,cb){
-  _cfmCb=cb;
-  document.getElementById('cfm-t').textContent=t;
-  document.getElementById('cfm-s').textContent=s;
-  document.getElementById('cfm-ok').onclick=()=>{closeCfm();_cfmCb?.();};
-  document.getElementById('cfm-ov').classList.add('on');
+function _closeZoneQuiz(){
+  _zoneQuizOpen=false;
+  const menu=document.getElementById('zone-quiz-menu');
+  const arrow=document.getElementById('zone-quiz-arrow');
+  if(menu)  menu.classList.remove('open');
+  if(arrow) arrow.classList.remove('open');
 }
-function closeCfm(){ document.getElementById('cfm-ov').classList.remove('on'); }
+
+// ══ nav.js — 導覽與初始化 ══════════════════════════════
+// 依賴：全部模組
+
+// ── FAB 導覽 ─────────────────────────────────────────────────
+// ── 加號下拉選單（題目管理）──────────────────────────────────
+function toggleAddQMenu(){
+  const m=document.getElementById('add-q-menu');
+  const open=m.style.display==='none';
+  m.style.display=open?'block':'none';
+  if(open) setTimeout(()=>document.addEventListener('click',_closeAddQOutside,{once:true}),0);
+}
+function closeAddQMenu(){ document.getElementById('add-q-menu').style.display='none'; }
+function _closeAddQOutside(e){
+  const wrap=document.getElementById('add-q-wrap');
+  if(wrap&&!wrap.contains(e.target)) closeAddQMenu();
+}
+
+// ── 加號下拉選單（資料庫）────────────────────────────────────
+function toggleAddLawMenu(){
+  const m=document.getElementById('add-law-menu');
+  const open=m.style.display==='none';
+  m.style.display=open?'block':'none';
+  if(open) setTimeout(()=>document.addEventListener('click',_closeAddLawOutside,{once:true}),0);
+}
+function closeAddLawMenu(){ document.getElementById('add-law-menu').style.display='none'; }
+function _closeAddLawOutside(e){
+  const wrap=document.getElementById('add-law-wrap');
+  if(wrap&&!wrap.contains(e.target)) closeAddLawMenu();
+}
+
+let _fabOpen=false;
+
+// ── FAB 項目定義 ──────────────────────────────────────────────
+const _F_HOME  = {pg:'home',  icon:'🏠', label:'首頁'};
+const _F_LIST  = {pg:'list',  icon:'📚', label:'題目管理'};
+const _F_DB    = {pg:'db',    icon:'🗄',  label:'資料庫'};
+const _F_SET   = {pg:'set',   icon:'⚙️', label:'設定'};
+const _F_STATS = {pg:'stats', icon:'📊', label:'分析'};
+
+// ── FAB 規則：
+// home（無選擇）→ 只有設定
+// home（考試區展開）→ 題目管理、資料庫、設定
+// home（學習區展開）→ 只有設定
+// list  → 首頁、資料庫、設定
+// db    → 首頁、題目管理、設定
+// stats → 首頁、題目管理、資料庫、設定
+// set   → 只有首頁
+// bulk  → 首頁、設定
+// 其餘  → 首頁、設定
+
+function _fabItemsForPage(pg){
+  switch(pg){
+    case 'home':
+      if(window._activeZone==='exam')  return [_F_LIST,_F_DB,_F_SET];
+      if(window._activeZone==='study') return [_F_SET];
+      return [_F_SET];           // 無選擇
+    case 'list':   return [_F_HOME,_F_DB,_F_SET];
+    case 'db':     return [_F_HOME,_F_LIST,_F_SET];
+    case 'stats':  return [_F_HOME,_F_LIST,_F_DB,_F_SET];
+    case 'set':    return [_F_HOME];
+    case 'bulk':   return [_F_HOME,_F_SET];
+    default:       return [_F_HOME,_F_SET];
+  }
+}
+
+function _buildFabItems(curPg){
+  const container=document.getElementById('fab-items');
+  if(!container)return;
+  const items=_fabItemsForPage(curPg);
+  container.innerHTML=items.map((it,i)=>`
+    <div class="fab-item" style="transition-delay:${i*35}ms">
+      <span class="fab-label">${it.label}</span>
+      <button class="fab-btn" onclick="fabGo('${it.pg}')">${it.icon}</button>
+    </div>`).join('');
+}
+
+function toggleFab(){
+  _fabOpen=!_fabOpen;
+  const main=document.getElementById('fab-main');
+  const overlay=document.getElementById('fab-overlay');
+  main.classList.toggle('open',_fabOpen);
+  overlay.classList.toggle('open',_fabOpen);
+  if(_fabOpen){
+    _buildFabItems(S.page||'home');
+    requestAnimationFrame(()=>{
+      document.querySelectorAll('#fab-items .fab-item').forEach((el,i)=>{
+        setTimeout(()=>el.classList.add('vis'),i*35);
+      });
+    });
+  } else {
+    document.querySelectorAll('#fab-items .fab-item').forEach(el=>el.classList.remove('vis'));
+  }
+}
+
+function closeFab(){
+  if(!_fabOpen)return;
+  _fabOpen=false;
+  document.getElementById('fab-main').classList.remove('open');
+  document.getElementById('fab-overlay').classList.remove('open');
+  document.querySelectorAll('#fab-items .fab-item').forEach(el=>el.classList.remove('vis'));
+}
+
+function fabGo(pg){
+  closeFab();
+  goPage(pg,null);
+}
+
+function goPage(pg,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.add('hide'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  const el=document.getElementById('pg-'+pg);if(el)el.classList.remove('hide');
+  if(btn)btn.classList.add('on');
+  S.page=pg;
+  ({
+    home:renderHome,
+    list:renderList,
+    laws:renderDB,
+    db:renderDB,
+    stats:renderStats,
+    set:renderSet,
+    bulk:()=>{}
+  })[pg]?.();
+}
+
+
+const _splashStart=Date.now();
+async function init(){  try{
+  await initDB();
+  buildOpts({});
+  goPage('home',document.querySelector('.nb'));
+  }catch(e){
+    logError('init',e);
+    // 顯示錯誤提示但不讓畫面全黑，仍顯示 FAB
+    const errDiv=document.createElement('div');
+    errDiv.style.cssText='position:fixed;top:60px;left:0;right:0;margin:12px;background:#2a1010;border:1px solid var(--red);border-radius:10px;padding:14px;font-size:13px;color:#e05c57;z-index:9999;line-height:1.7';
+    errDiv.innerHTML='⚠ 資料庫初始化失敗<br><span style="font-size:11px;color:#888">'+String(e.message||e)+'</span><br><button onclick="location.reload()" style="margin-top:8px;padding:6px 14px;background:#3a1212;border:1px solid #e05c57;color:#e05c57;border-radius:6px;cursor:pointer;font-size:12px">重新載入</button>';
+    document.body.appendChild(errDiv);
+    // 仍嘗試顯示首頁框架
+    try{ goPage('home',null); }catch(_){}
+    // 即使出錯也要關閉 splash
+    if(typeof window._splashDismiss==='function')window._splashDismiss();
+  }
+}
+init().then(()=>{
+  // 填入版本號
+  const verEl=document.getElementById('app-ver');
+  if(verEl) verEl.textContent=typeof APP_VER!=='undefined'?APP_VER:'';
+  // 關閉載入畫面（至少顯示 2.6 秒讓動畫完整播完）
+  const elapsed=Date.now()-_splashStart;
+  const wait=Math.max(0,2600-elapsed);
+  setTimeout(()=>{if(typeof window._splashDismiss==='function')window._splashDismiss();},wait);
+});
+
+
+
