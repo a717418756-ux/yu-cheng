@@ -52,7 +52,7 @@ async function gdriveBackup(){ try{
   };
   const res  = await fetch(url, {
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{'Content-Type':'text/plain'},
     body: JSON.stringify(payload)
   });
   const json = await res.json();
@@ -68,7 +68,7 @@ async function gdriveRestore(){ try{
     toast('還原中…');
     const res  = await fetch(url, {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({ password:pwd, action:'restore', filename:GAS_BACKUP_FILE })
     });
     const json = await res.json();
