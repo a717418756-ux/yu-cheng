@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#121212">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<title>警察考題庫 Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<script>
+(function(){
+  var stars=document.getElementById('splash-stars');
+  if(stars){var f=document.createDocumentFragment();for(var i=0;i<85;i++){var s=document.createElement('div');s.className='splash-star';var sz=(Math.random()*1.4+0.4).toFixed(1);s.style.cssText='left:'+Math.random()*100+'%;top:'+Math.random()*100+'%;width:'+sz+'px;height:'+sz+'px;--d:'+(2.5+Math.random()*4).toFixed(1)+'s;--del:'+(Math.random()*4).toFixed(2)+'s;opacity:'+(0.08+Math.random()*0.35);f.appendChild(s);}stars.appendChild(f);}
+  window._splashDismiss=function(){var el=document.getElementById('splash');if(el){el.classList.add('fade-out');setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},800);}};
+})();
+</script>
+<div id="app">
+<!-- HOME -->
+<div id="pg-home" class="page hide">
+
+  <!-- Header：日期在上，勉勵語在下 -->
+  <div class="hd hd-home">
+    <div class="hd-home-inner">
+      <div id="h-date" class="h-date-txt"></div>
+      <div id="h-motto" class="h-motto" onclick="editMotto()" title="點擊編輯勉勵語">備考如磨刃，臨陣方知銳</div>
+    </div>
+  </div>
+
+  <!-- 考試倒數 -->
+  <div id="h-countdown" class="home-countdown"></div>
+
+  <!-- 今日任務 badges -->
+  <div class="plan-strip">
+    <div class="plan-badges" id="h-plan-badges">
+      <span class="plan-badge time">載入中...</span>
+    </div>
+  </div>
+
+  <!-- 數據橫條：正確率 / 危險題 / 待複習 / 題目數 — 4 格 -->
+  <div class="home-data-bar" id="h-data-bar">
+    <div class="hdb-cell">
+      <div class="hdb-n" id="hdb-rate" style="color:var(--acc)">—</div>
+      <div class="hdb-l">正確率</div>
+    </div>
+    <div class="hdb-cell">
+      <div class="hdb-n" id="hdb-danger" style="color:var(--red)">0</div>
+      <div class="hdb-l">危險題</div>
+    </div>
+    <div class="hdb-cell">
+      <div class="hdb-n" id="hdb-review" style="color:var(--org)">0</div>
+      <div class="hdb-l">待複習</div>
+    </div>
+    <div class="hdb-cell">
+      <div class="hdb-n" id="hdb-q" style="color:var(--t1)">0</div>
+      <div class="hdb-l">題目數</div>
+    </div>
+  </div>
+
+  <!-- 兩大主區（橫向展縮） -->
+  <div class="home-zones">
+    <div class="zone-card zone-exam" id="zone-exam" onclick="toggleZone('exam')">
+      <div class="zone-bar"></div>
+      <div class="zone-body">
+        <div class="zone-icon">📝</div>
+        <div class="zone-title">考試區</div>
+        <div class="zone-desc">題庫・測驗・弱點・法條</div>
+      </div>
+    </div>
+    <div class="zone-card zone-study" id="zone-study" onclick="toggleZone('study')">
+      <span class="zone-study-wip">即將推出</span>
+      <div class="zone-bar"></div>
+      <div class="zone-body">
+        <div class="zone-icon">🎧</div>
+        <div class="zone-title">學習區</div>
+        <div class="zone-desc">課程・音訊・碎片・複習</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 考試區展開面板 -->
+  <div class="zone-panel" id="panel-exam">
+    <div class="zone-panel-inner">
+      <!-- 測驗 toggle -->
+      <button class="zpanel-main" onclick="toggleZoneQuiz()">
+        <span class="zpanel-main-icon">🏆</span>
+        <div class="zpanel-main-text">
+          <div class="t">測驗專區</div>
+          <div class="s">今日複習・隨機刷題・模擬考…</div>
+        </div>
+        <span class="zpanel-main-arrow" id="zone-quiz-arrow">›</span>
+      </button>
+      <!-- 測驗子選單 -->
+      <div class="zpanel-quiz" id="zone-quiz-menu">
+        <button class="zqb" onclick="startQ('review')"><span class="zqb-icon">📅</span><div class="zqb-label">今日複習</div><div class="zqb-desc">遺忘曲線到期</div></button>
+        <button class="zqb" onclick="startQ('all')"><span class="zqb-icon">🎯</span><div class="zqb-label">隨機刷題</div><div class="zqb-desc">全部題目隨機</div></button>
+        <button class="zqb" onclick="startQ('wrong')"><span class="zqb-icon">🔴</span><div class="zqb-label">危險題</div><div class="zqb-desc">錯誤率高</div></button>
+        <button class="zqb" onclick="startQ('star')"><span class="zqb-icon">⭐</span><div class="zqb-label">收藏題目</div><div class="zqb-desc">已星號題目</div></button>
+        <button class="zqb" onclick="startQuick()"><span class="zqb-icon">⚡</span><div class="zqb-label">快刷5題</div><div class="zqb-desc">優先危險題</div></button>
+        <button class="zqb" onclick="startExam()"><span class="zqb-icon">📝</span><div class="zqb-label">模擬考</div><div class="zqb-desc">50題限時</div></button>
+        <button class="zqb" onclick="startNumberMode()" style="grid-column:1/-1"><span class="zqb-icon">🔢</span><div class="zqb-label">數字魔鬼</div><div class="zqb-desc">快速數字記憶訓練</div></button>
+      </div>
+      <!-- 閱覽區（含子選單） -->
+      <button class="zpanel-row" onclick="toggleBrowseSub()">
+        <span class="zpanel-row-icon">🗂</span>
+        <div class="zpanel-row-text">
+          <div class="t">閱覽區</div>
+          <div class="s">題目閱覽・資料閱覽</div>
+        </div>
+        <span class="zpanel-main-arrow" id="browse-sub-arrow" style="margin-left:auto">›</span>
+      </button>
+      <div class="zpanel-browse-sub" id="browse-sub-menu">
+        <button class="zpanel-browse-opt" onclick="openBrowse()">
+          <span class="zpanel-browse-opt-icon">📋</span>
+          <div class="zpanel-browse-opt-text">
+            <div class="t">題目閱覽</div>
+            <div class="s">瀏覽全部題目・依年度科目篩選</div>
+          </div>
+        </button>
+        <button class="zpanel-browse-opt" onclick="openLawBrowse()">
+          <span class="zpanel-browse-opt-icon">⚖️</span>
+          <div class="zpanel-browse-opt-text">
+            <div class="t">資料閱覽</div>
+            <div class="s">查詢已輸入的法條資料庫</div>
+          </div>
+        </button>
+      </div>
+      <!-- AI 分析匯出 -->
+      <button class="zpanel-row" onclick="fabGo('stats')">
+        <span class="zpanel-row-icon">📊</span>
+        <div class="zpanel-row-text">
+          <div class="t">分析 & AI 匯出</div>
+          <div class="s">弱點分析・正確率・AI備考建議</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- 學習區展開面板 -->
+  <div class="zone-panel" id="panel-study">
+    <div class="zone-panel-inner">
+      <div class="zpanel-wip">
+        <div class="zpanel-wip-icon">🚧</div>
+        <div class="zpanel-wip-t">學習區即將推出</div>
+        <div class="zpanel-wip-s">課程・音訊碎片・複習功能<br>持續開發中，敬請期待</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<!-- LIST -->
+<div id="pg-list" class="page hide">
+  <div class="hd">
+    <div class="hdt">題目管理</div>
+    <div style="display:flex;gap:6px">
+      <button class="hd-btn red" onclick="openBulkDelQ()">🗑 大量刪除</button>
+      <div style="position:relative" id="add-q-wrap">
+        <button class="hd-btn blue plus" id="add-q-btn" onclick="toggleAddQMenu()">＋</button>
+        <div id="add-q-menu" style="display:none;position:absolute;top:calc(100% + 7px);right:0;background:var(--bg1);border:1px solid var(--bd);border-radius:10px;padding:5px 0;min-width:148px;box-shadow:0 6px 24px rgba(0,0,0,.5);z-index:260">
+          <button onclick="closeAddQMenu();showAdd()" style="width:100%;padding:11px 16px;text-align:left;background:none;border:none;color:var(--t0);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:9px;transition:background .12s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'"><span style="font-size:16px">✏️</span>逐一新增</button>
+          <button onclick="closeAddQMenu();goPage('bulk')" style="width:100%;padding:11px 16px;text-align:left;background:none;border:none;color:var(--t0);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:9px;transition:background .12s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'"><span style="font-size:16px">📋</span>大量新增</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sb"><span class="ic">🔍</span><input id="si" type="search" placeholder="搜尋題目、科目、關鍵概念..." oninput="_debouncedRenderList()"></div>
+  <div class="chips" id="fchips">
+    <button class="chip on" onclick="setF(this,'all')">全部</button>
+    <button class="chip" onclick="setF(this,'mc')">選擇題</button>
+    <button class="chip" onclick="setF(this,'es')">申論題</button>
+    <button class="chip" onclick="setF(this,'wrong')">錯題</button>
+    <button class="chip" onclick="setF(this,'star')">收藏</button>
+  </div>
+  <div class="chips" id="schips"></div>
+  <div id="lc" style="font-size:12px;color:var(--t2);padding:2px 12px"></div>
+  <div id="qlist"></div>
+</div>
+<!-- DB -->
+<div id="pg-db" class="page hide">
+  <div class="hd">
+    <div><div class="hdt">資料庫</div></div>
+    <div style="display:flex;gap:6px">
+      <button class="hd-btn bg" id="law-sort-btn" onclick="openLawSortMenu(this)">排序</button>
+      <button class="hd-btn red" onclick="openBulkDelLaw()">🗑 大量刪除</button>
+      <div style="position:relative" id="add-law-wrap">
+        <button class="hd-btn blue plus" id="add-law-btn" onclick="toggleAddLawMenu()">＋</button>
+        <div id="add-law-menu" style="display:none;position:absolute;top:calc(100% + 7px);right:0;background:var(--bg1);border:1px solid var(--bd);border-radius:10px;padding:5px 0;min-width:148px;box-shadow:0 6px 24px rgba(0,0,0,.5);z-index:260">
+          <button onclick="closeAddLawMenu();showAddLaw()" style="width:100%;padding:11px 16px;text-align:left;background:none;border:none;color:var(--t0);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:9px;transition:background .12s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'"><span style="font-size:16px">✏️</span>逐一新增</button>
+          <button onclick="closeAddLawMenu();showBulkLaw()" style="width:100%;padding:11px 16px;text-align:left;background:none;border:none;color:var(--t0);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:9px;transition:background .12s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'"><span style="font-size:16px">📋</span>大量新增</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sb"><span class="ic">🔍</span><input id="lsi" type="search" placeholder="搜尋法規名稱、條號、關鍵概念..." oninput="_debouncedRenderDB()"></div>
+  <div class="chips" id="lchips">
+    <button class="chip on" onclick="setLC(this,'all')">全部</button>
+    <button class="chip" onclick="setLC(this,'statute')">法規條文</button>
+    <button class="chip" onclick="setLC(this,'sop')">SOP</button>
+    <button class="chip" onclick="setLC(this,'supplement')">補充資料</button>
+    <button class="chip" onclick="setLC(this,'interpretation')">函釋</button>
+  </div>
+  <div style="font-size:11px;color:var(--t2);padding:4px 12px" id="db-lc"></div>
+  <div id="llist"></div>
+</div>
+<!-- BULK -->
+<div id="pg-bulk" class="page hide">
+  <div class="hd"><div><div class="hdt">大量貼題</div><div class="hds">PDF複製文字貼入，自動拆題</div></div></div>
+  <div class="bwrap">
+    <div style="font-size:12px;color:var(--t2);line-height:1.65;padding:4px 0">💡 <b>建議流程</b>：PDF → 貼到 Word → 從 Word 複製 → 貼在此處，選項符號 <span class="tag">(A)</span><span class="tag">A.</span><span class="tag">■▪</span><span class="tag">PDF方塊符號</span> 均支援，題號格式：<span class="tag">1.</span><span class="tag">1、</span><span class="tag">(1)</span><span class="tag">Q1</span></div>
+    <div class="fr">
+      <div><label class="fl">科目</label><input id="bi-sub" placeholder="警察法規" list="bi-subs"><datalist id="bi-subs"></datalist></div>
+      <div><label class="fl">年度</label><input id="bi-yr" placeholder="民國113年"></div>
+    </div>
+    <div class="fr">
+      <div><label class="fl">考試別</label><select id="bi-ex"><option value="">選擇考試</option><option>警佐班</option><option>升官等</option><option>警大二技</option><option>三等考試</option><option>其他</option></select></div>
+      <div><label class="fl">答案列（可空）</label><input id="bi-ans" placeholder="DACB 或 1.D 2.A"></div>
+    </div>
+
+    <div><label class="fl">貼入考題文字</label>
+      <textarea id="bi-text" class="bta" placeholder="1. 下列何者為警察之任務？&#10;▪維持公共秩序&#10;▪保護社會安全&#10;▪防止一切危害&#10;▪以上皆是&#10;&#10;2. 警察法第幾條規定警察任務？"></textarea>
+    </div>
+    <div style="display:flex;gap:7px">
+      <button class="btn bp bw" style="padding:13px;font-size:14px" onclick="parseBulk()">🔍 解析預覽</button>
+      <button class="btn bg" style="padding:13px;white-space:nowrap" onclick="clearBulk()">清除</button>
+    </div>
+    <div id="bulk-result" class="hide">
+      <div id="bulk-stats" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px"></div>
+      <div class="prev-list" id="prev-list"></div>
+      <button class="btn bgrn bw" style="padding:13px;font-size:14px;margin-top:8px" onclick="importBulk()">✓ 批次匯入</button>
+    </div>
+  </div>
+</div>
+<!-- STATS -->
+<div id="pg-stats" class="page hide">
+  <div class="hd"><div class="hdt">分析 & AI匯出</div><button class="hd-btn blue" onclick="buildAI()">🤖 AI匯出</button></div>
+  <div class="st3">
+    <div class="stb"><div class="n" id="st-q">0</div><div class="l">總題數</div></div>
+    <div class="stb"><div class="n" id="st-a" style="color:var(--grn)">0</div><div class="l">總作答</div></div>
+    <div class="stb"><div class="n" id="st-r" style="color:var(--org)">—</div><div class="l">正確率</div></div>
+  </div>
+  <div class="cc"><div class="ct">📊 各科正確率</div><div id="subj-bars"></div></div>
+  <div class="cc"><div class="ct">📅 近7天練習量</div><canvas id="dchart" height="110"></canvas></div>
+  <div class="cc"><div class="ct">🔴 常錯科目</div><div id="wrong-subs"></div></div>
+  <div class="cc"><div class="ct">🏷 高頻關鍵概念</div><div id="kw-cloud" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
+  <div id="ai-out" class="hide">
+    <div class="sec">AI 分析結果</div>
+    <div class="aic"><div class="ait">📝 Markdown（貼給 ChatGPT/Claude）</div><div class="aipv" id="ai-md"></div>
+      <div style="display:flex;gap:7px;margin-top:9px"><button class="btn bp" onclick="copyAI('md')">📋 複製</button><button class="btn bg" onclick="dlAI('md')">⬇ 下載</button></div></div>
+    <div class="aic"><div class="ait">📊 JSON 結構化資料</div><div class="aipv" id="ai-json"></div>
+      <div style="display:flex;gap:7px;margin-top:9px"><button class="btn bp" onclick="copyAI('json')">📋 複製</button><button class="btn bg" onclick="dlAI('json')">⬇ 下載</button></div></div>
+    <div style="padding:4px 0 8px"><button class="btn bg" style="width:100%;padding:10px;font-size:13px;color:var(--red)" onclick="clearWrongAts()">🗑 刪除全部作答錯誤記錄</button></div>
+    <div class="card" style="font-size:12px;color:var(--t2);line-height:1.7">💡 複製 Markdown 貼到 ChatGPT，輸入：「根據以上資料，分析我的弱點並給備考建議」</div>
+  </div>
+</div>
+
+
+<!-- SETTINGS -->
+<div id="pg-set" class="page hide">
+  <div class="hd"><div class="hdt">設定與資料</div></div>
+  <div class="sec">題庫管理</div>
+  <div class="srow"><div><div class="slb">匯出完整題庫 JSON</div><div class="ssb" id="exp-info">備份題目與記錄</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expJSON()">匯出</button></div>
+  <div class="srow"><div><div class="slb">匯入 JSON 題庫</div><div class="ssb">不覆蓋已有題目</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="document.getElementById('imp').click()">匯入</button></div>
+  <input type="file" id="imp" accept=".json" style="display:none" onchange="impJSON(event)">
+  <div class="srow"><div><div class="slb">匯出錯題 HTML</div><div class="ssb">可列印錯題卷</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expWrong()">匯出</button></div>
+  <div class="srow"><div><div class="slb">匯出全部題目 HTML</div><div class="ssb">適合列印複習</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expAll()">匯出</button></div>
+  <div class="sec">資料庫資訊</div>
+  <div id="db-info" style="padding:0 12px 12px;font-size:13px;color:var(--t2);line-height:2"></div>
+  <div class="sec">考試倒數</div>
+  <div id="set-countdown" style="padding:0 12px 4px"></div>
+  <div style="padding:4px 12px 12px">
+    <button class="btn bg bw" style="font-size:13px;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:7px" onclick="openCountdownMgr()">
+      <span style="font-size:16px">＋</span> 新增考試
+    </button>
+  </div>
+  <!-- Google Drive 雲端同步 -->
+  <div class="sec">雲端同步</div>
+  <div style="padding:0 12px 10px">
+    <!-- Client ID 輸入區 -->
+    <div style="margin-bottom:10px">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:5px;line-height:1.5">
+        Google OAuth Client ID
+        <span style="float:right;font-size:11px;color:var(--acc);cursor:pointer" onclick="toggleClientIdHelp()">？說明</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <input id="gdrive-client-id-input" type="text" placeholder="貼上您的 Client ID（.apps.googleusercontent.com）"
+          style="flex:1;font-size:11.5px;padding:7px 10px;border-radius:8px"
+          oninput="gdriveClientIdChanged()">
+        <button class="btn bg" style="padding:7px 12px;font-size:12px;white-space:nowrap;flex-shrink:0" onclick="saveClientId()">儲存</button>
+      </div>
+      <div id="gdrive-client-id-help" style="display:none;font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.65;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:7px;border:1px solid rgba(255,255,255,0.07)">
+        1. 前往 <span style="color:var(--acc)">console.cloud.google.com</span><br>
+        2. 建立專案 → API 和服務 → 憑證<br>
+        3. 建立 OAuth 2.0 用戶端 ID（網頁應用程式）<br>
+        4. 授權來源填入此頁面的網址<br>
+        5. 複製 Client ID 貼到上方欄位並儲存
+      </div>
+    </div>
+    <!-- 狀態 + 登入登出 -->
+    <div id="gdrive-status" style="font-size:12px;color:var(--t2);margin-bottom:8px;line-height:1.6;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.07)">
+      🔒 尚未登入 Google 帳號
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn bg" id="gdrive-login-btn" style="flex:1;padding:9px;font-size:12px" onclick="gdriveLogin()">
+        <span style="font-size:14px">🔑</span> Google 登入
+      </button>
+      <button class="btn bg" id="gdrive-logout-btn" style="flex:1;padding:9px;font-size:12px;display:none" onclick="gdriveLogout()">
+        <span style="font-size:14px">🚪</span> 登出
+      </button>
+    </div>
+    <!-- 備份還原 -->
+    <div style="display:flex;gap:8px">
+      <button class="btn bg" id="gdrive-backup-btn" style="flex:1;padding:9px;font-size:12px" onclick="gdriveBackup()" disabled>
+        <span style="font-size:14px">☁️</span> 備份到雲端
+      </button>
+      <button class="btn bg" id="gdrive-restore-btn" style="flex:1;padding:9px;font-size:12px" onclick="gdriveRestore()" disabled>
+        <span style="font-size:14px">📥</span> 從雲端還原
+      </button>
+    </div>
+    <div style="font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.5">
+      備份檔儲存於您的 Google Drive 根目錄（<code style="color:var(--acc)">警察考題庫_backup.json</code>）
+    </div>
+  </div>
+  <div class="sec" style="color:var(--red)">危險操作</div>
+  <div class="srow"><div><div class="slb" style="color:var(--red)">清除作答記錄</div><div class="ssb">保留題目</div></div>
+  <button class="btn br" style="padding:6px 10px;font-size:12px" onclick="cfm('清除作答記錄','確定清除？',clearAts)">清除</button></div>
+  <div class="srow"><div><div class="slb" style="color:var(--red)">刪除全部題目</div><div class="ssb">無法復原</div></div><button class="btn br" style="padding:6px 10px;font-size:12px" onclick="cfm('刪除全部題目','無法復原，確定嗎？',delAll)">全刪</button></div>
+  <div style="text-align:center;padding:20px;font-size:11px;color:var(--t2)">考題庫 <span id="app-ver"></span></div>
+</div>
+<nav class="nav">
+  <button class="nb on" onclick="goPage('home',this)"><span class="ic">🏠</span>首頁</button>
+  <button class="nb" onclick="goPage('list',this)"><span class="ic">📚</span>題目</button>
+  <button class="nb" onclick="goPage('db',this)"><span class="ic">🗄</span>資料庫</button>
+  <button class="nb" onclick="goPage('stats',this)"><span class="ic">📊</span>分析</button>
+  <button class="nb" onclick="goPage('set',this)"><span class="ic">⚙️</span>設定</button>
+</nav>
+
+<!-- 資料庫排序選單 -->
+<div id="law-sort-menu" onclick="closeLawSortMenu()" style="display:none;position:fixed;inset:0;z-index:250"></div>
+<div id="law-sort-popup" style="display:none;position:fixed;z-index:251;background:var(--bg1);border:1px solid var(--bd);border-radius:10px;padding:6px 0;min-width:150px;box-shadow:0 4px 20px rgba(0,0,0,.5)">
+  <div id="lsp-name"  class="lsp-item lsp-on" onclick="pickLawSort('name')" >名稱 <span class="lsp-arrow">✓</span></div>
+  <div id="lsp-amend" class="lsp-item"         onclick="pickLawSort('amend')">修正日期 <span class="lsp-arrow"></span></div>
+  <div id="lsp-count" class="lsp-item"         onclick="pickLawSort('count')">條數 <span class="lsp-arrow"></span></div>
+</div>
+
+<!-- FAB 隱藏式導覽（動態渲染，根據頁面顯示不同選項） -->
+<div id="fab-overlay" onclick="closeFab()"></div>
+<div id="fab-wrap">
+  <div id="fab-items"></div>
+  <button id="fab-main" onclick="toggleFab()">☰</button>
+</div>
+</div>
+<!-- QUIZ -->
+<div id="qv">
+  <div class="qhd">
+    <button class="btn bg" style="padding:6px 10px;font-size:13px" onclick="exitQ()">✕</button>
+    <div class="qpw"><div class="qpb" id="qpb"></div></div>
+    <div style="font-size:12px;color:var(--t2);white-space:nowrap" id="qct">0/0</div>
+  </div>
+  <div class="qbody" id="qbody">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span id="qbadge" class="badge"></span><span id="qmeta" style="font-size:11px;color:var(--t2)"></span></div>
+    <div id="q-type-hint" style="font-size:12px;color:var(--acc);margin-bottom:7px;font-weight:600;min-height:18px"></div>
+    <div class="qstemb" id="qstem"></div>
+    <div class="qos" id="qopts"></div>
+    <div class="qres" id="qres"></div>
+    <div id="qnote" style="display:none;margin-top:11px;padding:10px;background:var(--bg2);border-radius:8px;font-size:13px;color:var(--t2);line-height:1.7"></div>
+    <div id="qes" style="display:none"><textarea id="qes-input" rows="4" placeholder="輸入你的答案重點（可選）..." style="width:100%;margin-top:8px;padding:10px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--t1);font-size:14px;resize:vertical;box-sizing:border-box"></textarea><button id="qrevbtn" class="btn bg bw" style="margin-top:10px;padding:14px;font-size:14px;width:100%" onclick="revealES()">顯示參考答案 / 解析</button></div>
+    <div id="qlaw" style="display:none;margin-top:13px"><div class="sec" style="padding:0 0 5px;font-size:11px">相關法條</div><div id="qlaw-list"></div></div>
+    <div id="qdone-area" style="display:none;flex-direction:column;align-items:center;padding:20px 0;gap:12px"></div>
+  </div>
+  <div class="qfoot" id="qfoot">
+    <button class="qfb qstar" id="qstar" onclick="toggleQStar()">☆</button>
+    <button id="qmulti-confirm" class="btn bp bw hide" style="flex:1;padding:11px;font-size:14px;font-weight:600" onclick="submitAnswer()">✓ 確認答案</button>
+    <button class="qfb qnxt hide" id="qnxt" onclick="nextQ()" style="flex:1;padding:11px;font-size:14px">下一題 →</button>
+  </div>
+</div>
+<!-- LAW READER -->
+<div id="lv">
+  <div class="qhd">
+    <button class="btn bg" style="padding:6px 10px;font-size:13px" onclick="exitLaw()">← 返回</button>
+    <div style="flex:1;padding-left:8px;overflow:hidden"><div style="font-size:15px;font-weight:700;color:var(--t0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="lv-name"></div><div id="lv-info" style="font-size:10px;color:var(--t2);display:none;margin-top:1px"></div></div>
+    <button onclick="editLawGroupInfo()" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--t2);padding:4px 6px" title="編輯法規資訊（機關/日期）">⚙</button>
+    <button id="lv-star" style="width:40px;height:40px;border-radius:50%;background:var(--bg2);font-size:18px;border:1px solid var(--bd);color:var(--t2);cursor:pointer;flex-shrink:0">☆</button>
+  </div>
+  <div class="lb" id="lbody"></div>
+  <div style="padding:10px 12px;border-top:1px solid var(--bd);background:var(--bg1);display:flex;gap:7px">
+    <button class="btn bg" style="flex:1;padding:12px;font-size:13px" onclick="addLawInGroup()">＋ 新增條文</button>
+    <button class="btn bp" style="flex:1;padding:12px;font-size:13px" onclick="quizFromLaw()">🎯 練習相關題</button>
+  </div>
+</div>
+
+<!-- 概念群組編輯 -->
+<!-- ADD Q -->
+<div class="ov" id="add-ov" onclick="closeAdd()">
+  <div class="sh" onclick="event.stopPropagation()">
+    <div class="shdl"></div>
+    <div class="sht"><span id="add-title">新增題目</span><button class="shx" onclick="closeAdd()">✕</button></div>
+    <div style="padding:0 0 16px">
+      <div class="fg"><label class="fl">題型</label>
+        <div style="display:flex;gap:7px">
+          <button id="tmc" class="btn bp" style="flex:1;padding:10px" onclick="setQT('mc')">選擇題</button>
+          <button id="tes" class="btn bg" style="flex:1;padding:10px" onclick="setQT('es')">申論題</button>
+        </div>
+      </div>
+      <div class="fr fg">
+        <div><label class="fl">科目</label><input id="f-sub" placeholder="警察法規" list="f-subs"><datalist id="f-subs"></datalist></div>
+        <div><label class="fl">年度</label><input id="f-yr" placeholder="113" onblur="formatYearInput(this)"></div>
+      </div>
+      <div class="fr fg">
+        <div><label class="fl">考試別</label><select id="f-ex"><option value="">選擇</option><option>警佐班</option><option>升官等</option><option>警大二技</option><option>三等考試</option><option>其他</option></select></div>
+        <div><label class="fl">題號</label><input id="f-num" placeholder="1"></div>
+      </div>
+      <div class="fg"><label class="fl">題目內容 *</label><textarea id="f-stem" rows="4" placeholder="輸入或貼上題目..."></textarea></div>
+      <div id="mc-opts" class="fg"><label class="fl">選項（點 ✓ 標記正確答案）</label><div id="opts-c"></div></div>
+      <div id="es-area" class="fg hide"><label class="fl">參考答案 / 解析</label><textarea id="f-es" rows="4" placeholder="參考解析..."></textarea></div>
+      <div class="fg"><label class="fl">關鍵概念（逗號分隔）</label><input id="f-kw" placeholder="比例原則,臨檢"></div>
+      <div class="fg"><label class="fl">備註</label><textarea id="f-note" rows="2" placeholder="個人筆記..."></textarea></div>
+      <div class="fg" style="display:flex;align-items:center;gap:10px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="f-is-number" style="width:18px;height:18px"><span class="fl" style="margin:0">🔢 數字魔鬼題（含重要數字/期限）</span></label></div>
+      <div class="fg"><label class="fl">關聯法條（如：警職法§6）</label><input id="f-laws" placeholder="警職法§6"></div>
+      <div class="fg hide" id="must-kw-wrap"><label class="fl">申論必寫關鍵概念（逗號分隔）</label><input id="f-must-kw" placeholder="比例原則,正當法律程序,釋字535號"></div>
+      <div class="fg" style="display:flex;gap:7px">
+        <button class="btn bg" style="flex:1;padding:12px" onclick="closeAdd()">取消</button>
+        <button class="btn bp" style="flex:2;padding:12px;font-size:15px" onclick="saveQ()">儲存題目</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ADD LAW -->
+<div class="ov" id="law-ov" onclick="closeLawSh()">
+  <div class="sh" onclick="event.stopPropagation()">
+    <div class="shdl"></div>
+    <div class="sht"><span id="law-sh-t">新增法條</span><button class="shx" onclick="closeLawSh()">✕</button></div>
+    <div style="padding:0 0 16px">
+      <div class="fr fg">
+        <div><label class="fl">法律名稱</label><input id="l-name" placeholder="警察職權行使法"></div>
+        <div><label class="fl">條號</label><input id="l-art" placeholder="第6條"></div>
+      </div>
+      <div class="fr fg">
+        <div><label class="fl">章節（可空）</label><input id="l-chapter" placeholder="第一章 總則" list="l-chapter-list"><datalist id="l-chapter-list"></datalist></div>
+        <div><label class="fl">標題（可空）</label><input id="l-title" placeholder="臨檢"></div>
+      </div>
+      <div class="fr fg">
+        <div><label class="fl">類別</label><select id="l-cat" onchange="toggleSOPMode()"><option value="statute">法規條文</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">函釋</option></select></div>
+      </div>
+      <div class="fg" id="l-content-wrap"><label class="fl">內容 *</label><textarea id="l-content" rows="6" placeholder="法條文字..."></textarea></div>
+      <div id="l-img-toggle-wrap" style="display:none;margin-bottom:8px">
+        <div style="display:flex;gap:6px">
+          <button class="btn bg" style="flex:1;padding:8px;font-size:12px" onclick="switchLawMode('text')">📝 文字</button>
+          <button class="btn bg" style="flex:1;padding:8px;font-size:12px" onclick="switchLawMode('img')">🖼 圖片</button>
+        </div>
+      </div>
+      <div class="fg hide" id="l-img-wrap">
+        <label class="fl">圖片（SOP 流程圖、表格截圖）</label>
+        <div id="l-img-prev" style="min-height:100px;border:2px dashed var(--bd);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);font-size:13px" onclick="document.getElementById('l-img-file').click()">點擊上傳圖片</div>
+        <input type="file" id="l-img-file" accept="image/*" style="display:none" onchange="onLawImgSelect(event)">
+      </div>
+      <div class="fg"><label class="fl">關鍵概念</label><input id="l-kw" placeholder="臨檢,比例原則"></div>
+      <div class="fg"><label class="fl">關聯法條（母法/子法）</label><input id="l-related" placeholder="憲法§108,警察法施行細則"></div>
+      <div class="fg"><label class="fl">來源</label><input id="l-src" placeholder="全國法規資料庫"></div>
+      <div class="fg"><label class="fl">備註</label><textarea id="l-note" rows="2" placeholder="個人標記、補充說明..."></textarea></div>
+      <div class="fg" style="display:flex;gap:7px">
+        <button class="btn bg" style="flex:1;padding:12px" onclick="closeLawSh()">取消</button>
+        <button class="btn bpur" style="flex:2;padding:12px;font-size:15px" onclick="saveLaw()">儲存法條</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- BULK LAW -->
+<div class="ov" id="blaw-ov" onclick="closeBulkLaw()">
+  <div class="sh" onclick="event.stopPropagation()">
+    <div class="shdl"></div>
+    <div class="sht"><span>批次匯入法條</span><button class="shx" onclick="closeBulkLaw()">✕</button></div>
+    <div style="padding:0 0 16px">
+      <div class="fr fg">
+        <div><label class="fl">法律名稱</label><input id="bl-name" placeholder="警察職權行使法"></div>
+        <div><label class="fl">類別</label><select id="bl-cat"><option value="statute">法規條文</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">函釋</option></select></div>
+      </div>
+      <div class="fg"><label class="fl">來源</label><input id="bl-src" placeholder="全國法規資料庫"></div>
+      <div class="fg"><label class="fl">貼入法條文字（自動分條）</label>
+        <textarea id="bl-text" rows="8" placeholder="第 六 條&#10;警察於公共場所...&#10;&#10;第 七 條&#10;警察依前條規定..."></textarea>
+      </div>
+      <div id="bl-prev" style="font-size:12px;color:var(--t2);min-height:20px;padding:4px 12px;line-height:1.8"></div>
+      <div class="fg" style="display:flex;gap:7px;margin-top:4px">
+        <button class="btn bg" style="flex:1;padding:11px" onclick="prevBulkLaw()">🔍 預覽</button>
+        <button class="btn bpur" style="flex:2;padding:11px;font-size:14px" onclick="importBulkLaw()">✓ 批次匯入</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 題目閱覽 -->
+<div id="browse-ov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:500;flex-direction:column;max-width:520px;margin:0 auto">
+  <div class="qhd">
+    <button class="btn bg" style="padding:6px 10px;font-size:13px" onclick="closeBrowse()">✕ 關閉</button>
+    <div style="flex:1;font-size:15px;font-weight:700;padding-left:8px">題目閱覽</div>
+  </div>
+  <div style="padding:8px 12px;background:var(--bg1);border-bottom:1px solid var(--bd)">
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="chip on" id="br-type-all" onclick="setBrType(this,'all')">全部</button>
+      <button class="chip" id="br-type-mc" onclick="setBrType(this,'mc')">☑ 選擇題</button>
+      <button class="chip" id="br-type-es" onclick="setBrType(this,'es')">📝 申論題</button>
+    </div>
+    <div class="sb" style="margin:0"><span class="ic">🔍</span><input id="br-search" type="search" placeholder="搜尋題目、年度、科目、關鍵概念..." oninput="_debouncedBrowseSearch()"></div>
+    <div class="chips" id="br-chips" style="margin-top:6px;padding:0"></div>
+    <div class="chips" id="br-year-chips" style="padding:4px 0 0"></div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding-bottom:20px" id="br-list"></div>
+</div>
+
+<!-- 資料閱覽 overlay -->
+<div id="law-browse-ov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:500;flex-direction:column;max-width:520px;margin:0 auto">
+  <div class="qhd">
+    <button class="btn bg" style="padding:6px 10px;font-size:13px" onclick="closeLawBrowse()">✕ 關閉</button>
+    <div style="flex:1;font-size:15px;font-weight:700;padding-left:8px">資料閱覽</div>
+  </div>
+  <div style="padding:8px 12px;background:var(--bg1);border-bottom:1px solid var(--bd)">
+    <div class="sb" style="margin:0 0 6px"><span class="ic">🔍</span><input id="lb-search" type="search" placeholder="搜尋法規名稱、條號、關鍵概念..." oninput="_debouncedLawBrowseSearch()"></div>
+    <div class="chips" id="lb-cat-chips" style="padding:0">
+      <button class="chip on" onclick="setLBCat(this,'all')">全部</button>
+      <button class="chip" onclick="setLBCat(this,'statute')">法規條文</button>
+      <button class="chip" onclick="setLBCat(this,'sop')">SOP</button>
+      <button class="chip" onclick="setLBCat(this,'supplement')">補充資料</button>
+      <button class="chip" onclick="setLBCat(this,'interpretation')">函釋</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding-bottom:20px" id="lb-list"></div>
+</div>
+<!-- 法條小視窗 -->
+<div id="lawpop-ov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:600;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--bg1);border:1px solid var(--pur2);border-radius:14px;width:100%;max-width:480px;max-height:75vh;overflow-y:auto;padding:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:15px;font-weight:700;color:var(--pur)" id="lawpop-title"></div>
+      <button onclick="closeLawPop()" style="background:var(--bg2);border:1px solid var(--bd);color:var(--t2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px">✕</button>
+    </div>
+    <div style="font-size:14px;line-height:1.85;color:var(--t1)" id="lawpop-body"></div>
+    <div style="margin-top:10px" id="lawpop-related"></div>
+  </div>
+</div>
+<!-- 重複防呆 -->
+<div id="dup-ov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:700;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--bg1);border:1px solid var(--bd);border-radius:14px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto;padding:18px">
+    <div style="font-size:16px;font-weight:700;margin-bottom:6px">⚠ 偵測到重複題目</div>
+    <div style="font-size:13px;color:var(--t2);margin-bottom:14px">以下題目已存在，請選擇處理方式</div>
+    <div id="dup-diff" style="font-size:12px;background:var(--bg2);padding:10px;border-radius:8px;margin-bottom:14px;line-height:1.7;max-height:200px;overflow-y:auto;white-space:pre-wrap"></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap">
+      <button class="btn bp" style="flex:1;padding:12px" onclick="dupAction('replace')">🔄 取代原題</button>
+      <button class="btn bg" style="flex:1;padding:12px" onclick="dupAction('keep')">➕ 保留兩者</button>
+      <button class="btn br" style="flex:1;padding:12px" onclick="dupAction('skip')">✕ 略過</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- CONFIRM -->
+<div class="cov" id="cfm-ov">
+  <div class="cbox">
+    <div class="cbt" id="cfm-t"></div><div class="cbs" id="cfm-s"></div>
+    <div class="cbn"><button class="btn br bw" id="cfm-cn">取消</button><button class="btn br bw" id="cfm-ok">確認</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="toast" id="toast"></div>
+<div class="toast" id="toast"></div>
+<div class="toast" id="toast"></div>
+<div class="toast" id="toast"></div>
+<div class="toast" id="toast"></div>
+<div class="toast" id="toast"></div>
+
+<!-- ── JS Modules (載入順序：依賴先行) ── -->
+<script src="js/db.js"></script>
+<script src="js/app.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/quiz.js"></script>
+<script src="js/law.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/bulk.js"></script>
+<script src="js/stats.js"></script>
+<script src="js/backup.js"></script>
+<script src="js/home.js"></script>
+
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
