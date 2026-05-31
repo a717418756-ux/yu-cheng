@@ -3,189 +3,89 @@
 
 
 // ══════════════════════════════════════════════════════════════
-// Google Drive 雲端同步
-// Client ID 由使用者在設定頁輸入，存於 IndexedDB settings store
+// ══ 雲端備份（Google Apps Script）══════════════════════════════
+// 架構：PWA → POST → Apps Script → Google Drive
+// 不需要 OAuth 登入，只需 Script URL + 自訂密碼
 // ══════════════════════════════════════════════════════════════
-const GDRIVE_SCOPES      = 'https://www.googleapis.com/auth/drive.file';
-const GDRIVE_BACKUP_FILE = '警察考題庫_backup.json';
-const GDRIVE_CID_KEY     = 'gdriveClientId';
 
-// 讀取 Client ID
-async function getGDriveClientId(){
-  return (await getSetting(GDRIVE_CID_KEY, '')).trim();
-}
+const GAS_URL_KEY      = 'gasWebAppUrl';
+const GAS_PWD_KEY      = 'gasPassword';
+const GAS_BACKUP_FILE  = 'YC_Platform_backup.json';
 
-let _gToken = null;   // access token
-
-// ── Client ID 輸入欄位操作 ────────────────────────────────────
-function gdriveClientIdChanged(){
-  // 即時存入（每次輸入都先暫存，按儲存才正式存）
-}
-async function saveClientId(){
-  const val=(document.getElementById('gdrive-client-id-input')?.value||'').trim();
-  if(!val){ toast('請輸入 Client ID'); return; }
-  await setSetting(GDRIVE_CID_KEY, val);
-  toast('Client ID 已儲存 ✓');
-  // 如果已有 token，重設（可能換了 ID）
-  if(_gToken){ gdriveLogout(); }
-}
-function toggleClientIdHelp(){
-  const el=document.getElementById('gdrive-client-id-help');
-  if(el) el.style.display=el.style.display==='none'?'':'none';
-}
-// 載入已儲存的 Client ID 到輸入框
-async function _gdriveLoadSavedId(){
-  const saved=await getGDriveClientId();
-  const el=document.getElementById('gdrive-client-id-input');
-  if(el&&saved) el.value=saved;
+async function _gasGetConfig(){
+  const url = await getSetting(GAS_URL_KEY,'');
+  const pwd = await getSetting(GAS_PWD_KEY,'');
+  return { url: url.trim(), pwd: pwd.trim() };
 }
 
-// ── 載入 Google Identity Services ────────────────────────────
-function _loadGIS(){
-  return new Promise((res,rej)=>{
-    if(window.google?.accounts?.oauth2){ res(); return; }
-    const s=document.createElement('script');
-    s.src='https://accounts.google.com/gsi/client';
-    s.onload=res; s.onerror=rej;
-    document.head.appendChild(s);
-  });
+async function saveGasConfig(){
+  const url = (document.getElementById('gas-url-input')?.value||'').trim();
+  const pwd = (document.getElementById('gas-pwd-input')?.value||'').trim();
+  if(!url){ toast('請填入 Apps Script 網址'); return; }
+  await setSetting(GAS_URL_KEY, url);
+  await setSetting(GAS_PWD_KEY, pwd);
+  toast('設定已儲存 ✓');
 }
 
-// ── 登入 ─────────────────────────────────────────────────────
-async function gdriveLogin(){
-  const cid=await getGDriveClientId();
-  if(!cid){
-    toast('請先在設定頁填入並儲存 Google Client ID');return;
-  }
-  try{
-    await _loadGIS();
-    const client=google.accounts.oauth2.initTokenClient({
-      client_id:cid,
-      scope:GDRIVE_SCOPES,
-      callback:(resp)=>{
-        if(resp.error){ toast('登入失敗：'+resp.error); return; }
-        _gToken=resp.access_token;
-        _gdriveUpdateUI(true);
-        toast('Google 登入成功 ✓');
-      }
-    });
-    client.requestAccessToken();
-  }catch(e){ logError('gdriveLogin',e); toast('登入失敗，請檢查網路'); }
+async function _gasLoadSavedConfig(){
+  const { url, pwd } = await _gasGetConfig();
+  const urlEl = document.getElementById('gas-url-input');
+  const pwdEl = document.getElementById('gas-pwd-input');
+  if(urlEl && url) urlEl.value = url;
+  if(pwdEl && pwd) pwdEl.value = pwd;
 }
 
-// ── 登出 ─────────────────────────────────────────────────────
-function gdriveLogout(){
-  if(_gToken) google.accounts.oauth2.revoke(_gToken,()=>{});
-  _gToken=null;
-  _gdriveUpdateUI(false);
-  toast('已登出 Google');
-}
-
-// ── 更新 UI 狀態 ─────────────────────────────────────────────
-function _gdriveUpdateUI(loggedIn){
-  const status=document.getElementById('gdrive-status');
-  const loginBtn=document.getElementById('gdrive-login-btn');
-  const logoutBtn=document.getElementById('gdrive-logout-btn');
-  const backupBtn=document.getElementById('gdrive-backup-btn');
-  const restoreBtn=document.getElementById('gdrive-restore-btn');
-  if(status) status.innerHTML=loggedIn
-    ?'✅ 已登入 Google 帳號，可進行雲端同步'
-    :'🔒 尚未登入 Google 帳號';
-  if(loginBtn)  loginBtn.style.display=loggedIn?'none':'';
-  if(logoutBtn) logoutBtn.style.display=loggedIn?'':'none';
-  if(backupBtn)  backupBtn.disabled=!loggedIn;
-  if(restoreBtn) restoreBtn.disabled=!loggedIn;
-}
-
-// ── 備份到 Google Drive ───────────────────────────────────────
-async function gdriveBackup(){  try{
-  if(!_gToken){ toast('請先登入 Google'); return; }
+// ── 備份 ────────────────────────────────────────────────────
+async function gdriveBackup(){ try{
+  const { url, pwd } = await _gasGetConfig();
+  if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
   toast('備份中…');
-  const [qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
-  const data=JSON.stringify({version:2,exportedAt:new Date().toISOString(),questions:qs,laws:ls,attempts:ats});
-  // 查找現有備份檔
-  const searchRes=await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=name='${GDRIVE_BACKUP_FILE}'+and+trashed=false&fields=files(id,name,modifiedTime)`,
-    {headers:{Authorization:'Bearer '+_gToken}}
-  );
-  const searchData=await searchRes.json();
-  const existing=searchData.files?.[0];
-  let uploadUrl,method;
-  if(existing){
-    uploadUrl=`https://www.googleapis.com/upload/drive/v3/files/${existing.id}?uploadType=media`;
-    method='PATCH';
-  } else {
-    // 先建立檔案 metadata
-    const metaRes=await fetch('https://www.googleapis.com/drive/v3/files',{
-      method:'POST',
-      headers:{Authorization:'Bearer '+_gToken,'Content-Type':'application/json'},
-      body:JSON.stringify({name:GDRIVE_BACKUP_FILE,mimeType:'application/json'})
-    });
-    const meta=await metaRes.json();
-    uploadUrl=`https://www.googleapis.com/upload/drive/v3/files/${meta.id}?uploadType=media`;
-    method='PATCH';
-  }
-  const upRes=await fetch(uploadUrl,{
-    method,
-    headers:{Authorization:'Bearer '+_gToken,'Content-Type':'application/json'},
-    body:data
+  const [qs, ls, ats, cds] = await Promise.all([
+    da('questions'), da('laws'), da('attempts'), da('countdowns')
+  ]);
+  const motto  = await getSetting('examMotto','');
+  const payload = {
+    password: pwd,
+    action:   'backup',
+    filename: GAS_BACKUP_FILE,
+    data: JSON.stringify({ questions:qs, laws:ls, attempts:ats, countdowns:cds, motto })
+  };
+  const res  = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
   });
-  if(!upRes.ok){ toast('備份失敗：'+upRes.status); return; }
-  toast('已備份到 Google Drive ✓');
+  const json = await res.json();
+  if(json.ok){ toast('已備份到 Google Drive ✓'); }
+  else{ toast('備份失敗：'+(json.error||'未知錯誤')); }
 }catch(e){ logError('gdriveBackup',e); toast('備份失敗：'+e.message); }}
 
-// ── 從 Google Drive 還原 ──────────────────────────────────────
-async function gdriveRestore(){  try{
-  if(!_gToken){ toast('請先登入 Google'); return; }
-  const searchRes=await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=name='${GDRIVE_BACKUP_FILE}'+and+trashed=false&fields=files(id,name,modifiedTime)`,
-    {headers:{Authorization:'Bearer '+_gToken}}
-  );
-  const searchData=await searchRes.json();
-  const file=searchData.files?.[0];
-  if(!file){ toast('找不到雲端備份檔案'); return; }
-  const ts=new Date(file.modifiedTime).toLocaleString('zh-TW');
-  if(!confirm(`找到備份檔案\n最後更新：${ts}\n\n確定還原？（不覆蓋已有題目）`)) return;
-  toast('還原中…');
-  const dlRes=await fetch(
-    `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,
-    {headers:{Authorization:'Bearer '+_gToken}}
-  );
-  if(!dlRes.ok){ toast('下載失敗：'+dlRes.status); return; }
-  const rawData=await dlRes.json();
-  // 用現有 impJSON 邏輯直接處理
-  await _importFromObj(rawData);
-  toast('雲端還原完成 ✓');
-  renderSet();
+// ── 還原 ────────────────────────────────────────────────────
+async function gdriveRestore(){ try{
+  const { url, pwd } = await _gasGetConfig();
+  if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
+  cfm('從雲端還原','現有資料將被覆蓋，確定繼續？', async()=>{
+    toast('還原中…');
+    const res  = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ password:pwd, action:'restore', filename:GAS_BACKUP_FILE })
+    });
+    const json = await res.json();
+    if(!json.ok){ toast('還原失敗：'+(json.error||'未知錯誤')); return; }
+    const bk = JSON.parse(json.data);
+    await dc('questions'); await dc('laws'); await dc('attempts'); await dc('countdowns');
+    if(bk.questions?.length) await bulkPut('questions', bk.questions);
+    if(bk.laws?.length)      await bulkPut('laws',      bk.laws);
+    if(bk.attempts?.length)  await bulkPut('attempts',  bk.attempts);
+    if(bk.countdowns?.length)await bulkPut('countdowns',bk.countdowns);
+    if(bk.motto) await setSetting('examMotto', bk.motto);
+    _cacheInvalidate();
+    toast('還原完成，重新整理頁面中…');
+    setTimeout(()=>location.reload(), 1200);
+  });
 }catch(e){ logError('gdriveRestore',e); toast('還原失敗：'+e.message); }}
 
-// ── 共用匯入邏輯（從物件而非 File）─────────────────────────────
-async function _importFromObj(data){  try{
-  if(typeof data!=='object'||data===null){ toast('資料格式不正確'); return; }
-  let qs=[],ls=[],ats=[];
-  if(Array.isArray(data)){ qs=data; }
-  else {
-    qs=data.questions||[]; ls=data.laws||[]; ats=data.attempts||[];
-  }
-  if(qs.length){
-    const existing=await da('questions');
-    const existIds=new Set(existing.map(q=>q.id).filter(Boolean));
-    const newQs=qs.filter(q=>!q.id||!existIds.has(q.id));
-    if(newQs.length) await bulkPut('questions',newQs);
-  }
-  if(ls.length){
-    const existingL=await da('laws');
-    const existLIds=new Set(existingL.map(l=>l.id).filter(Boolean));
-    const newLs=ls.filter(l=>!l.id||!existLIds.has(l.id));
-    if(newLs.length) await bulkPut('laws',newLs);
-  }
-  if(ats.length){
-    const existingA=await da('attempts');
-    const existAIds=new Set(existingA.map(a=>a.id).filter(Boolean));
-    const newAts=ats.filter(a=>!a.id||!existAIds.has(a.id));
-    if(newAts.length) await bulkPut('attempts',newAts);
-  }
-}catch(e){ logError('_importFromObj',e); throw e; }}
 
 async function renderSet(){  try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
@@ -193,7 +93,7 @@ async function renderSet(){  try{
   const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
   document.getElementById('db-info').innerHTML=`總題數：${qs.length}<br>法條數：${ls.length}<br>作答記錄：${ats.length}<br>科目：${subs.join('、')||'無'}<br>題型：選擇 ${qs.filter(q=>q.type==='mc').length} / 申論 ${qs.filter(q=>q.type==='es').length}`;
   renderSetCountdown();
-  _gdriveLoadSavedId();
+  _gasLoadSavedConfig();
   }catch(e){ logError('renderSet',e); }}
 async function expJSON(){  try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
@@ -299,3 +199,9 @@ async function delAll(){  try{
   renderSet();
   }catch(e){ logError('delAll',e); }}
 
+
+function toggleGasHelp(){
+  const el = document.getElementById('gas-help');
+  if(!el) return;
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
