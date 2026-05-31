@@ -293,54 +293,48 @@
       <span style="font-size:16px">＋</span> 新增考試
     </button>
   </div>
-  <!-- Google Drive 雲端同步 -->
+  <!-- 雲端同步（Apps Script）-->
   <div class="sec">雲端同步</div>
   <div style="padding:0 12px 10px">
-    <!-- Client ID 輸入區 -->
+    <div style="font-size:11.5px;color:var(--t2);line-height:1.7;margin-bottom:10px">
+      一鍵備份／還原到你的 Google Drive，不需要登入 Google。<br>
+      需先建立 Apps Script 網路應用程式並貼入網址。
+      <span style="color:var(--acc);cursor:pointer;margin-left:4px" onclick="toggleGasHelp()">說明 ▾</span>
+    </div>
+    <div id="gas-help" style="display:none;font-size:10.5px;color:var(--t2);margin-bottom:10px;line-height:1.8;padding:9px 11px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.07)">
+      1. 前往 <span style="color:var(--acc)">script.google.com</span> → 建立新專案<br>
+      2. 貼上備份程式碼（README 有完整程式碼）<br>
+      3. 部署 → 新增部署 → 網路應用程式<br>
+      4. 執行身分：我、存取權：任何人 → 部署<br>
+      5. 複製網址貼到下方，設定自訂密碼後儲存
+    </div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:11.5px;color:var(--t2);margin-bottom:4px">Apps Script 網址</div>
+      <input id="gas-url-input" type="url" placeholder="https://script.google.com/macros/s/…/exec"
+        style="width:100%;box-sizing:border-box;font-size:11.5px;padding:7px 10px;border-radius:8px">
+    </div>
     <div style="margin-bottom:10px">
-      <div style="font-size:12px;color:var(--t2);margin-bottom:5px;line-height:1.5">
-        Google OAuth Client ID
-        <span style="float:right;font-size:11px;color:var(--acc);cursor:pointer" onclick="toggleClientIdHelp()">？說明</span>
-      </div>
+      <div style="font-size:11.5px;color:var(--t2);margin-bottom:4px">自訂密碼（防止他人存取）</div>
       <div style="display:flex;gap:6px">
-        <input id="gdrive-client-id-input" type="text" placeholder="貼上您的 Client ID（.apps.googleusercontent.com）"
-          style="flex:1;font-size:11.5px;padding:7px 10px;border-radius:8px"
-          oninput="gdriveClientIdChanged()">
-        <button class="btn bg" style="padding:7px 12px;font-size:12px;white-space:nowrap;flex-shrink:0" onclick="saveClientId()">儲存</button>
-      </div>
-      <div id="gdrive-client-id-help" style="display:none;font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.65;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:7px;border:1px solid rgba(255,255,255,0.07)">
-        1. 前往 <span style="color:var(--acc)">console.cloud.google.com</span><br>
-        2. 建立專案 → API 和服務 → 憑證<br>
-        3. 建立 OAuth 2.0 用戶端 ID（網頁應用程式）<br>
-        4. 授權來源填入此頁面的網址<br>
-        5. 複製 Client ID 貼到上方欄位並儲存
+        <input id="gas-pwd-input" type="password" placeholder="自訂任意密碼"
+          style="flex:1;font-size:11.5px;padding:7px 10px;border-radius:8px">
+        <button class="btn bg" style="padding:7px 14px;font-size:12px;white-space:nowrap;flex-shrink:0"
+          onclick="saveGasConfig()">儲存</button>
       </div>
     </div>
-    <!-- 狀態 + 登入登出 -->
-    <div id="gdrive-status" style="font-size:12px;color:var(--t2);margin-bottom:8px;line-height:1.6;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.07)">
-      🔒 尚未登入 Google 帳號
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <button class="btn bg" id="gdrive-login-btn" style="flex:1;padding:9px;font-size:12px" onclick="gdriveLogin()">
-        <span style="font-size:14px">🔑</span> Google 登入
-      </button>
-      <button class="btn bg" id="gdrive-logout-btn" style="flex:1;padding:9px;font-size:12px;display:none" onclick="gdriveLogout()">
-        <span style="font-size:14px">🚪</span> 登出
-      </button>
-    </div>
-    <!-- 備份還原 -->
     <div style="display:flex;gap:8px">
-      <button class="btn bg" id="gdrive-backup-btn" style="flex:1;padding:9px;font-size:12px" onclick="gdriveBackup()" disabled>
+      <button class="btn bg" style="flex:1;padding:10px;font-size:12px" onclick="gdriveBackup()">
         <span style="font-size:14px">☁️</span> 備份到雲端
       </button>
-      <button class="btn bg" id="gdrive-restore-btn" style="flex:1;padding:9px;font-size:12px" onclick="gdriveRestore()" disabled>
+      <button class="btn bg" style="flex:1;padding:10px;font-size:12px" onclick="gdriveRestore()">
         <span style="font-size:14px">📥</span> 從雲端還原
       </button>
     </div>
     <div style="font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.5">
-      備份檔儲存於您的 Google Drive 根目錄（<code style="color:var(--acc)">警察考題庫_backup.json</code>）
+      備份檔名：<code style="color:var(--acc)">YC_Platform_backup.json</code>，儲存於你的 Google Drive 根目錄
     </div>
   </div>
+
   <div class="sec" style="color:var(--red)">危險操作</div>
   <div class="srow"><div><div class="slb" style="color:var(--red)">清除作答記錄</div><div class="ssb">保留題目</div></div>
   <button class="btn br" style="padding:6px 10px;font-size:12px" onclick="cfm('清除作答記錄','確定清除？',clearAts)">清除</button></div>
