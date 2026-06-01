@@ -10,6 +10,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/splash.css">
+<script>
+/* 早期主題套用：避免畫面閃白（IDB 非同步，先暫存到 localStorage） */
+(function(){
+  var t = localStorage.getItem('_themeCache') || 'dark';
+  if(t && t !== 'dark') document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
 </head>
 <body>
 
@@ -50,6 +57,12 @@
 
   <!-- 考試倒數 -->
   <div id="h-countdown" class="home-countdown"></div>
+  <!-- 快速主題切換 -->
+  <div id="theme-switcher-home" style="display:flex;gap:6px;padding:6px 12px 2px">
+    <button class="theme-btn" id="home-btn-dark"  onclick="setTheme('dark')" >🌙 標準</button>
+    <button class="theme-btn" id="home-btn-light" onclick="setTheme('light')">☀️ 淺色</button>
+    <button class="theme-btn" id="home-btn-eink"  onclick="setTheme('eink')" >📖 電子紙</button>
+  </div>
 
   <!-- 今日任務 badges -->
   <div class="plan-strip">
@@ -278,6 +291,13 @@
 <!-- SETTINGS -->
 <div id="pg-set" class="page hide">
   <div class="hd"><div class="hdt">設定與資料</div></div>
+  <!-- 顯示模式 -->
+  <div class="sec">顯示模式</div>
+  <div id="theme-switcher">
+    <button class="theme-btn" id="theme-btn-dark"  onclick="setTheme('dark')" >🌙<br>標準</button>
+    <button class="theme-btn" id="theme-btn-light" onclick="setTheme('light')">☀️<br>淺色</button>
+    <button class="theme-btn" id="theme-btn-eink"  onclick="setTheme('eink')" >📖<br>電子紙</button>
+  </div>
   <div class="sec">題庫管理</div>
   <div class="srow"><div><div class="slb">匯出完整題庫 JSON</div><div class="ssb" id="exp-info">備份題目與記錄</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expJSON()">匯出</button></div>
   <div class="srow"><div><div class="slb">匯入 JSON 題庫</div><div class="ssb">不覆蓋已有題目</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="document.getElementById('imp').click()">匯入</button></div>
