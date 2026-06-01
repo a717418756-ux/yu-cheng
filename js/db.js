@@ -220,4 +220,4 @@ async function saveCountdowns(list){
 }
 
 const APP_VERSION  = '1.0.2';       // 程式版本（HTML/CSS/JS/SW 更新時遞增）
-const DATA_VERSION = '1150531-3';   // 題庫版本（題庫/法條資料更新時遞增）
+const DATA_VERSION = '1150601-01';   // 題庫版本（題庫/法條資料更新時遞增）
