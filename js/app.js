@@ -281,8 +281,6 @@ function _applyTheme(theme){
   ['dark','light','eink'].forEach(t => {
     const btn = document.getElementById(`theme-btn-${t}`);
     if(btn) btn.classList.toggle('active', t === theme);
-    const hbtn = document.getElementById(`home-btn-${t}`);
-    if(hbtn) hbtn.classList.toggle('active', t === theme);
   });
 }
 async function init(){  try{
