@@ -1025,6 +1025,89 @@ textarea{resize:vertical;line-height:1.7}
 /* 電子紙：lw-card */
 [data-theme="eink"] .lw-card{ background:var(--bg1);border:1.5px solid var(--bd); }
 
+/* 電子紙：FAB label（深色半透明 → 不透明深色）*/
+[data-theme="eink"] .fab-label{
+  background:var(--t0) !important;
+  color:var(--bg0) !important;
+  border:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+  font-size:14px;
+  font-weight:700;
+}
+[data-theme="eink"] .fab-btn{
+  background:var(--t0) !important;
+  border:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+  font-size:18px;
+}
+[data-theme="eink"] #fab-main{
+  background:var(--t0) !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+
+/* 電子紙：所有 rgba 半透明背景 → 不透明，消除方格 */
+[data-theme="eink"] .hd{
+  background:var(--bg1) !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+[data-theme="eink"] .zone-card{
+  background:var(--bg1) !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+[data-theme="eink"] .zone-panel{
+  background:var(--bg1) !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+[data-theme="eink"] .zqb{
+  background:var(--bg2) !important;
+}
+[data-theme="eink"] .zpanel-quiz{
+  background:var(--bd) !important;
+}
+[data-theme="eink"] .btn.bg,
+[data-theme="eink"] .hd-btn.bg{
+  background:var(--bg2) !important;
+  color:var(--t0) !important;
+  border:1.5px solid var(--bd) !important;
+}
+[data-theme="eink"] #fab-overlay.open{
+  background:rgba(0,0,0,0.5) !important;
+}
+[data-theme="eink"] #fab-list{
+  background:var(--bg1) !important;
+  border:1.5px solid var(--bd) !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+}
+/* plan-badges 底部分隔 */
+[data-theme="eink"] .plan-badges{
+  border-bottom:1.5px solid var(--bd);
+}
+
+/* ── 淺色模式：FAB label 修正 ── */
+[data-theme="light"] .fab-label{
+  background:rgba(30,30,40,0.92) !important;
+  color:#ffffff !important;
+  border:none !important;
+}
+[data-theme="light"] .fab-btn{
+  background:rgba(30,30,40,0.90) !important;
+  border:1px solid rgba(255,255,255,0.15) !important;
+}
+[data-theme="light"] #fab-main{
+  background:var(--acc2) !important;
+  color:#fff !important;
+}
+
 /* ── 主題切換按鈕（設定頁）── */
 #theme-switcher{
   display:flex;gap:8px;padding:0 12px 12px;
