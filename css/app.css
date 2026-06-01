@@ -770,6 +770,106 @@ textarea{resize:vertical;line-height:1.7}
 [data-theme="light"] .lsp-item:hover{ background:var(--bg2); }
 
 
+/* zone-card */
+[data-theme="light"] .zone-card{
+  background:var(--bg1);
+  border:1px solid var(--bd);
+  box-shadow:0 2px 8px rgba(0,0,0,0.07);
+}
+[data-theme="light"] .zone-card.zone-active{ border-color:var(--acc); }
+[data-theme="light"] .zone-card.zone-shrink{ opacity:.6; }
+[data-theme="light"] .zone-exam .zone-title{ color:var(--acc); }
+[data-theme="light"] .zone-study .zone-title{ color:var(--grn); }
+
+/* zone-panel（展開面板）*/
+[data-theme="light"] .zone-panel{
+  background:var(--bg1);
+  border:1px solid var(--bd);
+  box-shadow:0 2px 12px rgba(0,0,0,0.07);
+}
+[data-theme="light"] .zpanel-main{
+  border-bottom:1px solid var(--bd);
+}
+[data-theme="light"] .zpanel-main:active{ background:rgba(0,0,0,0.04); }
+[data-theme="light"] .zpanel-main-text .t{ color:var(--t0); }
+[data-theme="light"] .zpanel-main-text .s{ color:var(--t2); }
+[data-theme="light"] .zpanel-main-arrow{ color:var(--t2); }
+
+/* zpanel quiz grid */
+[data-theme="light"] .zpanel-quiz{
+  background:var(--bd);
+}
+[data-theme="light"] .zqb{
+  background:var(--bg2);
+  border-top:1px solid var(--bd);
+}
+[data-theme="light"] .zqb::before{ display:none; }
+[data-theme="light"] .zqb:active{ background:rgba(26,111,212,0.08); }
+[data-theme="light"] .zqb-label{ color:var(--t0); }
+[data-theme="light"] .zqb-desc{ color:var(--t2); }
+
+/* zpanel row */
+[data-theme="light"] .zpanel-row{
+  border-top:1px solid var(--bd);
+}
+[data-theme="light"] .zpanel-row:active{ background:rgba(0,0,0,0.04); }
+[data-theme="light"] .zpanel-row-text .t{ color:var(--t0); }
+[data-theme="light"] .zpanel-row-text .s{ color:var(--t2); }
+
+/* hdb 數據橫條 */
+[data-theme="light"] .home-data-bar{ background:transparent; }
+[data-theme="light"] .hdb-cell{
+  background:var(--bg2);
+  border:1px solid var(--bd);
+}
+[data-theme="light"] .hdb-n{ color:inherit; }
+[data-theme="light"] .hdb-l{ color:var(--t2); }
+
+/* plan-badge */
+[data-theme="light"] .plan-badges{
+  border-bottom:1px solid var(--bd);
+}
+
+/* home motto */
+[data-theme="light"] .h-date-txt{ color:var(--t2); }
+
+/* FAB overlay */
+[data-theme="light"] #fab-overlay.open{ background:rgba(0,0,0,0.3); }
+[data-theme="light"] #fab-list{
+  background:rgba(255,255,255,0.98);
+  border:1px solid var(--bd);
+  box-shadow:0 4px 20px rgba(0,0,0,0.12);
+}
+[data-theme="light"] .fab-item-label{ color:var(--t0); }
+
+/* hcd 倒數列 */
+[data-theme="light"] .hcd-row{
+  border-bottom:1px solid rgba(0,0,0,0.06);
+}
+
+/* sec 分隔標題 */
+[data-theme="light"] .sec{ color:var(--t2); }
+
+/* lw-card 法條卡片 */
+[data-theme="light"] .lw-card{
+  background:var(--bg1);border-color:var(--bd);
+}
+
+/* cov overlay */
+[data-theme="light"] .cov{
+  background:rgba(0,0,0,0.4);
+}
+[data-theme="light"] .cbox{
+  background:var(--bg1);border:1px solid var(--bd);
+  box-shadow:0 4px 20px rgba(0,0,0,0.12);
+}
+[data-theme="light"] .cbt{ color:var(--t0); }
+[data-theme="light"] .cbs{ color:var(--t2); }
+
+/* bottom sheet modal */
+[data-theme="light"] #countdown-add-modal > div > div:last-child,
+[data-theme="light"] [onclick="event.stopPropagation()"]{ background:var(--bg1) !important; }
+
 /* ══ 電子紙模式：關閉動畫與特效 ════════════════════════════════ */
 [data-theme="eink"] *{
   animation:none !important;
@@ -879,6 +979,51 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 電子紙：scrollbar */
 [data-theme="eink"] .page::-webkit-scrollbar-thumb{ background:var(--bd); }
+
+/* 電子紙：zone-card */
+[data-theme="eink"] .zone-card{
+  background:var(--bg1);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .zone-card.zone-active{ border-color:var(--t0); }
+[data-theme="eink"] .zone-exam .zone-title{ color:var(--t0); }
+[data-theme="eink"] .zone-study .zone-title{ color:var(--t0); }
+
+/* 電子紙：zone-panel */
+[data-theme="eink"] .zone-panel{
+  background:var(--bg1);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .zpanel-main{ border-bottom:1px solid var(--bd); }
+[data-theme="eink"] .zpanel-main-text .t{ color:var(--t0);font-size:15px; }
+[data-theme="eink"] .zpanel-main-text .s{ color:var(--t2); }
+[data-theme="eink"] .zpanel-quiz{ background:var(--bd); }
+[data-theme="eink"] .zqb{
+  background:var(--bg2);border-top:1px solid var(--bd);
+}
+[data-theme="eink"] .zqb::before{ display:none; }
+[data-theme="eink"] .zqb-label{ color:var(--t0);font-size:13px; }
+[data-theme="eink"] .zqb-desc{ color:var(--t2);font-size:11px; }
+[data-theme="eink"] .zpanel-row{ border-top:1px solid var(--bd); }
+[data-theme="eink"] .zpanel-row-text .t{ color:var(--t0);font-size:15px; }
+[data-theme="eink"] .zpanel-row-text .s{ color:var(--t2); }
+
+/* 電子紙：數據橫條 */
+[data-theme="eink"] .hdb-cell{
+  background:var(--bg2);border:1.5px solid var(--bd);
+}
+
+/* 電子紙：hcd 倒數 */
+[data-theme="eink"] .hcd-row{ border-bottom:1px solid var(--bd); }
+[data-theme="eink"] .hcd-name{ color:var(--t0);font-size:15px; }
+[data-theme="eink"] .hcd-days{ font-size:28px; }
+
+/* 電子紙：FAB */
+[data-theme="eink"] #fab-list{
+  background:var(--bg1);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .fab-item-label{ color:var(--t0);font-size:13px; }
+
+/* 電子紙：lw-card */
+[data-theme="eink"] .lw-card{ background:var(--bg1);border:1.5px solid var(--bd); }
 
 /* ── 主題切換按鈕（設定頁）── */
 #theme-switcher{
