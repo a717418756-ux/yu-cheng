@@ -663,28 +663,121 @@ textarea{resize:vertical;line-height:1.7}
    主題系統補充樣式
    ══════════════════════════════════════════════════════════════ */
 
-/* ── 淺色模式：背景與文字 ── */
-[data-theme="light"] html,
-[data-theme="light"] body{background:var(--bg0);color:var(--t0)}
+/* ══ 淺色模式完整 override ═════════════════════════════════════ */
+[data-theme="light"] body{ background:var(--bg0); color:var(--t0); }
 [data-theme="light"] input,
 [data-theme="light"] textarea,
-[data-theme="light"] select{background:var(--bg2);color:var(--t0);border-color:var(--bd)}
-[data-theme="light"] select option{background:var(--bg2);color:var(--t0)}
-[data-theme="light"] .nav{background:var(--bg1);border-top:1px solid var(--bd)}
-[data-theme="light"] .hd{background:var(--bg1);border-bottom:1px solid var(--bd)}
-[data-theme="light"] .page::-webkit-scrollbar-thumb{background:var(--bg3)}
+[data-theme="light"] select{
+  background:var(--bg2);color:var(--t0);border-color:var(--bd);
+}
+[data-theme="light"] select option{ background:var(--bg2);color:var(--t0); }
 
-/* ── 電子紙模式：關閉動畫與特效 ── */
+/* header / nav */
+[data-theme="light"] .nav{ background:var(--bg1);border-top:1px solid var(--bd); }
+[data-theme="light"] .hd{
+  background:rgba(255,255,255,0.95);
+  border-bottom:1px solid var(--bd);
+  backdrop-filter:blur(10px);
+}
+[data-theme="light"] .page::-webkit-scrollbar-thumb{ background:var(--bg3); }
+
+/* 硬編碼深色背景 → 淺色 */
+[data-theme="light"] .btn.bg{
+  background:rgba(0,0,0,0.05);
+  color:var(--t0);
+  border:1px solid var(--bd);
+}
+[data-theme="light"] .btn.bg:hover{ background:rgba(0,0,0,0.08); }
+[data-theme="light"] .btn.bg:active{ background:rgba(26,111,212,0.08);border-color:var(--acc); }
+[data-theme="light"] .hd-btn.bg{
+  background:rgba(0,0,0,0.05);color:var(--t0);border:1px solid var(--bd);
+}
+
+/* FAB */
+[data-theme="light"] #fab-list{
+  background:rgba(255,255,255,0.97);
+  border:1px solid var(--bd);
+  box-shadow:0 4px 20px rgba(0,0,0,0.12);
+}
+[data-theme="light"] .fab-btn{
+  background:rgba(0,0,0,0.05);color:var(--t0);border:1px solid var(--bd);
+}
+
+/* 卡片 */
+[data-theme="light"] .card,
+[data-theme="light"] .qc,
+[data-theme="light"] .cc,
+[data-theme="light"] .sc,
+[data-theme="light"] .stb,
+[data-theme="light"] .aic,
+[data-theme="light"] .qb{
+  background:var(--bg1);border-color:var(--bd);
+  box-shadow:0 1px 4px rgba(0,0,0,0.06);
+}
+[data-theme="light"] .qb:hover{ background:var(--bg2); }
+
+/* overlay / modal */
+[data-theme="light"] #fab-overlay.open{ background:rgba(0,0,0,0.35); }
+
+/* chip */
+[data-theme="light"] .chip{ background:var(--bg2);color:var(--t1);border-color:var(--bd); }
+[data-theme="light"] .chip.on{ background:rgba(26,111,212,0.1);color:var(--acc);border-color:var(--acc); }
+
+/* sec 標籤 */
+[data-theme="light"] .sec{ color:var(--t2); }
+
+/* tag */
+[data-theme="light"] .tag{ background:var(--bg2);color:var(--t1); }
+
+/* 文字顏色確保可見 */
+[data-theme="light"] .slb{ color:var(--t0); }
+[data-theme="light"] .ssb{ color:var(--t2); }
+[data-theme="light"] .hdt{ color:var(--t0); }
+
+/* 勉勵語 */
+[data-theme="light"] .h-motto{ color:var(--t0); }
+[data-theme="light"] .h-motto:hover{ color:var(--acc); }
+
+/* 數據橫條 */
+[data-theme="light"] .hdb-cell{ background:var(--bg2);border-color:var(--bd); }
+[data-theme="light"] .hdb-l{ color:var(--t2); }
+
+/* zone card */
+[data-theme="light"] .zone-card{
+  background:var(--bg1);border-color:var(--bd);
+  box-shadow:0 1px 6px rgba(0,0,0,0.07);
+}
+[data-theme="light"] .zone-title{ color:var(--t0); }
+[data-theme="light"] .zone-desc{ color:var(--t2); }
+
+/* srow */
+[data-theme="light"] .srow{ border-bottom-color:var(--bd); }
+
+/* 答題選項 */
+[data-theme="light"] .qabn{
+  background:var(--bg2);color:var(--t0);border-color:var(--bd);
+}
+
+/* pi 區塊 */
+[data-theme="light"] .pi{
+  background:var(--bg2);border-color:var(--bd);color:var(--t1);
+}
+[data-theme="light"] .pi-n{ color:var(--acc); }
+[data-theme="light"] .aipv{ background:var(--bg2);color:var(--t1); }
+
+/* lsp 排序 popup */
+[data-theme="light"] .lsp-item{ color:var(--t1); }
+[data-theme="light"] .lsp-item:hover{ background:var(--bg2); }
+
+
+/* ══ 電子紙模式：關閉動畫與特效 ════════════════════════════════ */
 [data-theme="eink"] *{
   animation:none !important;
   transition:none !important;
   backdrop-filter:none !important;
   -webkit-backdrop-filter:none !important;
+  box-shadow:0 1px 3px rgba(0,0,0,0.12) !important;
 }
-[data-theme="eink"] *{
-  box-shadow:0 1px 3px rgba(0,0,0,0.15) !important;
-}
-[data-theme="eink"] html,
 [data-theme="eink"] body{
   background:var(--bg0);color:var(--t0);
   font-size:var(--fs-body);
@@ -695,55 +788,125 @@ textarea{resize:vertical;line-height:1.7}
 [data-theme="eink"] textarea,
 [data-theme="eink"] select{
   background:var(--bg2);color:var(--t0);
-  border-color:var(--bd);
+  border-color:var(--bd);border-width:1.5px;
   font-size:var(--fs-body);
   min-height:var(--btn-h);
 }
-[data-theme="eink"] select option{background:var(--bg2);color:var(--t0)}
+[data-theme="eink"] select option{ background:var(--bg2);color:var(--t0); }
+
+/* 電子紙：header / nav */
+[data-theme="eink"] .hd{
+  background:var(--bg1);border-bottom:2px solid var(--bd);
+}
+[data-theme="eink"] .nav{
+  background:var(--bg1);border-top:2px solid var(--bd);
+}
+[data-theme="eink"] .hdt{ font-size:17px;font-weight:800;color:var(--t0); }
+
+/* 電子紙：卡片加框線 */
+[data-theme="eink"] .card,
+[data-theme="eink"] .qc,
+[data-theme="eink"] .cc,
+[data-theme="eink"] .sc,
+[data-theme="eink"] .stb,
+[data-theme="eink"] .qb{
+  background:var(--bg1);
+  border:1.5px solid var(--bd);
+}
+
+/* 電子紙：FAB → 純文字按鈕，不用圓型 */
+[data-theme="eink"] #fab-list{
+  background:var(--bg1);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .fab-btn{
+  background:var(--bg2);color:var(--t0);
+  border:1.5px solid var(--bd);border-radius:8px;
+  font-size:13px;
+}
+[data-theme="eink"] #fab-main{
+  background:var(--t0);color:var(--bg0);
+  border:2px solid var(--t0);
+}
 
 /* 電子紙：題目字體放大 */
 [data-theme="eink"] .q-stem,
 [data-theme="eink"] .qstem,
-[data-theme="eink"] #q-stem{font-size:var(--fs-q) !important;line-height:var(--lh-body)}
+[data-theme="eink"] #q-stem,
+[data-theme="eink"] .qst{ font-size:var(--fs-q) !important;line-height:var(--lh-body); }
 [data-theme="eink"] .law-content,
-[data-theme="eink"] .law-text{font-size:var(--fs-law) !important;line-height:var(--lh-body)}
+[data-theme="eink"] .law-text{ font-size:var(--fs-law) !important;line-height:var(--lh-body); }
+[data-theme="eink"] .pi-s,
+[data-theme="eink"] .pi-n{ font-size:calc(var(--fs-body) - 1px); }
 
-/* 電子紙：按鈕加高，防誤觸 */
+/* 電子紙：按鈕加高、加粗邊線 */
 [data-theme="eink"] .btn,
 [data-theme="eink"] .nb,
-[data-theme="eink"] button{min-height:var(--btn-h)}
+[data-theme="eink"] button{ min-height:var(--btn-h);font-size:15px; }
+[data-theme="eink"] .btn.bg{
+  background:var(--bg2);color:var(--t0);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .btn.bp{
+  background:var(--t0);color:var(--bg0);border:none;
+}
 
-/* 電子紙：nav */
-[data-theme="eink"] .nav{background:var(--bg1);border-top:1px solid var(--bd)}
-[data-theme="eink"] .hd{background:var(--bg1);border-bottom:1px solid var(--bd)}
-[data-theme="eink"] .page::-webkit-scrollbar-thumb{background:var(--bg3)}
+/* 電子紙：chip */
+[data-theme="eink"] .chip{
+  background:var(--bg2);color:var(--t0);
+  border:1.5px solid var(--bd);font-size:13px;
+  padding:7px 14px;
+}
+[data-theme="eink"] .chip.on{
+  background:var(--t0);color:var(--bg0);border-color:var(--t0);
+}
 
-/* 電子紙：單欄，最大化閱讀寬度 */
+/* 電子紙：答題選項更清晰 */
+[data-theme="eink"] .qabn{
+  background:var(--bg2);color:var(--t0);
+  border:1.5px solid var(--bd);
+  padding:10px 14px;font-size:15px;
+}
+
+/* 電子紙：單欄版面 */
 [data-theme="eink"] .grid-2,
 [data-theme="eink"] [style*="grid-template-columns"]{
   grid-template-columns:1fr !important;
 }
 
-/* ── 主題切換按鈕（首頁快速切換）── */
+/* 電子紙：勉勵語 */
+[data-theme="eink"] .h-motto{
+  font-size:22px;font-weight:800;color:var(--t0);letter-spacing:-.01em;
+}
+
+/* 電子紙：scrollbar */
+[data-theme="eink"] .page::-webkit-scrollbar-thumb{ background:var(--bd); }
+
+/* ── 主題切換按鈕（設定頁）── */
 #theme-switcher{
-  display:flex;gap:6px;padding:0 12px 10px;
+  display:flex;gap:8px;padding:0 12px 12px;
 }
 .theme-btn{
-  flex:1;padding:8px 4px;border-radius:8px;
+  flex:1;padding:10px 4px;border-radius:10px;
   border:1px solid var(--bd);
   background:var(--bg2);color:var(--t1);
-  font-size:11px;text-align:center;cursor:pointer;
-  line-height:1.4;
+  font-size:12px;text-align:center;cursor:pointer;
+  line-height:1.5;font-weight:500;
 }
 .theme-btn.active{
   border-color:var(--acc);
   background:rgba(110,168,254,0.1);
   color:var(--acc);font-weight:700;
 }
+[data-theme="light"] .theme-btn{
+  background:var(--bg2);color:var(--t1);border-color:var(--bd);
+}
 [data-theme="light"] .theme-btn.active{
   background:rgba(26,111,212,0.08);
-  color:var(--acc);
+  border-color:var(--acc);color:var(--acc);
+}
+[data-theme="eink"] .theme-btn{
+  background:var(--bg2);color:var(--t0);
+  border:1.5px solid var(--bd);font-size:14px;
 }
 [data-theme="eink"] .theme-btn.active{
-  border-color:#000;background:#000;color:#fff;
+  border:2px solid var(--t0);background:var(--t0);color:var(--bg0);
 }
