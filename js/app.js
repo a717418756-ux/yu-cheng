@@ -219,7 +219,12 @@ function toggleFab(){
       });
     });
   } else {
-    document.querySelectorAll('#fab-items .fab-item').forEach(el=>el.classList.remove('vis'));
+    const container=document.getElementById('fab-items');
+    if(container){
+      document.querySelectorAll('#fab-items .fab-item').forEach(el=>el.classList.remove('vis'));
+      const isEink=document.documentElement.getAttribute('data-theme')==='eink';
+      setTimeout(()=>{ if(container) container.innerHTML=''; }, isEink?0:260);
+    }
   }
 }
 
@@ -228,7 +233,13 @@ function closeFab(){
   _fabOpen=false;
   document.getElementById('fab-main').classList.remove('open');
   document.getElementById('fab-overlay').classList.remove('open');
-  document.querySelectorAll('#fab-items .fab-item').forEach(el=>el.classList.remove('vis'));
+  const container=document.getElementById('fab-items');
+  if(container){
+    document.querySelectorAll('#fab-items .fab-item').forEach(el=>el.classList.remove('vis'));
+    // 動畫結束後清空，避免佔空間（電子紙模式直接清）
+    const isEink=document.documentElement.getAttribute('data-theme')==='eink';
+    setTimeout(()=>{ if(container) container.innerHTML=''; }, isEink?0:260);
+  }
 }
 
 function fabGo(pg){
@@ -281,6 +292,8 @@ function _applyTheme(theme){
   ['dark','light','eink'].forEach(t => {
     const btn = document.getElementById(`theme-btn-${t}`);
     if(btn) btn.classList.toggle('active', t === theme);
+    const hbtn = document.getElementById(`home-btn-${t}`);
+    if(hbtn) hbtn.classList.toggle('active', t === theme);
   });
 }
 async function init(){  try{
