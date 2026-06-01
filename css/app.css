@@ -5,11 +5,12 @@
    ══════════════════════════════════════════════════════════════ */
 
 /* ── 1. CSS 變數 ─────────────────────────────────────────────── */
+/* ══ 標準模式（預設深色）══════════════════════════════════════ */
 :root{
-  --bg0:#121212;   /* 最底層背景 */
-  --bg1:#1b1b1b;   /* 卡片/導覽 */
-  --bg2:#242424;   /* 輸入框/次卡片 */
-  --bg3:#2d2d2d;   /* hover/badge */
+  --bg0:#121212;
+  --bg1:#1b1b1b;
+  --bg2:#242424;
+  --bg3:#2d2d2d;
   --bd:rgba(255,255,255,0.08);
 
   --t0:#eaeaea;
@@ -30,6 +31,74 @@
 
   --r:10px;--rs:6px;
   --tr:.2s cubic-bezier(.4,0,.2,1);
+
+  /* 字體尺寸（電子紙模式會覆蓋） */
+  --fs-body:14px;
+  --fs-q:15px;
+  --fs-law:14px;
+  --lh-body:1.6;
+  --btn-h:44px;
+}
+
+/* ══ 淺色模式 ══════════════════════════════════════════════════ */
+[data-theme="light"]{
+  --bg0:#FFFFFF;
+  --bg1:#FFFFFF;
+  --bg2:#F4F4F4;
+  --bg3:#E8E8E8;
+  --bd:#DADADA;
+
+  --t0:#111111;
+  --t1:#333333;
+  --t2:#555555;
+
+  --acc:#1a6fd4;
+  --acc2:#1255aa;
+
+  --grn:#2e8b57;
+  --grn2:rgba(46,139,87,0.12);
+  --red:#c0392b;
+  --red2:rgba(192,57,43,0.1);
+  --org:#b8860b;
+  --org2:rgba(184,134,11,0.1);
+  --pur:#6a4fa3;
+  --pur2:rgba(106,79,163,0.1);
+
+  color-scheme: light;
+}
+
+/* ══ 電子紙模式（Boox 專用）══════════════════════════════════ */
+[data-theme="eink"]{
+  --bg0:#F6F4EE;
+  --bg1:#F6F4EE;
+  --bg2:#EEEBE2;
+  --bg3:#E0DCCE;
+  --bd:#AAAAAA;
+
+  --t0:#000000;
+  --t1:#111111;
+  --t2:#444444;
+
+  --acc:#1a1a1a;
+  --acc2:#333333;
+
+  --grn:#1a5c2e;
+  --grn2:rgba(26,92,46,0.1);
+  --red:#8b0000;
+  --red2:rgba(139,0,0,0.08);
+  --org:#6b4c00;
+  --org2:rgba(107,76,0,0.08);
+  --pur:#3d2b6b;
+  --pur2:rgba(61,43,107,0.08);
+
+  /* 字體放大 */
+  --fs-body:18px;
+  --fs-q:22px;
+  --fs-law:20px;
+  --lh-body:1.8;
+  --btn-h:56px;
+
+  color-scheme: light;
 }
 
 /* ── 2. 基底 ─────────────────────────────────────────────────── */
@@ -589,3 +658,92 @@ textarea{resize:vertical;line-height:1.7}
 
 @supports (height:100dvh){#qv,#lv{height:100dvh}}
 
+
+/* ══════════════════════════════════════════════════════════════
+   主題系統補充樣式
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 淺色模式：背景與文字 ── */
+[data-theme="light"] html,
+[data-theme="light"] body{background:var(--bg0);color:var(--t0)}
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select{background:var(--bg2);color:var(--t0);border-color:var(--bd)}
+[data-theme="light"] select option{background:var(--bg2);color:var(--t0)}
+[data-theme="light"] .nav{background:var(--bg1);border-top:1px solid var(--bd)}
+[data-theme="light"] .hd{background:var(--bg1);border-bottom:1px solid var(--bd)}
+[data-theme="light"] .page::-webkit-scrollbar-thumb{background:var(--bg3)}
+
+/* ── 電子紙模式：關閉動畫與特效 ── */
+[data-theme="eink"] *{
+  animation:none !important;
+  transition:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+[data-theme="eink"] *{
+  box-shadow:0 1px 3px rgba(0,0,0,0.15) !important;
+}
+[data-theme="eink"] html,
+[data-theme="eink"] body{
+  background:var(--bg0);color:var(--t0);
+  font-size:var(--fs-body);
+  line-height:var(--lh-body);
+  font-family:'Noto Sans TC','Microsoft JhengHei','PingFang TC',sans-serif;
+}
+[data-theme="eink"] input,
+[data-theme="eink"] textarea,
+[data-theme="eink"] select{
+  background:var(--bg2);color:var(--t0);
+  border-color:var(--bd);
+  font-size:var(--fs-body);
+  min-height:var(--btn-h);
+}
+[data-theme="eink"] select option{background:var(--bg2);color:var(--t0)}
+
+/* 電子紙：題目字體放大 */
+[data-theme="eink"] .q-stem,
+[data-theme="eink"] .qstem,
+[data-theme="eink"] #q-stem{font-size:var(--fs-q) !important;line-height:var(--lh-body)}
+[data-theme="eink"] .law-content,
+[data-theme="eink"] .law-text{font-size:var(--fs-law) !important;line-height:var(--lh-body)}
+
+/* 電子紙：按鈕加高，防誤觸 */
+[data-theme="eink"] .btn,
+[data-theme="eink"] .nb,
+[data-theme="eink"] button{min-height:var(--btn-h)}
+
+/* 電子紙：nav */
+[data-theme="eink"] .nav{background:var(--bg1);border-top:1px solid var(--bd)}
+[data-theme="eink"] .hd{background:var(--bg1);border-bottom:1px solid var(--bd)}
+[data-theme="eink"] .page::-webkit-scrollbar-thumb{background:var(--bg3)}
+
+/* 電子紙：單欄，最大化閱讀寬度 */
+[data-theme="eink"] .grid-2,
+[data-theme="eink"] [style*="grid-template-columns"]{
+  grid-template-columns:1fr !important;
+}
+
+/* ── 主題切換按鈕（首頁快速切換）── */
+#theme-switcher{
+  display:flex;gap:6px;padding:0 12px 10px;
+}
+.theme-btn{
+  flex:1;padding:8px 4px;border-radius:8px;
+  border:1px solid var(--bd);
+  background:var(--bg2);color:var(--t1);
+  font-size:11px;text-align:center;cursor:pointer;
+  line-height:1.4;
+}
+.theme-btn.active{
+  border-color:var(--acc);
+  background:rgba(110,168,254,0.1);
+  color:var(--acc);font-weight:700;
+}
+[data-theme="light"] .theme-btn.active{
+  background:rgba(26,111,212,0.08);
+  color:var(--acc);
+}
+[data-theme="eink"] .theme-btn.active{
+  border-color:#000;background:#000;color:#fff;
+}
