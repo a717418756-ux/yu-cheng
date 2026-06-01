@@ -121,3 +121,27 @@
   0%,80%,100%{transform:scale(.55);opacity:.25}
   40%{transform:scale(1);opacity:1;background:rgba(255,200,100,.9)}
 }
+
+/* ── 電子紙模式：splash 改白底黑圖 ── */
+[data-theme="eink"] #splash{
+  background:#F6F4EE;
+}
+[data-theme="eink"] #splash-stars{ display:none; }
+[data-theme="eink"] .splash-streak{ display:none; }
+[data-theme="eink"] #splash-logo-wrap::after{
+  background:linear-gradient(to top, #F6F4EE 0%, transparent 100%);
+}
+[data-theme="eink"] #splash-sub{
+  color:rgba(0,0,0,0.75);
+  text-shadow:none;
+  letter-spacing:.3em;
+}
+[data-theme="eink"] #splash-zh{
+  color:rgba(0,0,0,0.55);
+}
+[data-theme="eink"] #splash-line{
+  background:linear-gradient(90deg,transparent,rgba(0,0,0,0.4),transparent);
+}
+[data-theme="eink"] .sdot{
+  background:rgba(0,0,0,0.25);
+}
