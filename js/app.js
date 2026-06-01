@@ -273,14 +273,69 @@ async function init(){  try{
   }
 }
 init().then(()=>{
-  // 填入版本號
-  const verEl=document.getElementById('app-ver');
-  if(verEl) verEl.textContent=typeof APP_VER!=='undefined'?APP_VER:'';
+  // 填入版本號（雙版本）
+  const verEl = document.getElementById('app-ver');
+  if(verEl){
+    const av = typeof APP_VERSION  !== 'undefined' ? APP_VERSION  : '';
+    const dv = typeof DATA_VERSION !== 'undefined' ? DATA_VERSION : '';
+    verEl.innerHTML = `v${av} <span style="color:var(--t2);font-size:10px">題庫 ${dv}</span>`;
+  }
   // 關閉載入畫面（至少顯示 2.6 秒讓動畫完整播完）
-  const elapsed=Date.now()-_splashStart;
-  const wait=Math.max(0,2600-elapsed);
-  setTimeout(()=>{if(typeof window._splashDismiss==='function')window._splashDismiss();},wait);
+  const elapsed = Date.now() - _splashStart;
+  const wait    = Math.max(0, 2600 - elapsed);
+  setTimeout(()=>{ if(typeof window._splashDismiss==='function') window._splashDismiss(); }, wait);
 });
+
+/* ── Service Worker 更新偵測 ── */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.ready.then(reg => {
+    // 定期檢查更新（每 30 分鐘）
+    setInterval(()=> reg.update(), 30 * 60 * 1000);
+    // 偵測到新 SW 進入 waiting
+    reg.addEventListener('updatefound', ()=>{
+      const newWorker = reg.installing;
+      if(!newWorker) return;
+      newWorker.addEventListener('statechange', ()=>{
+        if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
+          _showUpdateBanner(reg);
+        }
+      });
+    });
+  });
+  // 新 SW 接管後自動 reload
+  let _swRefreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+    if(!_swRefreshing){ _swRefreshing = true; location.reload(); }
+  });
+}
+
+function _showUpdateBanner(reg){
+  if(document.getElementById('sw-update-banner')) return;
+  const av = typeof APP_VERSION !== 'undefined' ? APP_VERSION : '';
+  const banner = document.createElement('div');
+  banner.id = 'sw-update-banner';
+  banner.innerHTML = `
+    <div style="position:fixed;bottom:70px;left:50%;transform:translateX(-50%);
+      z-index:8000;background:var(--bg1);border:1px solid var(--acc);
+      border-radius:14px;padding:14px 18px;min-width:260px;max-width:90vw;
+      box-shadow:0 4px 24px rgba(0,0,0,.5);text-align:center">
+      <div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:4px">🔄 發現新版本</div>
+      <div style="font-size:11px;color:var(--t2);margin-bottom:12px">點擊更新載入最新版，題庫資料完全保留</div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button onclick="document.getElementById('sw-update-banner').remove()"
+          style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--t2);
+          background:transparent;color:var(--t2);font-size:12px;cursor:pointer">稍後</button>
+        <button id="sw-update-btn"
+          style="flex:1;padding:8px;border-radius:8px;border:none;
+          background:var(--acc);color:#fff;font-size:12px;font-weight:700;cursor:pointer">立即更新</button>
+      </div>
+    </div>`;
+  document.body.appendChild(banner);
+  document.getElementById('sw-update-btn').addEventListener('click', ()=>{
+    if(reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    banner.remove();
+  });
+}
 
 
 

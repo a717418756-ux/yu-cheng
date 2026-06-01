@@ -56,7 +56,12 @@ async function gdriveBackup(){ try{
     body: JSON.stringify(payload)
   });
   const json = await res.json();
-  if(json.ok){ toast('已備份到 Google Drive ✓'); }
+  if(json.ok){
+    const t = new Date().toLocaleString('zh-TW');
+    await setSetting('lastBackupTime', t);
+    toast('已備份到 Google Drive ✓');
+    renderSet();
+  }
   else{ toast('備份失敗：'+(json.error||'未知錯誤')); }
 }catch(e){ logError('gdriveBackup',e); toast('備份失敗：'+e.message); }}
 
@@ -81,6 +86,8 @@ async function gdriveRestore(){ try{
     if(bk.countdowns?.length)await bulkPut('countdowns',bk.countdowns);
     if(bk.motto) await setSetting('examMotto', bk.motto);
     _cacheInvalidate();
+    const rt = new Date().toLocaleString('zh-TW');
+    await setSetting('lastRestoreTime', rt);
     toast('還原完成，重新整理頁面中…');
     setTimeout(()=>location.reload(), 1200);
   });
@@ -94,6 +101,20 @@ async function renderSet(){  try{
   document.getElementById('db-info').innerHTML=`總題數：${qs.length}<br>法條數：${ls.length}<br>作答記錄：${ats.length}<br>科目：${subs.join('、')||'無'}<br>題型：選擇 ${qs.filter(q=>q.type==='mc').length} / 申論 ${qs.filter(q=>q.type==='es').length}`;
   renderSetCountdown();
   _gasLoadSavedConfig();
+  // 版本號與備份時間
+  const [lastBk, lastRs] = await Promise.all([
+    getSetting('lastBackupTime','—'),
+    getSetting('lastRestoreTime','—')
+  ]);
+  const verInfoEl = document.getElementById('set-ver-info');
+  if(verInfoEl){
+    const av = typeof APP_VERSION  !== 'undefined' ? APP_VERSION  : '';
+    const dv = typeof DATA_VERSION !== 'undefined' ? DATA_VERSION : '';
+    verInfoEl.innerHTML =
+      `程式版本：<b>v${av}</b>　題庫版本：<b>${dv}</b><br>` +
+      `最後備份：<span style="color:var(--t2)">${lastBk}</span>　` +
+      `最後還原：<span style="color:var(--t2)">${lastRs}</span>`;
+  }
   }catch(e){ logError('renderSet',e); }}
 async function expJSON(){  try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
