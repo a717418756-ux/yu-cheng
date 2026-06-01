@@ -1,12 +1,14 @@
 /* ══════════════════════════════════════════════════════════════
-   sw.js — Y.C. 多功能專用平台 Service Worker
+   sw.js — Y.C. 多功能專用平台
+   ★ 每次更新程式只需修改 APP_VERSION
    ══════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'yc-platform-v1';
+const APP_VERSION = '1.0.0';
+const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
+// ── 快取資源（不包含 index.html）────────────────────────────
+// index.html 永遠從網路取得，確保 HTML 結構不落後於 JS/CSS
 const ASSETS = [
-  './',
-  './index.html',
   './manifest.json',
   './css/app.css',
   './css/splash.css',
@@ -18,6 +20,7 @@ const ASSETS = [
   './js/settings.js',
   './js/countdown.js',
   './js/app.js',
+  './icons/splash-logo.png',
   './icons/icon-72.png',
   './icons/icon-96.png',
   './icons/icon-128.png',
@@ -29,48 +32,68 @@ const ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js'
 ];
 
-/* ── 安裝：預快取所有資源 ── */
+/* ── 安裝：預快取，完成後立即進入 waiting ── */
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting())   // 不等舊 SW 結束，直接進 waiting
   );
 });
 
-/* ── 啟動：清除舊版快取 ── */
+/* ── 啟動：清舊快取，立即接管所有頁面 ── */
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(k => k !== CACHE_NAME)
-            .map(k => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(
+        keys
+          .filter(k => k.startsWith('yc-cache-') && k !== CACHE_NAME)
+          .map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())  // 立即接管，不等使用者重開頁面
   );
 });
 
-/* ── 攔截請求：Cache First，失敗才走網路 ── */
+/* ── 攔截請求 ── */
 self.addEventListener('fetch', e => {
-  // 非 GET 或 chrome-extension 略過
   if (e.request.method !== 'GET') return;
-  if (!e.request.url.startsWith('http')) return;
+  const url = e.request.url;
+  if (!url.startsWith('http')) return;
 
+  // index.html → 永遠優先走網路，失敗才用快取
+  if (url.endsWith('/') || url.endsWith('/index.html') || url.endsWith('.io/')) {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          // 網路成功：不快取 index.html，直接回傳
+          return res;
+        })
+        .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // 其他資源：Cache First（有快取直接用，沒有才去網路並存快取）
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(res => {
-        // 只快取成功的回應
         if (!res || res.status !== 200 || res.type === 'opaque') return res;
         const clone = res.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         return res;
       }).catch(() => {
-        // 離線且無快取：若是 HTML 導向首頁
         if (e.request.destination === 'document') {
           return caches.match('./index.html');
         }
       });
     })
   );
+});
+
+/* ── 接收主頁面訊息（立即更新指令）── */
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
