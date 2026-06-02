@@ -8,13 +8,17 @@
 <link rel="manifest" href="manifest.json">
 <title>警察考題庫 Pro</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<!-- Google Fonts：電子紙標楷體備援 + 英文 serif -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;700&family=Dancing+Script:wght@600;700&family=Cormorant+Garamond:ital,wght@1,400;1,500&display=swap">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/splash.css">
 <script>
 /* 早期主題套用：避免畫面閃白（IDB 非同步，先暫存到 localStorage） */
 (function(){
   var t = localStorage.getItem('_themeCache') || 'dark';
-  if(t && t !== 'dark') document.documentElement.setAttribute('data-theme', t);
+  if(t === 'eink') document.documentElement.setAttribute('data-theme', 'eink');
 })();
 </script>
 </head>
@@ -25,14 +29,28 @@
   <div id="splash-stars"></div>
   <div class="splash-streak"></div>
   <div class="splash-streak"></div>
+
+  <!-- 頂部英文標語 -->
+  <div id="splash-top">
+    <div id="splash-tagline">Become your ideal self.</div>
+  </div>
+
+  <!-- 中央門框圖 -->
   <div id="splash-logo-wrap">
     <img id="splash-logo-img" src="icons/splash-logo.png" alt="">
   </div>
+
+  <!-- 底部文字區 -->
   <div id="splash-text">
-    <div id="splash-title">Y.C. 多功能專用平台</div>
-    <div id="splash-line"></div>
-    <div id="splash-sub">Become your ideal self.</div>
     <div id="splash-zh">學習 × 成長 × 行動 × 實現</div>
+    <div id="splash-en-sub">LEARN &times; GROW &times; ACT &times; ACHIEVE</div>
+    <div id="splash-deco">
+      <span class="splash-deco-dot"></span>
+      <span class="splash-deco-line"></span>
+      <span class="splash-deco-center">◈</span>
+      <span class="splash-deco-line"></span>
+      <span class="splash-deco-dot"></span>
+    </div>
   </div>
   <div id="splash-dots"><div class="sdot"></div><div class="sdot"></div><div class="sdot"></div></div>
 </div>
@@ -289,9 +307,8 @@
   <!-- 顯示模式 -->
   <div class="sec">顯示模式</div>
   <div id="theme-switcher">
-    <button class="theme-btn" id="theme-btn-dark"  onclick="setTheme('dark')" >🌙<br>標準</button>
-    <button class="theme-btn" id="theme-btn-light" onclick="setTheme('light')">☀️<br>淺色</button>
-    <button class="theme-btn" id="theme-btn-eink"  onclick="setTheme('eink')" >📖<br>電子紙</button>
+    <button class="theme-btn" id="theme-btn-dark" onclick="setTheme('dark')">🌙<br>標準</button>
+    <button class="theme-btn" id="theme-btn-eink" onclick="setTheme('eink')">📖<br>電子紙</button>
   </div>
   <div class="sec">題庫管理</div>
   <div class="srow"><div><div class="slb">匯出完整題庫 JSON</div><div class="ssb" id="exp-info">備份題目與記錄</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expJSON()">匯出</button></div>
