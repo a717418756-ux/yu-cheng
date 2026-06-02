@@ -319,7 +319,8 @@ init().then(()=>{
   }
   // 關閉載入畫面（至少顯示 2.6 秒讓動畫完整播完）
   const elapsed = Date.now() - _splashStart;
-  const wait    = Math.max(0, 2600 - elapsed);
+  // 兩段式 splash：第一段 1.5s + 淡出 0.7s + 第二段至少 2s = 4200ms
+  const wait = Math.max(0, 4200 - elapsed);
   setTimeout(()=>{ if(typeof window._splashDismiss==='function') window._splashDismiss(); }, wait);
 });
 
