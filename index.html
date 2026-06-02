@@ -69,9 +69,14 @@
       s1.classList.add('fade-out');
       setTimeout(function(){
         if(s1.parentNode) s1.parentNode.removeChild(s1);
-        s2.classList.add('splash-2-in');
-        // 第二段顯示後 2s 才算 ready
-        setTimeout(function(){ _s2shown=true; },2000);
+        // requestAnimationFrame 強制 reflow，讓 opacity transition 生效
+        requestAnimationFrame(function(){
+          requestAnimationFrame(function(){
+            s2.classList.add('splash-2-in');
+            // 第二段顯示後 2s 才算 ready
+            setTimeout(function(){ _s2shown=true; },2000);
+          });
+        });
       },700);
     },1500);
   }
