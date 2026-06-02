@@ -3,7 +3,7 @@
    ★ 每次更新程式只需修改 APP_VERSION
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 快取資源（不包含 index.html）────────────────────────────
@@ -20,7 +20,7 @@ const ASSETS = [
   './js/settings.js',
   './js/countdown.js',
   './js/app.js',
-  './icons/splash-logo-icon.png',
+  './splash-logo-icon.png',
   './icons/splash-logo.png',
   './icons/icon-72.png',
   './icons/icon-96.png',
