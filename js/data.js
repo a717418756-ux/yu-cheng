@@ -159,6 +159,18 @@ function showAdd(q){
   document.getElementById('f-ex').value=data?.exam||'';
   document.getElementById('f-num').value=data?.num||'';
   document.getElementById('f-stem').value=data?.stem||'';
+  // 題組欄位
+  const isGroupEl=document.getElementById('f-is-group');
+  const groupWrap=document.getElementById('f-group-wrap');
+  const hasGroup=!!(data?.groupId);
+  if(isGroupEl) isGroupEl.checked=hasGroup;
+  if(groupWrap) groupWrap.classList.toggle('hide',!hasGroup);
+  const gsEl=document.getElementById('f-group-stem');
+  if(gsEl) gsEl.value=data?.groupStem||'';
+  const giEl=document.getElementById('f-group-id');
+  if(giEl) giEl.value=data?.groupId||'';
+  const goEl=document.getElementById('f-group-order');
+  if(goEl) goEl.value=data?.groupOrder||''  ;
   document.getElementById('f-kw').value=(data?.keywords||[]).join(',');
   document.getElementById('f-note').value=data?.note||'';
   const isNumEl=document.getElementById('f-is-number');
@@ -172,6 +184,12 @@ function showAdd(q){
   setTimeout(()=>document.getElementById('f-stem').focus(),300);
 }
 function closeAdd(){document.getElementById('add-ov').classList.remove('on');S.editId=null;}
+
+function toggleGroupStem(){
+  const cb=document.getElementById('f-is-group');
+  const wrap=document.getElementById('f-group-wrap');
+  if(wrap) wrap.classList.toggle('hide',!cb?.checked);
+}
 
 function setQT(t){
   S.qType=t;
@@ -246,6 +264,9 @@ async function saveQ(){
     tags:[],
     note:document.getElementById('f-note').value.trim(),
     isNumberQ:document.getElementById('f-is-number')?.checked||false,
+    groupStem:(document.getElementById('f-is-group')?.checked && document.getElementById('f-group-stem')?.value.trim()) || '',
+    groupId:(document.getElementById('f-is-group')?.checked && document.getElementById('f-group-id')?.value.trim()) || '',
+    groupOrder:parseInt(document.getElementById('f-group-order')?.value)||0,
     relatedLaws,
     starred:false,createdAt:Date.now(),
     reviewLevel:0,nextReview:Date.now(),lastReview:null,
@@ -267,12 +288,13 @@ async function saveQ(){
     data.reviewLevel=ex?.reviewLevel||0;
     data.nextReview=ex?.nextReview||Date.now();
     data.wrongCount=ex?.wrongCount||0;
+    // 編輯時若未勾選題組，保留原 groupId 讓使用者決定（不自動清空）
     data.correctStreak=ex?.correctStreak||0;
     data.difficultyScore=ex?.difficultyScore||5;
   }
   try{
     // 建立搜尋索引（加速搜尋）
-    data.searchBlob=((data.stem||'')+' '+(data.subject||'')+' '+(data.keywords||[]).join(' ')).toLowerCase();
+    data.searchBlob=((data.stem||'')+' '+(data.groupStem||'')+' '+(data.subject||'')+' '+(data.keywords||[]).join(' ')).toLowerCase();
     await dp('questions',data);
     closeAdd();toast(S.editId?'題目已更新 ✓':'題目已儲存 ✓');
   }catch(e){

@@ -45,6 +45,19 @@ if(_qfoot) _qfoot.style.display='';
   document.getElementById('qmeta').textContent=
     [qu.subject,qu.year,qu.num?'第'+qu.num+'題':'',danger].filter(Boolean).join(' · ');
 
+  // 題組共同題幹（有 groupStem 才顯示）
+  const qGroupEl=document.getElementById('q-group-stem');
+  if(qGroupEl){
+    if(qu.groupStem){
+      const orderLabel=qu.groupOrder?`（第 ${qu.groupOrder} 題）`:'';
+      qGroupEl.textContent='【題組共同題幹】'+orderLabel+'\n'+qu.groupStem;
+      qGroupEl.style.display='';
+    } else {
+      qGroupEl.style.display='none';
+      qGroupEl.textContent='';
+    }
+  }
+
   // 題幹
   document.getElementById('qstem').textContent=qu.stem||'';
   document.getElementById('qres').className='qres';
