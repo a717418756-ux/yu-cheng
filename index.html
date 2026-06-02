@@ -25,27 +25,22 @@
 <body>
 
 <!-- SPLASH -->
-<div id="splash">
+<!-- 第一段 splash：大 LOGO 全畫面 -->
+<div id="splash-1">
+  <img id="splash-icon-img" src="splash-logo-icon.png" alt="">
+</div>
+
+<!-- 第二段 splash：門框 + 文字 -->
+<div id="splash-2">
   <div id="splash-stars"></div>
   <div class="splash-streak"></div>
   <div class="splash-streak"></div>
-
-  <!-- 頂部英文標語 -->
   <div id="splash-top">
     <div id="splash-tagline">Become your ideal self.</div>
   </div>
-
-  <!-- 大 LOGO（人形圓圈）-->
-  <div id="splash-icon-wrap">
-    <img id="splash-icon-img" src="splash-logo-icon.png" alt="">
-  </div>
-
-  <!-- 門框水墨圖 -->
   <div id="splash-logo-wrap">
     <img id="splash-logo-img" src="icons/splash-logo.png" alt="">
   </div>
-
-  <!-- 底部文字區 -->
   <div id="splash-text">
     <div id="splash-zh">學習 × 成長 × 行動 × 實現</div>
     <div id="splash-en-sub">LEARN &times; GROW &times; ACT &times; ACHIEVE</div>
@@ -63,7 +58,24 @@
 (function(){
   var stars=document.getElementById('splash-stars');
   if(stars){var f=document.createDocumentFragment();for(var i=0;i<85;i++){var s=document.createElement('div');s.className='splash-star';var sz=(Math.random()*1.4+0.4).toFixed(1);s.style.cssText='left:'+Math.random()*100+'%;top:'+Math.random()*100+'%;width:'+sz+'px;height:'+sz+'px;--d:'+(2.5+Math.random()*4).toFixed(1)+'s;--del:'+(Math.random()*4).toFixed(2)+'s;opacity:'+(0.08+Math.random()*0.35);f.appendChild(s);}stars.appendChild(f);}
-  window._splashDismiss=function(){var el=document.getElementById('splash');if(el){el.classList.add('fade-out');setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},800);}};
+  // 兩段式 splash
+  // 第一段：LOGO 全畫面，顯示 1.5 秒後淡出，淡出完成後顯示第二段
+  var s1=document.getElementById('splash-1');
+  var s2=document.getElementById('splash-2');
+  if(s1&&s2){
+    s2.style.opacity='0';
+    setTimeout(function(){
+      s1.classList.add('fade-out');
+      setTimeout(function(){
+        if(s1.parentNode)s1.parentNode.removeChild(s1);
+        s2.classList.add('splash-2-in');
+      },700);
+    },1500);
+  }
+  window._splashDismiss=function(){
+    var el=document.getElementById('splash-2');
+    if(el){el.classList.add('fade-out');setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},800);}
+  };
 })();
 </script>
 <div id="app">
