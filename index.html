@@ -25,13 +25,7 @@
 <body>
 
 <!-- SPLASH -->
-<!-- 第一段 splash：大 LOGO 全畫面 -->
-<div id="splash-1">
-  <img id="splash-icon-img" src="splash-logo-icon.png" alt="">
-</div>
-
-<!-- 第二段 splash：門框 + 文字 -->
-<div id="splash-2">
+<div id="splash">
   <div id="splash-stars"></div>
   <div class="splash-streak"></div>
   <div class="splash-streak"></div>
@@ -58,45 +52,9 @@
 (function(){
   var stars=document.getElementById('splash-stars');
   if(stars){var f=document.createDocumentFragment();for(var i=0;i<85;i++){var s=document.createElement('div');s.className='splash-star';var sz=(Math.random()*1.4+0.4).toFixed(1);s.style.cssText='left:'+Math.random()*100+'%;top:'+Math.random()*100+'%;width:'+sz+'px;height:'+sz+'px;--d:'+(2.5+Math.random()*4).toFixed(1)+'s;--del:'+(Math.random()*4).toFixed(2)+'s;opacity:'+(0.08+Math.random()*0.35);f.appendChild(s);}stars.appendChild(f);}
-  // 兩段式 splash
-  var s1=document.getElementById('splash-1');
-  var s2=document.getElementById('splash-2');
-  var _s2shown=false;
-
-  // 第一段：1.5s 後淡出，淡出完（700ms）後顯示第二段
-  if(s1&&s2){
-    setTimeout(function(){
-      s1.classList.add('fade-out');
-      setTimeout(function(){
-        if(s1.parentNode) s1.parentNode.removeChild(s1);
-        // requestAnimationFrame 強制 reflow，讓 opacity transition 生效
-        requestAnimationFrame(function(){
-          requestAnimationFrame(function(){
-            s2.classList.add('splash-2-in');
-            // 第二段顯示後 2s 才算 ready
-            setTimeout(function(){ _s2shown=true; },2000);
-          });
-        });
-      },700);
-    },1500);
-  }
-
-  // _splashDismiss：等第二段顯示滿 2s 才關閉，期間首頁不會露出
   window._splashDismiss=function(){
-    function doClose(){
-      var el=document.getElementById('splash-2');
-      if(!el) return;
-      el.classList.add('fade-out');
-      setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); },800);
-    }
-    if(_s2shown){
-      doClose();
-    } else {
-      // 尚未滿 2s，等到 _s2shown 再關
-      var t=setInterval(function(){
-        if(_s2shown){ clearInterval(t); doClose(); }
-      },80);
-    }
+    var el=document.getElementById('splash');
+    if(el){el.classList.add('fade-out');setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},800);}
   };
 })();
 </script>
