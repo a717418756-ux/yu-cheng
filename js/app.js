@@ -268,7 +268,7 @@ function goPage(pg,btn){
 const _splashStart=Date.now();
 
 /* ══════════════════════════════════════════════════════════════
-   主題系統（三模式：dark / light / eink）
+   主題系統（兩模式：dark / eink）
    儲存於 IndexedDB settings store，key: 'displayTheme'
    ══════════════════════════════════════════════════════════════ */
 
@@ -283,17 +283,12 @@ async function setTheme(theme){
 }
 
 function _applyTheme(theme){
-  // 套用到 <html> data-theme 屬性
-  document.documentElement.setAttribute('data-theme', theme === 'dark' ? '' : theme);
-  // 暫存至 localStorage 供早期載入用（避免閃白）
-  try{ localStorage.setItem('_themeCache', theme); }catch(e){}
-
-  // 更新設定頁按鈕狀態
-  ['dark','light','eink'].forEach(t => {
-    const btn = document.getElementById(`theme-btn-${t}`);
-    if(btn) btn.classList.toggle('active', t === theme);
-    const hbtn = document.getElementById(`home-btn-${t}`);
-    if(hbtn) hbtn.classList.toggle('active', t === theme);
+  const t = (theme === 'eink') ? 'eink' : 'dark';
+  document.documentElement.setAttribute('data-theme', t === 'dark' ? '' : t);
+  try{ localStorage.setItem('_themeCache', t); }catch(e){}
+  ['dark','eink'].forEach(th => {
+    const btn = document.getElementById(`theme-btn-${th}`);
+    if(btn) btn.classList.toggle('active', th === t);
   });
 }
 async function init(){  try{
