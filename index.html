@@ -406,6 +406,8 @@
   <div class="qbody" id="qbody">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span id="qbadge" class="badge"></span><span id="qmeta" style="font-size:11px;color:var(--t2)"></span></div>
     <div id="q-type-hint" style="font-size:12px;color:var(--acc);margin-bottom:7px;font-weight:600;min-height:18px"></div>
+    <!-- 題組共同題幹（有 groupStem 才顯示） -->
+    <div id="q-group-stem" style="display:none;background:var(--bg2);border-left:3px solid var(--acc);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:10px;font-size:13px;color:var(--t1);line-height:1.7;white-space:pre-wrap"></div>
     <div class="qstemb" id="qstem"></div>
     <div class="qos" id="qopts"></div>
     <div class="qres" id="qres"></div>
@@ -455,6 +457,21 @@
       <div class="fr fg">
         <div><label class="fl">考試別</label><select id="f-ex"><option value="">選擇</option><option>警佐班</option><option>升官等</option><option>警大二技</option><option>三等考試</option><option>其他</option></select></div>
         <div><label class="fl">題號</label><input id="f-num" placeholder="1"></div>
+      </div>
+      <!-- 題組共同題幹（選填，有填才顯示為題組題） -->
+      <div class="fg">
+        <label class="fl" style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="f-is-group" style="width:16px;height:16px" onchange="toggleGroupStem()">
+          <span>📋 題組題（共同題幹）</span>
+        </label>
+      </div>
+      <div id="f-group-wrap" class="fg hide">
+        <label class="fl">共同題幹 *</label>
+        <textarea id="f-group-stem" rows="4" placeholder="輸入所有子題共用的題幹內容..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div style="flex:1"><label class="fl">題組 ID（同組填相同）</label><input id="f-group-id" placeholder="例：113_1_g1"></div>
+          <div style="width:70px"><label class="fl">第幾題</label><input id="f-group-order" type="number" min="1" placeholder="1"></div>
+        </div>
       </div>
       <div class="fg"><label class="fl">題目內容 *</label><textarea id="f-stem" rows="4" placeholder="輸入或貼上題目..."></textarea></div>
       <div id="mc-opts" class="fg"><label class="fl">選項（點 ✓ 標記正確答案）</label><div id="opts-c"></div></div>
