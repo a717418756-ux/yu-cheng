@@ -565,286 +565,405 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 
-/* ══ 書庫 (books.js) ══════════════════════════════════════════*/
-.books-grid{
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:12px;
-  padding:8px 14px 16px;
-}
-.book-card{
-  background:var(--bg1);
-  border:1px solid rgba(255,255,255,0.07);
-  border-radius:14px;
-  overflow:hidden;
-  display:flex;flex-direction:column;
-}
-.book-cover{
-  width:100%;aspect-ratio:3/4;
-  background:rgba(255,255,255,0.04);
-  cursor:pointer;overflow:hidden;
-}
-.book-cover-img{width:100%;height:100%;object-fit:cover}
-.book-cover-placeholder{
-  width:100%;height:100%;
-  display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:8px;
-  background:linear-gradient(135deg,rgba(37,98,200,0.12),rgba(110,168,254,0.06));
-}
-.bcp-ext{
-  font-size:11px;font-weight:700;letter-spacing:.08em;
-  color:var(--acc);background:rgba(110,168,254,0.15);
-  padding:2px 8px;border-radius:4px;
-}
-.bcp-title{
-  font-size:11px;color:var(--t1);text-align:center;
-  padding:0 8px;line-height:1.4;
-  display:-webkit-box;-webkit-line-clamp:4;
-  -webkit-box-orient:vertical;overflow:hidden;
-}
-.book-info{padding:10px 10px 8px;display:flex;flex-direction:column;gap:4px;flex:1}
-.book-title{
-  font-size:13px;font-weight:700;color:var(--t0);
-  cursor:pointer;line-height:1.35;
-  display:-webkit-box;-webkit-line-clamp:2;
-  -webkit-box-orient:vertical;overflow:hidden;
-}
-.book-author{font-size:11px;color:var(--t2)}
-.book-meta{font-size:10px;color:var(--t2);margin-top:2px}
-.book-actions{display:flex;align-items:center;gap:6px;margin-top:6px}
-.book-act-btn{
-  flex:1;padding:5px 0;border-radius:7px;
-  background:rgba(255,255,255,0.06);
-  border:1px solid rgba(255,255,255,0.09);
-  color:var(--t1);font-size:11px;cursor:pointer;
-}
-.book-act-btn.del{flex:0 0 28px;color:var(--red)}
-.book-act-btn:active{filter:brightness(.8)}
-.book-fav{
-  flex:0 0 28px;padding:5px 0;border-radius:7px;
-  background:none;border:1px solid rgba(255,255,255,0.09);
-  font-size:13px;cursor:pointer;text-align:center;
-}
-.book-fav.on{color:#f5c518}
+/* ══ 書庫 (books.js) — 書架書背模式 ══════════════════════════*/
 
-/* ══ 影音庫 (media.js) ════════════════════════════════════════*/
-.media-sec-title{
-  font-size:12px;font-weight:700;color:var(--t2);
-  letter-spacing:.04em;padding:12px 14px 6px;
+/* ── 書架容器 ─────────────────────────────────────────────── */
+.bookshelf{
+  /* 木紋書架：深色木質感 */
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 139px,
+      rgba(0,0,0,0.55) 139px,
+      rgba(0,0,0,0.55) 159px,
+      rgba(80,40,10,0.35) 159px,
+      rgba(80,40,10,0.35) 161px
+    ),
+    linear-gradient(180deg,#2a1a0a 0%,#3d2510 40%,#2a1a0a 100%);
+  padding:18px 16px 8px;
+  min-height:160px;
+  display:flex;
+  flex-wrap:wrap;
+  align-content:flex-start;
+  gap:4px;
+  row-gap:20px;
+  margin:8px 0 4px;
 }
-/* 影片：海報牆網格 */
-.media-grid-video{
+
+/* ── 書背 ──────────────────────────────────────────────────── */
+.book-spine{
+  border-radius:2px 3px 3px 2px;
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+  flex-shrink:0;
+  box-shadow:
+    2px 2px 6px rgba(0,0,0,0.5),
+    inset -1px 0 2px rgba(0,0,0,0.3),
+    inset 1px 0 1px rgba(255,255,255,0.06);
+  transition:transform .15s, box-shadow .15s, filter .15s;
+}
+.book-spine:active{
+  transform:translateY(-6px) scale(1.04);
+  box-shadow:2px 8px 18px rgba(0,0,0,0.7);
+  filter:brightness(1.15);
+}
+
+/* 書名垂直文字 */
+.spine-label{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  writing-mode:vertical-rl;
+  text-orientation:mixed;
+  font-size:11px;
+  font-weight:600;
+  color:rgba(255,255,255,0.88);
+  letter-spacing:.04em;
+  line-height:1;
+  padding:6px 2px;
+  text-shadow:0 1px 3px rgba(0,0,0,0.8);
+  overflow:hidden;
+  /* 多行書名裁切 */
+  display:-webkit-box;
+  -webkit-line-clamp:6;
+  -webkit-box-orient:vertical;
+  white-space:normal;
+  word-break:break-all;
+}
+
+/* 作者（書背底部小字）*/
+.spine-author{
+  position:absolute;
+  bottom:5px;
+  left:0;right:0;
+  writing-mode:vertical-rl;
+  font-size:8px;
+  color:rgba(255,255,255,0.4);
+  text-align:center;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  padding:0 2px;
+}
+
+/* ── eink 主題：移除陰影動畫 ─────────────────────────────── */
+[data-theme="eink"] .bookshelf{
+  background:#e8e0d0;
+}
+[data-theme="eink"] .book-spine{
+  box-shadow:1px 1px 0 rgba(0,0,0,0.4);
+  transition:none;
+}
+[data-theme="eink"] .book-spine:active{
+  transform:none;filter:none;
+}
+
+/* ── finput（新增書籍表單用）────────────────────────────── */
+.finput{
+  width:100%;box-sizing:border-box;
+  padding:8px 10px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:8px;
+  color:var(--t0);
+  font-size:13px;
+}
+.finput:focus{
+  outline:none;
+  border-color:var(--acc);
+}
+
+/* ══ 影音庫 (media.js) — 黑膠播放器 + 海報牆 ══════════════*/
+
+/* ── 共用 section 標題 ─────────────────────────────────────── */
+.media-sec-hd{
+  font-size:12px;font-weight:700;color:var(--t2);
+  letter-spacing:.06em;text-transform:uppercase;
+  padding:14px 14px 8px;
+}
+
+/* ── 影片海報牆 ─────────────────────────────────────────────── */
+.media-video-grid{
   display:grid;
   grid-template-columns:repeat(2,1fr);
-  gap:10px;padding:0 14px 12px;
+  gap:10px;
+  padding:0 14px 14px;
 }
-.media-card-video{
+.media-vcard{
   background:var(--bg1);
   border:1px solid rgba(255,255,255,0.07);
-  border-radius:12px;overflow:hidden;
+  border-radius:12px;
+  overflow:hidden;
 }
-.mvc-thumb{
+.mvc-poster{
   width:100%;aspect-ratio:16/9;
-  background:rgba(255,255,255,0.04);
-  cursor:pointer;overflow:hidden;position:relative;
+  background:#111;
+  position:relative;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
 }
-.mvc-no-thumb{font-size:32px}
-.mvc-dur{
-  position:absolute;bottom:4px;right:6px;
-  font-size:10px;font-weight:700;color:#fff;
-  background:rgba(0,0,0,0.7);padding:1px 5px;border-radius:4px;
+.mvc-no-poster{font-size:36px}
+.mvc-dur-badge{
+  position:absolute;bottom:5px;right:6px;
+  background:rgba(0,0,0,0.75);color:#fff;
+  font-size:10px;font-weight:700;
+  padding:1px 5px;border-radius:4px;
 }
-.mvc-info{padding:8px 10px 8px}
-.mvc-title{
-  font-size:12px;font-weight:700;color:var(--t0);cursor:pointer;
+.mvc-play-icon{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;color:rgba(255,255,255,0);
+  transition:color .18s;
+}
+.mvc-poster:active .mvc-play-icon{color:rgba(255,255,255,0.85)}
+.mvc-meta-row{
+  display:flex;align-items:center;
+  padding:8px 10px 2px;gap:6px;
+}
+.mvc-title-txt{
+  flex:1;font-size:12px;font-weight:600;color:var(--t0);
+  cursor:pointer;
   display:-webkit-box;-webkit-line-clamp:2;
-  -webkit-box-orient:vertical;overflow:hidden;margin-bottom:3px;
+  -webkit-box-orient:vertical;overflow:hidden;
+  line-height:1.35;
 }
-.mvc-meta{font-size:10px;color:var(--t2);margin-bottom:6px}
-.mvc-actions{display:flex;gap:5px}
-/* 音頻：橫列卡片 */
-.media-list-audio{
-  display:flex;flex-direction:column;gap:8px;
-  padding:0 14px 12px;
+.mvc-cat{font-size:10px;color:var(--t2);padding:2px 10px 8px}
+.mv-fav-btn{
+  background:none;border:none;font-size:16px;
+  cursor:pointer;flex-shrink:0;padding:2px;
 }
-.media-card-audio{
+.mv-fav-btn.on{color:#f5c518}
+
+/* ── 音頻列表（黑膠縮圖列）────────────────────────────────── */
+.media-audio-list{
+  display:flex;flex-direction:column;
+  gap:0;padding:0 14px 16px;
+}
+.media-arow{
   display:flex;align-items:center;gap:12px;
-  background:var(--bg1);
-  border:1px solid rgba(255,255,255,0.07);
-  border-radius:12px;padding:10px 12px;
+  padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  cursor:default;
 }
-.mac-icon{font-size:28px;flex-shrink:0}
-.mac-info{flex:1;cursor:pointer;min-width:0}
-.mac-title{
+.mar-vinyl{
+  width:46px;height:46px;border-radius:50%;
+  background:radial-gradient(circle,#1a1a2e 30%,#111 60%,#1a1a2e 100%);
+  flex-shrink:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  box-shadow:0 2px 8px rgba(0,0,0,0.5);
+  position:relative;
+}
+.mar-vinyl-inner{
+  width:100%;height:100%;border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 50%, #333 0%, #111 30%, #222 55%, #1a1a1a 70%, #111 100%);
+}
+/* 旋轉動畫 */
+@keyframes vinyl-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.mar-vinyl.spinning,.vp-record.spinning{
+  animation:vinyl-spin 2.2s linear infinite;
+}
+.mar-info{flex:1;min-width:0;cursor:pointer}
+.mar-title{
   font-size:13px;font-weight:600;color:var(--t0);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.mac-meta{font-size:10px;color:var(--t2);margin-top:2px}
-.mac-actions{display:flex;gap:5px;flex-shrink:0}
-
-/* ── 展開面板（在 home-zones 下方滑出）── */
-.zone-panel{
-  margin:0 14px;border-radius:14px;overflow:hidden;
-  border:1px solid rgba(255,255,255,0.07);
-  background:rgba(12,12,18,0.6);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  max-height:0;opacity:0;
-  margin-bottom:0;
-  transition:max-height .36s cubic-bezier(.4,0,.2,1),opacity .26s,margin-bottom .36s;
+.mar-title.playing{color:#a855f7}
+.mar-meta{font-size:10px;color:var(--t2);margin-top:2px}
+.mar-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.mar-dur{font-size:11px;color:var(--t2)}
+.mar-del{
+  background:none;border:none;color:var(--t2);
+  font-size:14px;cursor:pointer;padding:2px 4px;
 }
-.zone-panel.open{max-height:720px;opacity:1;margin-bottom:10px}
-.zone-panel-inner{padding:4px 0}
 
-/* 面板主按鈕（測驗 toggle） */
-.zpanel-main{
-  display:flex;align-items:center;gap:13px;
-  padding:13px 15px;cursor:pointer;border:none;
-  background:none;width:100%;text-align:left;
-  border-bottom:1px solid rgba(255,255,255,0.06);
-  transition:background .14s;
+/* ── 黑膠播放器（全螢幕）────────────────────────────────────── */
+.vp-topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px 4px;
+  background:transparent;
 }
-.zpanel-main:active{background:rgba(255,255,255,0.05)}
-.zpanel-main-icon{font-size:22px;flex-shrink:0}
-.zpanel-main-text .t{font-size:13.5px;font-weight:700;color:var(--t0);letter-spacing:.01em}
-.zpanel-main-text .s{font-size:10.5px;color:var(--t2);margin-top:2px}
-.zpanel-main-arrow{margin-left:auto;font-size:13px;color:var(--t2);transition:transform .28s;flex-shrink:0}
-.zpanel-main-arrow.open{transform:rotate(90deg)}
-
-/* 測驗子選單 grid */
-.zpanel-quiz{
-  display:grid;grid-template-columns:1fr 1fr;
-  gap:1px;background:rgba(255,255,255,0.05);
-  max-height:0;overflow:hidden;
-  transition:max-height .3s cubic-bezier(.4,0,.2,1);
+.vp-back{
+  background:none;border:none;
+  color:rgba(255,255,255,0.7);font-size:22px;cursor:pointer;
+  padding:4px 8px;
 }
-.zpanel-quiz.open{max-height:420px}
-.zqb{
-  background:linear-gradient(160deg,rgba(20,30,70,0.55) 0%,rgba(10,15,40,0.35) 100%);
-  border:none;border-top:1px solid rgba(255,255,255,0.05);
-  padding:13px 8px;text-align:center;cursor:pointer;
-  transition:background .16s;position:relative;overflow:hidden;
+.vp-mode-lbl{
+  font-size:13px;font-weight:700;
+  color:rgba(255,255,255,0.85);letter-spacing:.04em;
 }
-.zqb::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(135deg,rgba(110,168,254,0.07) 0%,transparent 60%);
-  pointer-events:none;
+.vp-more{
+  background:none;border:none;
+  color:rgba(255,255,255,0.6);font-size:22px;cursor:pointer;padding:4px 8px;
 }
-.zqb:active{background:linear-gradient(160deg,rgba(37,98,200,0.28) 0%,rgba(20,40,120,0.2) 100%)}
-.zqb-icon{font-size:20px;margin-bottom:4px;display:block}
-.zqb-label{font-size:11.5px;font-weight:700;color:var(--t0);letter-spacing:.01em}
-.zqb-desc{font-size:9.5px;color:var(--t2);margin-top:2px;line-height:1.3}
 
-/* 面板次要列（題目閱覽） */
-.zpanel-row{
-  display:flex;align-items:center;gap:12px;
-  padding:12px 15px;cursor:pointer;border:none;
-  background:none;width:100%;text-align:left;
-  border-top:1px solid rgba(255,255,255,0.06);
-  transition:background .14s;
+/* 唱片台 */
+.vp-vinyl-wrap{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  position:relative;padding:16px;
+  min-height:0;
 }
-.zpanel-row:active{background:rgba(255,255,255,0.05)}
-.zpanel-row-icon{font-size:19px;flex-shrink:0}
-.zpanel-row-text .t{font-size:13px;font-weight:600;color:var(--t0);letter-spacing:.01em}
-.zpanel-row-text .s{font-size:10.5px;color:var(--t2);margin-top:1px}
-
-/* 學習區 wip */
-.zpanel-wip{
-  display:flex;flex-direction:column;align-items:center;
-  padding:28px 20px;gap:8px;text-align:center;
+/* 唱針（CSS純繪製）*/
+.vp-tonearm{
+  position:absolute;top:18%;right:12%;
+  width:2px;height:40%;
+  background:linear-gradient(180deg,#ccc 0%,#888 100%);
+  border-radius:1px;
+  transform-origin:top center;
+  transform:rotate(22deg);
+  z-index:2;
+  box-shadow:0 0 4px rgba(0,0,0,0.5);
 }
-.zpanel-wip-icon{font-size:36px}
-.zpanel-wip-t{font-size:14px;font-weight:700;color:var(--t0);letter-spacing:.01em}
-.zpanel-wip-s{font-size:11.5px;color:var(--t2);line-height:1.65}
-
-/* 閱覽區子選單（zpanel-browse）*/
-.zpanel-browse-sub{
-  display:flex;flex-direction:column;
-  max-height:0;overflow:hidden;
-  transition:max-height .3s cubic-bezier(.4,0,.2,1);
+.vp-tonearm::after{
+  content:'';position:absolute;bottom:-6px;left:-4px;
+  width:10px;height:8px;
+  background:#aaa;border-radius:2px;
 }
-.zpanel-browse-sub.open{max-height:200px}
-.zpanel-browse-opt{
-  display:flex;align-items:center;gap:12px;
-  padding:11px 15px 11px 20px;
-  cursor:pointer;border:none;background:none;
-  width:100%;text-align:left;
-  border-top:1px solid rgba(255,255,255,0.05);
-  background:linear-gradient(90deg,rgba(255,255,255,0.02) 0%,transparent 100%);
-  transition:background .14s;
+/* 黑膠唱片 */
+.vp-record{
+  width:min(72vw,300px);height:min(72vw,300px);
+  border-radius:50%;
+  background:radial-gradient(circle,#2a2a3a 0%,#111 25%,#222 50%,#111 75%,#1a1a1a 100%);
+  position:relative;
+  box-shadow:0 8px 40px rgba(0,0,0,0.8),0 0 0 1px rgba(255,255,255,0.06);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
 }
-.zpanel-browse-opt:active{background:rgba(110,168,254,0.08)}
-.zpanel-browse-opt-icon{font-size:17px;flex-shrink:0}
-.zpanel-browse-opt-text .t{font-size:12.5px;font-weight:600;color:var(--t0)}
-.zpanel-browse-opt-text .s{font-size:10.5px;color:var(--t2);margin-top:1px}
+.vp-record-groove{
+  position:absolute;inset:0;border-radius:50%;
+  background:repeating-radial-gradient(
+    circle at 50%,
+    transparent 0px,transparent 3px,
+    rgba(255,255,255,0.015) 3px,rgba(255,255,255,0.015) 4px
+  );
+}
+.vp-record-label{
+  width:38%;height:38%;border-radius:50%;
+  overflow:hidden;
+  background:linear-gradient(135deg,#1a0a2e,#2a1050);
+  display:flex;align-items:center;justify-content:center;
+  z-index:1;position:relative;
+  box-shadow:0 2px 8px rgba(0,0,0,0.6);
+}
+.vp-label-text{
+  font-size:10px;font-weight:700;color:rgba(255,255,255,0.8);
+  text-align:center;padding:4px;line-height:1.3;
+  word-break:break-all;
+}
+.vp-record-center{
+  position:absolute;width:10px;height:10px;border-radius:50%;
+  background:#888;z-index:2;
+}
 
-/* ── 7. 測驗 ─────────────────────────────────────────────────── */
-#qv{display:none;position:fixed;inset:0;background:var(--bg0);z-index:200;flex-direction:column;max-width:520px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom,0)}
-#qv.on{display:flex}
-.qhd{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid var(--bd);background:var(--bg1)}
-.qpw{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
-.qpb{height:5px;background:var(--acc);border-radius:3px;transition:width .4s}
-.qbody{flex:1;overflow-y:auto;padding:14px 12px}
-.qstemb{font-size:16px;line-height:1.85;color:var(--t0);margin-bottom:16px;font-weight:500;letter-spacing:.01em}
-.qos{display:flex;flex-direction:column;gap:8px}
-.qopt{background:var(--bg1);border:2px solid var(--bd);border-radius:var(--r);padding:12px;display:flex;align-items:flex-start;gap:10px;cursor:pointer;transition:all var(--tr)}
-.qopt.correct{background:rgba(76,175,80,0.14);border-color:var(--grn)}
-.qopt.missed{background:var(--org2);border-color:var(--org);color:var(--org)}
-.qopt.wrong{background:rgba(232,73,68,0.14);border-color:var(--red)}
-.qopt.selected-opt{border-color:var(--acc);background:rgba(110,168,254,.10)}
-.qopt.selected{border-color:var(--acc);background:rgba(88,166,255,.18);transform:scale(.98)}
-.qopt.dim{opacity:.5}
-.qok{width:29px;height:29px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--acc);flex-shrink:0}
-.qopt.correct .qok{background:var(--grn);color:#fff}
-.qopt.wrong .qok{background:var(--red);color:#fff}
-.qov{font-size:14px;line-height:1.6;color:var(--t1);flex:1;padding-top:3px;word-break:break-all}
-.qres{margin-top:12px;padding:12px;border-radius:var(--r);display:none}
-.qres.on{display:block}
-.qres.c{background:var(--grn2);border:1px solid var(--grn)}
-.qres.w{background:var(--red2);border:1px solid var(--red)}
-.qres.r{background:var(--bg2);border:1px solid var(--bd)}
-.qfoot{padding:10px 12px;border-top:1px solid var(--bd);background:var(--bg1);display:flex;gap:7px}
-.qfb{flex:1;padding:14px;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;transition:all var(--tr)}
-.qstar{width:46px;height:46px;border-radius:50%;background:var(--bg2);font-size:19px;border:1px solid var(--bd);color:var(--t2);flex:none}
-.qstar.on{background:var(--org2);border-color:var(--org);color:var(--org)}
-.qnxt{background:var(--acc2);color:#fff}
-.qskip{background:var(--bg2);color:var(--t2)}
-.qdone{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:28px 20px;text-align:center;gap:13px}
-#qv .qhd{border-bottom:1px solid rgba(110,168,254,0.12)}
+/* 曲目資訊 */
+.vp-info{
+  text-align:center;padding:8px 24px 4px;
+}
+.vp-title{
+  font-size:18px;font-weight:700;color:#fff;
+  margin-bottom:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.vp-artist{font-size:13px;color:rgba(255,255,255,0.5)}
 
-/* ── 8. 法規閱讀器 ───────────────────────────────────────────── */
-#lv{display:none;position:fixed;inset:0;background:var(--bg0);z-index:200;flex-direction:column;max-width:520px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom,0)}
-#lv.on{display:flex}
-.lb{flex:1;overflow-y:auto;padding:12px 12px 80px}
+/* 進度條 */
+.vp-progress-wrap{padding:8px 20px 0}
+.vp-seek{
+  -webkit-appearance:none;width:100%;height:3px;
+  background:rgba(255,255,255,0.15);border-radius:2px;
+  cursor:pointer;
+}
+.vp-seek::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:#a855f7;cursor:pointer;
+  box-shadow:0 0 6px rgba(168,85,247,0.6);
+}
+.vp-times{
+  display:flex;justify-content:space-between;
+  font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;
+}
 
-/* ── 9. 彈出層 ───────────────────────────────────────────────── */
-.ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:flex-end;justify-content:center}
-.ov.on{display:flex}
-.sh{background:var(--bg1);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:94vh;overflow-y:auto;padding-bottom:env(safe-area-inset-bottom,16px);animation:sup .23s cubic-bezier(.4,0,.2,1)}
-.shdl{width:36px;height:4px;background:var(--bg3);border-radius:2px;margin:10px auto 6px}
-.sht{font-size:17px;font-weight:700;padding:6px 16px 13px;display:flex;align-items:center;justify-content:space-between}
-.shx{background:var(--bg2);border:none;color:var(--t2);width:27px;height:27px;border-radius:50%;font-size:14px;cursor:pointer}
+/* 主控制列 */
+.vp-controls{
+  display:flex;align-items:center;justify-content:center;
+  gap:28px;padding:12px 0 6px;
+}
+.vpc-btn{
+  background:none;border:none;color:rgba(255,255,255,0.75);
+  font-size:22px;cursor:pointer;padding:6px;
+  transition:color .15s,transform .1s;
+}
+.vpc-btn:active{color:#fff;transform:scale(.9)}
+.vpc-main{
+  width:58px;height:58px;border-radius:50%;
+  background:linear-gradient(135deg,#7c3aed,#a855f7);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;color:#fff;
+  box-shadow:0 4px 20px rgba(168,85,247,0.5);
+}
+.vpc-main:active{transform:scale(.93)}
 
-.cov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:center;justify-content:center;padding:16px}
-.cov.on{display:flex}
-.cbox{background:var(--bg1);border:1px solid var(--bd);border-radius:13px;padding:20px 17px;width:100%;max-width:290px;text-align:center}
-.cbt{font-size:15px;font-weight:700;margin-bottom:6px}
-.cbs{font-size:13px;color:var(--t2);margin-bottom:16px}
-.cbn{display:flex;gap:7px}
+/* 工具列 */
+.vp-tools{
+  display:flex;justify-content:space-around;
+  padding:6px 20px 16px;
+}
+.vpt-btn{
+  background:none;border:none;
+  color:rgba(255,255,255,0.55);font-size:12px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:4px 10px;
+}
+.vpt-btn:active{color:#fff}
 
-/* ── Google Drive 同步 UI ─── */
-#gdrive-status{transition:background .2s}
-#gdrive-backup-btn:disabled,#gdrive-restore-btn:disabled{opacity:.4;cursor:not-allowed}
-/* ── 10. 工具 ────────────────────────────────────────────────── */
-.toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%) translateY(14px);background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:8px 15px;font-size:13px;color:var(--t0);white-space:nowrap;z-index:600;opacity:0;transition:all .27s;pointer-events:none}
-.toast.on{opacity:1;transform:translateX(-50%)}
+/* ── 影片播放器 ─────────────────────────────────────────────── */
+.vvp-topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;background:rgba(0,0,0,0.8);
+}
+.vvp-toolbar{
+  display:flex;align-items:center;justify-content:center;
+  gap:16px;padding:10px;background:rgba(0,0,0,0.8);
+}
 
-@keyframes sup{from{transform:translateY(100%)}to{transform:none}}
-.fdi{animation:fdi .2s ease}
-@keyframes fdi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-
-@supports (height:100dvh){#qv,#lv{height:100dvh}}
-
+/* ── 迷你播放列 ─────────────────────────────────────────────── */
+.media-mini-bar{
+  position:sticky;bottom:0;left:0;right:0;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(20,16,30,0.96);
+  border-top:1px solid rgba(168,85,247,0.25);
+  padding:8px 12px;
+  backdrop-filter:blur(16px);
+  z-index:50;
+}
+.mmb-vinyl{
+  width:40px;height:40px;border-radius:50%;
+  background:radial-gradient(circle,#2a1050,#111);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;cursor:pointer;flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,0,0,0.5);
+}
+.mmb-thumb{
+  width:40px;height:40px;border-radius:8px;
+  background:#111;display:flex;align-items:center;
+  justify-content:center;font-size:18px;cursor:pointer;flex-shrink:0;
+}
+.mmb-info{flex:1;min-width:0;cursor:pointer}
+.mmb-title{
+  font-size:13px;font-weight:600;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.mmb-status{font-size:10px;color:#a855f7;margin-top:1px}
+.mmb-btn{
+  background:none;border:none;color:rgba(255,255,255,0.6);
+  font-size:18px;cursor:pointer;padding:4px 6px;flex-shrink:0;
+}
+.mmb-btn:active{color:#fff}
 
 /* ══════════════════════════════════════════════════════════════
    主題系統補充樣式
