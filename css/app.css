@@ -427,12 +427,15 @@ textarea{resize:vertical;line-height:1.7}
 }
 /* 預設：各佔 1fr（等寬） */
 #zone-exam{flex:1;transition:flex .32s cubic-bezier(.4,0,.2,1)}
+#zone-leisure{flex:1;transition:flex .32s cubic-bezier(.4,0,.2,1)}
 #zone-study{flex:1;transition:flex .32s cubic-bezier(.4,0,.2,1)}
-/* 展開態：目標區 flex:1.85，另一區 flex:0.6 */
-#zone-exam.zone-active{flex:1.85}
-#zone-study.zone-active{flex:1.85}
-#zone-exam.zone-shrink{flex:0.6}
-#zone-study.zone-shrink{flex:0.6}
+/* 展開態：目標區放大，其餘縮小 */
+#zone-exam.zone-active{flex:2.2}
+#zone-leisure.zone-active{flex:2.2}
+#zone-study.zone-active{flex:2.2}
+#zone-exam.zone-shrink{flex:0.55}
+#zone-leisure.zone-shrink{flex:0.55}
+#zone-study.zone-shrink{flex:0.55}
 
 /* zone 卡通用 */
 .zone-card{
@@ -456,6 +459,7 @@ textarea{resize:vertical;line-height:1.7}
 /* 頂部色條 */
 .zone-bar{height:3px;width:100%;border-radius:16px 16px 0 0;flex-shrink:0}
 .zone-exam .zone-bar{background:linear-gradient(90deg,#2562c8,#6ea8fe)}
+.zone-leisure .zone-bar{background:linear-gradient(90deg,#b06a00,#f0a030)}
 .zone-study .zone-bar{background:linear-gradient(90deg,#267a44,#4caf7d)}
 
 /* 卡片內容 */
@@ -471,6 +475,8 @@ textarea{resize:vertical;line-height:1.7}
 
 .zone-exam.zone-active{border-color:rgba(110,168,254,0.32);box-shadow:0 6px 24px rgba(37,98,200,0.22)}
 .zone-exam .zone-title{color:var(--acc)}
+.zone-leisure.zone-active{border-color:rgba(240,160,48,0.32);box-shadow:0 6px 24px rgba(176,106,0,0.22)}
+.zone-leisure .zone-title{color:#f0a030}
 .zone-study.zone-active{border-color:rgba(76,175,125,0.32);box-shadow:0 6px 24px rgba(38,122,68,0.18)}
 .zone-study .zone-title{color:var(--grn)}
 .zone-study-wip{
@@ -836,6 +842,7 @@ textarea{resize:vertical;line-height:1.7}
 }
 [data-theme="eink"] .zone-card.zone-active{ border-color:var(--t0); }
 [data-theme="eink"] .zone-exam .zone-title{ color:var(--t0); }
+[data-theme="eink"] .zone-leisure .zone-title{ color:var(--t0); }
 [data-theme="eink"] .zone-study .zone-title{ color:var(--t0); }
 
 /* 電子紙：zone-panel */
