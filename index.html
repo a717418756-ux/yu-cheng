@@ -81,26 +81,6 @@
     </div>
   </div>
 
-  <!-- 數據橫條：正確率 / 危險題 / 待複習 / 題目數 — 4 格 -->
-  <div class="home-data-bar" id="h-data-bar">
-    <div class="hdb-cell">
-      <div class="hdb-n" id="hdb-rate" style="color:var(--acc)">—</div>
-      <div class="hdb-l">正確率</div>
-    </div>
-    <div class="hdb-cell">
-      <div class="hdb-n" id="hdb-danger" style="color:var(--red)">0</div>
-      <div class="hdb-l">危險題</div>
-    </div>
-    <div class="hdb-cell">
-      <div class="hdb-n" id="hdb-review" style="color:var(--org)">0</div>
-      <div class="hdb-l">待複習</div>
-    </div>
-    <div class="hdb-cell">
-      <div class="hdb-n" id="hdb-q" style="color:var(--t1)">0</div>
-      <div class="hdb-l">題目數</div>
-    </div>
-  </div>
-
   <!-- 三大主區（橫向展縮） -->
   <div class="home-zones">
     <div class="zone-card zone-exam" id="zone-exam" onclick="toggleZone('exam')">
@@ -128,6 +108,56 @@
         <div class="zone-title">學習區</div>
         <div class="zone-desc">課程・音訊・碎片・複習</div>
       </div>
+    </div>
+  </div>
+
+  <!-- 數據橫條 + 熱力圖（三區下方，始終顯示）-->
+  <div class="home-data-bar" id="h-data-bar">
+    <div class="hdb-cell">
+      <div class="hdb-n" id="hdb-rate" style="color:var(--acc)">—</div>
+      <div class="hdb-l">正確率</div>
+    </div>
+    <div class="hdb-cell">
+      <div class="hdb-n" id="hdb-danger" style="color:var(--red)">0</div>
+      <div class="hdb-l">危險題</div>
+    </div>
+    <div class="hdb-cell">
+      <div class="hdb-n" id="hdb-review" style="color:var(--org)">0</div>
+      <div class="hdb-l">待複習</div>
+    </div>
+    <div class="hdb-cell">
+      <div class="hdb-n" id="hdb-q" style="color:var(--t1)">0</div>
+      <div class="hdb-l">題目數</div>
+    </div>
+  </div>
+
+  <!-- 熱力圖（過去35天）-->
+  <div class="heatmap-wrap" id="heatmap-wrap">
+    <div class="heatmap-header">
+      <span class="heatmap-title">學習軌跡</span>
+      <span class="heatmap-sub" id="heatmap-sub">過去35天</span>
+    </div>
+    <div class="heatmap-grid" id="heatmap-grid"></div>
+    <div class="heatmap-legend">
+      <span class="heatmap-legend-l">少</span>
+      <span class="heatmap-dot" style="background:var(--hm0)"></span>
+      <span class="heatmap-dot" style="background:var(--hm1)"></span>
+      <span class="heatmap-dot" style="background:var(--hm2)"></span>
+      <span class="heatmap-dot" style="background:var(--hm3)"></span>
+      <span class="heatmap-dot" style="background:var(--hm4)"></span>
+      <span class="heatmap-legend-l">多</span>
+    </div>
+  </div>
+
+  <!-- 熱力圖點擊視窗（當日圓餅）-->
+  <div class="ov" id="heatmap-ov" onclick="closeHeatmapOv()">
+    <div class="sh" onclick="event.stopPropagation()">
+      <div class="shdl"></div>
+      <div class="sht">
+        <span id="heatmap-ov-date">學習詳情</span>
+        <button class="shx" onclick="closeHeatmapOv()">✕</button>
+      </div>
+      <div id="heatmap-ov-body" style="padding:0 0 20px"></div>
     </div>
   </div>
 
