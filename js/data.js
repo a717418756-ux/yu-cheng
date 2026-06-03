@@ -502,7 +502,8 @@ async function renderDB(){  try{
                         (l.article||'').replace(/\s/g,'').includes('第'+kwArt+'條');
       return nameMatch && artMatch;
     }
-    const h = ((l.lawName||'')+(l.article||'')+(l.title||'')+(l.content||'')+(l.keywords||[]).join(' ')).toLowerCase();
+    // searchBlob 優先（純文字），沒有才 fallback 到欄位拼接（排除 content 避免 base64 拖慢）
+    const h = (l.searchBlob || ((l.lawName||'')+(l.article||'')+(l.title||'')+(l.keywords||[]).join(' '))).toLowerCase();
     return h.includes(kwText);
   });
 
@@ -1165,6 +1166,11 @@ async function saveLaw(){
     data.createdAt=ex?.createdAt||Date.now();
   }
   try{
+    // 建立純文字搜尋索引（排除 base64 圖片 content，加速搜尋）
+    data.searchBlob = [
+      data.lawName, data.article, String(data.articleNumber||''),
+      data.title, (data.keywords||[]).join(' ')
+    ].filter(Boolean).join(' ').toLowerCase();
     await dp('laws',data);
     // 更新制定機關 datalist
     if(data.org){
@@ -1364,6 +1370,13 @@ async function importBulkLaw(){  try{
     // 刪除舊資料
     for(const l of sameGroup) await dd('laws',l.id);
   }
+  // 批量匯入同步建立 searchBlob
+  items.forEach(l => {
+    l.searchBlob = [
+      l.lawName, l.article, String(l.articleNumber||''),
+      l.title, (l.keywords||[]).join(' ')
+    ].filter(Boolean).join(' ').toLowerCase();
+  });
   await bulkPut('laws',items);
   toast('已匯入 '+items.length+' 條法條 ✓');
   closeBulkLaw();

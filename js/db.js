@@ -8,12 +8,23 @@ const DB_NAME = 'Y.C. All-in-one';
 
 const _db = new Dexie(DB_NAME);
 
+// version(1)：原始 schema（不動）
 _db.version(1).stores({
   questions: '++id, subject, createdAt, nextReview, reviewLevel, difficultyScore, type, starred',
   laws:      '++id, lawName, category, articleNumber',
   attempts:  '++id, qid, date, responseTime',
   settings:  'key',
   countdowns:'++id'
+});
+
+// version(2)：新增 ebooks store（學習區電子書）
+_db.version(2).stores({
+  questions: '++id, subject, createdAt, nextReview, reviewLevel, difficultyScore, type, starred',
+  laws:      '++id, lawName, category, articleNumber',
+  attempts:  '++id, qid, date, responseTime',
+  settings:  'key',
+  countdowns:'++id',
+  ebooks:    '++id, title, category, fileType, lastRead, createdAt'
 });
 
 // ── 遺忘曲線間隔 ─────────────────────────────────────────────
@@ -38,8 +49,14 @@ function _cacheGet(key) {
 }
 function _cacheSet(key, data) { _cache[key] = { data, ts: Date.now() }; }
 function _cacheInvalidate(st) {
-  if (st === undefined) { Object.keys(_cache).forEach(k => delete _cache[k]); }
-  else { delete _cache[st]; }
+  if (st === undefined) {
+    Object.keys(_cache).forEach(k => delete _cache[k]);
+  } else {
+    // 清除 store 本身 + 所有以 'store:' 開頭的條件快取
+    Object.keys(_cache).forEach(k => {
+      if (k === st || k.startsWith(st + ':')) delete _cache[k];
+    });
+  }
 }
 
 // ── 錯誤記錄 ─────────────────────────────────────────────────
@@ -58,13 +75,18 @@ function logError(context, err) {
 const dg = (st, k) => _db[st].get(k);
 
 const da = (st, idx, qry) => {
+  // 分條件快取 key：無條件用 store 名，有條件帶入參數
+  const cacheKey = (idx && qry !== undefined) ? `${st}:${idx}=${qry}` : st;
   if (!idx && !qry) {
-    const cached = _cacheGet(st);
+    const cached = _cacheGet(cacheKey);
     if (cached) return Promise.resolve(cached);
-    return _db[st].toArray().then(rows => { _cacheSet(st, rows); return rows; });
+    return _db[st].toArray().then(rows => { _cacheSet(cacheKey, rows); return rows; });
   }
   if (idx && qry !== undefined) {
-    return _db[st].where(idx).equals(qry).toArray();
+    const cached = _cacheGet(cacheKey);
+    if (cached) return Promise.resolve(cached);
+    return _db[st].where(idx).equals(qry).toArray()
+      .then(rows => { _cacheSet(cacheKey, rows); return rows; });
   }
   return _db[st].toArray();
 };
@@ -156,8 +178,50 @@ async function saveCountdowns(list) {
   } catch(e) { logError('saveCountdowns', e); }
 }
 
+
+// ════════════════════════════════════════════════════════════════
+// ebooks helpers（學習區電子書）
+// ════════════════════════════════════════════════════════════════
+
+// 取得電子書列表（不含 blob，避免一次載入所有大檔）
+async function getEbookList() {
+  try {
+    const books = await _db.ebooks.toArray();
+    // 回傳時排除 blob 欄位，只給清單用的 metadata
+    return books.map(({ blob: _b, ...meta }) => meta);
+  } catch(e) { logError('getEbookList', e); return []; }
+}
+
+// 取得單本電子書（含 blob）
+async function getEbook(id) {
+  try { return await dg('ebooks', id); }
+  catch(e) { logError('getEbook', e); return null; }
+}
+
+// 儲存電子書（新增或更新）
+async function saveEbook(book) {
+  try {
+    const key = await dp('ebooks', book);
+    return key;
+  } catch(e) { logError('saveEbook', e); return null; }
+}
+
+// 更新閱讀進度（不重寫整個 blob）
+async function updateEbookProgress(id, lastPage) {
+  try {
+    await _db.ebooks.where('id').equals(id).modify({ lastPage, lastRead: Date.now() });
+    _cacheInvalidate('ebooks');
+  } catch(e) { logError('updateEbookProgress', e); }
+}
+
+// 刪除電子書
+async function deleteEbook(id) {
+  try { await dd('ebooks', id); }
+  catch(e) { logError('deleteEbook', e); }
+}
+
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '1.2.1';       // 程式版本（DB 改名 + SW 更新修正）
+const APP_VERSION  = '1.3.0';       // 程式版本（效能優化 + 休閒區 + ebooks）
 const DATA_VERSION = '1150531-3';   // 題庫版本（題庫/法條資料更新時遞增）

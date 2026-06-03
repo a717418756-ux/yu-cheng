@@ -84,32 +84,29 @@ window._activeZone = null;  // 'exam' | 'study' | null
 let _zoneQuizOpen = false;
 
 function toggleZone(zone){
-  const examCard  = document.getElementById('zone-exam');
-  const studyCard = document.getElementById('zone-study');
-  const examPanel = document.getElementById('panel-exam');
-  const studyPanel= document.getElementById('panel-study');
+  const cards  = ['exam','leisure','study'].map(z=>document.getElementById('zone-'+z));
+  const panels = ['exam','leisure','study'].map(z=>document.getElementById('panel-'+z));
+  const zones  = ['exam','leisure','study'];
 
   if(window._activeZone === zone){
-    // 同區再點 → 收合
+    // 同區再點 → 全部收合
     window._activeZone = null;
-    [examCard,studyCard].forEach(c=>{
-      c.classList.remove('zone-active','zone-shrink');
-    });
-    [examPanel,studyPanel].forEach(p=>p.classList.remove('open'));
+    cards.forEach(c=>c.classList.remove('zone-active','zone-shrink'));
+    panels.forEach(p=>p.classList.remove('open'));
     if(zone==='exam') _closeZoneQuiz();
   } else {
     window._activeZone = zone;
-    const isExam = zone==='exam';
-    // 目標區：放大
-    (isExam?examCard:studyCard).classList.add('zone-active');
-    (isExam?examCard:studyCard).classList.remove('zone-shrink');
-    // 另一區：縮小
-    (isExam?studyCard:examCard).classList.add('zone-shrink');
-    (isExam?studyCard:examCard).classList.remove('zone-active');
-    // 面板
-    (isExam?examPanel:studyPanel).classList.add('open');
-    (isExam?studyPanel:examPanel).classList.remove('open');
-    if(!isExam) _closeZoneQuiz();
+    const idx = zones.indexOf(zone);
+    cards.forEach((c,i)=>{
+      c.classList.remove('zone-active','zone-shrink');
+      if(i===idx) c.classList.add('zone-active');
+      else        c.classList.add('zone-shrink');
+    });
+    panels.forEach((p,i)=>{
+      if(i===idx) p.classList.add('open');
+      else        p.classList.remove('open');
+    });
+    if(zone!=='exam') _closeZoneQuiz();
   }
 }
 
@@ -190,6 +187,7 @@ function _fabItemsForPage(pg){
     case 'stats':  return [_F_HOME,_F_LIST,_F_DB,_F_SET];
     case 'set':    return [_F_HOME];
     case 'bulk':   return [_F_HOME,_F_SET];
+    case 'leisure':return [_F_HOME,_F_SET];
     default:       return [_F_HOME,_F_SET];
   }
 }
