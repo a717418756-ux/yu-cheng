@@ -101,7 +101,7 @@
     </div>
   </div>
 
-  <!-- 兩大主區（橫向展縮） -->
+  <!-- 三大主區（橫向展縮） -->
   <div class="home-zones">
     <div class="zone-card zone-exam" id="zone-exam" onclick="toggleZone('exam')">
       <div class="zone-bar"></div>
@@ -109,6 +109,14 @@
         <div class="zone-icon">📝</div>
         <div class="zone-title">考試區</div>
         <div class="zone-desc">題庫・測驗・弱點・法條</div>
+      </div>
+    </div>
+    <div class="zone-card zone-leisure" id="zone-leisure" onclick="toggleZone('leisure')">
+      <div class="zone-bar"></div>
+      <div class="zone-body">
+        <div class="zone-icon">☕</div>
+        <div class="zone-title">休閒區</div>
+        <div class="zone-desc">放鬆・閱讀・小遊戲</div>
       </div>
     </div>
     <div class="zone-card zone-study" id="zone-study" onclick="toggleZone('study')">
@@ -177,6 +185,17 @@
           <div class="s">弱點分析・正確率・AI備考建議</div>
         </div>
       </button>
+    </div>
+  </div>
+
+  <!-- 休閒區展開面板 -->
+  <div class="zone-panel" id="panel-leisure">
+    <div class="zone-panel-inner">
+      <div class="zpanel-wip">
+        <div class="zpanel-wip-icon">☕</div>
+        <div class="zpanel-wip-t">休閒區</div>
+        <div class="zpanel-wip-s">放鬆・閱讀・小遊戲<br>持續規劃中，敬請期待</div>
+      </div>
     </div>
   </div>
 
