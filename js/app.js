@@ -164,7 +164,7 @@ let _fabOpen=false;
 // ── FAB 項目定義 ──────────────────────────────────────────────
 const _F_HOME  = {pg:'home',  icon:'🏠', label:'首頁'};
 const _F_LIST  = {pg:'list',  icon:'📚', label:'題目管理'};
-const _F_DB    = {pg:'db',    icon:'🗄',  label:'資料庫'};
+const _F_DB    = {pg:'db',    icon:'🗃',  label:'資料庫'};
 const _F_SET   = {pg:'set',   icon:'⚙️', label:'設定'};
 const _F_STATS = {pg:'stats', icon:'📊', label:'分析'};
 
@@ -248,6 +248,8 @@ function fabGo(pg){
 }
 
 function goPage(pg,btn){
+  // bulk 是 overlay，不跳頁，直接開啟後返回
+  if(pg==='bulk'){ openBulkQ(); return; }
   document.querySelectorAll('.page').forEach(p=>p.classList.add('hide'));
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
   const el=document.getElementById('pg-'+pg);if(el)el.classList.remove('hide');
@@ -260,7 +262,6 @@ function goPage(pg,btn){
     db:renderDB,
     stats:renderStats,
     set:renderSet,
-    bulk:()=>{ openBulkQ(); }
   })[pg]?.();
 }
 
