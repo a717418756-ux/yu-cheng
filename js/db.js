@@ -17,14 +17,23 @@ _db.version(1).stores({
   countdowns:'++id'
 });
 
-// version(2)：新增 ebooks store（學習區電子書）
+// version(2)：新增學習區/休閒區 store
 _db.version(2).stores({
-  questions: '++id, subject, createdAt, nextReview, reviewLevel, difficultyScore, type, starred',
-  laws:      '++id, lawName, category, articleNumber',
-  attempts:  '++id, qid, date, responseTime',
-  settings:  'key',
-  countdowns:'++id',
-  ebooks:    '++id, title, category, fileType, lastRead, createdAt'
+  questions:  '++id, subject, createdAt, nextReview, reviewLevel, difficultyScore, type, starred',
+  laws:       '++id, lawName, category, articleNumber',
+  attempts:   '++id, qid, date, responseTime',
+  settings:   'key',
+  countdowns: '++id',
+  // ── 學習區 ──────────────────────────────────────────────
+  // 參考書/教材（PDF/epub，Blob 儲存）
+  refbooks:   '++id, title, category, fileType, lastRead, createdAt',
+  // 學習媒體（影片 or 音檔，二選一，Blob 儲存）
+  learnmedia: '++id, title, mediaType, subject, lastPlay, createdAt',
+  // ── 休閒區 ──────────────────────────────────────────────
+  // 電子書（PDF/epub，Blob 儲存）
+  ebooks:     '++id, title, category, fileType, lastRead, createdAt',
+  // 休閒媒體（影片/音樂，Blob 儲存）
+  leisuremedia:'++id, title, mediaType, lastPlay, createdAt'
 });
 
 // ── 遺忘曲線間隔 ─────────────────────────────────────────────
@@ -223,5 +232,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '1.3.0';       // 程式版本（效能優化 + 休閒區 + ebooks）
+const APP_VERSION  = '1.3.1';       // 程式版本（效能優化 + 休閒區 + ebooks）
 const DATA_VERSION = '1150531-3';   // 題庫版本（題庫/法條資料更新時遞增）

@@ -180,6 +180,7 @@ function _fabItemsForPage(pg){
   switch(pg){
     case 'home':
       if(window._activeZone==='exam')  return [_F_LIST,_F_DB,_F_SET];
+      if(window._activeZone==='leisure') return [_F_SET];
       if(window._activeZone==='study') return [_F_SET];
       return [_F_SET];           // 無選擇
     case 'list':   return [_F_HOME,_F_DB,_F_SET];
