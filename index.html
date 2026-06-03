@@ -222,11 +222,22 @@
   <!-- 休閒區展開面板 -->
   <div class="zone-panel" id="panel-leisure">
     <div class="zone-panel-inner">
-      <div class="zpanel-wip">
-        <div class="zpanel-wip-icon">☕</div>
-        <div class="zpanel-wip-t">休閒區</div>
-        <div class="zpanel-wip-s">電子書・影片・音樂<br>持續規劃中，敬請期待</div>
-      </div>
+      <button class="zpanel-main" onclick="goPage('books',null)">
+        <span class="zpanel-main-icon">📚</span>
+        <div class="zpanel-main-text">
+          <div class="t">書庫</div>
+          <div class="s">電子書・PDF・epub・閱讀進度</div>
+        </div>
+        <span class="zpanel-main-arrow">›</span>
+      </button>
+      <button class="zpanel-main" onclick="goPage('media',null)">
+        <span class="zpanel-main-icon">🎬</span>
+        <div class="zpanel-main-text">
+          <div class="t">影音庫</div>
+          <div class="s">教學影片・音頻課程・錄音</div>
+        </div>
+        <span class="zpanel-main-arrow">›</span>
+      </button>
     </div>
   </div>
 
@@ -351,6 +362,48 @@
 
 
 <!-- SETTINGS -->
+<!-- ══ 書庫頁面 ══ -->
+<div id="pg-books" class="page hide">
+  <div class="hd">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="hd-btn" onclick="goPage('home',null)" style="padding:6px 10px;font-size:13px">← 返回</button>
+      <div class="hdt">書庫</div>
+    </div>
+    <button class="hd-btn blue" onclick="openAddBook()" style="font-size:13px">＋ 新增</button>
+  </div>
+  <div class="sb"><span class="ic">🔍</span><input id="books-si" type="search" placeholder="搜尋書名、作者、分類…" oninput="searchBooks()"></div>
+  <div class="chips" id="books-chips">
+    <button class="chip on" onclick="setBooksFilter(this,'all')">全部</button>
+    <button class="chip" onclick="setBooksFilter(this,'recent')">最近閱讀</button>
+    <button class="chip" onclick="setBooksFilter(this,'fav')">收藏</button>
+    <button class="chip" onclick="setBooksFilter(this,'pdf')">PDF</button>
+    <button class="chip" onclick="setBooksFilter(this,'epub')">ePub</button>
+  </div>
+  <div style="font-size:11px;color:var(--t2);padding:2px 14px 6px" id="books-count"></div>
+  <div id="books-list"></div>
+</div>
+
+<!-- ══ 影音庫頁面 ══ -->
+<div id="pg-media" class="page hide">
+  <div class="hd">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="hd-btn" onclick="goPage('home',null)" style="padding:6px 10px;font-size:13px">← 返回</button>
+      <div class="hdt">影音庫</div>
+    </div>
+    <button class="hd-btn blue" onclick="openAddMedia()" style="font-size:13px">＋ 新增</button>
+  </div>
+  <div class="sb"><span class="ic">🔍</span><input id="media-si" type="search" placeholder="搜尋標題、分類、標籤…" oninput="searchMedia()"></div>
+  <div class="chips" id="media-chips">
+    <button class="chip on" onclick="setMediaFilter(this,'all')">全部</button>
+    <button class="chip" onclick="setMediaFilter(this,'recent')">最近播放</button>
+    <button class="chip" onclick="setMediaFilter(this,'fav')">收藏</button>
+    <button class="chip" onclick="setMediaFilter(this,'video')">影片</button>
+    <button class="chip" onclick="setMediaFilter(this,'audio')">音頻</button>
+  </div>
+  <div style="font-size:11px;color:var(--t2);padding:2px 14px 6px" id="media-count"></div>
+  <div id="media-list"></div>
+</div>
+
 <div id="pg-set" class="page hide">
   <div class="hd"><div class="hdt">設定與資料</div></div>
   <!-- 顯示模式 -->
@@ -684,6 +737,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js"></script>
 <!-- JS 模組（載入順序不可更動）-->
 <script src="js/db.js"></script>
+<script src="js/books.js"></script>
+<script src="js/media.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/quiz.js"></script>
 <script src="js/data.js"></script>
