@@ -260,7 +260,7 @@ function goPage(pg,btn){
     db:renderDB,
     stats:renderStats,
     set:renderSet,
-    bulk:()=>{}
+    bulk:()=>{ openBulkQ(); }
   })[pg]?.();
 }
 

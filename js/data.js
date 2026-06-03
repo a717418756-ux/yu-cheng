@@ -922,7 +922,7 @@ async function delLaw(id){  try{
 async function showAddLaw(l){
   try{
   S.editLawId=l?.id||null;
-  document.getElementById('law-sh-t').textContent=l?'編輯法條':'新增法條';
+  document.getElementById('law-sh-t').textContent=l?'編輯資料':'新增資料';
   document.getElementById('l-name').value=l?.lawName||'';
   document.getElementById('l-art').value=l?.article||'';
   const chEl=document.getElementById('l-chapter');
@@ -1186,6 +1186,17 @@ async function saveLaw(){
   renderDB();
   }catch(e){logError('saveLaw',e);toast('saveLaw 發生錯誤');}
 }
+
+function openBulkQ(){
+  // 填入科目 datalist（與逐一新增共用來源）
+  da('questions').then(qs=>{
+    const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
+    const dl=document.getElementById('bi-subs');
+    if(dl) dl.innerHTML=subs.map(s=>`<option value="${s}">`).join('');
+  }).catch(()=>{});
+  document.getElementById('bulk-ov').classList.add('on');
+}
+function closeBulkQ(){ document.getElementById('bulk-ov').classList.remove('on'); }
 
 function showBulkLaw(){ document.getElementById('blaw-ov').classList.add('on'); }
 function closeBulkLaw(){ document.getElementById('blaw-ov').classList.remove('on'); }
