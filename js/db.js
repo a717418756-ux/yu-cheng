@@ -36,7 +36,7 @@ _db.version(2).stores({
   leisuremedia:'++id, title, mediaType, lastPlay, createdAt',
   // ── 共用：使用時間記錄 ───────────────────────────────────
   // key = 'YYYY-MM-DD:zone'，value 累積秒數
-  usageLogs:  'date+zone, date, zone'
+  usageLogs:  '++id, [date+zone], date, zone'
 });
 
 // ── 遺忘曲線間隔 ─────────────────────────────────────────────
@@ -201,8 +201,10 @@ async function logZoneUsage(zone, seconds) {
   if (!zone || seconds < 1) return;
   const date = today();
   try {
-    const existing = await _db.usageLogs.get({ date, zone });
-    if (existing) {
+    // Dexie 複合索引查詢：where('[date+zone]').equals([date, zone])
+    const rows = await _db.usageLogs.where('[date+zone]').equals([date, zone]).toArray();
+    if (rows.length > 0) {
+      const existing = rows[0];
       await _db.usageLogs.update(existing.id, { seconds: (existing.seconds || 0) + seconds });
     } else {
       await _db.usageLogs.add({ date, zone, seconds });
@@ -270,5 +272,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '1.4.0';       // 程式版本（效能優化 + 休閒區 + ebooks）
+const APP_VERSION  = '1.4.1';       // 程式版本（效能優化 + 休閒區 + ebooks）
 const DATA_VERSION = '1150531-3';   // 題庫版本（題庫/法條資料更新時遞增）

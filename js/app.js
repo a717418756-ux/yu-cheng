@@ -83,6 +83,24 @@ const _debouncedLawBrowseSearch = debounce(renderLawBrowse, 200);
 window._activeZone = null;  // 'exam' | 'study' | null
 let _zoneQuizOpen = false;
 
+// ── 首頁 widget 顯示控制 ────────────────────────────────────
+// show=true：顯示數據橫條+熱力圖（無區域展開狀態）
+// show=false：隱藏熱力圖，考試區顯示數據橫條，其他區隱藏
+function _setHomeWidgets(show, zone){
+  const dataBar   = document.getElementById('h-data-bar');
+  const heatmap   = document.getElementById('heatmap-wrap');
+  if(!dataBar || !heatmap) return;
+  if(show){
+    // 無區展開：兩者都顯示
+    dataBar.style.display  = '';
+    heatmap.style.display  = '';
+  } else {
+    // 有區展開：熱力圖隱藏；數據橫條只在考試區顯示
+    heatmap.style.display  = 'none';
+    dataBar.style.display  = (zone === 'exam') ? '' : 'none';
+  }
+}
+
 // ── 區域計時：記錄每個區域的使用時間 ──────────────────────
 let _zoneTimer = null;
 let _zoneTick  = 0;
@@ -121,6 +139,8 @@ function toggleZone(zone){
     cards.forEach(c=>c.classList.remove('zone-active','zone-shrink'));
     panels.forEach(p=>p.classList.remove('open'));
     if(zone==='exam') _closeZoneQuiz();
+    // 收合：顯示數據橫條 + 熱力圖
+    _setHomeWidgets(true);
   } else {
     // 切換到新區：停止舊區計時，開始新區計時
     _stopZoneTimer();
@@ -137,6 +157,8 @@ function toggleZone(zone){
       else        p.classList.remove('open');
     });
     if(zone!=='exam') _closeZoneQuiz();
+    // 展開：隱藏數據橫條 + 熱力圖（考試區顯示考試數據橫條）
+    _setHomeWidgets(false, zone);
   }
 }
 
@@ -285,7 +307,7 @@ function goPage(pg,btn){
   if(btn)btn.classList.add('on');
   S.page=pg;
   ({
-    home:renderHome,
+    home:()=>{ _setHomeWidgets(true); renderHome(); },
     list:renderList,
     laws:renderDB,
     db:renderDB,
