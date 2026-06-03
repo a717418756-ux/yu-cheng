@@ -202,7 +202,7 @@
         <button class="hd-btn blue plus" id="add-q-btn" onclick="toggleAddQMenu()">＋</button>
         <div id="add-q-menu" style="display:none;position:absolute;top:calc(100% + 7px);right:0;background:var(--bg1);border:1px solid var(--bd);border-radius:10px;padding:5px 0;min-width:148px;box-shadow:0 6px 24px rgba(0,0,0,.5);z-index:260">
           <button onclick="closeAddQMenu();showAdd()" style="width:100%;padding:11px 16px;text-align:left;background:none;border:none;color:var(--t0);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:9px;transition:background .12s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'"><span style="font-size:16px">✏️</span>逐一新增</button>
-          <button onclick="closeAddQMenu();goPage('bulk')" style="width:100%;padding:11px 16px;text-align:left;background:none;border:none;color:var(--t0);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:9px;transition:background .12s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'"><span style="font-size:16px">📋</span>大量新增</button>
+          <button onclick="closeAddQMenu();openBulkQ()" style="width:100%;padding:11px 16px;text-align:left;background:none;border:none;color:var(--t0);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:9px;transition:background .12s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'"><span style="font-size:16px">📋</span>大量新增</button>
         </div>
       </div>
     </div>
@@ -246,31 +246,33 @@
   <div style="font-size:11px;color:var(--t2);padding:4px 12px" id="db-lc"></div>
   <div id="llist"></div>
 </div>
-<!-- BULK -->
-<div id="pg-bulk" class="page hide">
-  <div class="hd"><div><div class="hdt">大量貼題</div><div class="hds">PDF複製文字貼入，自動拆題</div></div></div>
-  <div class="bwrap">
-    <div style="font-size:12px;color:var(--t2);line-height:1.65;padding:4px 0">💡 <b>建議流程</b>：PDF → 貼到 Word → 從 Word 複製 → 貼在此處，選項符號 <span class="tag">(A)</span><span class="tag">A.</span><span class="tag">■▪</span><span class="tag">PDF方塊符號</span> 均支援，題號格式：<span class="tag">1.</span><span class="tag">1、</span><span class="tag">(1)</span><span class="tag">Q1</span></div>
-    <div class="fr">
-      <div><label class="fl">科目</label><input id="bi-sub" placeholder="警察法規" list="bi-subs"><datalist id="bi-subs"></datalist></div>
-      <div><label class="fl">年度</label><input id="bi-yr" placeholder="民國113年"></div>
-    </div>
-    <div class="fr">
-      <div><label class="fl">考試別</label><select id="bi-ex"><option value="">選擇考試</option><option>警佐班</option><option>升官等</option><option>警大二技</option><option>三等考試</option><option>其他</option></select></div>
-      <div><label class="fl">答案列（可空）</label><input id="bi-ans" placeholder="DACB 或 1.D 2.A"></div>
-    </div>
-
-    <div><label class="fl">貼入考題文字</label>
-      <textarea id="bi-text" class="bta" placeholder="1. 下列何者為警察之任務？&#10;▪維持公共秩序&#10;▪保護社會安全&#10;▪防止一切危害&#10;▪以上皆是&#10;&#10;2. 警察法第幾條規定警察任務？"></textarea>
-    </div>
-    <div style="display:flex;gap:7px">
-      <button class="btn bp bw" style="padding:13px;font-size:14px" onclick="parseBulk()">🔍 解析預覽</button>
-      <button class="btn bg" style="padding:13px;white-space:nowrap" onclick="clearBulk()">清除</button>
-    </div>
-    <div id="bulk-result" class="hide">
-      <div id="bulk-stats" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px"></div>
-      <div class="prev-list" id="prev-list"></div>
-      <button class="btn bgrn bw" style="padding:13px;font-size:14px;margin-top:8px" onclick="importBulk()">✓ 批次匯入</button>
+<!-- BULK（overlay，與逐一新增相同樣式）-->
+<div class="ov" id="bulk-ov" onclick="closeBulkQ()">
+  <div class="sh" onclick="event.stopPropagation()">
+    <div class="shdl"></div>
+    <div class="sht"><span>大量新增（題目）</span><button class="shx" onclick="closeBulkQ()">✕</button></div>
+    <div style="padding:0 0 16px">
+      <div style="font-size:12px;color:var(--t2);line-height:1.65;padding:0 0 8px">💡 <b>建議流程</b>：PDF → 貼到 Word → 從 Word 複製 → 貼在此處，選項符號 <span class="tag">(A)</span><span class="tag">A.</span><span class="tag">■▪</span><span class="tag">PDF方塊符號</span> 均支援</div>
+      <div class="fr fg">
+        <div><label class="fl">科目</label><input id="bi-sub" placeholder="警察法規" list="bi-subs"><datalist id="bi-subs"></datalist></div>
+        <div><label class="fl">年度</label><input id="bi-yr" placeholder="民國113年"></div>
+      </div>
+      <div class="fr fg">
+        <div><label class="fl">考試別</label><select id="bi-ex"><option value="">選擇考試</option><option>警佐班</option><option>升官等</option><option>警大二技</option><option>三等考試</option><option>其他</option></select></div>
+        <div><label class="fl">答案列（可空）</label><input id="bi-ans" placeholder="DACB 或 1.D 2.A"></div>
+      </div>
+      <div class="fg"><label class="fl">貼入考題文字</label>
+        <textarea id="bi-text" class="bta" rows="7" placeholder="1. 下列何者為警察之任務？&#10;▪維持公共秩序&#10;▪保護社會安全&#10;▪防止一切危害&#10;▪以上皆是&#10;&#10;2. 警察法第幾條規定警察任務？"></textarea>
+      </div>
+      <div class="fg" style="display:flex;gap:7px">
+        <button class="btn bp bw" style="padding:11px;font-size:14px" onclick="parseBulk()">🔍 解析預覽</button>
+        <button class="btn bg" style="padding:11px;white-space:nowrap" onclick="clearBulk()">清除</button>
+      </div>
+      <div id="bulk-result" class="hide">
+        <div id="bulk-stats" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px"></div>
+        <div class="prev-list" id="prev-list"></div>
+        <button class="btn blue bw" style="padding:13px;font-size:14px;margin-top:8px" onclick="importBulk()">✓ 新增</button>
+      </div>
     </div>
   </div>
 </div>
@@ -492,7 +494,7 @@
 <div class="ov" id="law-ov" onclick="closeLawSh()">
   <div class="sh" onclick="event.stopPropagation()">
     <div class="shdl"></div>
-    <div class="sht"><span id="law-sh-t">新增法條</span><button class="shx" onclick="closeLawSh()">✕</button></div>
+    <div class="sht"><span id="law-sh-t">新增資料</span><button class="shx" onclick="closeLawSh()">✕</button></div>
     <div style="padding:0 0 16px">
       <div class="fr fg">
         <div><label class="fl">法律名稱</label><input id="l-name" placeholder="警察職權行使法"></div>
@@ -523,7 +525,7 @@
       <div class="fg"><label class="fl">備註</label><textarea id="l-note" rows="2" placeholder="個人標記、補充說明..."></textarea></div>
       <div class="fg" style="display:flex;gap:7px">
         <button class="btn bg" style="flex:1;padding:12px" onclick="closeLawSh()">取消</button>
-        <button class="btn bpur" style="flex:2;padding:12px;font-size:15px" onclick="saveLaw()">儲存法條</button>
+        <button class="btn blue" style="flex:2;padding:12px;font-size:15px" onclick="saveLaw()">儲存資料</button>
       </div>
     </div>
   </div>
@@ -532,7 +534,7 @@
 <div class="ov" id="blaw-ov" onclick="closeBulkLaw()">
   <div class="sh" onclick="event.stopPropagation()">
     <div class="shdl"></div>
-    <div class="sht"><span>批次匯入法條</span><button class="shx" onclick="closeBulkLaw()">✕</button></div>
+    <div class="sht"><span>大量新增（資料）</span><button class="shx" onclick="closeBulkLaw()">✕</button></div>
     <div style="padding:0 0 16px">
       <div class="fr fg">
         <div><label class="fl">法律名稱</label><input id="bl-name" placeholder="警察職權行使法"></div>
@@ -545,7 +547,7 @@
       <div id="bl-prev" style="font-size:12px;color:var(--t2);min-height:20px;padding:4px 12px;line-height:1.8"></div>
       <div class="fg" style="display:flex;gap:7px;margin-top:4px">
         <button class="btn bg" style="flex:1;padding:11px" onclick="prevBulkLaw()">🔍 預覽</button>
-        <button class="btn bpur" style="flex:2;padding:11px;font-size:14px" onclick="importBulkLaw()">✓ 批次匯入</button>
+        <button class="btn blue" style="flex:2;padding:11px;font-size:14px" onclick="importBulkLaw()">✓ 新增</button>
       </div>
     </div>
   </div>
