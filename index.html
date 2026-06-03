@@ -146,7 +146,7 @@
       </div>
       <!-- 閱覽區（含子選單） -->
       <button class="zpanel-row" onclick="toggleBrowseSub()">
-        <span class="zpanel-row-icon">🗂</span>
+        <span class="zpanel-row-icon">📖</span>
         <div class="zpanel-row-text">
           <div class="t">閱覽區</div>
           <div class="s">題目閱覽・資料閱覽</div>
@@ -155,14 +155,14 @@
       </button>
       <div class="zpanel-browse-sub" id="browse-sub-menu">
         <button class="zpanel-browse-opt" onclick="openBrowse()">
-          <span class="zpanel-browse-opt-icon">📋</span>
+          <span class="zpanel-browse-opt-icon">📝</span>
           <div class="zpanel-browse-opt-text">
             <div class="t">題目閱覽</div>
             <div class="s">瀏覽全部題目・依年度科目篩選</div>
           </div>
         </button>
         <button class="zpanel-browse-opt" onclick="openLawBrowse()">
-          <span class="zpanel-browse-opt-icon">⚖️</span>
+          <span class="zpanel-browse-opt-icon">📖</span>
           <div class="zpanel-browse-opt-text">
             <div class="t">資料閱覽</div>
             <div class="s">查詢已輸入的法條資料庫</div>
@@ -271,7 +271,7 @@
       <div id="bulk-result" class="hide">
         <div id="bulk-stats" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px"></div>
         <div class="prev-list" id="prev-list"></div>
-        <button class="btn blue bw" style="padding:13px;font-size:14px;margin-top:8px" onclick="importBulk()">✓ 新增</button>
+        <button class="btn blue bw" style="padding:13px;font-size:14px;margin-top:8px;background:rgba(37,98,200,0.85);color:#fff;border:1px solid rgba(110,168,254,0.45)" onclick="importBulk()">✓ 新增</button>
       </div>
     </div>
   </div>
@@ -378,7 +378,7 @@
 <nav class="nav">
   <button class="nb on" onclick="goPage('home',this)"><span class="ic">🏠</span>首頁</button>
   <button class="nb" onclick="goPage('list',this)"><span class="ic">📚</span>題目</button>
-  <button class="nb" onclick="goPage('db',this)"><span class="ic">🗄</span>資料庫</button>
+  <button class="nb" onclick="goPage('db',this)"><span class="ic">🗃</span>資料庫</button>
   <button class="nb" onclick="goPage('stats',this)"><span class="ic">📊</span>分析</button>
   <button class="nb" onclick="goPage('set',this)"><span class="ic">⚙️</span>設定</button>
 </nav>
@@ -525,7 +525,7 @@
       <div class="fg"><label class="fl">備註</label><textarea id="l-note" rows="2" placeholder="個人標記、補充說明..."></textarea></div>
       <div class="fg" style="display:flex;gap:7px">
         <button class="btn bg" style="flex:1;padding:12px" onclick="closeLawSh()">取消</button>
-        <button class="btn blue" style="flex:2;padding:12px;font-size:15px" onclick="saveLaw()">儲存資料</button>
+        <button class="btn blue" style="flex:2;padding:12px;font-size:15px;background:rgba(37,98,200,0.85);color:#fff;border:1px solid rgba(110,168,254,0.45)" onclick="saveLaw()">儲存資料</button>
       </div>
     </div>
   </div>
@@ -547,7 +547,7 @@
       <div id="bl-prev" style="font-size:12px;color:var(--t2);min-height:20px;padding:4px 12px;line-height:1.8"></div>
       <div class="fg" style="display:flex;gap:7px;margin-top:4px">
         <button class="btn bg" style="flex:1;padding:11px" onclick="prevBulkLaw()">🔍 預覽</button>
-        <button class="btn blue" style="flex:2;padding:11px;font-size:14px" onclick="importBulkLaw()">✓ 新增</button>
+        <button class="btn blue" style="flex:2;padding:11px;font-size:14px;background:rgba(37,98,200,0.85);color:#fff;border:1px solid rgba(110,168,254,0.45)" onclick="importBulkLaw()">✓ 新增</button>
       </div>
     </div>
   </div>
