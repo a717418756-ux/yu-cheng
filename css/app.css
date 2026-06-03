@@ -200,6 +200,11 @@ textarea{resize:vertical;line-height:1.7}
   border:1px solid rgba(154,126,219,0.28);
 }
 .bpur:active{background:rgba(154,126,219,0.18)}
+.btn.blue{
+  background:rgba(110,168,254,0.15);color:var(--acc);
+  border:1px solid rgba(110,168,254,0.35);
+}
+.btn.blue:active{background:rgba(110,168,254,0.25)}
 .bw{width:100%}
 
 .hd-btn{display:inline-flex;align-items:center;justify-content:center;height:34px;min-width:34px;padding:0 12px;font-size:12.5px;font-weight:600;border-radius:8px;white-space:nowrap;cursor:pointer;border:none;transition:opacity .12s,background .12s;letter-spacing:.1px}
@@ -307,8 +312,8 @@ textarea{resize:vertical;line-height:1.7}
 /* 資料庫（紫） */
 #pg-db .hd-btn.blue{background:rgba(37,98,200,0.85);border-color:rgba(110,168,254,0.4)}
 #pg-db .hd-btn.red{background:rgba(180,50,50,0.18);border-color:rgba(207,71,71,0.3)}
-#pg-db .chip.on{background:rgba(154,126,219,0.15);color:var(--pur);border-color:var(--pur)}
-#pg-db .sb input:focus{border-color:var(--pur)}
+#pg-db .chip.on{background:rgba(110,168,254,0.12);color:var(--acc);border-color:var(--acc)}
+#pg-db .sb input:focus{border-color:var(--acc)}
 
 /* 分析（綠） */
 #pg-stats .hd-btn.blue{background:rgba(76,175,80,0.2);color:var(--grn);border-color:var(--grn)}
