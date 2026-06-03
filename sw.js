@@ -3,7 +3,7 @@
    ★ 每次更新程式只需修改 APP_VERSION
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '1.1.7';
+const APP_VERSION = '1.1.9';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 快取資源（不包含 index.html）────────────────────────────
@@ -12,6 +12,7 @@ const ASSETS = [
   './manifest.json',
   './css/app.css',
   './css/splash.css',
+  'https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js',
   './js/db.js',
   './js/utils.js',
   './js/quiz.js',
@@ -33,12 +34,13 @@ const ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js'
 ];
 
-/* ── 安裝：預快取，完成後立即進入 waiting ── */
+/* ── 安裝：預快取後進入 waiting，等待使用者確認才接管 ── */
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())   // 不等舊 SW 結束，直接進 waiting
+    // ★ 不呼叫 skipWaiting()：新 SW 進入 waiting 狀態，
+    //   等使用者按「立即更新」後由主頁面透過 postMessage 觸發。
   );
 });
 
