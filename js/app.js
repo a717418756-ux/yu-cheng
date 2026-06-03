@@ -83,19 +83,49 @@ const _debouncedLawBrowseSearch = debounce(renderLawBrowse, 200);
 window._activeZone = null;  // 'exam' | 'study' | null
 let _zoneQuizOpen = false;
 
+// ── 區域計時：記錄每個區域的使用時間 ──────────────────────
+let _zoneTimer = null;
+let _zoneTick  = 0;
+
+function _startZoneTimer(zone){
+  _stopZoneTimer();
+  _zoneTick = Date.now();
+  _zoneTimer = setInterval(()=>{
+    // 每60秒寫入一次，避免過於頻繁寫 DB
+    const elapsed = Math.round((Date.now() - _zoneTick) / 1000);
+    if(elapsed >= 60){
+      logZoneUsage(zone, elapsed).catch(()=>{});
+      _zoneTick = Date.now();
+    }
+  }, 10000); // 每10秒檢查一次
+}
+
+function _stopZoneTimer(){
+  if(_zoneTimer){ clearInterval(_zoneTimer); _zoneTimer=null; }
+  if(_zoneTick > 0 && window._activeZone){
+    const elapsed = Math.round((Date.now() - _zoneTick) / 1000);
+    if(elapsed >= 3) logZoneUsage(window._activeZone, elapsed).catch(()=>{});
+    _zoneTick = 0;
+  }
+}
+
 function toggleZone(zone){
   const cards  = ['exam','leisure','study'].map(z=>document.getElementById('zone-'+z));
   const panels = ['exam','leisure','study'].map(z=>document.getElementById('panel-'+z));
   const zones  = ['exam','leisure','study'];
 
   if(window._activeZone === zone){
-    // 同區再點 → 全部收合
+    // 同區再點 → 全部收合，停止計時
+    _stopZoneTimer();
     window._activeZone = null;
     cards.forEach(c=>c.classList.remove('zone-active','zone-shrink'));
     panels.forEach(p=>p.classList.remove('open'));
     if(zone==='exam') _closeZoneQuiz();
   } else {
+    // 切換到新區：停止舊區計時，開始新區計時
+    _stopZoneTimer();
     window._activeZone = zone;
+    _startZoneTimer(zone);
     const idx = zones.indexOf(zone);
     cards.forEach((c,i)=>{
       c.classList.remove('zone-active','zone-shrink');
@@ -264,6 +294,12 @@ function goPage(pg,btn){
   })[pg]?.();
 }
 
+
+// 頁面背景/關閉時停止計時
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden) _stopZoneTimer();
+  else if(window._activeZone) _startZoneTimer(window._activeZone);
+});
 
 const _splashStart=Date.now();
 

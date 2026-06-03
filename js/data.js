@@ -52,6 +52,9 @@ async function renderHome(){  try{
   _set('hdb-danger',  dangerQ);
   _set('hdb-review',  reviewDue);
 
+  // 熱力圖
+  renderHeatmap();
+
   // 考試倒數
   renderCountdown();
 
@@ -66,6 +69,122 @@ async function renderHome(){  try{
   const expEl=document.getElementById('exp-info');
   if(expEl)expEl.textContent=`題目 ${qs.length} 筆・法條 ${ls.length} 筆・作答 ${ats.length} 筆`;
   }catch(e){ logError('renderHome',e); }}
+
+// ── 熱力圖渲染 ───────────────────────────────────────────────
+const _HM_COLS = 35;  // 顯示35天
+
+async function renderHeatmap(){
+  const grid = document.getElementById('heatmap-grid');
+  if(!grid) return;
+
+  const logs = await getUsageLogs(_HM_COLS);
+
+  // 建立日期→秒數 map
+  const dayMap = {};
+  logs.forEach(l => {
+    dayMap[l.date] = (dayMap[l.date] || 0) + (l.seconds || 0);
+  });
+
+  // 最大值（用於色階計算）
+  const maxSec = Math.max(...Object.values(dayMap), 1);
+
+  const today_ = today();
+  const cells = [];
+  for(let i = _HM_COLS - 1; i >= 0; i--){
+    const d = new Date(Date.now() - i * 86400000);
+    const dateStr = d.toISOString().slice(0, 10);
+    const sec = dayMap[dateStr] || 0;
+    const level = sec === 0 ? 0 : Math.min(4, Math.ceil(sec / maxSec * 4));
+    const isToday = dateStr === today_;
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd_ = String(d.getDate()).padStart(2,'0');
+    cells.push({ dateStr, sec, level, isToday, label: `${mm}/${dd_}` });
+  }
+
+  grid.innerHTML = cells.map(c =>
+    `<div class="hm-cell${c.isToday?' hm-today':''}"
+      style="background:var(--hm${c.level})"
+      title="${c.label}"
+      onclick="openHeatmapOv('${c.dateStr}','${c.label}')"></div>`
+  ).join('');
+}
+
+// 開啟熱力圖日期視窗
+async function openHeatmapOv(dateStr, label){
+  const ov  = document.getElementById('heatmap-ov');
+  const ttl = document.getElementById('heatmap-ov-date');
+  const body= document.getElementById('heatmap-ov-body');
+  if(!ov||!ttl||!body) return;
+
+  ttl.textContent = label + ' 學習詳情';
+  body.innerHTML = '<div style="text-align:center;padding:16px;color:var(--t2);font-size:12px">載入中…</div>';
+  ov.classList.add('on');
+
+  const logs = await getDayUsage(dateStr);
+  const ZONE_CFG = {
+    exam:    { label:'考試區', color:'#6ea8fe' },
+    leisure: { label:'休閒區', color:'#ffb340' },
+    study:   { label:'學習區', color:'#4caf7d' },
+  };
+
+  if(!logs.length){
+    body.innerHTML = '<div class="hm-ov-empty">📭 這天沒有記錄</div>';
+    return;
+  }
+
+  const total = logs.reduce((s,l) => s + (l.seconds||0), 0);
+  const fmt = s => s >= 3600
+    ? `${Math.floor(s/3600)}h ${Math.floor(s%3600/60)}m`
+    : `${Math.floor(s/60)}m ${s%60}s`;
+
+  // 計算圓餅（SVG）
+  const R = 52, CX = 64, CY = 64;
+  let startAngle = -Math.PI / 2;
+  const slices = logs.map(l => ({
+    ...l, ...ZONE_CFG[l.zone],
+    pct: (l.seconds||0) / total
+  }));
+
+  function polarToXY(angle){
+    return [CX + R * Math.cos(angle), CY + R * Math.sin(angle)];
+  }
+
+  let svgPaths = '';
+  slices.forEach(s => {
+    const angle = s.pct * Math.PI * 2;
+    const [x1,y1] = polarToXY(startAngle);
+    const [x2,y2] = polarToXY(startAngle + angle);
+    const large = angle > Math.PI ? 1 : 0;
+    svgPaths += `<path d="M${CX},${CY} L${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} Z"
+      fill="${s.color}" opacity="0.9"/>`;
+    startAngle += angle;
+  });
+
+  const legendHTML = slices.map(s =>
+    `<div class="hm-pie-item">
+      <div class="hm-pie-dot" style="background:${s.color}"></div>
+      <div class="hm-pie-label">${s.label}</div>
+      <div class="hm-pie-val">${fmt(s.seconds||0)} (${Math.round(s.pct*100)}%)</div>
+    </div>`
+  ).join('');
+
+  body.innerHTML = `
+    <div class="hm-ov-total">總計 ${fmt(total)}</div>
+    <div class="hm-pie-wrap">
+      <svg width="128" height="128" viewBox="0 0 128 128">
+        ${svgPaths}
+        <circle cx="${CX}" cy="${CY}" r="28" fill="var(--bg0)"/>
+        <text x="${CX}" y="${CY}" text-anchor="middle" dominant-baseline="central"
+          style="font-size:11px;fill:var(--t1);font-weight:700">${fmt(total)}</text>
+      </svg>
+      <div class="hm-pie-legend">${legendHTML}</div>
+    </div>`;
+}
+
+function closeHeatmapOv(){
+  const ov = document.getElementById('heatmap-ov');
+  if(ov) ov.classList.remove('on');
+}
 
 async function renderList(){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);

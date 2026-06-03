@@ -33,7 +33,10 @@ _db.version(2).stores({
   // 電子書（PDF/epub，Blob 儲存）
   ebooks:     '++id, title, category, fileType, lastRead, createdAt',
   // 休閒媒體（影片/音樂，Blob 儲存）
-  leisuremedia:'++id, title, mediaType, lastPlay, createdAt'
+  leisuremedia:'++id, title, mediaType, lastPlay, createdAt',
+  // ── 共用：使用時間記錄 ───────────────────────────────────
+  // key = 'YYYY-MM-DD:zone'，value 累積秒數
+  usageLogs:  'date+zone, date, zone'
 });
 
 // ── 遺忘曲線間隔 ─────────────────────────────────────────────
@@ -188,6 +191,41 @@ async function saveCountdowns(list) {
 }
 
 
+
+// ════════════════════════════════════════════════════════════════
+// usageLogs helpers（三區使用時間記錄）
+// ════════════════════════════════════════════════════════════════
+
+// 記錄使用秒數（累加）
+async function logZoneUsage(zone, seconds) {
+  if (!zone || seconds < 1) return;
+  const date = today();
+  try {
+    const existing = await _db.usageLogs.get({ date, zone });
+    if (existing) {
+      await _db.usageLogs.update(existing.id, { seconds: (existing.seconds || 0) + seconds });
+    } else {
+      await _db.usageLogs.add({ date, zone, seconds });
+    }
+    _cacheInvalidate('usageLogs');
+  } catch(e) { logError('logZoneUsage', e); }
+}
+
+// 取得過去 N 天的所有記錄
+async function getUsageLogs(days = 35) {
+  try {
+    const from = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+    return await _db.usageLogs.where('date').aboveOrEqual(from).toArray();
+  } catch(e) { logError('getUsageLogs', e); return []; }
+}
+
+// 取得指定日期的各區時間
+async function getDayUsage(date) {
+  try {
+    return await _db.usageLogs.where('date').equals(date).toArray();
+  } catch(e) { return []; }
+}
+
 // ════════════════════════════════════════════════════════════════
 // ebooks helpers（學習區電子書）
 // ════════════════════════════════════════════════════════════════
@@ -232,5 +270,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '1.3.1';       // 程式版本（效能優化 + 休閒區 + ebooks）
+const APP_VERSION  = '1.4.0';       // 程式版本（效能優化 + 休閒區 + ebooks）
 const DATA_VERSION = '1150531-3';   // 題庫版本（題庫/法條資料更新時遞增）
