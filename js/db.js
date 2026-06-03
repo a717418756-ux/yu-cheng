@@ -39,6 +39,22 @@ _db.version(2).stores({
   usageLogs:  '++id, [date+zone], date, zone'
 });
 
+// version(3)：ebooks/leisuremedia 補充索引，新增 favorites store
+_db.version(3).stores({
+  questions:   '++id, subject, createdAt, nextReview, reviewLevel, difficultyScore, type, starred',
+  laws:        '++id, lawName, category, articleNumber',
+  attempts:    '++id, qid, date, responseTime',
+  settings:    'key',
+  countdowns:  '++id',
+  refbooks:    '++id, title, category, fileType, lastRead, createdAt',
+  learnmedia:  '++id, title, mediaType, subject, lastPlay, createdAt',
+  // ebooks：補充 author、tags 索引（搜尋用）
+  ebooks:      '++id, title, author, category, fileType, lastRead, createdAt, favorite',
+  // leisuremedia：補充 type、tags 索引（影片/音頻篩選用）
+  leisuremedia:'++id, title, type, category, lastPlay, createdAt, favorite',
+  usageLogs:   '++id, [date+zone], date, zone'
+});
+
 // ── 遺忘曲線間隔 ─────────────────────────────────────────────
 const REVIEW_INTERVALS = [1, 3, 7, 14, 30, 60, 180];
 
@@ -272,5 +288,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '1.4.1';       // 程式版本（效能優化 + 休閒區 + ebooks）
+const APP_VERSION  = '1.5.0';       // 程式版本（效能優化 + 休閒區 + ebooks）
 const DATA_VERSION = '1150531-3';   // 題庫版本（題庫/法條資料更新時遞增）

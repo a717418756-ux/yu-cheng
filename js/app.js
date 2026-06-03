@@ -87,17 +87,18 @@ let _zoneQuizOpen = false;
 // show=true：顯示數據橫條+熱力圖（無區域展開狀態）
 // show=false：隱藏熱力圖，考試區顯示數據橫條，其他區隱藏
 function _setHomeWidgets(show, zone){
-  const dataBar   = document.getElementById('h-data-bar');
-  const heatmap   = document.getElementById('heatmap-wrap');
+  const dataBar = document.getElementById('h-data-bar');
+  const heatmap = document.getElementById('heatmap-wrap');
   if(!dataBar || !heatmap) return;
   if(show){
-    // 無區展開：兩者都顯示
-    dataBar.style.display  = '';
-    heatmap.style.display  = '';
+    // 無區展開：只顯示熱力圖，數據橫條屬於考試區不顯示
+    dataBar.style.display = 'none';
+    heatmap.style.display = '';
   } else {
-    // 有區展開：熱力圖隱藏；數據橫條只在考試區顯示
-    heatmap.style.display  = 'none';
-    dataBar.style.display  = (zone === 'exam') ? '' : 'none';
+    // 有區展開：熱力圖隱藏
+    heatmap.style.display = 'none';
+    // 數據橫條只在考試區顯示
+    dataBar.style.display = (zone === 'exam') ? '' : 'none';
   }
 }
 
@@ -241,6 +242,8 @@ function _fabItemsForPage(pg){
     case 'set':    return [_F_HOME];
     case 'bulk':   return [_F_HOME,_F_SET];
     case 'leisure':return [_F_HOME,_F_SET];
+    case 'books':  return [_F_HOME,_F_SET];
+    case 'media':  return [_F_HOME,_F_SET];
     default:       return [_F_HOME,_F_SET];
   }
 }
@@ -313,6 +316,8 @@ function goPage(pg,btn){
     db:renderDB,
     stats:renderStats,
     set:renderSet,
+    books:renderBooks,
+    media:renderMedia,
   })[pg]?.();
 }
 
