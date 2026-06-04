@@ -3,7 +3,7 @@
    ★ 每次更新程式只需修改 APP_VERSION
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '1.7.8';
+const APP_VERSION = '1.7.9';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗會重試）────────────
@@ -32,6 +32,7 @@ const OPTIONAL_ASSETS = [
   './icons/icon-512.png',
   './splash-logo-icon.png',
   'https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js',
+  './js/jszip.min.js',
   './js/epub.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
 ];
