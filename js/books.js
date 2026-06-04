@@ -298,6 +298,18 @@ function _mkSpine(b, dispW, dispH){
     }
   }
 
+  // 收藏角標（右下角，不在批量模式時顯示）
+  if(!_B.bulkMode){
+    const favBadge = document.createElement('div');
+    favBadge.style.cssText = `position:absolute;bottom:3px;right:2px;z-index:5;
+      cursor:pointer;font-size:10px;line-height:1;text-align:center;
+      transition:transform .15s;`;
+    favBadge.textContent = b.favorite ? '♥' : '♡';
+    favBadge.style.color = b.favorite ? '#ec4899' : 'rgba(255,255,255,0.25)';
+    favBadge.onclick = e => { e.stopPropagation(); _quickToggleBookFav(b.id, favBadge); };
+    div.appendChild(favBadge);
+  }
+
   // 批量模式：勾選；一般模式：抽書動畫
   if(_B.bulkMode){
     div.style.cursor='pointer';
@@ -344,8 +356,18 @@ function _mkCoverGrid(books, total){
     const name=document.createElement('div');
     name.className='shelf-cover-name';
     name.textContent=b.title||'未命名';
+    // 底部操作列
+    const actions=document.createElement('div');
+    actions.style.cssText='display:flex;align-items:center;justify-content:center;margin-top:2px';
+    const favBtn=document.createElement('button');
+    favBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:14px;padding:2px 6px';
+    favBtn.textContent=b.favorite?'♥':'♡';
+    favBtn.style.color=b.favorite?'#ec4899':'rgba(255,255,255,0.3)';
+    favBtn.onclick=e=>{e.stopPropagation();_quickToggleBookFav(b.id,favBtn);};
+    actions.appendChild(favBtn);
     card.appendChild(img);
     card.appendChild(name);
+    card.appendChild(actions);
     grid.appendChild(card);
   });
   return grid;
@@ -380,8 +402,14 @@ function _mkListView(books, total){
       ${pct>0?`<div class="shelf-list-progress">
         <div class="shelf-list-progress-fill" style="width:${pct}%"></div>
       </div>`:''}`;
+    const favBtn=document.createElement('button');
+    favBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:18px;padding:8px;flex-shrink:0';
+    favBtn.textContent=b.favorite?'♥':'♡';
+    favBtn.style.color=b.favorite?'#ec4899':'rgba(255,255,255,0.25)';
+    favBtn.onclick=e=>{e.stopPropagation();_quickToggleBookFav(b.id,favBtn);};
     item.appendChild(cover);
     item.appendChild(info);
+    item.appendChild(favBtn);
     wrap.appendChild(item);
   });
   return wrap;
@@ -699,12 +727,24 @@ async function downloadBook(id){
 }
 
 async function toggleBookFav(id,btn){
+  await _quickToggleBookFav(id,btn);
+}
+
+// 快速收藏切換（只更新按鈕外觀，不重渲染整頁）
+async function _quickToggleBookFav(id, btn){
   try{
     const book=await dg('ebooks',id); if(!book) return;
     book.favorite=!book.favorite; await dp('ebooks',book);
     const idx=_B.allBooks.findIndex(b=>b.id===id);
     if(idx>=0) _B.allBooks[idx].favorite=book.favorite;
-  }catch(e){logError('toggleBookFav',e);}
+    // 更新按鈕外觀
+    if(btn){
+      btn.textContent=book.favorite?'♥':'♡';
+      btn.style.color=book.favorite?'#ec4899':'rgba(255,255,255,0.3)';
+    }
+    // 若目前在收藏模式，重渲染
+    if(_B.filter==='fav') _renderBooksPage();
+  }catch(e){logError('_quickToggleBookFav',e);}
 }
 
 async function confirmDeleteBook(id){
@@ -754,7 +794,8 @@ async function openBookReader(id){
             background:var(--reader-bg,#111);display:flex;flex-direction:column">
             <!-- epub.js 渲染區 -->
             <div id="epub-viewer"
-              style="flex:1;overflow:hidden;position:relative"></div>
+              style="flex:1;overflow:hidden;position:relative;
+              height:0;min-height:0"></div>
             <!-- 左右翻頁觸控區 -->
             <div id="epub-prev-zone"
               style="position:absolute;left:0;top:0;width:30%;height:100%;
@@ -865,14 +906,20 @@ async function _initEpubReader(url, savedCfi){
   }
 
   try{
-    const book = ePub(url);
+    // epub.js 對 blob:// URL 支援不穩定，改用 ArrayBuffer 方式
+    const resp = await fetch(url);
+    const buf  = await resp.arrayBuffer();
+    const book = ePub(buf);
     window._epubBook = book;
 
+    // 取得容器實際高度（epub.js 需要明確像素高度）
+    const viewerEl = document.getElementById('epub-viewer');
+    const viewerH = viewerEl ? viewerEl.parentElement.clientHeight - 40 : window.innerHeight - 120;
     const rendition = book.renderTo('epub-viewer', {
-      width:  '100%',
-      height: '100%',
-      spread: 'none',      // 手機單頁模式
-      flow:   'paginated', // 分頁模式
+      width:  viewerEl ? viewerEl.clientWidth || (window.innerWidth) : window.innerWidth,
+      height: Math.max(400, viewerH),
+      spread: 'none',
+      flow:   'paginated',
     });
     window._epubRendition = rendition;
 

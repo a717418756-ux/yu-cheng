@@ -616,10 +616,15 @@ function _showVinylPlayer(meta, url, full){
         </svg>
       </button>
       <button class="vpc-btn vpc-sm" onclick="_vpSleepTimer(this)" id="vp-sleep-btn"
-        style="color:rgba(255,255,255,0.35)">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        style="color:rgba(255,255,255,0.35);
+          display:flex;flex-direction:column;align-items:center;gap:2px;
+          min-width:32px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
+        <span id="vp-sleep-lbl"
+          style="font-size:9px;line-height:1;white-space:nowrap;
+          display:block;text-align:center;max-width:36px">定時</span>
       </button>
     </div>
 
@@ -981,7 +986,9 @@ function _vpCycleSpeed(btn){
   const cur=_audioEl.playbackRate;
   const nxt=speeds[(speeds.indexOf(cur)+1)%speeds.length];
   _audioEl.playbackRate=nxt;
-  btn.textContent=nxt+'×';
+  const sp = btn.querySelector('span') || btn;
+  sp.textContent = nxt+'×';
+  sp.style.color = nxt!==1 ? '#ffffff' : 'rgba(255,255,255,0.6)';
 }
 function _vpSleepTimer(btn){
   const opts=[15,30,60,0];
@@ -989,15 +996,21 @@ function _vpSleepTimer(btn){
   const nxt=opts[(opts.indexOf(cur)+1)%opts.length];
   btn.dataset.min=nxt;
   if(_sleepTimer){clearTimeout(_sleepTimer);_sleepTimer=null;}
+  const lbl = document.getElementById('vp-sleep-lbl');
   if(nxt>0){
-    btn.textContent=`⏱ ${nxt}分`;
+    if(lbl){ lbl.textContent=nxt+'分'; }
+    btn.style.color='#fff';
     _sleepTimer=setTimeout(()=>{
       if(_audioEl) _audioEl.pause();
       _stopVinylSpin();
-      document.getElementById('vp-play-btn').textContent='▶';
+      _setPlayIcon(false);
+      if(lbl) lbl.textContent='定時';
+      btn.style.color='rgba(255,255,255,0.35)';
+      btn.dataset.min='0';
     },nxt*60000);
   } else {
-    btn.textContent='⏱ 定時';
+    if(lbl) lbl.textContent='定時';
+    btn.style.color='rgba(255,255,255,0.35)';
   }
 }
 
