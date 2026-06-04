@@ -190,12 +190,24 @@ function _renderExpandMode(el){
   } else if(type==='audio'){
     items=items.filter(m=>m.type==='audio').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     title='音頻';
+  } else if(type==='search'){
+    title=`搜尋「${_M.kw}」`;
+  }
+  // 套用搜尋關鍵字（所有模式）
+  if(_M.kw){
+    const kw=_M.kw.toLowerCase();
+    items=items.filter(m=>
+      (m.title||'').toLowerCase().includes(kw)||
+      (m.category||'').toLowerCase().includes(kw)||
+      (m.tags||[]).join(' ').toLowerCase().includes(kw)
+    );
   }
 
   el.innerHTML='';
 
   // 頂部：標題 + 返回首頁 + 類別篩選（影片/音頻模式下）
   const isFavMode = (type==='fav');
+  const isSearchMode = (type==='search');
   const hd = document.createElement('div');
   hd.className='media-expand-hd';
   hd.innerHTML=`
@@ -204,7 +216,7 @@ function _renderExpandMode(el){
     <button class="media-expand-bulk" id="bulk-btn"
       onclick="_toggleBulkMode()"
       style="font-size:12px;font-weight:600;color:var(--acc);background:none;border:none;cursor:pointer;padding:4px 8px">
-      ${isFavMode?'批量移除':'批量刪除'}
+      ${isSearchMode?'':isFavMode?'批量移除':'批量刪除'}
     </button>`;
   el.appendChild(hd);
 
@@ -520,14 +532,14 @@ function _showVinylPlayer(meta, url, full){
       </div>
     </div>
 
-    <!-- ── 曲目資訊 + 喜愛 ── -->
+    <!-- ── 曲目資訊 + 喜愛（稍微靠左）── -->
     <div class="vp-info">
       <div class="vp-info-text">
         <div class="vp-title">${esc(meta.title||'未命名')}</div>
         <div class="vp-artist">${esc(meta.category||'Y.C. 影音庫')}</div>
       </div>
       <button class="vp-fav-btn${isFav?' on':''}" id="vp-fav-btn"
-        onclick="_vpToggleFav(${meta.id},this)">
+        onclick="_vpToggleFav(${meta.id},this)" style="margin-right:12px">
         <svg width="22" height="22" viewBox="0 0 24 24"
           fill="${isFav?'#ec4899':'none'}"
           stroke="${isFav?'#ec4899':'rgba(255,255,255,0.4)'}" stroke-width="2">
@@ -547,8 +559,12 @@ function _showVinylPlayer(meta, url, full){
       </div>
     </div>
 
-    <!-- ── 控制按鈕（循環 / 上首 / 播放暫停 / 下首 / 隨機）── -->
+    <!-- ── 控制列：倍速 | 循環 | ⏮ | ⏸(大) | ⏭ | 隨機 | 定時 ── -->
     <div class="vp-controls">
+      <button class="vpc-btn vpc-sm vpt-speed-btn" onclick="_vpCycleSpeed(this)"
+        style="display:flex;flex-direction:column;align-items:center;gap:2px">
+        <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">1.0×</span>
+      </button>
       <button id="vp-loop-btn" class="vpc-btn vpc-sm"
         onclick="_vpToggleLoop(this)" style="color:rgba(255,255,255,0.35)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -584,20 +600,16 @@ function _showVinylPlayer(meta, url, full){
           <line x1="15" y1="15" x2="21" y2="21"/>
         </svg>
       </button>
-    </div>
-
-    <!-- ── 工具列 ── -->
-    <div class="vp-tools">
-      <button class="vpt-btn" onclick="_vpCycleSpeed(this)">
-        <span class="vpt-icon" style="font-size:13px;font-weight:700">1.0×</span>
-        <span class="vpt-lbl">倍速</span>
-      </button>
-      <button class="vpt-btn" onclick="_vpSleepTimer(this)" id="vp-sleep-btn">
-        <svg class="vpt-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <button class="vpc-btn vpc-sm" onclick="_vpSleepTimer(this)" id="vp-sleep-btn"
+        style="color:rgba(255,255,255,0.35)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
-        <span class="vpt-lbl">定時</span>
       </button>
+    </div>
+
+    <!-- ── 工具列：播放列表（展開在進度條下方）── -->
+    <div class="vp-tools" style="justify-content:center">
       <button class="vpt-btn" onclick="openVpPlaylist()">
         <svg class="vpt-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
@@ -608,6 +620,8 @@ function _showVinylPlayer(meta, url, full){
         <span class="vpt-lbl">播放列表</span>
       </button>
     </div>
+    <!-- 播放列表容器（在工具列上方展開，不蓋到控制列）-->
+    <div id="vp-playlist-wrap" style="overflow:hidden;flex-shrink:0;max-height:0;transition:max-height .3s ease"></div>
 
     <!-- 隱藏 audio 元素 -->
     <audio id="vp-audio" src="${url}" style="display:none"></audio>`;
@@ -983,13 +997,15 @@ function _vpSleepTimer(btn){
 
 // 播放列表彈窗
 function openVpPlaylist(){
-  const existing=document.getElementById('vp-playlist-panel');
-  if(existing){existing.remove();return;}
+  const wrap = document.getElementById('vp-playlist-wrap');
+  if(!wrap) return;
+  const isOpen = wrap.style.maxHeight !== '0px' && wrap.style.maxHeight !== '';
+  if(isOpen){ wrap.style.maxHeight='0'; wrap.innerHTML=''; return; }
+  // 展開播放列表
   const panel=document.createElement('div');
   panel.id='vp-playlist-panel';
-  panel.style.cssText=`position:absolute;bottom:0;left:0;right:0;
-    background:rgba(20,16,30,0.97);border-top:1px solid rgba(255,255,255,0.1);
-    max-height:55%;overflow-y:auto;z-index:10;padding-bottom:16px`;
+  panel.style.cssText=`background:rgba(12,10,20,0.98);border-top:1px solid rgba(255,255,255,0.08);
+    max-height:220px;overflow-y:auto;padding-bottom:8px`;
   panel.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;
       padding:12px 16px 8px;position:sticky;top:0;background:rgba(20,16,30,0.97)">
@@ -1012,7 +1028,9 @@ function openVpPlaylist(){
         </div>
         ${m.duration?`<div style="font-size:11px;color:rgba(255,255,255,0.4)">${_fmtDur(m.duration)}</div>`:''}
       </div>`).join('')}`;
-  document.getElementById('vinyl-player-ov').appendChild(panel);
+  wrap.innerHTML = '';
+  wrap.appendChild(panel);
+  wrap.style.maxHeight = '220px';
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1083,15 +1101,15 @@ function _openVideoMenu(id, btn){
     <div style="width:100%;max-width:520px;margin:0 auto;
       background:var(--bg1);border-radius:20px 20px 0 0;padding:8px 0 32px">
       <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:10px auto 8px"></div>
+      <button onclick="openMediaDetail(${id});document.getElementById('video-menu-sheet').remove()"
+        style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;
+        color:var(--t0);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:12px">
+        <span style="font-size:18px">ℹ</span>詳細資料
+      </button>
       <button onclick="_vvpToggleFavMenu(${id},this)"
         style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;
         color:var(--t0);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:12px">
         <span id="vvp-menu-fav-icon" style="font-size:18px">♡</span>收藏
-      </button>
-      <button onclick="downloadMedia(${id});document.getElementById('video-menu-sheet').remove()"
-        style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;
-        color:var(--t0);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:12px">
-        <span style="font-size:18px">⬇</span>下載
       </button>
       <div style="height:1px;background:rgba(255,255,255,0.06);margin:4px 0"></div>
       <button onclick="confirmDeleteMedia(${id});document.getElementById('video-menu-sheet').remove()"
@@ -1462,7 +1480,15 @@ function _filterToType(type){
 }
 function searchMedia(){
   _M.kw=(document.getElementById('media-si')?.value||'').trim();
-  _M.page=0;_renderMediaPage();
+  _M.page=0;
+  if(_M.kw){
+    // 有關鍵字：進入搜尋展開模式
+    _M.expandMode='search';
+  } else if(_M.expandMode==='search'){
+    // 清空搜尋：回首頁
+    _M.expandMode=null;
+  }
+  _renderMediaPage();
 }
 
 // ════════════════════════════════════════════════════════════
