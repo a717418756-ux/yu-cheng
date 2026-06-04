@@ -96,7 +96,7 @@ function _renderMediaPage(){
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
 
   if(recent.length) el.appendChild(_mkHScrollSection('最近播放','recent',recent));
-  if(favs.length)   el.appendChild(_mkHScrollSection('收藏','fav',favs));
+  el.appendChild(_mkHScrollSection('收藏','fav',favs));  // 無收藏也顯示（空狀態）
   if(videos.length) el.appendChild(_mkHScrollSection('影片','video',videos));
   if(audios.length) el.appendChild(_mkHScrollSection('音頻','audio',audios));
 }
@@ -112,6 +112,15 @@ function _mkHScrollSection(title, type, items){
     <div class="media-sec-hd-big">${title}</div>
     <button class="media-sec-more" onclick="_openExpandMode('${type}')">更多 ›</button>`;
   sec.appendChild(hd);
+
+  if(!items.length){
+    // 空狀態
+    const empty = document.createElement('div');
+    empty.style.cssText='padding:12px 14px 18px;font-size:12px;color:var(--t2)';
+    empty.textContent = title==='收藏' ? '尚未收藏任何影音' : '尚無內容';
+    sec.appendChild(empty);
+    return sec;
+  }
 
   const row = document.createElement('div');
   row.className='media-hscroll-row';
@@ -372,9 +381,12 @@ function _showVinylPlayer(meta, url, full){
       <div style="text-align:center">
         <div class="vp-mode-lbl">黑膠模式</div>
       </div>
-      <button class="vp-more" onclick="openMediaDetail(${meta.id})">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+      <button class="vp-more" id="vp-top-fav" onclick="_vpToggleFav(${meta.id},this)"
+        style="color:${isFav?'#ec4899':'rgba(255,255,255,0.7)'}">
+        <svg width="20" height="20" viewBox="0 0 24 24"
+          fill="${isFav?'#ec4899':'none'}"
+          stroke="currentColor" stroke-width="2">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/>
         </svg>
       </button>
     </div>
@@ -425,17 +437,12 @@ function _showVinylPlayer(meta, url, full){
       </div>
     </div>
 
-    <!-- ── 控制按鈕（圖三風格）── -->
+    <!-- ── 控制按鈕（上首 / 播放暫停 / 下首）── -->
     <div class="vp-controls">
-      <button class="vpc-btn vpc-side" onclick="" title="循環" style="opacity:.45;cursor:default">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-          <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-        </svg>
-      </button>
       <button class="vpc-btn vpc-side" onclick="_vpPrev()">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-          <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/>
+          <polygon points="19 20 9 12 19 4 19 20"/>
+          <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/>
         </svg>
       </button>
       <button class="vpc-btn vpc-main" id="vp-play-btn" onclick="_vpToggle()">
@@ -445,13 +452,8 @@ function _showVinylPlayer(meta, url, full){
       </button>
       <button class="vpc-btn vpc-side" onclick="_vpNext()">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-          <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/>
-        </svg>
-      </button>
-      <button class="vpc-btn vpc-side" onclick="" title="隨機" style="opacity:.45;cursor:default">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
-          <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+          <polygon points="5 4 15 12 5 20 5 4"/>
+          <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/>
         </svg>
       </button>
     </div>
@@ -497,7 +499,15 @@ function _showVinylPlayer(meta, url, full){
       try{ navigator.mediaSession.setPositionState({duration:_audioEl.duration,position:_audioEl.currentTime||0}); }catch(_){}
     }
   };
-  _audioEl.onended=_vpNext;
+  _audioEl.onended=()=>{
+    // 播放列表只有1首時，停在最後不跳 miniBar
+    if(_M.playlist.length>1){
+      _vpNext();
+    } else {
+      _setPlayIcon(false);
+      _stopVinylSpin();
+    }
+  };
   _audioEl.play().then(()=>{
     _setPlayIcon(true);
     _startVinylSpin();
@@ -822,7 +832,7 @@ async function playVideo(id){
     <div class="vvp-topbar">
       <button class="vvp-back" onclick="closeVideoPlayer(${id})">←</button>
       <div class="vvp-title">${esc(full.title||'影片')}</div>
-      <button class="vvp-more" onclick="openMediaDetail(${id})">⋮</button>
+      <button class="vvp-more" onclick="downloadMedia(${id})">⬇</button>
     </div>
     <div style="flex:1;position:relative;background:#000;display:flex;align-items:center">
       <video id="video-el" controls playsinline preload="metadata"
@@ -834,13 +844,10 @@ async function playVideo(id){
         <span class="vvp-tool-val">1.0×</span>
         <span class="vvp-tool-lbl">倍速</span>
       </button>
-      <button class="vvp-tool-btn" onclick="downloadMedia(${id})">
-        <span class="vvp-tool-val">⬇</span>
-        <span class="vvp-tool-lbl">下載</span>
-      </button>
-      <button class="vvp-tool-btn" onclick="openMediaDetail(${id})">
-        <span class="vvp-tool-val">⋮</span>
-        <span class="vvp-tool-lbl">更多</span>
+      <button class="vvp-tool-btn" id="vvp-fav-btn" onclick="_vvpToggleFav(${id},this)"
+        style="color:${full.favorite?'#ec4899':'rgba(255,255,255,0.8)'}">
+        <span class="vvp-tool-val" style="font-size:18px">${full.favorite?'♥':'♡'}</span>
+        <span class="vvp-tool-lbl">${full.favorite?'已收藏':'收藏'}</span>
       </button>
     </div>`;
 
@@ -866,6 +873,23 @@ function _vvpCycleSpeed(btn){
   vidEl.playbackRate = nxt;
   const span = btn.querySelector('span');
   if(span) span.textContent = nxt.toFixed(2).replace('.00','').replace(/\.?0+$/,'');
+}
+
+async function _vvpToggleFav(id, btn){
+  try{
+    const m = await dg('leisuremedia', id);
+    if(!m) return;
+    m.favorite = !m.favorite;
+    await dp('leisuremedia', m);
+    const icon = document.getElementById('vvp-fav-icon');
+    if(icon) icon.textContent = m.favorite ? '♥' : '♡';
+    const lbl = btn.querySelector('.vvp-tool-lbl');
+    if(lbl) lbl.textContent = m.favorite ? '已收藏' : '收藏';
+    btn.style.color = m.favorite ? '#ec4899' : '';
+    const idx = _M.allMedia.findIndex(x=>x.id===id);
+    if(idx>=0) _M.allMedia[idx].favorite = m.favorite;
+    toast(m.favorite ? '已加入收藏' : '已取消收藏');
+  }catch(e){ logError('_vvpToggleFav',e); }
 }
 
 async function closeVideoPlayer(id){
@@ -1096,31 +1120,55 @@ function _compressMediaThumb(file){
 async function openMediaDetail(id){
   const m=await dg('leisuremedia',id);
   if(!m){toast('找不到');return;}
+  document.getElementById('media-detail-ov')?.remove();
   const ov=document.createElement('div');
   ov.id='media-detail-ov';
   ov.style.cssText='position:fixed;inset:0;z-index:700;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end';
+  const favColor = m.favorite ? '#ec4899' : 'rgba(255,255,255,0.7)';
+  const favTxt   = m.favorite ? '♥ 已收藏' : '♡ 收藏';
   ov.innerHTML=`
     <div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);
       border-radius:20px 20px 0 0;padding:20px 16px 32px">
       <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 14px"></div>
       <div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:4px">${esc(m.title||'')}</div>
-      <div style="font-size:11px;color:var(--t2);margin-bottom:14px">
+      <div style="font-size:11px;color:var(--t2);margin-bottom:16px">
         ${m.type==='video'?'🎬 影片':'🎵 音頻'} · ${m.category||'未分類'} · ${_fmtSize(m.fileSize||0)}
       </div>
-      <div style="display:flex;gap:8px">
-        <button onclick="document.getElementById('media-detail-ov').remove()"
-          style="flex:1;padding:11px;background:rgba(255,255,255,0.06);border:1px solid var(--bd);
-          color:var(--t1);border-radius:10px;cursor:pointer;font-size:13px">關閉</button>
-        ${m.blob?`<button onclick="downloadMedia(${id})"
-          style="flex:1;padding:11px;background:rgba(37,98,200,0.85);color:#fff;
-          border:none;border-radius:10px;cursor:pointer;font-size:13px">⬇ 下載</button>`:''}
-        <button onclick="confirmDeleteMedia(${id})"
-          style="flex:1;padding:11px;background:rgba(200,50,50,0.7);color:#fff;
-          border:none;border-radius:10px;cursor:pointer;font-size:13px">🗑 刪除</button>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px">
+          <button id="det-fav-btn" onclick="_detailToggleFav(${id},this)"
+            style="flex:1;padding:11px;background:rgba(255,255,255,0.06);border:1px solid var(--bd);
+            color:${favColor};border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">
+            ${favTxt}</button>
+          ${m.blob?`<button onclick="downloadMedia(${id})"
+            style="flex:1;padding:11px;background:rgba(37,98,200,0.85);color:#fff;
+            border:none;border-radius:10px;cursor:pointer;font-size:13px">⬇ 下載</button>`:''}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="document.getElementById('media-detail-ov').remove()"
+            style="flex:1;padding:11px;background:rgba(255,255,255,0.06);border:1px solid var(--bd);
+            color:var(--t1);border-radius:10px;cursor:pointer;font-size:13px">關閉</button>
+          <button onclick="confirmDeleteMedia(${id})"
+            style="flex:1;padding:11px;background:rgba(200,50,50,0.7);color:#fff;
+            border:none;border-radius:10px;cursor:pointer;font-size:13px">🗑 刪除</button>
+        </div>
       </div>
     </div>`;
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
   document.body.appendChild(ov);
+}
+
+async function _detailToggleFav(id, btn){
+  try{
+    const m = await dg('leisuremedia',id); if(!m) return;
+    m.favorite = !m.favorite;
+    await dp('leisuremedia', m);
+    btn.textContent = m.favorite ? '♥ 已收藏' : '♡ 收藏';
+    btn.style.color = m.favorite ? '#ec4899' : 'rgba(255,255,255,0.7)';
+    const idx = _M.allMedia.findIndex(x=>x.id===id);
+    if(idx>=0) _M.allMedia[idx].favorite = m.favorite;
+    toast(m.favorite ? '已加入收藏' : '已取消收藏');
+  }catch(e){ logError('_detailToggleFav',e); }
 }
 
 async function downloadMedia(id){
