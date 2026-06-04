@@ -623,11 +623,11 @@ function _showVinylPlayer(meta, url, full){
       </button>
     </div>
 
-    <!-- 播放列表容器（在控制列下方展開，不蓋工具列）-->
+    <!-- 播放列表容器（在控制列下方展開）-->
     <div id="vp-playlist-wrap"
       style="overflow:hidden;flex-shrink:0;max-height:0;
-             transition:max-height .28s ease;margin-top:4px;
-             border-top:1px solid rgba(255,255,255,0)"></div>
+             transition:max-height .3s cubic-bezier(.4,0,.2,1);
+             margin-top:20px"></div>
 
     <!-- 隱藏 audio 元素 -->
     <audio id="vp-audio" src="${url}" style="display:none"></audio>`;
@@ -1012,16 +1012,38 @@ function openVpPlaylist(){
   const panel = document.createElement('div');
   panel.id = 'vp-playlist-panel';
   panel.style.cssText = `
-    background:rgba(10,10,14,0.95);
-    border-top:1px solid rgba(255,255,255,0.07);
-    border-bottom:1px solid rgba(255,255,255,0.07);
-    padding:14px 0 14px;`;
+    background:rgba(8,8,12,0.97);
+    border-top:2px solid rgba(255,255,255,0.08);
+    padding:0 0 20px;`;
+
+  // 標題列
+  const titleBar = document.createElement('div');
+  titleBar.style.cssText = `
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px 10px;
+    border-bottom:1px solid rgba(255,255,255,0.05);`;
+  const _listCategory = _M.playlist[0]?.category || '';
+  titleBar.innerHTML = `
+    <div>
+      <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.85);
+        margin-bottom:2px">
+        ${_listCategory ? esc(_listCategory) : '播放清單'}
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.35)">
+        共 ${_M.playlist.length} 首
+      </div>
+    </div>
+    <button onclick="openVpPlaylist()"
+      style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+      color:rgba(255,255,255,0.4);width:28px;height:28px;border-radius:50%;
+      font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>`;
+  panel.appendChild(titleBar);
 
   // 橫向捲動列
   const row = document.createElement('div');
   row.style.cssText = `
-    display:flex;flex-direction:row;align-items:center;gap:10px;
-    padding:0 14px;
+    display:flex;flex-direction:row;align-items:center;gap:12px;
+    padding:14px 16px 0;
     overflow-x:auto;overflow-y:hidden;
     scrollbar-width:none;-webkit-overflow-scrolling:touch;`;
 
@@ -1078,7 +1100,7 @@ function openVpPlaylist(){
   panel.appendChild(row);
   wrap.innerHTML = '';
   wrap.appendChild(panel);
-  wrap.style.maxHeight = '170px';
+  wrap.style.maxHeight = '240px';
 
   // 捲動到當前播放項目
   setTimeout(()=>{

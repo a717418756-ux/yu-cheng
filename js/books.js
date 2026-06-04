@@ -5,12 +5,14 @@
 
 // ── 狀態 ────────────────────────────────────────────────────
 const _B = {
-  filter:   'all',   // all | recent | fav | pdf | epub
-  kw:       '',
-  page:     0,
-  PAGE:     30,
-  allBooks: [],
-  mode:     'spine', // spine | cover | list
+  filter:    'all',
+  kw:        '',
+  page:      0,
+  PAGE:      30,
+  allBooks:  [],
+  mode:      'spine',
+  bulkMode:  false,
+  bulkSelected: new Set(),
 };
 
 // ── 尺寸換算 ─────────────────────────────────────────────────
@@ -93,6 +95,23 @@ function _renderBooksPage(){
   if(_B.mode === 'spine')      el.appendChild(_mkShelf(batch, filtered.length));
   else if(_B.mode === 'cover') el.appendChild(_mkCoverGrid(batch, filtered.length));
   else                          el.appendChild(_mkListView(batch, filtered.length));
+
+  // 批量模式：底部確認列
+  if(_B.bulkMode){
+    const bar=document.createElement('div');
+    bar.style.cssText=`position:sticky;bottom:0;background:var(--bg1);
+      border-top:1px solid rgba(255,255,255,0.08);
+      padding:12px 14px;display:flex;gap:10px;z-index:10`;
+    bar.innerHTML=`
+      <button onclick="toggleBooksBulk(document.getElementById('books-bulk-btn'))"
+        style="flex:1;padding:11px;background:rgba(255,255,255,0.06);border:1px solid var(--bd);
+        color:var(--t1);border-radius:10px;cursor:pointer;font-size:13px">取消</button>
+      <button id="books-bulk-confirm" onclick="_executeBooksDelete()"
+        style="flex:2;padding:11px;background:rgba(200,50,50,0.8);color:#fff;
+        border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700">
+        刪除 0 本</button>`;
+    el.appendChild(bar);
+  }
 
   // 無限捲動
   if(batch.length < filtered.length){
@@ -264,8 +283,14 @@ function _mkSpine(b, dispW, dispH){
     }
   }
 
-  // 抽書動畫
-  div.onclick = ()=> _pullBook(b.id, div);
+  // 批量模式：勾選；一般模式：抽書動畫
+  if(_B.bulkMode){
+    div.style.cursor='pointer';
+    if(_B.bulkSelected.has(b.id)) div.style.outline='3px solid var(--acc)';
+    div.onclick = ()=> _toggleBookSelect(b.id, div);
+  } else {
+    div.onclick = ()=> _pullBook(b.id, div);
+  }
   return div;
 }
 
@@ -288,7 +313,7 @@ function _mkCoverGrid(books, total){
   books.forEach(b=>{
     const card=document.createElement('div');
     card.className='shelf-cover-card';
-    card.onclick=()=>openBookCover(b.id);
+    card.onclick=()=>_B.bulkMode?_toggleBookSelect(b.id,card.querySelector('.shelf-cover-img')):openBookCover(b.id);
     const t=_SPINE_THEMES[(b.id||0)%_SPINE_THEMES.length];
     const img=document.createElement('div');
     img.className='shelf-cover-img';
@@ -319,7 +344,7 @@ function _mkListView(books, total){
   books.forEach(b=>{
     const item=document.createElement('div');
     item.className='shelf-list-item';
-    item.onclick=()=>openBookDetail(b.id);
+    item.onclick=()=>_B.bulkMode?_toggleBookSelect(b.id,item):openBookDetail(b.id);
     const t=_SPINE_THEMES[(b.id||0)%_SPINE_THEMES.length];
     const cover=document.createElement('div');
     cover.className='shelf-list-cover';
@@ -601,21 +626,53 @@ async function openBookDetail(id){
           </div>
         </div>
       </div>
-      <div style="display:flex;gap:8px">
-        <button onclick="document.getElementById('book-detail-ov').remove()"
-          style="flex:1;padding:11px;background:rgba(255,255,255,0.06);border:1px solid var(--bd);
-          color:var(--t1);border-radius:10px;cursor:pointer;font-size:13px">關閉</button>
-        ${book.blob?`<button onclick="downloadBook(${id})"
-          style="flex:1;padding:11px;background:rgba(37,98,200,0.85);color:#fff;
-          border:none;border-radius:10px;cursor:pointer;font-size:13px">⬇ 下載</button>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${book.blob
+          ?`<button onclick="openBookReader(${id});document.getElementById('book-detail-ov').remove()"
+              style="flex:2;padding:11px;background:rgba(37,98,200,0.85);color:#fff;
+              border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700">
+              📖 閱讀</button>
+            <button onclick="downloadBook(${id})"
+              style="flex:1;padding:11px;background:rgba(255,255,255,0.08);border:1px solid var(--bd);
+              color:var(--t1);border-radius:10px;cursor:pointer;font-size:13px">⬇</button>`
+          :`<button onclick="_attachBookFile(${id})"
+              style="flex:2;padding:11px;background:rgba(255,180,60,0.2);border:1px solid rgba(255,180,60,0.3);
+              color:rgba(255,200,100,0.9);border-radius:10px;cursor:pointer;font-size:13px">
+              📎 附加檔案以閱讀</button>`}
         <button onclick="confirmDeleteBook(${id})"
           style="flex:1;padding:11px;background:rgba(200,50,50,0.7);color:#fff;
-          border:none;border-radius:10px;cursor:pointer;font-size:13px">🗑 刪除</button>
+          border:none;border-radius:10px;cursor:pointer;font-size:13px">🗑</button>
+        <button onclick="document.getElementById('book-detail-ov').remove()"
+          style="width:100%;padding:10px;background:rgba(255,255,255,0.04);border:1px solid var(--bd);
+          color:var(--t2);border-radius:10px;cursor:pointer;font-size:12px">關閉</button>
       </div>
     </div>`;
   ov.onclick=e=>{if(e.target===ov) ov.remove();};
   document.body.appendChild(ov);
   await updateEbookProgress(id, book.lastPage||0);
+}
+
+// 補充附加檔案（書本無 blob 時）
+async function _attachBookFile(id){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.pdf,.epub,.txt';
+  inp.onchange = async e=>{
+    const file = e.target.files[0]; if(!file) return;
+    try{
+      const book = await dg('ebooks', id); if(!book) return;
+      book.blob = file;
+      book.fileType = file.name.split('.').pop().toLowerCase();
+      book.fileSize = file.size;
+      await dp('ebooks', book);
+      // 更新快取
+      const idx = _B.allBooks.findIndex(b=>b.id===id);
+      if(idx>=0){ _B.allBooks[idx].fileType=book.fileType; _B.allBooks[idx].fileSize=book.fileSize; }
+      toast('已附加檔案，可以開始閱讀');
+      document.getElementById('book-detail-ov')?.remove();
+      openBookDetail(id);
+    }catch(err){ logError('_attachBookFile',err); toast('附加失敗'); }
+  };
+  inp.click();
 }
 
 async function downloadBook(id){
@@ -649,4 +706,197 @@ function _fmtSize(bytes){
   if(!bytes) return '';
   if(bytes<1048576) return (bytes/1024).toFixed(1)+'KB';
   return (bytes/1048576).toFixed(1)+'MB';
+}
+
+// ════════════════════════════════════════════════════════════
+// 電子書閱讀器
+// ════════════════════════════════════════════════════════════
+async function openBookReader(id){
+  const book = await dg('ebooks', id);
+  if(!book?.blob){toast('無附加檔案');return;}
+
+  const url = URL.createObjectURL(book.blob);
+  const ext  = (book.fileType||'').toLowerCase();
+
+  const ov = document.createElement('div');
+  ov.id = 'book-reader-ov';
+  ov.style.cssText = `position:fixed;inset:0;z-index:800;
+    background:#111;display:flex;flex-direction:column`;
+
+  // 頂部列
+  ov.innerHTML = `
+    <div class="reader-topbar" id="reader-topbar">
+      <button class="reader-btn" onclick="closeBookReader(${id})">←</button>
+      <div class="reader-title">${esc(book.title||'閱讀中')}</div>
+      <button class="reader-btn" onclick="_toggleReaderUI()">Aa</button>
+    </div>
+    <div id="reader-body" style="flex:1;overflow:hidden;position:relative;background:#111">
+      ${ext==='pdf'
+        ? `<iframe id="reader-iframe" src="${url}#toolbar=0&navpanes=0"
+            style="width:100%;height:100%;border:none;background:#111"></iframe>`
+        : ext==='epub'
+        ? `<div id="reader-epub-wrap"
+            style="width:100%;height:100%;overflow-y:auto;
+            background:var(--reader-bg,#111);color:var(--reader-fg,#e8e8e8);
+            font-size:var(--reader-fs,17px);line-height:1.75;
+            padding:20px 20px 60px;box-sizing:border-box">
+            <div id="reader-epub-content" style="max-width:680px;margin:0 auto"></div>
+          </div>`
+        : ext==='txt'
+        ? `<div id="reader-txt"
+            style="width:100%;height:100%;overflow-y:auto;
+            background:var(--reader-bg,#111);color:var(--reader-fg,#e8e8e8);
+            font-size:var(--reader-fs,17px);line-height:1.8;
+            padding:20px 20px 60px;box-sizing:border-box;white-space:pre-wrap;
+            font-family:Georgia,serif;max-width:680px;margin:0 auto"></div>`
+        : `<div style="display:flex;align-items:center;justify-content:center;
+            height:100%;flex-direction:column;gap:12px;color:rgba(255,255,255,0.5)">
+            <div style="font-size:48px">📄</div>
+            <div>此格式暫不支援直接閱讀</div>
+            <button onclick="downloadBook(${id})"
+              style="padding:10px 24px;background:rgba(37,98,200,0.85);color:#fff;
+              border:none;border-radius:10px;cursor:pointer;font-size:14px">⬇ 下載後閱讀</button>
+          </div>`}
+    </div>
+    <!-- 閱讀設定面板 -->
+    <div id="reader-settings" style="display:none;position:absolute;top:52px;right:0;
+      background:rgba(20,20,28,0.97);border-radius:0 0 0 12px;
+      padding:14px 16px;z-index:10;min-width:180px;
+      border-left:1px solid rgba(255,255,255,0.08);
+      border-bottom:1px solid rgba(255,255,255,0.08)">
+      <div style="font-size:11px;color:rgba(255,255,255,0.4);
+        margin-bottom:10px;letter-spacing:.06em">閱讀設定</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <button onclick="_readerFontSize(-2)"
+          style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.08);
+          border:none;color:#fff;font-size:14px;cursor:pointer">A-</button>
+        <div id="reader-fs-lbl" style="flex:1;text-align:center;font-size:13px;color:#fff">17px</div>
+        <button onclick="_readerFontSize(2)"
+          style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.08);
+          border:none;color:#fff;font-size:16px;cursor:pointer">A+</button>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="_readerTheme('dark')"
+          style="flex:1;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);
+          background:#111;color:#e8e8e8;font-size:11px;cursor:pointer">深色</button>
+        <button onclick="_readerTheme('sepia')"
+          style="flex:1;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);
+          background:#2d2416;color:#d4b896;font-size:11px;cursor:pointer">護眼</button>
+        <button onclick="_readerTheme('light')"
+          style="flex:1;padding:6px;border-radius:8px;border:1px solid rgba(0,0,0,0.1);
+          background:#f5f5f0;color:#222;font-size:11px;cursor:pointer">白色</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(ov);
+  ov._objectUrl = url;
+
+  // 載入文字內容（txt / epub 純文字模式）
+  if(ext==='txt'){
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const el=document.getElementById('reader-txt');
+      if(el) el.textContent=e.target.result;
+    };
+    reader.readAsText(book.blob,'UTF-8');
+  } else if(ext==='epub'){
+    // epub 為 zip，嘗試讀取純文字
+    const el=document.getElementById('reader-epub-content');
+    if(el) el.innerHTML=`<div style="color:rgba(255,255,255,0.4);text-align:center;padding:40px">
+      epub 預覽功能開發中，請使用下載後在外部閱讀器開啟。<br><br>
+      <button onclick="downloadBook(${id})" style="padding:10px 24px;
+      background:rgba(37,98,200,0.85);color:#fff;border:none;border-radius:10px;
+      cursor:pointer;font-size:14px">⬇ 下載</button></div>`;
+  }
+
+  // 恢復閱讀位置（僅 txt）
+  if(ext==='txt' && book.lastPage>0){
+    setTimeout(()=>{
+      const el=document.getElementById('reader-txt');
+      if(el) el.scrollTop = book.lastPage;
+    },300);
+  }
+}
+
+let _readerFontSz = 17;
+let _readerUIVisible = true;
+
+function _toggleReaderUI(){
+  const settings=document.getElementById('reader-settings');
+  if(settings) settings.style.display = settings.style.display==='none' ? 'block' : 'none';
+}
+
+function _readerFontSize(delta){
+  _readerFontSz = Math.max(12, Math.min(28, _readerFontSz+delta));
+  const lbl=document.getElementById('reader-fs-lbl');
+  if(lbl) lbl.textContent=_readerFontSz+'px';
+  document.getElementById('reader-txt')?.style.setProperty('font-size',_readerFontSz+'px');
+  document.getElementById('reader-epub-wrap')?.style.setProperty('font-size',_readerFontSz+'px');
+}
+
+function _readerTheme(theme){
+  const themes={
+    dark:  {bg:'#111',fg:'#e8e8e8'},
+    sepia: {bg:'#2d2416',fg:'#d4b896'},
+    light: {bg:'#f5f5f0',fg:'#222'},
+  };
+  const t=themes[theme]||themes.dark;
+  const ov=document.getElementById('book-reader-ov');
+  if(!ov) return;
+  ov.style.background=t.bg;
+  const txt=document.getElementById('reader-txt');
+  const epub=document.getElementById('reader-epub-wrap');
+  if(txt){txt.style.background=t.bg;txt.style.color=t.fg;}
+  if(epub){epub.style.background=t.bg;epub.style.color=t.fg;}
+}
+
+async function closeBookReader(id){
+  const ov=document.getElementById('book-reader-ov');
+  if(!ov) return;
+  // 儲存閱讀位置（txt）
+  try{
+    const txt=document.getElementById('reader-txt');
+    if(txt){
+      const book=await dg('ebooks',id);
+      if(book){book.lastPage=txt.scrollTop;book.lastRead=Date.now();await dp('ebooks',book);}
+    }
+  }catch(_){}
+  if(ov._objectUrl) URL.revokeObjectURL(ov._objectUrl);
+  ov.remove();
+}
+
+// ════════════════════════════════════════════════════════════
+// 書庫批量刪除
+// ════════════════════════════════════════════════════════════
+function toggleBooksBulk(btn){
+  _B.bulkMode = !_B.bulkMode;
+  _B.bulkSelected = new Set();
+  btn.textContent = _B.bulkMode ? '取消' : '批量刪除';
+  btn.style.color  = _B.bulkMode ? 'var(--acc)' : 'var(--red)';
+  _renderBooksPage();
+}
+
+function _toggleBookSelect(id, el){
+  if(_B.bulkSelected.has(id)) _B.bulkSelected.delete(id);
+  else _B.bulkSelected.add(id);
+  el.style.outline = _B.bulkSelected.has(id)
+    ? '3px solid var(--acc)' : 'none';
+  // 更新確認按鈕計數
+  const confirmBtn=document.getElementById('books-bulk-confirm');
+  if(confirmBtn) confirmBtn.textContent=`刪除 ${_B.bulkSelected.size} 本`;
+}
+
+async function _executeBooksDelete(){
+  if(!_B.bulkSelected.size){toast('請先勾選書本');return;}
+  if(!confirm(`確定刪除 ${_B.bulkSelected.size} 本書？此操作無法復原。`)) return;
+  const ids=[..._B.bulkSelected];
+  for(const id of ids){
+    await dd('ebooks',id);
+    _B.allBooks=_B.allBooks.filter(b=>b.id!==id);
+  }
+  toast(`已刪除 ${ids.length} 本`);
+  _B.bulkMode=false; _B.bulkSelected=new Set();
+  const btn=document.getElementById('books-bulk-btn');
+  if(btn){btn.textContent='批量刪除';btn.style.color='var(--red)';}
+  _renderBooksPage();
 }
