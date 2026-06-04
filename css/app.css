@@ -770,7 +770,7 @@ textarea{resize:vertical;line-height:1.7}
 .media-hscroll-row{
   display:flex;
   flex-direction:row;
-  align-items:flex-end;  /* 底部對齊：文字齊底 */
+  align-items:center;  /* 圖片中心點水平一直線對齊 */
   gap:12px;
   padding:0 14px 16px;
   overflow-x:auto;
@@ -783,9 +783,9 @@ textarea{resize:vertical;line-height:1.7}
 /* 橫向卡片（影片 + 音頻共用外框）*/
 .media-hcard{
   flex-shrink:0;
-  width:120px;
+  width:130px;
   display:flex;flex-direction:column;
-  align-items:center;  /* 水平置中（音頻圓形置中）*/
+  align-items:center;
   gap:6px;
   cursor:pointer;
 }
@@ -798,7 +798,7 @@ textarea{resize:vertical;line-height:1.7}
   background:rgba(255,255,255,0.06);
 }
 .media-hcard-thumb.video{
-  width:120px;height:68px;   /* 16:9 */
+  width:130px;height:88px;   /* 更高，視覺平衡 */
   border-radius:10px;
   flex-shrink:0;
 }
@@ -1162,26 +1162,32 @@ textarea{resize:vertical;line-height:1.7}
 .vp-progress-wrap{padding:6px 22px 2px;flex-shrink:0}
 .vp-seek{
   -webkit-appearance:none;width:100%;
-  /* 線條高度 = 圓點的1/4，圓點12px → 線3px */
-  height:1.5px;
-  border-radius:1px;cursor:pointer;
+  /* 設定足夠高度讓 thumb 可以互動，視覺用 transform 壓扁 */
+  height:20px;
+  cursor:pointer;
+  background:transparent;
+  display:flex;align-items:center;
+}
+.vp-seek::-webkit-slider-runnable-track{
+  height:2px;
+  border-radius:1px;
   background:linear-gradient(
     to right,
-    rgba(255,255,255,0.88) 0%,
-    rgba(255,255,255,0.88) var(--seek-pct,0%),
-    rgba(255,255,255,0.15) var(--seek-pct,0%),
-    rgba(255,255,255,0.15) 100%
+    rgba(255,255,255,0.85) 0%,
+    rgba(255,255,255,0.85) var(--seek-pct,0%),
+    rgba(255,255,255,0.18) var(--seek-pct,0%),
+    rgba(255,255,255,0.18) 100%
   );
 }
 .vp-seek::-webkit-slider-thumb{
   -webkit-appearance:none;
-  /* 圓點比線條大4倍 = 6px，視覺平衡 */
   width:12px;height:12px;border-radius:50%;
   background:#fff;
   border:none;cursor:pointer;
-  box-shadow:0 0 0 1.5px rgba(255,255,255,0.2),0 2px 8px rgba(0,0,0,0.6);
+  margin-top:-5px;
+  box-shadow:0 0 0 1px rgba(255,255,255,0.15),0 2px 8px rgba(0,0,0,0.5);
 }
-.vp-seek:active::-webkit-slider-thumb{transform:scale(1.2)}
+.vp-seek:active::-webkit-slider-thumb{transform:scale(1.18)}
 .vp-times{
   display:flex;justify-content:space-between;
   font-size:11px;color:rgba(255,255,255,0.3);
@@ -1215,6 +1221,15 @@ textarea{resize:vertical;line-height:1.7}
   box-shadow:0 0 0 8px rgba(255,255,255,0.08),0 4px 16px rgba(0,0,0,0.4);
 }
 /* 側邊按鍵（上/下首、循環、隨機）*/
+.vpc-sm{
+  width:36px;height:36px;border-radius:50%;
+  background:none;border:none;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  transition:color .15s;
+}
+.vpc-sm:active{opacity:.6}
+
 .vpc-side{
   width:46px;height:46px;border-radius:50%;
   background:rgba(255,255,255,0.07);
