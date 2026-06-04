@@ -795,6 +795,11 @@ textarea{resize:vertical;line-height:1.7}
   background:rgba(255,255,255,0.12);
   color:rgba(255,255,255,0.9);
 }
+.media-sec-more.active{
+  background:rgba(110,168,254,0.15);
+  color:var(--acc);
+  border-color:rgba(110,168,254,0.35);
+}
 
 /* ── 影片海報牆 ─────────────────────────────────────────────── */
 .media-video-grid{
@@ -993,7 +998,7 @@ textarea{resize:vertical;line-height:1.7}
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
   /* 使用真實黑膠唱盤圖片 */
-  background-image:url('icons/vinyl-record.png');
+  background-image:url('../icons/vinyl-record.png');
   background-size:cover;
   background-position:center;
   /* Fallback：無圖片時顯示 CSS 漸層 */
