@@ -505,12 +505,25 @@ function _showVinylPlayer(meta, url, full){
       <div style="text-align:center">
         <div class="vp-mode-lbl">黑膠模式</div>
       </div>
-      <button class="vp-more" onclick="_openAudioMenu(${meta.id})">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/>
-          <circle cx="12" cy="19" r="2"/>
-        </svg>
-      </button>
+      <div style="display:flex;align-items:center;gap:4px">
+        <!-- 播放列表按鈕（在三點旁邊）-->
+        <button class="vp-more" onclick="openVpPlaylist()" title="播放列表"
+          style="font-size:16px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="21" y2="18"/>
+            <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/>
+            <line x1="3" y1="18" x2="3.01" y2="18"/>
+          </svg>
+        </button>
+        <!-- 三點選單 -->
+        <button class="vp-more" onclick="_openAudioMenu(${meta.id})">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/>
+            <circle cx="12" cy="19" r="2"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- ── 唱片台：唱盤圖 + 唱針圖 + 封面裁圓 ── -->
@@ -532,15 +545,17 @@ function _showVinylPlayer(meta, url, full){
       </div>
     </div>
 
-    <!-- ── 曲目資訊 + 喜愛（稍微靠左）── -->
+    <!-- ── 曲目資訊列：[♡] [標題] [≡播放列表] ── -->
     <div class="vp-info">
-      <div class="vp-info-text">
+      <!-- 標題（左側）-->
+      <div class="vp-info-text" style="flex:1;min-width:0">
         <div class="vp-title">${esc(meta.title||'未命名')}</div>
         <div class="vp-artist">${esc(meta.category||'Y.C. 影音庫')}</div>
       </div>
+      <!-- 收藏按鈕（右側，稍微向左）-->
       <button class="vp-fav-btn${isFav?' on':''}" id="vp-fav-btn"
-        onclick="_vpToggleFav(${meta.id},this)" style="margin-right:12px">
-        <svg width="22" height="22" viewBox="0 0 24 24"
+        onclick="_vpToggleFav(${meta.id},this)" style="flex-shrink:0;margin-right:4px">
+        <svg width="24" height="24" viewBox="0 0 24 24"
           fill="${isFav?'#ec4899':'none'}"
           stroke="${isFav?'#ec4899':'rgba(255,255,255,0.4)'}" stroke-width="2">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/>
@@ -608,20 +623,9 @@ function _showVinylPlayer(meta, url, full){
       </button>
     </div>
 
-    <!-- ── 工具列：播放列表（展開在進度條下方）── -->
-    <div class="vp-tools" style="justify-content:center">
-      <button class="vpt-btn" onclick="openVpPlaylist()">
-        <svg class="vpt-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
-          <line x1="8" y1="18" x2="21" y2="18"/>
-          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/>
-          <line x1="3" y1="18" x2="3.01" y2="18"/>
-        </svg>
-        <span class="vpt-lbl">播放列表</span>
-      </button>
-    </div>
-    <!-- 播放列表容器（在工具列上方展開，不蓋到控制列）-->
-    <div id="vp-playlist-wrap" style="overflow:hidden;flex-shrink:0;max-height:0;transition:max-height .3s ease"></div>
+    <!-- 播放列表容器（在控制列下方展開，不蓋工具列）-->
+    <div id="vp-playlist-wrap"
+      style="overflow:hidden;flex-shrink:0;max-height:0;transition:max-height .28s ease"></div>
 
     <!-- 隱藏 audio 元素 -->
     <audio id="vp-audio" src="${url}" style="display:none"></audio>`;
@@ -1000,37 +1004,87 @@ function openVpPlaylist(){
   const wrap = document.getElementById('vp-playlist-wrap');
   if(!wrap) return;
   const isOpen = wrap.style.maxHeight !== '0px' && wrap.style.maxHeight !== '';
-  if(isOpen){ wrap.style.maxHeight='0'; wrap.innerHTML=''; return; }
-  // 展開播放列表
-  const panel=document.createElement('div');
-  panel.id='vp-playlist-panel';
-  panel.style.cssText=`background:rgba(12,10,20,0.98);border-top:1px solid rgba(255,255,255,0.08);
-    max-height:220px;overflow-y:auto;padding-bottom:8px`;
-  panel.innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:space-between;
-      padding:12px 16px 8px;position:sticky;top:0;background:rgba(20,16,30,0.97)">
-      <div style="font-size:13px;font-weight:700;color:#fff">
-        播放列表 (${_M.playlist.length})</div>
-      <button onclick="document.getElementById('vp-playlist-panel').remove()"
-        style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:18px;cursor:pointer">✕</button>
-    </div>
-    ${_M.playlist.map((m,i)=>`
-      <div onclick="playAudio(${m.id})"
-        style="display:flex;align-items:center;gap:12px;padding:10px 16px;
-        cursor:pointer;${i===_M.playIdx?'background:rgba(168,85,247,0.15)':''}
-        border-bottom:1px solid rgba(255,255,255,0.04)">
-        ${i===_M.playIdx
-          ?`<div style="width:16px;font-size:12px;color:#a855f7">♪</div>`
-          :`<div style="width:16px;font-size:11px;color:rgba(255,255,255,0.3);text-align:center">${i+1}</div>`}
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;color:${i===_M.playIdx?'#a855f7':'#fff'};
-            white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.title||'未命名')}</div>
-        </div>
-        ${m.duration?`<div style="font-size:11px;color:rgba(255,255,255,0.4)">${_fmtDur(m.duration)}</div>`:''}
-      </div>`).join('')}`;
+  if(isOpen){ wrap.style.maxHeight='0'; setTimeout(()=>{ wrap.innerHTML=''; },300); return; }
+
+  // 橫向捲動卡片列表（唱盤縮圖 + 名稱）
+  const panel = document.createElement('div');
+  panel.id = 'vp-playlist-panel';
+  panel.style.cssText = `
+    background:rgba(10,10,14,0.95);
+    border-top:1px solid rgba(255,255,255,0.07);
+    border-bottom:1px solid rgba(255,255,255,0.07);
+    padding:10px 0 12px;`;
+
+  // 橫向捲動列
+  const row = document.createElement('div');
+  row.style.cssText = `
+    display:flex;flex-direction:row;align-items:center;gap:10px;
+    padding:0 14px;
+    overflow-x:auto;overflow-y:hidden;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch;`;
+
+  _M.playlist.forEach((m, i)=>{
+    const isActive = (i === _M.playIdx);
+    const card = document.createElement('div');
+    card.style.cssText = `
+      flex-shrink:0;width:70px;
+      display:flex;flex-direction:column;align-items:center;gap:5px;
+      cursor:pointer;opacity:${isActive?'1':'0.65'};
+      transition:opacity .15s;`;
+    card.onclick = ()=>playAudio(m.id);
+
+    // 唱盤縮圖（小圓形）
+    const thumb = document.createElement('div');
+    thumb.style.cssText = `
+      width:56px;height:56px;border-radius:50%;
+      background:radial-gradient(circle at 50%,#2a2a36 0%,#111 25%,#1c1c24 45%,#111 65%,#0e0e12 100%);
+      overflow:hidden;flex-shrink:0;
+      box-shadow:${isActive?'0 0 0 2px #a855f7':'0 2px 8px rgba(0,0,0,0.5)'};
+      position:relative;display:flex;align-items:center;justify-content:center;`;
+    if(m.thumbnail){
+      const img = document.createElement('img');
+      img.src = m.thumbnail;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+      thumb.appendChild(img);
+    }
+    // 正在播放指示
+    if(isActive){
+      const dot = document.createElement('div');
+      dot.style.cssText = `
+        position:absolute;bottom:3px;right:3px;
+        width:10px;height:10px;border-radius:50%;
+        background:#a855f7;border:1.5px solid #0a0a0a;`;
+      thumb.appendChild(dot);
+    }
+
+    // 名稱
+    const name = document.createElement('div');
+    name.style.cssText = `
+      font-size:10px;font-weight:${isActive?'700':'500'};
+      color:${isActive?'#a855f7':'rgba(255,255,255,0.65)'};
+      text-align:center;line-height:1.3;
+      width:100%;overflow:hidden;
+      display:-webkit-box;-webkit-line-clamp:2;
+      -webkit-box-orient:vertical;`;
+    name.textContent = m.title||'未命名';
+
+    card.appendChild(thumb);
+    card.appendChild(name);
+    row.appendChild(card);
+  });
+
+  panel.appendChild(row);
   wrap.innerHTML = '';
   wrap.appendChild(panel);
-  wrap.style.maxHeight = '220px';
+  wrap.style.maxHeight = '130px';
+
+  // 捲動到當前播放項目
+  setTimeout(()=>{
+    const cards = row.children;
+    if(cards[_M.playIdx]){
+      cards[_M.playIdx].scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+    }
+  },50);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1090,26 +1144,40 @@ function _vvpCycleSpeed(btn){
 }
 
 // 影片右上三點選單
-function _openVideoMenu(id, btn){
+async function _openVideoMenu(id, btn){
   document.getElementById('video-menu-sheet')?.remove();
   const sheet = document.createElement('div');
   sheet.id = 'video-menu-sheet';
   sheet.style.cssText = `position:fixed;inset:0;z-index:700;
     background:rgba(0,0,0,0.6);display:flex;align-items:flex-end`;
   sheet.onclick = e=>{ if(e.target===sheet) sheet.remove(); };
+  // 先讀取資料再顯示
+  const _m = await dg('leisuremedia', id);
+  const _favTxt = _m?.favorite ? '♥ 已收藏' : '♡ 收藏';
+  const _favClr = _m?.favorite ? '#ec4899' : 'rgba(255,255,255,0.7)';
   sheet.innerHTML = `
     <div style="width:100%;max-width:520px;margin:0 auto;
       background:var(--bg1);border-radius:20px 20px 0 0;padding:8px 0 32px">
-      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:10px auto 8px"></div>
-      <button onclick="openMediaDetail(${id});document.getElementById('video-menu-sheet').remove()"
+      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:10px auto 14px"></div>
+      <!-- 詳細資料直接顯示（不需按鈕）-->
+      <div style="padding:0 20px 16px;border-bottom:1px solid rgba(255,255,255,0.06)">
+        <div style="font-size:16px;font-weight:700;color:var(--t0);margin-bottom:6px">
+          ${esc(_m?.title||'未命名')}
+        </div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.8">
+          <div>🎬 影片</div>
+          ${_m?.category?`<div>分類：${esc(_m.category)}</div>`:''}
+          ${_m?.fileSize?`<div>大小：${_fmtSize(_m.fileSize)}</div>`:''}
+          <div>新增：${_m?.createdAt?new Date(_m.createdAt).toLocaleDateString('zh-TW'):'-'}</div>
+          ${_m?.lastPlay?`<div>上次播放：${new Date(_m.lastPlay).toLocaleDateString('zh-TW')}</div>`:''}
+        </div>
+      </div>
+      <!-- 操作按鈕 -->
+      <button id="vvp-menu-fav-btn" onclick="_vvpToggleFavMenu(${id},this)"
         style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;
-        color:var(--t0);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:12px">
-        <span style="font-size:18px">ℹ</span>詳細資料
-      </button>
-      <button onclick="_vvpToggleFavMenu(${id},this)"
-        style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;
-        color:var(--t0);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:12px">
-        <span id="vvp-menu-fav-icon" style="font-size:18px">♡</span>收藏
+        color:${_favClr};font-size:14px;cursor:pointer;display:flex;align-items:center;gap:12px">
+        <span id="vvp-menu-fav-icon" style="font-size:18px">${_m?.favorite?'♥':'♡'}</span>
+        <span id="vvp-menu-fav-lbl">${_favTxt}</span>
       </button>
       <div style="height:1px;background:rgba(255,255,255,0.06);margin:4px 0"></div>
       <button onclick="confirmDeleteMedia(${id});document.getElementById('video-menu-sheet').remove()"
@@ -1119,11 +1187,6 @@ function _openVideoMenu(id, btn){
       </button>
     </div>`;
   document.body.appendChild(sheet);
-  // 初始化收藏狀態
-  dg('leisuremedia', id).then(m=>{
-    const icon = document.getElementById('vvp-menu-fav-icon');
-    if(icon && m) icon.textContent = m.favorite ? '♥' : '♡';
-  });
 }
 
 async function _vvpToggleFavMenu(id, btn){
@@ -1132,7 +1195,11 @@ async function _vvpToggleFavMenu(id, btn){
     m.favorite = !m.favorite;
     await dp('leisuremedia', m);
     const icon = document.getElementById('vvp-menu-fav-icon');
+    const lbl  = document.getElementById('vvp-menu-fav-lbl');
+    const favBtn = document.getElementById('vvp-menu-fav-btn');
     if(icon) icon.textContent = m.favorite ? '♥' : '♡';
+    if(lbl)  lbl.textContent  = m.favorite ? '♥ 已收藏' : '♡ 收藏';
+    if(favBtn) favBtn.style.color = m.favorite ? '#ec4899' : 'rgba(255,255,255,0.7)';
     const idx = _M.allMedia.findIndex(x=>x.id===id);
     if(idx>=0) _M.allMedia[idx].favorite = m.favorite;
     toast(m.favorite ? '已加入收藏' : '已取消收藏');
@@ -1388,35 +1455,28 @@ async function openMediaDetail(id){
   const ov=document.createElement('div');
   ov.id='media-detail-ov';
   ov.style.cssText='position:fixed;inset:0;z-index:700;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end';
-  const favColor = m.favorite ? '#ec4899' : 'rgba(255,255,255,0.7)';
-  const favTxt   = m.favorite ? '♥ 已收藏' : '♡ 收藏';
   ov.innerHTML=`
     <div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);
-      border-radius:20px 20px 0 0;padding:20px 16px 32px">
-      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 14px"></div>
-      <div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:4px">${esc(m.title||'')}</div>
-      <div style="font-size:11px;color:var(--t2);margin-bottom:16px">
-        ${m.type==='video'?'🎬 影片':'🎵 音頻'} · ${m.category||'未分類'} · ${_fmtSize(m.fileSize||0)}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;gap:8px">
-          <button id="det-fav-btn" onclick="_detailToggleFav(${id},this)"
-            style="flex:1;padding:11px;background:rgba(255,255,255,0.06);border:1px solid var(--bd);
-            color:${favColor};border-radius:10px;cursor:pointer;font-size:13px;font-weight:600">
-            ${favTxt}</button>
-          ${m.blob?`<button onclick="downloadMedia(${id})"
-            style="flex:1;padding:11px;background:rgba(37,98,200,0.85);color:#fff;
-            border:none;border-radius:10px;cursor:pointer;font-size:13px">⬇ 下載</button>`:''}
+      border-radius:20px 20px 0 0;padding:8px 0 28px">
+      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:10px auto 14px"></div>
+      <!-- 詳細資料：直接顯示，不需按鈕 -->
+      <div style="padding:0 20px 16px">
+        <div style="font-size:16px;font-weight:700;color:var(--t0);margin-bottom:8px">
+          ${esc(m.title||'未命名')}
         </div>
-        <div style="display:flex;gap:8px">
-          <button onclick="document.getElementById('media-detail-ov').remove()"
-            style="flex:1;padding:11px;background:rgba(255,255,255,0.06);border:1px solid var(--bd);
-            color:var(--t1);border-radius:10px;cursor:pointer;font-size:13px">關閉</button>
-          <button onclick="confirmDeleteMedia(${id})"
-            style="flex:1;padding:11px;background:rgba(200,50,50,0.7);color:#fff;
-            border:none;border-radius:10px;cursor:pointer;font-size:13px">🗑 刪除</button>
+        <div style="font-size:12px;color:var(--t2);line-height:2">
+          <div>${m.type==='video'?'🎬 影片':'🎵 音頻'}</div>
+          ${m.category?`<div>分類：${esc(m.category)}</div>`:''}
+          ${m.fileSize?`<div>大小：${_fmtSize(m.fileSize)}</div>`:''}
+          <div>新增：${m.createdAt?new Date(m.createdAt).toLocaleDateString('zh-TW'):'-'}</div>
+          ${m.lastPlay?`<div>上次播放：${new Date(m.lastPlay).toLocaleDateString('zh-TW')}</div>`:''}
+          ${m.playCount?`<div>播放次數：${m.playCount}</div>`:''}
         </div>
       </div>
+      <div style="height:1px;background:rgba(255,255,255,0.06);margin:0 0 8px"></div>
+      <button onclick="document.getElementById('media-detail-ov').remove()"
+        style="width:100%;padding:13px 20px;text-align:center;background:none;border:none;
+        color:var(--t2);font-size:14px;cursor:pointer">關閉</button>
     </div>`;
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
   document.body.appendChild(ov);
