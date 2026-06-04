@@ -2756,23 +2756,7 @@ textarea{resize:vertical;line-height:1.7}
   padding:22px 14px 14px;
   position:relative;
 }
-.media-sec-hd-row::after{
-  content:'';
-  position:absolute;
-  bottom:0;left:14px;
-  width:120px;
-  height:1.5px;
-  border-radius:1px;
-  background:linear-gradient(
-    90deg,
-    rgba(255,255,255,0.8) 0%,
-    rgba(255,255,255,0.5) 60%,
-    transparent 100%
-  );
-  box-shadow:
-    0 0 4px rgba(255,255,255,0.6),
-    0 0 10px rgba(255,255,255,0.2);
-}
+/* media-sec-hd-row::after removed */
 
 /* 標題大字不再用漸層（改純白，更清晰有質感）*/
 .media-sec-hd-big{
@@ -2794,25 +2778,7 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* section 內容下緣炫光長線 */
-.media-hscroll-row::after,
-.media-video-grid::after,
-.media-audio-list::after{
-  content:'';
-  display:block;
-  height:1px;
-  margin:28px 0 0;
-  background:linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255,255,255,0.06) 5%,
-    rgba(255,255,255,0.22) 30%,
-    rgba(255,255,255,0.3) 50%,
-    rgba(255,255,255,0.22) 70%,
-    rgba(255,255,255,0.06) 95%,
-    transparent 100%
-  );
-  box-shadow:0 0 4px rgba(255,255,255,0.06);
-}
+/* old section bottom lines removed */
 
 
 /* 書庫 藏書/收藏 切換 tab */
@@ -2843,3 +2809,83 @@ textarea{resize:vertical;line-height:1.7}
 .media-hscroll-row{ padding-bottom:0; }
 .media-video-grid{ padding-bottom:4px; }
 .media-audio-list{ padding-bottom:4px; }
+
+/* ══ 影音庫分隔線重構（最終版）══════════════════════════════
+   結構：
+   [標題文字]  ─────────────── (裝飾線，flex:1，右側延伸)
+   [卡片列]
+   ──────── (底部分隔線，寬度≈標題文字寬，置左)
+   ════════════════════════════════════════════════════════ */
+
+/* 標題行：flex 排版讓標題+裝飾線在同一行 */
+.media-sec-hd-row{
+  display:flex;
+  align-items:center;
+  padding:22px 14px 12px;
+  position:relative;
+  gap:0;
+}
+
+/* 標題文字 */
+.media-sec-hd-big{
+  font-size:22px;
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-.02em;
+  -webkit-text-fill-color:#fff;
+  flex-shrink:0;
+}
+
+/* 標題右側裝飾線：緊接標題右方，延伸剩餘70%寬 */
+.media-sec-hd-row::before{
+  content:'';
+  flex:1;
+  max-width:70%;
+  height:1px;
+  margin-left:10px;
+  background:linear-gradient(
+    90deg,
+    rgba(255,255,255,0.18) 0%,
+    rgba(255,255,255,0.08) 40%,
+    transparent 100%
+  );
+}
+
+/* 「更多」按鈕不擠壓裝飾線 */
+.media-sec-more{
+  flex-shrink:0;
+  margin-left:8px;
+}
+
+/* 每個 section 的底部分隔線：DOM 結構加在 hscroll-row 後面
+   用 padding-bottom + ::after 實現，長度約等於標題文字 */
+.media-hscroll-row,
+.media-video-grid,
+.media-audio-list{
+  padding-bottom:0;
+  position:relative;
+}
+
+/* section 容器底部分隔線：寬度 ~80px（≈4個中文字），柔和 Glow */
+.media-sec-wrap{
+  position:relative;
+  padding-bottom:20px;
+}
+.media-sec-wrap::after{
+  content:'';
+  position:absolute;
+  bottom:0;
+  left:14px;
+  width:80px;
+  height:1px;
+  background:linear-gradient(
+    90deg,
+    rgba(255,255,255,0.55) 0%,
+    rgba(255,255,255,0.25) 60%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 4px rgba(255,255,255,0.3),
+    0 0 10px rgba(255,255,255,0.1);
+}
+
