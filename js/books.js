@@ -298,17 +298,7 @@ function _mkSpine(b, dispW, dispH){
     }
   }
 
-  // 收藏角標（右下角，不在批量模式時顯示）
-  if(!_B.bulkMode){
-    const favBadge = document.createElement('div');
-    favBadge.style.cssText = `position:absolute;bottom:3px;right:2px;z-index:5;
-      cursor:pointer;font-size:10px;line-height:1;text-align:center;
-      transition:transform .15s;`;
-    favBadge.textContent = b.favorite ? '♥' : '♡';
-    favBadge.style.color = b.favorite ? '#ec4899' : 'rgba(255,255,255,0.25)';
-    favBadge.onclick = e => { e.stopPropagation(); _quickToggleBookFav(b.id, favBadge); };
-    div.appendChild(favBadge);
-  }
+  // 收藏操作已移至書籍資訊視窗（openBookDetail）
 
   // 批量模式：勾選；一般模式：抽書動畫
   if(_B.bulkMode){
@@ -409,7 +399,7 @@ function _mkListView(books, total){
     favBtn.onclick=e=>{e.stopPropagation();_quickToggleBookFav(b.id,favBtn);};
     item.appendChild(cover);
     item.appendChild(info);
-    item.appendChild(favBtn);
+    // if(favBtn) item.appendChild(favBtn);
     wrap.appendChild(item);
   });
   return wrap;
@@ -668,6 +658,16 @@ async function openBookDetail(id){
           </div>
         </div>
       </div>
+      <!-- 收藏按鈕 -->
+      <button id="book-det-fav" onclick="_detailToggleBookFav(${id},this)"
+        style="width:100%;padding:10px;margin-bottom:8px;
+          background:${book.favorite?'rgba(236,72,153,0.12)':'rgba(255,255,255,0.05)'};
+          border:1px solid ${book.favorite?'rgba(236,72,153,0.3)':'rgba(255,255,255,0.1)'};
+          color:${book.favorite?'#ec4899':'rgba(255,255,255,0.5)'};
+          border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;
+          display:flex;align-items:center;justify-content:center;gap:8px">
+        ${book.favorite?'♥ 已收藏':'♡ 加入收藏'}
+      </button>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         ${book.blob
           ?`<button onclick="openBookReader(${id});document.getElementById('book-detail-ov').remove()"
@@ -695,6 +695,24 @@ async function openBookDetail(id){
 }
 
 // 補充附加檔案（書本無 blob 時）
+// 書籍資訊視窗收藏切換
+async function _detailToggleBookFav(id, btn){
+  try{
+    const book = await dg('ebooks', id); if(!book) return;
+    book.favorite = !book.favorite;
+    await dp('ebooks', book);
+    const idx = _B.allBooks.findIndex(b=>b.id===id);
+    if(idx>=0) _B.allBooks[idx].favorite = book.favorite;
+    btn.innerHTML = book.favorite ? '♥ 已收藏' : '♡ 加入收藏';
+    btn.style.background = book.favorite ? 'rgba(236,72,153,0.12)' : 'rgba(255,255,255,0.05)';
+    btn.style.borderColor = book.favorite ? 'rgba(236,72,153,0.3)' : 'rgba(255,255,255,0.1)';
+    btn.style.color = book.favorite ? '#ec4899' : 'rgba(255,255,255,0.5)';
+    toast(book.favorite ? '已加入收藏' : '已移除收藏');
+    // 若目前在收藏模式，重新渲染讓書架同步
+    if(_B.filter==='fav') _renderBooksPage();
+  }catch(e){ logError('_detailToggleBookFav',e); }
+}
+
 async function _attachBookFile(id){
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = '.pdf,.epub,.txt';

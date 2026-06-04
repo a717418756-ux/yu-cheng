@@ -107,32 +107,33 @@ function _renderMediaPage(){
 
 // ── 橫向捲動 section ──────────────────────────────────────
 function _mkHScrollSection(title, type, items, showMore=true){
-  const sec = document.createElement('div');
-  const preview = items.slice(0,5);
+  // 外層 wrap 負責底部分隔線
+  const wrap = document.createElement('div');
+  wrap.className = 'media-sec-wrap';
 
   const hd = document.createElement('div');
   hd.className='media-sec-hd-row';
   hd.innerHTML=`
     <div class="media-sec-hd-big">${title}</div>
     ${showMore ? `<button class="media-sec-more" onclick="_openExpandMode('${type}')">更多 ›</button>` : ''}`;
-  sec.appendChild(hd);
+  wrap.appendChild(hd);
 
   if(!items.length){
-    // 空狀態
     const empty = document.createElement('div');
     empty.style.cssText='padding:12px 14px 18px;font-size:12px;color:var(--t2)';
     empty.textContent = title==='收藏' ? '尚未收藏任何影音' : '尚無內容';
-    sec.appendChild(empty);
-    return sec;
+    wrap.appendChild(empty);
+    return wrap;
   }
 
+  const preview = items.slice(0,5);
   const row = document.createElement('div');
   row.className='media-hscroll-row';
   preview.forEach(m=>{
     row.appendChild(m.type==='audio' ? _mkAudioCard(m) : _mkVideoThumbCard(m));
   });
-  sec.appendChild(row);
-  return sec;
+  wrap.appendChild(row);
+  return wrap;
 }
 
 // 音頻卡片（橫向捲動用：黑膠唱片縮圖 + 名稱）
