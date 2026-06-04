@@ -773,6 +773,28 @@ textarea{resize:vertical;line-height:1.7}
   letter-spacing:.06em;text-transform:uppercase;
   padding:14px 14px 8px;
 }
+/* 新：大字 section header 行 */
+.media-sec-hd-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 14px 10px;
+}
+.media-sec-hd-big{
+  font-size:20px;font-weight:800;color:var(--t0);
+  letter-spacing:-.01em;
+}
+.media-sec-more{
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.55);
+  font-size:13px;font-weight:600;
+  padding:5px 14px;border-radius:20px;
+  cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.media-sec-more:active{
+  background:rgba(255,255,255,0.12);
+  color:rgba(255,255,255,0.9);
+}
 
 /* ── 影片海報牆 ─────────────────────────────────────────────── */
 .media-video-grid{
@@ -970,32 +992,16 @@ textarea{resize:vertical;line-height:1.7}
   z-index:1;
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
-  /* 多層同心漸層模擬唱片紋路 */
-  background:
-    radial-gradient(circle at 50% 50%,
-      #2a2a36 0%,   /* 中心標籤邊緣 */
-      #18181f 20%,
-      #202028 26%,
-      #141419 32%,
-      #1e1e26 38%,
-      #111116 44%,
-      #1c1c24 50%,
-      #101014 56%,
-      #1a1a22 62%,
-      #0e0e12 68%,
-      #181820 74%,
-      #0c0c10 80%,
-      #161618 86%,
-      #0a0a0e 92%,
-      #0c0c10 100%
-    );
+  /* 使用真實黑膠唱盤圖片 */
+  background-image:url('icons/vinyl-record.png');
+  background-size:cover;
+  background-position:center;
+  /* Fallback：無圖片時顯示 CSS 漸層 */
+  background-color:#111;
   box-shadow:
-    /* 外發光 */
-    0 0 60px rgba(139,92,246,0.2),
-    0 0 0 1px rgba(255,255,255,0.06),
-    /* 主陰影 */
+    0 0 60px rgba(139,92,246,0.18),
+    0 0 0 1px rgba(255,255,255,0.05),
     0 20px 80px rgba(0,0,0,0.95),
-    /* 底部厚度感 */
     0 4px 0 rgba(0,0,0,0.8);
 }
 
@@ -1046,16 +1052,16 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 中心標籤 */
 .vp-record-label{
-  width:34%;height:34%;border-radius:50%;
+  /* 封面圓形：對應真實唱盤圖片中心標籤大小（約38%）*/
+  width:38%;height:38%;border-radius:50%;
   overflow:hidden;
-  /* 預設標籤（無封面時）*/
   background:radial-gradient(circle at 40% 35%,#2d1560,#1a0a3e 60%,#0f0626);
   display:flex;align-items:center;justify-content:center;
   z-index:3;position:relative;
   box-shadow:
     0 4px 16px rgba(0,0,0,0.8),
-    0 0 0 1px rgba(255,255,255,0.1),
-    inset 0 1px rgba(255,255,255,0.12);
+    0 0 0 2px rgba(255,255,255,0.08),
+    inset 0 1px rgba(255,255,255,0.1);
 }
 .vp-label-text{
   font-size:9px;font-weight:700;color:rgba(255,255,255,0.8);
@@ -1113,15 +1119,28 @@ textarea{resize:vertical;line-height:1.7}
 /* ── 進度條 ── */
 .vp-progress-wrap{padding:4px 22px 2px;flex-shrink:0}
 .vp-seek{
-  -webkit-appearance:none;width:100%;height:3px;
+  -webkit-appearance:none;width:100%;height:2px;
   border-radius:2px;cursor:pointer;
-  background:rgba(255,255,255,0.1);
+  /* 已播放（紫色）/ 未播放（灰色）動態填色，由 JS 更新 --seek-pct */
+  background:linear-gradient(
+    to right,
+    #a855f7 0%,
+    #a855f7 var(--seek-pct, 0%),
+    rgba(255,255,255,0.15) var(--seek-pct, 0%),
+    rgba(255,255,255,0.15) 100%
+  );
 }
 .vp-seek::-webkit-slider-thumb{
-  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
-  background:radial-gradient(circle at 40% 35%,#d8b4fe,#a855f7);
+  -webkit-appearance:none;
+  width:12px;height:12px;border-radius:50%;
+  background:radial-gradient(circle at 38% 32%,#e9d5ff,#a855f7 60%);
   cursor:pointer;
-  box-shadow:0 0 8px rgba(168,85,247,0.8),0 2px 4px rgba(0,0,0,0.5);
+  box-shadow:0 0 6px rgba(168,85,247,0.9),0 1px 3px rgba(0,0,0,0.6);
+  /* 懸浮時放大 */
+  transition:transform .1s;
+}
+.vp-seek:active::-webkit-slider-thumb{
+  transform:scale(1.3);
 }
 .vp-times{
   display:flex;justify-content:space-between;
@@ -1135,28 +1154,39 @@ textarea{resize:vertical;line-height:1.7}
   gap:16px;padding:6px 0 4px;flex-shrink:0;
 }
 .vpc-btn{
-  background:none;border:none;color:rgba(255,255,255,0.55);
-  font-size:26px;cursor:pointer;padding:8px;
-  transition:color .12s,transform .1s;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.7);
+  font-size:22px;cursor:pointer;
+  width:46px;height:46px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);
+  transition:color .12s,transform .1s,background .15s;
 }
-.vpc-btn:active{color:#fff;transform:scale(.87)}
+.vpc-btn:active{
+  color:#fff;transform:scale(.88);
+  background:rgba(255,255,255,0.12);
+}
 .vpc-main{
   width:62px;height:62px;border-radius:50%;
-  /* 立體紫色按鈕 */
-  background:linear-gradient(145deg,#9333ea 0%,#a855f7 50%,#7c3aed 100%);
+  /* 懸浮玻璃感：不用純色，用半透明 + 邊框 */
+  background:rgba(255,255,255,0.12);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border:1.5px solid rgba(255,255,255,0.22);
   display:flex;align-items:center;justify-content:center;
   font-size:22px;color:#fff;
   box-shadow:
-    0 8px 28px rgba(168,85,247,0.55),
-    0 2px 8px rgba(0,0,0,0.5),
-    inset 0 1px rgba(255,255,255,0.25),
-    inset 0 -2px rgba(0,0,0,0.2);
-  transition:transform .12s,box-shadow .15s;
-  border:none;cursor:pointer;
+    0 8px 32px rgba(0,0,0,0.4),
+    0 2px 8px rgba(0,0,0,0.3),
+    inset 0 1px rgba(255,255,255,0.3);
+  transition:transform .12s,box-shadow .15s,background .15s;
+  cursor:pointer;
 }
 .vpc-main:active{
   transform:scale(.91);
-  box-shadow:0 4px 16px rgba(168,85,247,0.4),0 1px 4px rgba(0,0,0,0.4);
+  background:rgba(255,255,255,0.18);
+  box-shadow:0 4px 16px rgba(0,0,0,0.35);
 }
 
 /* ── 工具列 ── */
