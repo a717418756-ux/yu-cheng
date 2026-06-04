@@ -2035,3 +2035,116 @@ textarea{resize:vertical;line-height:1.7}
 [data-theme="eink"] .theme-btn.active{
   border:2px solid var(--t0);background:var(--t0);color:var(--bg0);
 }
+
+/* ══ 影音庫美化 ══════════════════════════════════════════════*/
+
+/* section 標題大字加漸層 */
+.media-sec-hd-big{
+  font-size:20px;font-weight:800;color:var(--t0);
+  letter-spacing:-.01em;
+  background:linear-gradient(90deg,#fff 60%,rgba(255,255,255,0.5) 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+
+/* 橫向卡片：按壓回饋 */
+.media-hcard:active .media-hcard-thumb{
+  transform:scale(0.94);
+  transition:transform .12s;
+}
+.media-hcard-thumb{
+  transition:transform .15s;
+}
+
+/* 音頻圓形：增加光暈邊框 */
+.media-hcard-thumb.audio{
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.06),
+    0 6px 20px rgba(0,0,0,0.6);
+}
+
+/* 影片縮圖：底部漸層遮罩（讓時長標籤更清晰）*/
+.media-hcard-thumb.video{
+  box-shadow:0 4px 16px rgba(0,0,0,0.5);
+}
+
+/* 黑膠圓形（無封面）加質感紋路 */
+.media-hcard-vinyl{
+  background:
+    radial-gradient(circle at 50%,
+      #3a3a48 0%,
+      #111 18%,
+      #1e1e28 30%,
+      #111 42%,
+      #1c1c24 55%,
+      #111 68%,
+      #181820 80%,
+      #0c0c10 100%
+    );
+}
+
+/* 展開模式頂部 sticky 背景加毛玻璃 */
+.media-expand-hd{
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  background:rgba(10,10,10,0.85);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+
+/* 展開模式標題文字漸層 */
+.media-expand-title{
+  background:linear-gradient(90deg,#fff 60%,rgba(255,255,255,0.55) 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+
+/* 影片卡片：懸浮效果 */
+.media-vcard{
+  transition:transform .15s,box-shadow .15s;
+}
+.media-vcard:active{
+  transform:scale(0.96);
+  box-shadow:0 2px 12px rgba(0,0,0,0.6);
+}
+
+/* 音頻橫列：按壓效果 */
+.media-arow:active{
+  background:rgba(255,255,255,0.04);
+  border-radius:10px;
+}
+
+/* 更多按鈕質感 */
+.media-sec-more{
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.08);
+  color:rgba(255,255,255,0.45);
+  font-size:12px;font-weight:600;
+  padding:5px 14px;border-radius:20px;
+  cursor:pointer;
+  transition:all .18s;
+  letter-spacing:.02em;
+}
+.media-sec-more:active,.media-sec-more.active{
+  background:rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.85);
+  border-color:rgba(255,255,255,0.18);
+}
+
+/* 頂部 header 加毛玻璃（書庫/影音庫共用）*/
+#pg-books .hd,
+#pg-media .hd{
+  background:rgba(10,10,10,0.88);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+
+/* 搜尋列加深色質感 */
+#pg-media .sb,
+#pg-books .sb{
+  background:rgba(255,255,255,0.05);
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+
