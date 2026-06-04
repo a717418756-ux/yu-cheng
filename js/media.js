@@ -102,7 +102,9 @@ function _mkVideoSection(videos){
   sec.innerHTML=`
     <div class="media-sec-hd-row">
       <div class="media-sec-hd-big">影片</div>
-      <button class="media-sec-more" onclick="_filterToType('video')">更多 ›</button>
+      <button class="media-sec-more${_M.filter==='video'?' active':''}" onclick="_filterToType('video')">
+        ${_M.filter==='video'?'收起 ‹':'更多 ›'}
+      </button>
     </div>`;
   const grid=document.createElement('div');
   grid.className='media-video-grid';
@@ -143,7 +145,9 @@ function _mkAudioSection(audios){
   sec.innerHTML=`
     <div class="media-sec-hd-row">
       <div class="media-sec-hd-big">音頻</div>
-      <button class="media-sec-more" onclick="_filterToType('audio')">更多 ›</button>
+      <button class="media-sec-more${_M.filter==='audio'?' active':''}" onclick="_filterToType('audio')">
+        ${_M.filter==='audio'?'收起 ‹':'更多 ›'}
+      </button>
     </div>`;
   const list=document.createElement('div');
   list.className='media-audio-list';
@@ -857,9 +861,11 @@ function setMediaFilter(btn,filter){
   _M.filter=filter;_M.page=0;_renderMediaPage();
 }
 
-// 點「更多」直接切換到對應篩選
+// 點「更多」切換篩選；已在該篩選則切回全部（toggle）
 function _filterToType(type){
-  _M.filter=type;_M.page=0;_renderMediaPage();
+  _M.filter = (_M.filter === type) ? 'all' : type;
+  _M.page = 0;
+  _renderMediaPage();
 }
 function searchMedia(){
   _M.kw=(document.getElementById('media-si')?.value||'').trim();
