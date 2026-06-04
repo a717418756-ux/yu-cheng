@@ -3,17 +3,14 @@
    ★ 每次更新程式只需修改 APP_VERSION
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '1.7.5';
+const APP_VERSION = '1.7.6';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
-// ── 快取資源（不包含 index.html）────────────────────────────
-// index.html 永遠從網路取得，確保 HTML 結構不落後於 JS/CSS
-const ASSETS = [
+// ── 核心本地資源（必須快取成功，任一失敗會重試）────────────
+const CORE_ASSETS = [
   './manifest.json',
   './css/app.css',
   './css/splash.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js',
   './js/db.js',
   './js/books.js',
   './js/media.js',
@@ -24,27 +21,35 @@ const ASSETS = [
   './js/settings.js',
   './js/countdown.js',
   './js/app.js',
-  './splash-logo-icon.png',
+];
+
+// ── 可選資源（快取失敗不影響 SW 安裝）──────────────────────
+const OPTIONAL_ASSETS = [
   './icons/splash-logo.png',
   './icons/vinyl-record.png',
   './icons/tonearm.png',
-  './icons/icon-72.png',
-  './icons/icon-96.png',
-  './icons/icon-128.png',
-  './icons/icon-144.png',
-  './icons/icon-152.png',
   './icons/icon-192.png',
-  './icons/icon-384.png',
   './icons/icon-512.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js'
+  './splash-logo-icon.png',
+  'https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
 ];
 
-/* ── 安裝：預快取完成後立即 skipWaiting，自動接管 ── */
+/* ── 安裝：核心資源快取成功後立即 skipWaiting ── */
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())  // ★ 安裝完直接接管，不等使用者手動更新
+    caches.open(CACHE_NAME).then(cache => {
+      // 核心資源：全部成功才繼續
+      const corePromise = cache.addAll(CORE_ASSETS);
+      // 可選資源：逐一嘗試，失敗不影響安裝
+      const optionalPromise = Promise.allSettled(
+        OPTIONAL_ASSETS.map(url =>
+          cache.add(url).catch(() => {/* 靜默失敗 */})
+        )
+      );
+      return Promise.all([corePromise, optionalPromise]);
+    }).then(() => self.skipWaiting())  // 安裝完直接接管
   );
 });
 
@@ -57,7 +62,7 @@ self.addEventListener('activate', e => {
           .filter(k => k.startsWith('yc-cache-') && k !== CACHE_NAME)
           .map(k => caches.delete(k))
       ))
-      .then(() => self.clients.claim())  // 立即接管，不等使用者重開頁面
+      .then(() => self.clients.claim())
   );
 });
 
@@ -68,13 +73,10 @@ self.addEventListener('fetch', e => {
   if (!url.startsWith('http')) return;
 
   // index.html → 永遠優先走網路，失敗才用快取
-  if (url.endsWith('/') || url.endsWith('/index.html') || url.endsWith('.io/')) {
+  if (url.endsWith('/') || url.endsWith('/index.html') || url.endsWith('.io/') || url.endsWith('.io')) {
     e.respondWith(
       fetch(e.request)
-        .then(res => {
-          // 網路成功：不快取 index.html，直接回傳
-          return res;
-        })
+        .then(res => res)
         .catch(() => caches.match('./index.html'))
     );
     return;
