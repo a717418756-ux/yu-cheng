@@ -3,7 +3,7 @@
    ★ 每次更新程式只需修改 APP_VERSION
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '1.5.7';
+const APP_VERSION = '1.6.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 快取資源（不包含 index.html）────────────────────────────
@@ -26,6 +26,7 @@ const ASSETS = [
   './splash-logo-icon.png',
   './icons/splash-logo.png',
   './icons/vinyl-record.png',
+  './icons/tonearm.png',
   './icons/icon-72.png',
   './icons/icon-96.png',
   './icons/icon-128.png',
