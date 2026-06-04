@@ -393,13 +393,7 @@
     <button class="hd-btn blue" onclick="openAddMedia()" style="font-size:13px">＋ 新增</button>
   </div>
   <div class="sb"><span class="ic">🔍</span><input id="media-si" type="search" placeholder="搜尋標題、分類、標籤…" oninput="searchMedia()"></div>
-  <div class="chips" id="media-chips">
-    <button class="chip on" onclick="setMediaFilter(this,'all')">全部</button>
-    <button class="chip" onclick="setMediaFilter(this,'recent')">最近播放</button>
-    <button class="chip" onclick="setMediaFilter(this,'fav')">收藏</button>
-    <button class="chip" onclick="setMediaFilter(this,'video')">影片</button>
-    <button class="chip" onclick="setMediaFilter(this,'audio')">音頻</button>
-  </div>
+  <!-- 影音庫篩選改用各 section 的「更多」按鈕，chips 移除 -->
   <div style="font-size:11px;color:var(--t2);padding:2px 14px 6px" id="media-count"></div>
   <div id="media-list"></div>
 </div>
