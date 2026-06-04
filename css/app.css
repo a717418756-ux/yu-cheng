@@ -2757,21 +2757,26 @@ textarea{resize:vertical;line-height:1.7}
 .media-sec-hd-row::after{
   content:'';
   position:absolute;
-  bottom:0;left:14px;right:14px;
+  bottom:0;left:0;right:0;
   height:1px;
-  /* 白色螢光線：中央亮、兩端漸淡 */
+  /* 更強的白色炫光線：從標題文字下方延伸 */
   background:linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255,255,255,0.08) 10%,
-    rgba(255,255,255,0.22) 30%,
-    rgba(255,255,255,0.28) 50%,
-    rgba(255,255,255,0.22) 70%,
-    rgba(255,255,255,0.08) 90%,
+    rgba(255,255,255,0.04) 5%,
+    rgba(255,255,255,0.3) 20%,
+    rgba(255,255,255,0.55) 40%,
+    rgba(255,255,255,0.6) 50%,
+    rgba(255,255,255,0.55) 60%,
+    rgba(255,255,255,0.3) 80%,
+    rgba(255,255,255,0.04) 95%,
     transparent 100%
   );
-  /* 白色螢光感 */
-  box-shadow:0 0 6px rgba(255,255,255,0.12);
+  /* 強炫光暈 */
+  box-shadow:
+    0 0 4px rgba(255,255,255,0.5),
+    0 0 12px rgba(255,255,255,0.2),
+    0 0 24px rgba(255,255,255,0.08);
 }
 
 /* 標題大字不再用漸層（改純白，更清晰有質感）*/
@@ -2793,21 +2798,40 @@ textarea{resize:vertical;line-height:1.7}
   padding-top:8px;
 }
 
-/* 每個 section 末尾加細白線（下緣分隔）*/
+/* 每個 section 末尾細白線（下緣，在內容下方更多空間）*/
 .media-hscroll-row::after,
 .media-video-grid::after,
 .media-audio-list::after{
   content:'';
   display:block;
   height:1px;
-  margin:16px 14px 0;
+  margin:24px 0 0;
   background:linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255,255,255,0.06) 15%,
-    rgba(255,255,255,0.12) 50%,
-    rgba(255,255,255,0.06) 85%,
+    rgba(255,255,255,0.05) 10%,
+    rgba(255,255,255,0.14) 35%,
+    rgba(255,255,255,0.18) 50%,
+    rgba(255,255,255,0.14) 65%,
+    rgba(255,255,255,0.05) 90%,
     transparent 100%
   );
 }
 
+
+/* 書庫 藏書/收藏 切換 tab */
+.shelf-section-tab{
+  background:none;border:none;cursor:pointer;
+  font-size:14px;font-weight:700;letter-spacing:.06em;
+  color:rgba(255,200,80,0.35);
+  padding:3px 6px;
+  transition:color .18s;
+  text-transform:uppercase;
+  font-size:11px;
+}
+.shelf-section-tab.on{
+  color:rgba(255,200,80,0.75);
+  text-decoration:underline;
+  text-decoration-thickness:1.5px;
+  text-underline-offset:3px;
+}
