@@ -99,10 +99,16 @@ function _renderMediaPage(){
 // ════════════════════════════════════════════════════════════
 function _mkVideoSection(videos){
   const sec=document.createElement('div');
-  sec.innerHTML=`<div class="media-sec-hd">🎬 影片</div>`;
+  sec.innerHTML=`
+    <div class="media-sec-hd-row">
+      <div class="media-sec-hd-big">影片</div>
+      <button class="media-sec-more" onclick="_filterToType('video')">更多 ›</button>
+    </div>`;
   const grid=document.createElement('div');
   grid.className='media-video-grid';
-  videos.forEach(m=>grid.appendChild(_mkVideoCard(m)));
+  // 主頁最多顯示4個，其餘點更多才看到
+  const preview = _M.filter==='all' ? videos.slice(0,4) : videos;
+  preview.forEach(m=>grid.appendChild(_mkVideoCard(m)));
   sec.appendChild(grid);
   return sec;
 }
@@ -134,10 +140,16 @@ function _mkVideoCard(m){
 // ════════════════════════════════════════════════════════════
 function _mkAudioSection(audios){
   const sec=document.createElement('div');
-  sec.innerHTML=`<div class="media-sec-hd">🎵 音頻</div>`;
+  sec.innerHTML=`
+    <div class="media-sec-hd-row">
+      <div class="media-sec-hd-big">音頻</div>
+      <button class="media-sec-more" onclick="_filterToType('audio')">更多 ›</button>
+    </div>`;
   const list=document.createElement('div');
   list.className='media-audio-list';
-  audios.forEach((m,i)=>list.appendChild(_mkAudioRow(m,i)));
+  // 主頁最多顯示5個
+  const preview = _M.filter==='all' ? audios.slice(0,5) : audios;
+  preview.forEach((m,i)=>list.appendChild(_mkAudioRow(m,i)));
   sec.appendChild(list);
   return sec;
 }
@@ -243,11 +255,13 @@ function _showVinylPlayer(meta, url, full){
     <!-- 黑膠唱片 -->
     <div class="vp-vinyl-wrap">
       <div class="vp-tonearm"></div>
+      <!-- 唱盤底圖（真實唱盤圖片） -->
       <div class="vp-record" id="vp-record">
         <div class="vp-record-groove"></div>
-        <div class="vp-record-label">
+        <!-- 封面圖疊在中央，自動裁圓 -->
+        <div class="vp-record-label" id="vp-label-inner">
           ${meta.thumbnail
-            ?`<img src="${meta.thumbnail}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+            ?`<img src="${meta.thumbnail}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;">`
             :`<div class="vp-label-text">${esc(meta.title||'')}</div>`}
         </div>
         <div class="vp-record-center"></div>
@@ -384,13 +398,23 @@ function closeVinylPlayer(){
 function _vpTimeUpdate(){
   if(!_audioEl) return;
   const cur=_audioEl.currentTime;
+  const dur=_audioEl.duration||1;
   const seek=document.getElementById('vp-seek');
-  if(seek && !seek.matches(':active')) seek.value=cur;
+  if(seek && !seek.matches(':active')){
+    seek.value=cur;
+    // 更新已播放填色
+    const pct=Math.round(cur/dur*1000)/10;
+    seek.style.setProperty('--seek-pct', pct+'%');
+  }
   const curEl=document.getElementById('vp-cur');
   if(curEl) curEl.textContent=_fmtDurSec(cur);
 }
 function _vpSeek(val){
-  if(_audioEl) _audioEl.currentTime=parseFloat(val);
+  if(!_audioEl) return;
+  _audioEl.currentTime=parseFloat(val);
+  const pct=Math.round(parseFloat(val)/(_audioEl.duration||1)*1000)/10;
+  const seek=document.getElementById('vp-seek');
+  if(seek) seek.style.setProperty('--seek-pct', pct+'%');
 }
 function _vpToggle(){
   if(!_audioEl) return;
@@ -829,8 +853,13 @@ async function confirmDeleteMedia(id){
 // ════════════════════════════════════════════════════════════
 function setMediaFilter(btn,filter){
   document.querySelectorAll('#media-chips .chip').forEach(c=>c.classList.remove('on'));
-  btn.classList.add('on');
+  if(btn) btn.classList.add('on');
   _M.filter=filter;_M.page=0;_renderMediaPage();
+}
+
+// 點「更多」直接切換到對應篩選
+function _filterToType(type){
+  _M.filter=type;_M.page=0;_renderMediaPage();
 }
 function searchMedia(){
   _M.kw=(document.getElementById('media-si')?.value||'').trim();
