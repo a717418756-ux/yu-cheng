@@ -160,8 +160,16 @@ function _mkRecentSection(books){
 function _mkModeBar(){
   const bar = document.createElement('div');
   bar.className='shelf-mode-bar';
+  // 「藏書 / 收藏」切換標題（點擊切換）
+  const isShowingFav = _B.filter === 'fav';
   bar.innerHTML=`
-    <div class="shelf-mode-title">藏書</div>
+    <div style="display:flex;align-items:center;gap:0">
+      <button class="shelf-section-tab${!isShowingFav?' on':''}"
+        onclick="toggleShelfSection('all')">藏書</button>
+      <span style="color:rgba(255,200,80,0.3);font-size:14px;padding:0 4px">｜</span>
+      <button class="shelf-section-tab${isShowingFav?' on':''}"
+        onclick="toggleShelfSection('fav')">收藏</button>
+    </div>
     <div class="shelf-mode-btns">
       <button class="shelf-mode-btn${_B.mode==='spine'?' on':''}"
         onclick="setBooksMode('spine',this)">書架</button>
@@ -171,6 +179,13 @@ function _mkModeBar(){
         onclick="setBooksMode('list',this)">清單</button>
     </div>`;
   return bar;
+}
+
+// 藏書 / 收藏 切換
+function toggleShelfSection(section){
+  _B.filter = section;
+  _B.page = 0;
+  _renderBooksPage();
 }
 
 function setBooksMode(mode, btn){
@@ -391,9 +406,8 @@ function _filteredBooks(){
   return list;
 }
 
+// setBooksFilter：chips 已移除，保留空函式防止殘留 HTML 呼叫報錯
 function setBooksFilter(btn, filter){
-  document.querySelectorAll('#books-chips .chip').forEach(c=>c.classList.remove('on'));
-  btn.classList.add('on');
   _B.filter=filter; _B.page=0; _renderBooksPage();
 }
 function searchBooks(){
