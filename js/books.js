@@ -12,12 +12,25 @@ const _B = {
   allBooks: [],      // metadata only（不含 blob）
 };
 
-// 預設書本尺寸（mm 比例，實際以 px 呈現）
-const _BOOK_DEFAULT = {
-  spineW: 28,   // 書背寬（px）
-  bookH:  140,  // 書本高（px）
-  bookW:  96,   // 書本寬（px，用於封面彈窗）
+// 書本尺寸：使用者輸入 mm，自動換算成 px
+// 換算比例：1mm ≈ 1.7px（96dpi * 0.45縮放）
+const MM_TO_PX = 1.7;
+function mmToPx(mm){ return Math.round(mm * MM_TO_PX); }
+
+// 預設書本尺寸（mm）—— A5 平裝書標準
+const _BOOK_DEFAULT_MM = {
+  thickMM: 20,   // 書背厚度（mm）→ 書背寬
+  heightMM: 210, // 書本高（mm）
+  widthMM:  148, // 書本寬（mm）
 };
+// 轉成 px（渲染用）
+const _BOOK_DEFAULT = {
+  spineW: mmToPx(_BOOK_DEFAULT_MM.thickMM),   // ~34px
+  bookH:  mmToPx(_BOOK_DEFAULT_MM.heightMM),   // ~357px → 壓縮顯示
+  bookW:  mmToPx(_BOOK_DEFAULT_MM.widthMM),    // ~252px
+};
+// 書架顯示高度縮放（手機螢幕空間有限）
+const SHELF_SCALE = 0.5;  // 顯示時縮放為50%
 
 // ════════════════════════════════════════════════════════════
 // 書庫渲染入口
@@ -78,10 +91,51 @@ function _renderShelf(){
   const batch = list.slice(0, (_B.page+1)*_B.PAGE);
   el.innerHTML = '';
 
-  // 書架容器
   const shelf = document.createElement('div');
   shelf.className = 'bookshelf';
-  batch.forEach(b => shelf.appendChild(_mkSpine(b)));
+
+  // 書背依顯示寬度分行（每行填滿後換行，下方加木板）
+  const containerW = Math.min(window.innerWidth, 540) - 28; // 14px padding *2
+  let rowDiv = null;
+  let rowUsed = 0;
+  const GAP = 3;
+
+  batch.forEach(b => {
+    const thickMM  = b.thickMM  || _BOOK_DEFAULT_MM.thickMM;
+    const heightMM = b.heightMM || _BOOK_DEFAULT_MM.heightMM;
+    const dispW = Math.round(mmToPx(thickMM) * SHELF_SCALE);
+    const dispH = Math.round(mmToPx(heightMM) * SHELF_SCALE);
+
+    if(!rowDiv || rowUsed + dispW + GAP > containerW){
+      if(rowDiv){
+        // 填充空白（讓最後一本書也有書架感）
+        const spacer = document.createElement('div');
+        spacer.style.cssText='flex:1;min-width:0';
+        rowDiv.appendChild(spacer);
+        // 加木板
+        const plank = document.createElement('div');
+        plank.className = 'shelf-plank';
+        shelf.appendChild(plank);
+      }
+      rowDiv = document.createElement('div');
+      rowDiv.className = 'shelf-row';
+      shelf.appendChild(rowDiv);
+      rowUsed = 0;
+    }
+    rowDiv.appendChild(_mkSpine(b));
+    rowUsed += dispW + GAP;
+  });
+
+  // 最後一行也加木板（書沒滿時補空白）
+  if(rowDiv){
+    const spacer = document.createElement('div');
+    spacer.style.cssText='flex:1;min-width:0';
+    rowDiv.appendChild(spacer);
+    const plank = document.createElement('div');
+    plank.className = 'shelf-plank';
+    shelf.appendChild(plank);
+  }
+
   el.appendChild(shelf);
 
   // 無限捲動觸發點
@@ -98,13 +152,20 @@ function _renderShelf(){
 
 // 書背卡片
 function _mkSpine(b){
-  const spineW = b.spineW || _BOOK_DEFAULT.spineW;
-  const bookH  = b.bookH  || _BOOK_DEFAULT.bookH;
+  // 若有 mm 尺寸就換算，否則用舊 px 值相容
+  const spineW = b.thickMM ? mmToPx(b.thickMM) : (b.spineW || _BOOK_DEFAULT.spineW);
+  const bookH  = b.heightMM? mmToPx(b.heightMM): (b.bookH  || _BOOK_DEFAULT.bookH);
+  const bookW  = b.widthMM ? mmToPx(b.widthMM) : (b.bookW  || _BOOK_DEFAULT.bookW);
+
+  // 顯示高度縮放（保持比例，書背寬不縮放太多）
+  const dispH  = Math.round(bookH * SHELF_SCALE);
+  const dispW  = Math.round(spineW * SHELF_SCALE);
 
   const div = document.createElement('div');
   div.className   = 'book-spine';
-  div.style.width = spineW + 'px';
-  div.style.height= bookH  + 'px';
+  div.style.width = dispW + 'px';
+  div.style.height= dispH + 'px';
+  div.dataset.bookId = b.id;
   div.title       = b.title || '未命名';
   div.onclick     = () => openBookCover(b.id);
 
@@ -146,8 +207,8 @@ async function openBookCover(id){
   const b = _B.allBooks.find(x=>x.id===id);
   if(!b) return;
 
-  const bookW = b.bookW || _BOOK_DEFAULT.bookW;
-  const bookH = b.bookH || _BOOK_DEFAULT.bookH;
+  const bookW = b.widthMM  ? mmToPx(b.widthMM)  : (b.bookW || _BOOK_DEFAULT.bookW);
+  const bookH = b.heightMM ? mmToPx(b.heightMM) : (b.bookH  || _BOOK_DEFAULT.bookH);
   // 封面彈窗顯示比例（放大3倍顯示）
   const dispH = Math.min(bookH * 3, window.innerHeight * 0.65);
   const dispW = Math.round(dispH * bookW / bookH);
@@ -219,22 +280,22 @@ function openAddBook(){
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px">
         <div>
-          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">書背寬(px)</div>
-          <input id="ab-spineW" type="number" value="${_BOOK_DEFAULT.spineW}" min="16" max="60" class="finput" style="text-align:center">
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">厚度 mm</div>
+          <input id="ab-thick" type="number" value="${_BOOK_DEFAULT_MM.thickMM}" min="5" max="100" class="finput" style="text-align:center">
         </div>
         <div>
-          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">書本高(px)</div>
-          <input id="ab-bookH" type="number" value="${_BOOK_DEFAULT.bookH}" min="80" max="220" class="finput" style="text-align:center">
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">高度 mm</div>
+          <input id="ab-height" type="number" value="${_BOOK_DEFAULT_MM.heightMM}" min="100" max="300" class="finput" style="text-align:center">
         </div>
         <div>
-          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">書本寬(px)</div>
-          <input id="ab-bookW" type="number" value="${_BOOK_DEFAULT.bookW}" min="60" max="160" class="finput" style="text-align:center">
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">寬度 mm</div>
+          <input id="ab-width" type="number" value="${_BOOK_DEFAULT_MM.widthMM}" min="80" max="220" class="finput" style="text-align:center">
         </div>
       </div>
       <div style="font-size:10px;color:var(--t2);margin-bottom:12px">
-        ↑ 書背寬建議 20–40px；書本高/寬會影響點擊後封面彈窗比例（預設 ${_BOOK_DEFAULT.bookW}×${_BOOK_DEFAULT.bookH} ≈ 標準書本）
+        ↑ 輸入實際書本尺寸（mm），系統自動換算。預設為 A5 平裝書（210×148mm，厚20mm）
       </div>
 
       <label style="font-size:11px;color:var(--t2);display:flex;align-items:center;gap:6px;margin-bottom:12px">
@@ -279,9 +340,9 @@ async function saveNewBook(){
   const title    = document.getElementById('ab-title')?.value.trim();
   if(!title){ toast('請填寫書名'); return; }
 
-  const spineW   = parseInt(document.getElementById('ab-spineW')?.value) || _BOOK_DEFAULT.spineW;
-  const bookH    = parseInt(document.getElementById('ab-bookH')?.value)  || _BOOK_DEFAULT.bookH;
-  const bookW    = parseInt(document.getElementById('ab-bookW')?.value)  || _BOOK_DEFAULT.bookW;
+  const thickMM  = parseInt(document.getElementById('ab-thick')?.value)  || _BOOK_DEFAULT_MM.thickMM;
+  const heightMM = parseInt(document.getElementById('ab-height')?.value) || _BOOK_DEFAULT_MM.heightMM;
+  const widthMM  = parseInt(document.getElementById('ab-width')?.value)  || _BOOK_DEFAULT_MM.widthMM;
   const coverInp = document.getElementById('ab-cover-inp');
   const fileInp  = document.getElementById('ab-file-inp');
 
@@ -292,9 +353,10 @@ async function saveNewBook(){
   if(coverInp?.files[0]){
     const img = coverInp.files[0];
     // 封面縮圖：壓縮到最大 200px 寬
-    coverThumb = await _compressImage(img, 200, Math.round(200 * bookH / bookW));
-    // 書背縮圖：壓縮到書背尺寸（spineW × bookH）
-    spineThumb = await _compressImage(img, spineW * 2, bookH * 2); // 2x for retina
+    const pxW = mmToPx(widthMM), pxH = mmToPx(heightMM), pxS = mmToPx(thickMM);
+    coverThumb = await _compressImage(img, 200, Math.round(200 * pxH / pxW));
+    // 書背縮圖：壓縮到書背尺寸
+    spineThumb = await _compressImage(img, pxS * 2, pxH * 2);
   }
 
   const book = {
@@ -306,7 +368,7 @@ async function saveNewBook(){
     blob:       fileInp?.files[0]||null,
     coverThumb,   // 封面縮圖（base64，約20-60KB）
     spineThumb,   // 書背縮圖（base64，極小）
-    spineW, bookH, bookW,
+    thickMM, heightMM, widthMM,
     tags:       [],
     favorite:   false,
     lastRead:   null,

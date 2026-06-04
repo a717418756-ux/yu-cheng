@@ -163,7 +163,7 @@ function _mkAudioRow(m,i){
       ${dur?`<span class="mar-dur">${dur}</span>`:''}
       <button class="mv-fav-btn${m.favorite?' on':''}"
         onclick="toggleMediaFav(${m.id},this)">${m.favorite?'⭐':'☆'}</button>
-      <button class="mar-del" onclick="confirmDeleteMedia(${m.id})">🗑</button>
+      <button class="mar-more" onclick="openMediaDetail(${m.id})">⋯</button>
     </div>`;
   return div;
 }
@@ -184,7 +184,12 @@ async function playAudio(id){
 
   // 讀取 Blob
   const full=await dg('leisuremedia',id);
-  if(!full?.blob){toast('找不到音頻檔案');return;}
+  if(!full?.blob){
+    // 無附加檔案，但仍可開詳情視窗讓使用者刪除
+    openMediaDetail(id);
+    toast('此音頻無附加檔案，可在詳情中刪除');
+    return;
+  }
 
   // 停掉舊播放器
   if(_audioEl){_audioEl.pause();_audioEl.src='';}
@@ -218,12 +223,21 @@ function _showVinylPlayer(meta, url, full){
 
   const lastPos=full.lastPos||0;
 
+  const isFav = meta.favorite || false;
   ov.innerHTML=`
     <!-- 頂部列 -->
     <div class="vp-topbar">
-      <button class="vp-back" onclick="closeVinylPlayer()">⌄</button>
+      <button class="vp-back" onclick="closeVinylPlayer()">
+        <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
+          <path d="M1 5H13M1 5L5 1M1 5L5 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
       <div class="vp-mode-lbl">黑膠模式</div>
-      <button class="vp-more" onclick="openMediaDetail(${meta.id})">⋮</button>
+      <button class="vp-more" onclick="openMediaDetail(${meta.id})">
+        <svg width="18" height="4" viewBox="0 0 18 4" fill="currentColor">
+          <circle cx="2" cy="2" r="2"/><circle cx="9" cy="2" r="2"/><circle cx="16" cy="2" r="2"/>
+        </svg>
+      </button>
     </div>
 
     <!-- 黑膠唱片 -->
@@ -240,10 +254,14 @@ function _showVinylPlayer(meta, url, full){
       </div>
     </div>
 
-    <!-- 曲目資訊 -->
+    <!-- 曲目資訊 + 喜愛 -->
     <div class="vp-info">
-      <div class="vp-title">${esc(meta.title||'未命名')}</div>
-      <div class="vp-artist">${esc(meta.category||'Y.C. 影音庫')}</div>
+      <div class="vp-info-text">
+        <div class="vp-title">${esc(meta.title||'未命名')}</div>
+        <div class="vp-artist">${esc(meta.category||'Y.C. 影音庫')}</div>
+      </div>
+      <button class="vp-fav-btn${isFav?' on':''}" id="vp-fav-btn"
+        onclick="_vpToggleFav(${meta.id},this)">${isFav?'♥':'♡'}</button>
     </div>
 
     <!-- 進度條 -->
@@ -265,9 +283,15 @@ function _showVinylPlayer(meta, url, full){
 
     <!-- 下排工具列 -->
     <div class="vp-tools">
-      <button class="vpt-btn" onclick="_vpCycleSpeed(this)">1.0×</button>
-      <button class="vpt-btn" onclick="_vpSleepTimer(this)" id="vp-sleep-btn">⏱ 定時</button>
-      <button class="vpt-btn" onclick="openVpPlaylist()">≡ 列表</button>
+      <button class="vpt-btn" onclick="_vpCycleSpeed(this)">
+        <span class="vpt-icon">🎚</span>1.0×
+      </button>
+      <button class="vpt-btn" onclick="_vpSleepTimer(this)" id="vp-sleep-btn">
+        <span class="vpt-icon">⏱</span>定時
+      </button>
+      <button class="vpt-btn" onclick="openVpPlaylist()">
+        <span class="vpt-icon">≡</span>列表
+      </button>
     </div>
 
     <!-- 隱藏 audio 元素 -->
@@ -283,12 +307,46 @@ function _showVinylPlayer(meta, url, full){
   _audioEl.onloadedmetadata=()=>{
     document.getElementById('vp-dur').textContent=_fmtDurSec(_audioEl.duration);
     document.getElementById('vp-seek').max=_audioEl.duration;
+    // 更新 MediaSession duration
+    if('mediaSession' in navigator && _audioEl.duration){
+      try{ navigator.mediaSession.setPositionState({duration:_audioEl.duration,position:_audioEl.currentTime||0}); }catch(_){}
+    }
   };
   _audioEl.onended=_vpNext;
   _audioEl.play().then(()=>{
     document.getElementById('vp-play-btn').textContent='⏸';
     _startVinylSpin();
+    _setupMediaSession(meta);
   }).catch(()=>{});
+}
+
+// MediaSession API：通知列 / 鎖屏 控制
+function _setupMediaSession(meta){
+  if(!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title:  meta.title  || '未命名',
+    artist: meta.category || 'Y.C. 影音庫',
+    album:  'Y.C. All-in-one',
+    artwork: meta.thumbnail ? [{src:meta.thumbnail,sizes:'192x192',type:'image/jpeg'}] : [],
+  });
+  navigator.mediaSession.setActionHandler('play',         ()=>{ if(_audioEl){_audioEl.play();_startVinylSpin();document.getElementById('vp-play-btn').textContent='⏸';} });
+  navigator.mediaSession.setActionHandler('pause',        ()=>{ if(_audioEl){_audioEl.pause();_stopVinylSpin();document.getElementById('vp-play-btn').textContent='▶';} });
+  navigator.mediaSession.setActionHandler('previoustrack',()=>_vpPrev());
+  navigator.mediaSession.setActionHandler('nexttrack',    ()=>_vpNext());
+  navigator.mediaSession.setActionHandler('seekto', e=>{ if(_audioEl && e.seekTime!=null) _audioEl.currentTime=e.seekTime; });
+}
+
+// 收藏切換（黑膠播放器內）
+async function _vpToggleFav(id, btn){
+  try{
+    const m = await dg('leisuremedia', id); if(!m) return;
+    m.favorite = !m.favorite;
+    await dp('leisuremedia', m);
+    btn.className = m.favorite ? 'vp-fav-btn on' : 'vp-fav-btn';
+    btn.textContent = m.favorite ? '♥' : '♡';
+    const idx = _M.allMedia.findIndex(x=>x.id===id);
+    if(idx>=0) _M.allMedia[idx].favorite = m.favorite;
+  }catch(e){ logError('_vpToggleFav',e); }
 }
 
 // 黑膠旋轉
@@ -418,7 +476,11 @@ function openVpPlaylist(){
 // ════════════════════════════════════════════════════════════
 async function playVideo(id){
   const full=await dg('leisuremedia',id);
-  if(!full?.blob){toast('找不到影片檔案');return;}
+  if(!full?.blob){
+    openMediaDetail(id);
+    toast('此影片無附加檔案，可在詳情中刪除');
+    return;
+  }
 
   _M.nowId  =id;
   _M.nowType='video';
@@ -431,28 +493,28 @@ async function playVideo(id){
 
   ov.innerHTML=`
     <div class="vvp-topbar">
-      <button class="vp-back" onclick="closeVideoPlayer(${id})">← ${esc(full.title||'')}</button>
-      <button onclick="openMediaDetail(${id})"
-        style="background:none;border:none;color:rgba(255,255,255,0.6);font-size:18px;cursor:pointer">⋮</button>
+      <button class="vvp-back" onclick="closeVideoPlayer(${id})">←</button>
+      <div class="vvp-title">${esc(full.title||'影片')}</div>
+      <button class="vvp-more" onclick="openMediaDetail(${id})">⋮</button>
     </div>
-    <video id="video-el" controls playsinline preload="metadata"
-      style="flex:1;width:100%;background:#000;max-height:calc(100vh - 120px)"
-      src="${url}"></video>
+    <div style="flex:1;position:relative;background:#000;display:flex;align-items:center">
+      <video id="video-el" controls playsinline preload="metadata"
+        style="width:100%;max-height:calc(100vh - 110px)"
+        src="${url}"></video>
+    </div>
     <div class="vvp-toolbar">
-      <select id="vv-speed"
-        style="background:#111;color:#fff;border:1px solid rgba(255,255,255,0.2);
-        padding:5px 10px;border-radius:8px;font-size:13px"
-        onchange="document.getElementById('video-el').playbackRate=parseFloat(this.value)">
-        <option value="0.5">0.5×</option>
-        <option value="0.75">0.75×</option>
-        <option value="1" selected>1.0×</option>
-        <option value="1.25">1.25×</option>
-        <option value="1.5">1.5×</option>
-        <option value="2">2×</option>
-      </select>
-      <button onclick="downloadMedia(${id})"
-        style="background:rgba(255,255,255,0.1);border:none;color:#fff;
-        padding:6px 16px;border-radius:8px;font-size:13px;cursor:pointer">⬇ 下載</button>
+      <button class="vvp-tool-btn" id="vvp-speed-btn" onclick="_vvpCycleSpeed(this)">
+        <span class="vvp-tool-val">1.0×</span>
+        <span class="vvp-tool-lbl">倍速</span>
+      </button>
+      <button class="vvp-tool-btn" onclick="downloadMedia(${id})">
+        <span class="vvp-tool-val">⬇</span>
+        <span class="vvp-tool-lbl">下載</span>
+      </button>
+      <button class="vvp-tool-btn" onclick="openMediaDetail(${id})">
+        <span class="vvp-tool-val">⋮</span>
+        <span class="vvp-tool-lbl">更多</span>
+      </button>
     </div>`;
 
   document.body.appendChild(ov);
@@ -466,6 +528,17 @@ async function playVideo(id){
   await dp('leisuremedia',full);
 
   _showMiniBar(full.title,'video');
+}
+
+function _vvpCycleSpeed(btn){
+  const vidEl = document.getElementById('video-el');
+  if(!vidEl) return;
+  const speeds = [0.75, 1, 1.25, 1.5, 2];
+  const cur = vidEl.playbackRate;
+  const nxt = speeds[(speeds.indexOf(cur)+1)%speeds.length];
+  vidEl.playbackRate = nxt;
+  const span = btn.querySelector('span');
+  if(span) span.textContent = nxt.toFixed(2).replace('.00','').replace(/\.?0+$/,'');
 }
 
 async function closeVideoPlayer(id){
