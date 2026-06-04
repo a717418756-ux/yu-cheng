@@ -365,7 +365,11 @@
 <div id="pg-books" class="page hide">
   <div class="hd">
     <div class="hdt">書庫</div>
-    <button class="hd-btn blue" onclick="openAddBook()" style="font-size:13px">＋ 新增</button>
+    <div style="display:flex;gap:6px">
+      <button class="hd-btn" onclick="toggleBooksBulk(this)"
+        id="books-bulk-btn" style="font-size:12px;color:var(--red)">批量刪除</button>
+      <button class="hd-btn blue" onclick="openAddBook()" style="font-size:13px">＋ 新增</button>
+    </div>
   </div>
   <div class="sb"><span class="ic">🔍</span><input id="books-si" type="search" placeholder="搜尋書名、作者、分類…" oninput="searchBooks()"></div>
   <div class="chips" id="books-chips">
@@ -724,6 +728,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js"></script>
 <!-- JS 模組（載入順序不可更動）-->
 <script src="js/db.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
 <script src="js/books.js"></script>
 <script src="js/media.js"></script>
 <script src="js/utils.js"></script>
