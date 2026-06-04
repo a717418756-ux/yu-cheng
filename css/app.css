@@ -1224,14 +1224,8 @@ textarea{resize:vertical;line-height:1.7}
   padding:14px 14px 8px;
 }
 /* 新：大字 section header 行 */
-.media-sec-hd-row{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:18px 14px 10px;
-}
-.media-sec-hd-big{
-  font-size:20px;font-weight:800;color:var(--t0);
-  letter-spacing:-.01em;
-}
+
+
 .media-sec-more{
   background:rgba(255,255,255,0.06);
   border:1px solid rgba(255,255,255,0.1);
@@ -2370,14 +2364,7 @@ textarea{resize:vertical;line-height:1.7}
 /* ══ 影音庫美化 ══════════════════════════════════════════════*/
 
 /* section 標題大字加漸層 */
-.media-sec-hd-big{
-  font-size:20px;font-weight:800;color:var(--t0);
-  letter-spacing:-.01em;
-  background:linear-gradient(90deg,#fff 60%,rgba(255,255,255,0.5) 100%);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  background-clip:text;
-}
+
 
 /* 橫向卡片：按壓回饋 */
 .media-hcard:active .media-hcard-thumb{
@@ -2547,23 +2534,13 @@ textarea{resize:vertical;line-height:1.7}
 /* section 之間的視覺分隔 */
 .media-hscroll-row + .media-sec-hd-row,
 .media-video-grid + .media-sec-hd-row,
-.media-audio-list + .media-sec-hd-row{
-  margin-top:4px;
-}
+.media-audio-list + 
 
 /* section header row 加細膩底線 */
-.media-sec-hd-row{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:24px 14px 12px;
-  position:relative;
-  border-bottom:1px solid rgba(255,255,255,0.05);
-  margin-bottom:2px;
-}
+
 
 /* 橫向捲動列底部 */
-.media-hscroll-row{
-  padding:0 14px 24px;
-}
+
 
 /* 影片海報牆：卡片加質感邊框 */
 .media-vcard{
@@ -2593,14 +2570,7 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* section 標題大字更精緻 */
-.media-sec-hd-big{
-  font-size:22px;font-weight:800;
-  letter-spacing:-.02em;
-  background:linear-gradient(135deg,#ffffff 0%,rgba(255,255,255,0.75) 100%);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  background-clip:text;
-}
+
 
 /* 影片縮圖無圖時更有質感 */
 .mvc-no-poster{
@@ -2670,9 +2640,7 @@ textarea{resize:vertical;line-height:1.7}
 /* ── 影音庫 section 質感加強 ──────────────────────────────── */
 
 /* 最近播放/收藏 section 頂部加細緻分隔線 */
-.media-sec-hd-row{
-  border-top:1px solid rgba(255,255,255,0.04);
-}
+
 .media-sec-hd-row:first-of-type{
   border-top:none;
 }
@@ -2780,8 +2748,11 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 標題行：加白色螢光底線 */
 .media-sec-hd-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:22px 14px 14px;
   position:relative;
-  padding-bottom:14px;
 }
 .media-sec-hd-row::after{
   content:'';
@@ -2814,9 +2785,7 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* 內容列距離標題增加（下移）*/
-.media-hscroll-row{
-  padding-top:14px;
-}
+
 .media-video-grid{
   padding-top:14px;
 }
