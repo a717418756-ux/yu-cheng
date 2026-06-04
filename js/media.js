@@ -10,7 +10,11 @@ const _M = {
   page:       0,
   PAGE:       20,
   allMedia:   [],
-  expandMode: null,   // null=首頁, 'video'|'audio'|'recent'|'fav'=展開模式
+  expandMode:   null,
+  bulkMode:     false,
+  bulkSelected: new Set(),
+  loopMode:   false,  // 單曲循環
+  shuffleMode:false,  // 隨機播放
   // 正在播放
   nowId:    null,
   nowType:  null,   // 'audio' | 'video'
@@ -95,14 +99,14 @@ function _renderMediaPage(){
   const audios = [...all].filter(m=>m.type==='audio')
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
 
-  if(recent.length) el.appendChild(_mkHScrollSection('最近播放','recent',recent));
+  if(recent.length) el.appendChild(_mkHScrollSection('最近播放','recent',recent, false));
   el.appendChild(_mkHScrollSection('收藏','fav',favs));  // 無收藏也顯示（空狀態）
   if(videos.length) el.appendChild(_mkHScrollSection('影片','video',videos));
   if(audios.length) el.appendChild(_mkHScrollSection('音頻','audio',audios));
 }
 
 // ── 橫向捲動 section ──────────────────────────────────────
-function _mkHScrollSection(title, type, items){
+function _mkHScrollSection(title, type, items, showMore=true){
   const sec = document.createElement('div');
   const preview = items.slice(0,5);
 
@@ -110,7 +114,7 @@ function _mkHScrollSection(title, type, items){
   hd.className='media-sec-hd-row';
   hd.innerHTML=`
     <div class="media-sec-hd-big">${title}</div>
-    <button class="media-sec-more" onclick="_openExpandMode('${type}')">更多 ›</button>`;
+    ${showMore ? `<button class="media-sec-more" onclick="_openExpandMode('${type}')">更多 ›</button>` : ''}`;
   sec.appendChild(hd);
 
   if(!items.length){
@@ -191,12 +195,17 @@ function _renderExpandMode(el){
   el.innerHTML='';
 
   // 頂部：標題 + 返回首頁 + 類別篩選（影片/音頻模式下）
+  const isFavMode = (type==='fav');
   const hd = document.createElement('div');
   hd.className='media-expand-hd';
   hd.innerHTML=`
     <button class="media-expand-back" onclick="_closeExpandMode()">‹ 返回</button>
     <div class="media-expand-title">${title}</div>
-    <div style="width:60px"></div>`;
+    <button class="media-expand-bulk" id="bulk-btn"
+      onclick="_toggleBulkMode()"
+      style="font-size:12px;font-weight:600;color:var(--acc);background:none;border:none;cursor:pointer;padding:4px 8px">
+      ${isFavMode?'批量移除':'批量刪除'}
+    </button>`;
   el.appendChild(hd);
 
   // 類別標籤（影片和音頻模式下才顯示）
@@ -224,16 +233,119 @@ function _renderExpandMode(el){
 
   if(type==='audio'){
     list.className='media-audio-list';
-    items.forEach((m,i)=>list.appendChild(_mkAudioRow(m,i)));
+    items.forEach((m,i)=>{
+      const row = _mkAudioRow(m,i);
+      if(_M.bulkMode){
+        const cb=document.createElement('input');
+        cb.type='checkbox'; cb.id=`bulk-cb-${m.id}`;
+        cb.style.cssText='width:18px;height:18px;margin:0 10px 0 14px;flex-shrink:0;accent-color:var(--acc)';
+        cb.checked=_M.bulkSelected.has(m.id);
+        cb.onchange=()=>_toggleBulkSelect(m.id);
+        row.insertBefore(cb, row.firstChild);
+      }
+      list.appendChild(row);
+    });
   } else {
     list.className='media-video-grid';
-    items.forEach(m=>list.appendChild(_mkVideoCard(m)));
+    items.forEach(m=>{
+      const card=_mkVideoCard(m);
+      if(_M.bulkMode){
+        card.style.position='relative';
+        const cb=document.createElement('input');
+        cb.type='checkbox'; cb.id=`bulk-cb-${m.id}`;
+        cb.style.cssText='position:absolute;top:8px;left:8px;width:20px;height:20px;z-index:2;accent-color:var(--acc)';
+        cb.checked=_M.bulkSelected.has(m.id);
+        cb.onchange=e=>{e.stopPropagation();_toggleBulkSelect(m.id);};
+        card.appendChild(cb);
+      }
+      list.appendChild(card);
+    });
   }
   el.appendChild(list);
+
+  // 批量模式：底部確認列
+  if(_M.bulkMode){
+    const bar=document.createElement('div');
+    bar.style.cssText=`position:sticky;bottom:0;background:var(--bg1);
+      border-top:1px solid rgba(255,255,255,0.08);
+      padding:12px 14px;display:flex;gap:10px;z-index:10`;
+    bar.innerHTML=`
+      <button onclick="_toggleBulkMode()"
+        style="flex:1;padding:11px;background:rgba(255,255,255,0.06);
+        border:1px solid var(--bd);color:var(--t1);border-radius:10px;
+        font-size:13px;cursor:pointer">取消</button>
+      <button id="bulk-confirm-btn" onclick="_executeBulk()"
+        style="flex:2;padding:11px;
+        background:${_M.expandMode==='fav'?'rgba(37,98,200,0.85)':'rgba(200,50,50,0.8)'};
+        color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">
+        ${_M.expandMode==='fav'?'移除收藏 (0)':'刪除 (0)'}
+      </button>`;
+    el.appendChild(bar);
+  }
 }
 
 function _closeExpandMode(){
   _M.expandMode = null;
+  _M.bulkMode = false;
+  _M.bulkSelected = new Set();
+  _renderMediaPage();
+}
+
+// 批量模式切換
+function _toggleBulkMode(){
+  _M.bulkMode = !_M.bulkMode;
+  _M.bulkSelected = new Set();
+  // 重新渲染展開模式（加勾選框）
+  const el = document.getElementById('media-list');
+  if(el) _renderExpandMode(el);
+}
+
+// 勾選切換
+function _toggleBulkSelect(id){
+  if(_M.bulkSelected.has(id)) _M.bulkSelected.delete(id);
+  else _M.bulkSelected.add(id);
+  // 更新勾選狀態 UI
+  const cb = document.getElementById(`bulk-cb-${id}`);
+  if(cb) cb.checked = _M.bulkSelected.has(id);
+  // 更新確認按鈕
+  const confirmBtn = document.getElementById('bulk-confirm-btn');
+  if(confirmBtn) confirmBtn.textContent =
+    _M.expandMode==='fav'
+      ? `移除收藏 (${_M.bulkSelected.size})`
+      : `刪除 (${_M.bulkSelected.size})`;
+}
+
+// 批量執行
+async function _executeBulk(){
+  if(!_M.bulkSelected.size){ toast('請先勾選項目'); return; }
+  const ids = [..._M.bulkSelected];
+  const isFav = _M.expandMode==='fav';
+  if(isFav){
+    // 批量移除收藏
+    for(const id of ids){
+      const m = await dg('leisuremedia', id);
+      if(m){ m.favorite=false; await dp('leisuremedia', m); }
+      const idx=_M.allMedia.findIndex(x=>x.id===id);
+      if(idx>=0) _M.allMedia[idx].favorite=false;
+    }
+    toast(`已移除 ${ids.length} 項收藏`);
+  } else {
+    if(!confirm(`確定刪除 ${ids.length} 項？此操作無法復原。`)) return;
+    for(const id of ids){
+      await dd('leisuremedia', id);
+      _M.allMedia = _M.allMedia.filter(x=>x.id!==id);
+    }
+    toast(`已刪除 ${ids.length} 項`);
+  }
+  _M.bulkMode=false; _M.bulkSelected=new Set();
+  const el=document.getElementById('media-list');
+  if(el) _renderExpandMode(el);
+}
+
+function _closeExpandMode(){
+  _M.expandMode = null;
+  _M.bulkMode = false;
+  _M.bulkSelected = new Set();
   _renderMediaPage();
 }
 
@@ -381,12 +493,10 @@ function _showVinylPlayer(meta, url, full){
       <div style="text-align:center">
         <div class="vp-mode-lbl">黑膠模式</div>
       </div>
-      <button class="vp-more" id="vp-top-fav" onclick="_vpToggleFav(${meta.id},this)"
-        style="color:${isFav?'#ec4899':'rgba(255,255,255,0.7)'}">
-        <svg width="20" height="20" viewBox="0 0 24 24"
-          fill="${isFav?'#ec4899':'none'}"
-          stroke="currentColor" stroke-width="2">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/>
+      <button class="vp-more" onclick="_openAudioMenu(${meta.id})">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/>
+          <circle cx="12" cy="19" r="2"/>
         </svg>
       </button>
     </div>
@@ -437,10 +547,19 @@ function _showVinylPlayer(meta, url, full){
       </div>
     </div>
 
-    <!-- ── 控制按鈕（上首 / 播放暫停 / 下首）── -->
+    <!-- ── 控制按鈕（循環 / 上首 / 播放暫停 / 下首 / 隨機）── -->
     <div class="vp-controls">
+      <button id="vp-loop-btn" class="vpc-btn vpc-sm"
+        onclick="_vpToggleLoop(this)" style="color:rgba(255,255,255,0.35)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="17 1 21 5 17 9"/>
+          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+          <polyline points="7 23 3 19 7 15"/>
+          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        </svg>
+      </button>
       <button class="vpc-btn vpc-side" onclick="_vpPrev()">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <polygon points="19 20 9 12 19 4 19 20"/>
           <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/>
         </svg>
@@ -451,9 +570,18 @@ function _showVinylPlayer(meta, url, full){
         </svg>
       </button>
       <button class="vpc-btn vpc-side" onclick="_vpNext()">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <polygon points="5 4 15 12 5 20 5 4"/>
           <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+      <button id="vp-shuffle-btn" class="vpc-btn vpc-sm"
+        onclick="_vpToggleShuffle(this)" style="color:rgba(255,255,255,0.35)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 3 21 3 21 8"/>
+          <line x1="4" y1="20" x2="21" y2="3"/>
+          <polyline points="21 16 21 21 16 21"/>
+          <line x1="15" y1="15" x2="21" y2="21"/>
         </svg>
       </button>
     </div>
@@ -529,6 +657,42 @@ function _setupMediaSession(meta){
   navigator.mediaSession.setActionHandler('previoustrack',()=>_vpPrev());
   navigator.mediaSession.setActionHandler('nexttrack',    ()=>_vpNext());
   navigator.mediaSession.setActionHandler('seekto', e=>{ if(_audioEl && e.seekTime!=null) _audioEl.currentTime=e.seekTime; });
+}
+
+// 音頻三點選單（詳細資料 + 刪除）
+function _openAudioMenu(id){
+  document.getElementById('audio-menu-sheet')?.remove();
+  const sheet = document.createElement('div');
+  sheet.id = 'audio-menu-sheet';
+  sheet.style.cssText = `position:fixed;inset:0;z-index:700;
+    background:rgba(0,0,0,0.6);display:flex;align-items:flex-end`;
+  sheet.onclick = e=>{ if(e.target===sheet) sheet.remove(); };
+  dg('leisuremedia', id).then(m=>{
+    if(!m) return;
+    sheet.innerHTML = `
+      <div style="width:100%;max-width:520px;margin:0 auto;
+        background:#1a1a22;border-radius:20px 20px 0 0;padding:8px 0 32px">
+        <div style="width:36px;height:4px;background:rgba(255,255,255,0.15);
+          border-radius:2px;margin:10px auto 8px"></div>
+        <div style="padding:10px 20px 14px;border-bottom:1px solid rgba(255,255,255,0.06)">
+          <div style="font-size:15px;font-weight:700;color:#fff">${esc(m.title||'')}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:3px">
+            🎵 音頻 · ${m.category||'未分類'} · ${_fmtSize(m.fileSize||0)}
+          </div>
+        </div>
+        <button onclick="confirmDeleteMedia(${id});document.getElementById('audio-menu-sheet').remove()"
+          style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;
+          color:#ff453a;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:12px">
+          <span>🗑</span>刪除
+        </button>
+        <button onclick="document.getElementById('audio-menu-sheet').remove()"
+          style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;
+          color:rgba(255,255,255,0.5);font-size:14px;cursor:pointer">
+          取消
+        </button>
+      </div>`;
+    document.body.appendChild(sheet);
+  });
 }
 
 // 封面裁剪（點擊封面區域開啟）
@@ -740,14 +904,57 @@ function _setPlayIcon(playing){
 }
 function _vpPrev(){
   if(_M.playlist.length<2) return;
-  _M.playIdx=(_M.playIdx-1+_M.playlist.length)%_M.playlist.length;
+  if(_M.shuffleMode){
+    let prev;
+    do { prev=Math.floor(Math.random()*_M.playlist.length); }
+    while(_M.playlist.length>1 && prev===_M.playIdx);
+    _M.playIdx=prev;
+  } else {
+    _M.playIdx=(_M.playIdx-1+_M.playlist.length)%_M.playlist.length;
+  }
   playAudio(_M.playlist[_M.playIdx].id);
 }
 function _vpNext(){
-  if(_M.playlist.length<2) return;
-  _M.playIdx=(_M.playIdx+1)%_M.playlist.length;
+  if(!_M.playlist.length) return;
+  if(_M.playlist.length===1){ 
+    // 只有一首：循環模式重播，否則停止
+    if(_M.loopMode && _audioEl){ _audioEl.currentTime=0; _audioEl.play(); }
+    return; 
+  }
+  if(_M.loopMode){
+    // 單曲循環
+    if(_audioEl){ _audioEl.currentTime=0; _audioEl.play(); }
+    return;
+  }
+  if(_M.shuffleMode){
+    // 隨機
+    let next;
+    do { next=Math.floor(Math.random()*_M.playlist.length); }
+    while(_M.playlist.length>1 && next===_M.playIdx);
+    _M.playIdx=next;
+  } else {
+    _M.playIdx=(_M.playIdx+1)%_M.playlist.length;
+  }
   playAudio(_M.playlist[_M.playIdx].id);
 }
+// 循環模式切換
+function _vpToggleLoop(btn){
+  _M.loopMode = !_M.loopMode;
+  if(_M.loopMode) _M.shuffleMode = false; // 互斥
+  btn.style.color = _M.loopMode ? '#fff' : 'rgba(255,255,255,0.35)';
+  // 同步隨機按鈕
+  const sh = document.getElementById('vp-shuffle-btn');
+  if(sh) sh.style.color = 'rgba(255,255,255,0.35)';
+}
+// 隨機模式切換
+function _vpToggleShuffle(btn){
+  _M.shuffleMode = !_M.shuffleMode;
+  if(_M.shuffleMode) _M.loopMode = false;
+  btn.style.color = _M.shuffleMode ? '#fff' : 'rgba(255,255,255,0.35)';
+  const lp = document.getElementById('vp-loop-btn');
+  if(lp) lp.style.color = 'rgba(255,255,255,0.35)';
+}
+
 function _vpCycleSpeed(btn){
   if(!_audioEl) return;
   const speeds=[0.75,1,1.25,1.5,2];
@@ -832,23 +1039,12 @@ async function playVideo(id){
     <div class="vvp-topbar">
       <button class="vvp-back" onclick="closeVideoPlayer(${id})">←</button>
       <div class="vvp-title">${esc(full.title||'影片')}</div>
-      <button class="vvp-more" onclick="downloadMedia(${id})">⬇</button>
+      <button class="vvp-more" onclick="_openVideoMenu(${id},this)">⋮</button>
     </div>
     <div style="flex:1;position:relative;background:#000;display:flex;align-items:center">
       <video id="video-el" controls playsinline preload="metadata"
-        style="width:100%;max-height:calc(100vh - 110px)"
+        style="width:100%;height:100%;object-fit:contain"
         src="${url}"></video>
-    </div>
-    <div class="vvp-toolbar">
-      <button class="vvp-tool-btn" id="vvp-speed-btn" onclick="_vvpCycleSpeed(this)">
-        <span class="vvp-tool-val">1.0×</span>
-        <span class="vvp-tool-lbl">倍速</span>
-      </button>
-      <button class="vvp-tool-btn" id="vvp-fav-btn" onclick="_vvpToggleFav(${id},this)"
-        style="color:${full.favorite?'#ec4899':'rgba(255,255,255,0.8)'}">
-        <span class="vvp-tool-val" style="font-size:18px">${full.favorite?'♥':'♡'}</span>
-        <span class="vvp-tool-lbl">${full.favorite?'已收藏':'收藏'}</span>
-      </button>
     </div>`;
 
   document.body.appendChild(ov);
@@ -873,6 +1069,56 @@ function _vvpCycleSpeed(btn){
   vidEl.playbackRate = nxt;
   const span = btn.querySelector('span');
   if(span) span.textContent = nxt.toFixed(2).replace('.00','').replace(/\.?0+$/,'');
+}
+
+// 影片右上三點選單
+function _openVideoMenu(id, btn){
+  document.getElementById('video-menu-sheet')?.remove();
+  const sheet = document.createElement('div');
+  sheet.id = 'video-menu-sheet';
+  sheet.style.cssText = `position:fixed;inset:0;z-index:700;
+    background:rgba(0,0,0,0.6);display:flex;align-items:flex-end`;
+  sheet.onclick = e=>{ if(e.target===sheet) sheet.remove(); };
+  sheet.innerHTML = `
+    <div style="width:100%;max-width:520px;margin:0 auto;
+      background:var(--bg1);border-radius:20px 20px 0 0;padding:8px 0 32px">
+      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:10px auto 8px"></div>
+      <button onclick="_vvpToggleFavMenu(${id},this)"
+        style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;
+        color:var(--t0);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:12px">
+        <span id="vvp-menu-fav-icon" style="font-size:18px">♡</span>收藏
+      </button>
+      <button onclick="downloadMedia(${id});document.getElementById('video-menu-sheet').remove()"
+        style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;
+        color:var(--t0);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:12px">
+        <span style="font-size:18px">⬇</span>下載
+      </button>
+      <div style="height:1px;background:rgba(255,255,255,0.06);margin:4px 0"></div>
+      <button onclick="confirmDeleteMedia(${id});document.getElementById('video-menu-sheet').remove()"
+        style="width:100%;padding:14px 20px;text-align:left;background:none;border:none;
+        color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:12px">
+        <span style="font-size:18px">🗑</span>刪除
+      </button>
+    </div>`;
+  document.body.appendChild(sheet);
+  // 初始化收藏狀態
+  dg('leisuremedia', id).then(m=>{
+    const icon = document.getElementById('vvp-menu-fav-icon');
+    if(icon && m) icon.textContent = m.favorite ? '♥' : '♡';
+  });
+}
+
+async function _vvpToggleFavMenu(id, btn){
+  try{
+    const m = await dg('leisuremedia', id); if(!m) return;
+    m.favorite = !m.favorite;
+    await dp('leisuremedia', m);
+    const icon = document.getElementById('vvp-menu-fav-icon');
+    if(icon) icon.textContent = m.favorite ? '♥' : '♡';
+    const idx = _M.allMedia.findIndex(x=>x.id===id);
+    if(idx>=0) _M.allMedia[idx].favorite = m.favorite;
+    toast(m.favorite ? '已加入收藏' : '已取消收藏');
+  }catch(e){ logError('_vvpToggleFavMenu',e); }
 }
 
 async function _vvpToggleFav(id, btn){
