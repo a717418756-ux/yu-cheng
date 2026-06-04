@@ -770,6 +770,7 @@ textarea{resize:vertical;line-height:1.7}
 .media-hscroll-row{
   display:flex;
   flex-direction:row;
+  align-items:flex-end;  /* 底部對齊：文字齊底 */
   gap:12px;
   padding:0 14px 16px;
   overflow-x:auto;
@@ -783,7 +784,9 @@ textarea{resize:vertical;line-height:1.7}
 .media-hcard{
   flex-shrink:0;
   width:120px;
-  display:flex;flex-direction:column;gap:6px;
+  display:flex;flex-direction:column;
+  align-items:center;  /* 水平置中（音頻圓形置中）*/
+  gap:6px;
   cursor:pointer;
 }
 
@@ -797,11 +800,12 @@ textarea{resize:vertical;line-height:1.7}
 .media-hcard-thumb.video{
   width:120px;height:68px;   /* 16:9 */
   border-radius:10px;
+  flex-shrink:0;
 }
 .media-hcard-thumb.audio{
   width:100px;height:100px;  /* 1:1 黑膠圓形 */
   border-radius:50%;
-  margin:0 auto;
+  flex-shrink:0;
   box-shadow:0 4px 16px rgba(0,0,0,0.5);
 }
 .media-hcard-nothumb{
@@ -1157,25 +1161,27 @@ textarea{resize:vertical;line-height:1.7}
 /* ── 進度條 ── */
 .vp-progress-wrap{padding:6px 22px 2px;flex-shrink:0}
 .vp-seek{
-  -webkit-appearance:none;width:100%;height:2px;
-  border-radius:2px;cursor:pointer;
+  -webkit-appearance:none;width:100%;
+  /* 線條高度 = 圓點的1/4，圓點12px → 線3px */
+  height:1.5px;
+  border-radius:1px;cursor:pointer;
   background:linear-gradient(
     to right,
-    rgba(255,255,255,0.9) 0%,
-    rgba(255,255,255,0.9) var(--seek-pct,0%),
-    rgba(255,255,255,0.18) var(--seek-pct,0%),
-    rgba(255,255,255,0.18) 100%
+    rgba(255,255,255,0.88) 0%,
+    rgba(255,255,255,0.88) var(--seek-pct,0%),
+    rgba(255,255,255,0.15) var(--seek-pct,0%),
+    rgba(255,255,255,0.15) 100%
   );
 }
 .vp-seek::-webkit-slider-thumb{
   -webkit-appearance:none;
-  width:13px;height:13px;border-radius:50%;
+  /* 圓點比線條大4倍 = 6px，視覺平衡 */
+  width:12px;height:12px;border-radius:50%;
   background:#fff;
-  border:none;
-  cursor:pointer;
-  box-shadow:0 0 0 2px rgba(255,255,255,0.25),0 2px 6px rgba(0,0,0,0.5);
+  border:none;cursor:pointer;
+  box-shadow:0 0 0 1.5px rgba(255,255,255,0.2),0 2px 8px rgba(0,0,0,0.6);
 }
-.vp-seek:active::-webkit-slider-thumb{transform:scale(1.25)}
+.vp-seek:active::-webkit-slider-thumb{transform:scale(1.2)}
 .vp-times{
   display:flex;justify-content:space-between;
   font-size:11px;color:rgba(255,255,255,0.3);
