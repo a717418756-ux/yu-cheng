@@ -5,11 +5,12 @@
 
 // ── 狀態 ────────────────────────────────────────────────────
 const _M = {
-  filter:   'all',
-  kw:       '',
-  page:     0,
-  PAGE:     20,
-  allMedia: [],
+  filter:     'all',
+  kw:         '',
+  page:       0,
+  PAGE:       20,
+  allMedia:   [],
+  expandMode: null,   // null=首頁, 'video'|'audio'|'recent'|'fav'=展開模式
   // 正在播放
   nowId:    null,
   nowType:  null,   // 'audio' | 'video'
@@ -53,67 +54,202 @@ function _filteredMedia(){
   return list;
 }
 
-// ── 首頁佈局（影片海報牆 + 音頻橫列）──────────────────────
+// ════════════════════════════════════════════════════════════
+// 主頁渲染（首頁 = 四個橫向捲動區塊）
+// 「更多」= 全螢幕純列表
+// ════════════════════════════════════════════════════════════
 function _renderMediaPage(){
   const el  = document.getElementById('media-list');
   const cnt = document.getElementById('media-count');
   if(!el) return;
 
-  const list  = _filteredMedia();
-  const total = list.length;
-  if(cnt) cnt.textContent = total ? `共 ${total} 筆` : '';
+  const all = _M.allMedia;
+  if(cnt) cnt.textContent='';  // 首頁不顯示總計
 
-  if(!total){
+  // 判斷目前是「更多」展開模式還是首頁模式
+  if(_M.expandMode){
+    _renderExpandMode(el);
+    return;
+  }
+
+  // ── 首頁模式：四個橫向捲動區塊 ──
+  el.innerHTML='';
+
+  if(!all.length){
     el.innerHTML=`<div class="empty"><span class="ic">🎬</span><span>尚無影音，點右上角＋新增</span></div>`;
     return;
   }
 
-  const batch  = list.slice(0, (_M.page+1)*_M.PAGE);
-  const videos = batch.filter(m=>m.type==='video');
-  const audios = batch.filter(m=>m.type==='audio');
-  el.innerHTML='';
+  // 最近播放（前10筆，依 lastPlay 排序，影片+音頻都包含）
+  const recent = [...all].filter(m=>m.lastPlay)
+    .sort((a,b)=>(b.lastPlay||0)-(a.lastPlay||0)).slice(0,10);
 
-  // 全部 / 最近 / 收藏：影片在上，音頻在下
-  const showBoth = ['all','recent','fav'].includes(_M.filter);
-  if((showBoth||_M.filter==='video') && videos.length){
-    el.appendChild(_mkVideoSection(videos));
-  }
-  if((showBoth||_M.filter==='audio') && audios.length){
-    el.appendChild(_mkAudioSection(audios));
-  }
+  // 收藏
+  const favs = all.filter(m=>m.favorite);
 
-  // 無限捲動
-  if(batch.length<total){
-    const trig=document.createElement('div');
-    trig.style.height='20px';
-    el.appendChild(trig);
-    const obs=new IntersectionObserver(entries=>{
-      if(entries[0].isIntersecting){obs.disconnect();_M.page++;_renderMediaPage();}
-    },{rootMargin:'80px'});
-    obs.observe(trig);
-  }
+  // 影片
+  const videos = [...all].filter(m=>m.type==='video')
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+  // 音頻
+  const audios = [...all].filter(m=>m.type==='audio')
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+  if(recent.length) el.appendChild(_mkHScrollSection('最近播放','recent',recent));
+  if(favs.length)   el.appendChild(_mkHScrollSection('收藏','fav',favs));
+  if(videos.length) el.appendChild(_mkHScrollSection('影片','video',videos));
+  if(audios.length) el.appendChild(_mkHScrollSection('音頻','audio',audios));
 }
 
-// ════════════════════════════════════════════════════════════
-// 影片海報牆區塊
-// ════════════════════════════════════════════════════════════
-function _mkVideoSection(videos){
-  const sec=document.createElement('div');
-  sec.innerHTML=`
-    <div class="media-sec-hd-row">
-      <div class="media-sec-hd-big">影片</div>
-      <button class="media-sec-more${_M.filter==='video'?' active':''}" onclick="_filterToType('video')">
-        ${_M.filter==='video'?'收起 ‹':'更多 ›'}
-      </button>
-    </div>`;
-  const grid=document.createElement('div');
-  grid.className='media-video-grid';
-  // 主頁最多顯示4個，其餘點更多才看到
-  const preview = _M.filter==='all' ? videos.slice(0,4) : videos;
-  preview.forEach(m=>grid.appendChild(_mkVideoCard(m)));
-  sec.appendChild(grid);
+// ── 橫向捲動 section ──────────────────────────────────────
+function _mkHScrollSection(title, type, items){
+  const sec = document.createElement('div');
+  const preview = items.slice(0,5);
+
+  const hd = document.createElement('div');
+  hd.className='media-sec-hd-row';
+  hd.innerHTML=`
+    <div class="media-sec-hd-big">${title}</div>
+    <button class="media-sec-more" onclick="_openExpandMode('${type}')">更多 ›</button>`;
+  sec.appendChild(hd);
+
+  const row = document.createElement('div');
+  row.className='media-hscroll-row';
+  preview.forEach(m=>{
+    row.appendChild(m.type==='audio' ? _mkAudioCard(m) : _mkVideoThumbCard(m));
+  });
+  sec.appendChild(row);
   return sec;
 }
+
+// 音頻卡片（橫向捲動用：黑膠唱片縮圖 + 名稱）
+function _mkAudioCard(m){
+  const div=document.createElement('div');
+  div.className='media-hcard';
+  div.onclick=()=>playAudio(m.id);
+  div.innerHTML=`
+    <div class="media-hcard-thumb audio">
+      ${m.thumbnail
+        ?`<img src="${m.thumbnail}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+        :`<div class="media-hcard-vinyl"></div>`}
+    </div>
+    <div class="media-hcard-name">${esc(m.title||'未命名')}</div>`;
+  return div;
+}
+
+// 影片縮圖卡片（橫向捲動用）
+function _mkVideoThumbCard(m){
+  const div=document.createElement('div');
+  div.className='media-hcard';
+  div.onclick=()=>playVideo(m.id);
+  const dur=m.duration?_fmtDur(m.duration):'';
+  div.innerHTML=`
+    <div class="media-hcard-thumb video">
+      ${m.thumbnail
+        ?`<img src="${m.thumbnail}" style="width:100%;height:100%;object-fit:cover;border-radius:10px">`
+        :`<div class="media-hcard-nothumb">🎬</div>`}
+      ${dur?`<div class="media-hcard-dur">${dur}</div>`:''}
+    </div>
+    <div class="media-hcard-name">${esc(m.title||'未命名')}</div>`;
+  return div;
+}
+
+// ── 「更多」展開模式：全螢幕縱向列表 ──────────────────────
+function _openExpandMode(type){
+  _M.expandMode = type;
+  _renderMediaPage();
+}
+
+function _renderExpandMode(el){
+  const type = _M.expandMode;
+  let items = [..._M.allMedia];
+  let title = '';
+
+  if(type==='recent'){
+    items=items.filter(m=>m.lastPlay).sort((a,b)=>(b.lastPlay||0)-(a.lastPlay||0)).slice(0,10);
+    title='最近播放';
+  } else if(type==='fav'){
+    items=items.filter(m=>m.favorite);
+    title='收藏';
+  } else if(type==='video'){
+    items=items.filter(m=>m.type==='video').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    title='影片';
+  } else if(type==='audio'){
+    items=items.filter(m=>m.type==='audio').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    title='音頻';
+  }
+
+  el.innerHTML='';
+
+  // 頂部：標題 + 返回首頁 + 類別篩選（影片/音頻模式下）
+  const hd = document.createElement('div');
+  hd.className='media-expand-hd';
+  hd.innerHTML=`
+    <button class="media-expand-back" onclick="_closeExpandMode()">‹ 返回</button>
+    <div class="media-expand-title">${title}</div>
+    <div style="width:60px"></div>`;
+  el.appendChild(hd);
+
+  // 類別標籤（影片和音頻模式下才顯示）
+  if(type==='video'||type==='audio'){
+    const cats=[...new Set(items.map(m=>m.category||'').filter(Boolean))];
+    if(cats.length>0){
+      const catRow=document.createElement('div');
+      catRow.className='media-expand-cats';
+      catRow.innerHTML=`
+        <button class="mec-chip on" onclick="_setExpandCat(this,'')">全部</button>
+        ${cats.map(c=>`<button class="mec-chip" onclick="_setExpandCat(this,'${esc(c)}')">${esc(c)}</button>`).join('')}`;
+      el.appendChild(catRow);
+    }
+  }
+
+  // 計數
+  const cntDiv=document.createElement('div');
+  cntDiv.style.cssText='font-size:11px;color:var(--t2);padding:4px 14px 8px';
+  cntDiv.textContent=`共 ${items.length} 筆`;
+  el.appendChild(cntDiv);
+
+  // 列表
+  const list=document.createElement('div');
+  list.id='expand-list';
+
+  if(type==='audio'){
+    list.className='media-audio-list';
+    items.forEach((m,i)=>list.appendChild(_mkAudioRow(m,i)));
+  } else {
+    list.className='media-video-grid';
+    items.forEach(m=>list.appendChild(_mkVideoCard(m)));
+  }
+  el.appendChild(list);
+}
+
+function _closeExpandMode(){
+  _M.expandMode = null;
+  _renderMediaPage();
+}
+
+// 類別篩選（展開模式內）
+function _setExpandCat(btn, cat){
+  document.querySelectorAll('.mec-chip').forEach(c=>c.classList.remove('on'));
+  btn.classList.add('on');
+  const type=_M.expandMode;
+  let items=[..._M.allMedia];
+  if(type==='video') items=items.filter(m=>m.type==='video');
+  else items=items.filter(m=>m.type==='audio');
+  if(cat) items=items.filter(m=>(m.category||'')===cat);
+  items.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+  const list=document.getElementById('expand-list');
+  if(!list) return;
+  list.innerHTML='';
+  if(type==='audio'){
+    items.forEach((m,i)=>list.appendChild(_mkAudioRow(m,i)));
+  } else {
+    items.forEach(m=>list.appendChild(_mkVideoCard(m)));
+  }
+}
+
+// _mkVideoSection 已整合至 _mkHScrollSection
 
 function _mkVideoCard(m){
   const div=document.createElement('div');
@@ -140,23 +276,7 @@ function _mkVideoCard(m){
 // ════════════════════════════════════════════════════════════
 // 音頻黑膠列表區塊
 // ════════════════════════════════════════════════════════════
-function _mkAudioSection(audios){
-  const sec=document.createElement('div');
-  sec.innerHTML=`
-    <div class="media-sec-hd-row">
-      <div class="media-sec-hd-big">音頻</div>
-      <button class="media-sec-more${_M.filter==='audio'?' active':''}" onclick="_filterToType('audio')">
-        ${_M.filter==='audio'?'收起 ‹':'更多 ›'}
-      </button>
-    </div>`;
-  const list=document.createElement('div');
-  list.className='media-audio-list';
-  // 主頁最多顯示5個
-  const preview = _M.filter==='all' ? audios.slice(0,5) : audios;
-  preview.forEach((m,i)=>list.appendChild(_mkAudioRow(m,i)));
-  sec.appendChild(list);
-  return sec;
-}
+// _mkAudioSection 已整合至 _mkHScrollSection
 
 function _mkAudioRow(m,i){
   const div=document.createElement('div');
@@ -234,7 +354,7 @@ function _showVinylPlayer(meta, url, full){
   const ov=document.createElement('div');
   ov.id='vinyl-player-ov';
   ov.style.cssText=`position:fixed;inset:0;z-index:600;
-    background:linear-gradient(160deg,#0d0818 0%,#130d22 40%,#0a0a14 100%);
+    background:#0a0a0a;
     display:flex;flex-direction:column;overflow:hidden`;
 
   const lastPos=full.lastPos||0;
