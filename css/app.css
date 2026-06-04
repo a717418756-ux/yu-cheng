@@ -900,186 +900,114 @@ textarea{resize:vertical;line-height:1.7}
   padding:14px 20px 0;flex-shrink:0;
 }
 .vp-back{
-  width:38px;height:38px;border-radius:50%;
+  width:40px;height:40px;border-radius:50%;
   background:rgba(255,255,255,0.08);border:none;
-  color:rgba(255,255,255,0.9);font-size:18px;cursor:pointer;
+  color:rgba(255,255,255,0.85);cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
+  transition:background .15s;
 }
 .vp-back:active{background:rgba(255,255,255,0.16)}
 .vp-mode-lbl{
-  font-size:13px;font-weight:700;
-  color:rgba(255,255,255,0.85);letter-spacing:.1em;
-  text-transform:uppercase;
+  font-size:14px;font-weight:700;
+  color:rgba(255,255,255,0.9);letter-spacing:.05em;
 }
 .vp-more{
-  width:38px;height:38px;border-radius:50%;
+  width:40px;height:40px;border-radius:50%;
   background:rgba(255,255,255,0.08);border:none;
-  color:rgba(255,255,255,0.9);font-size:16px;cursor:pointer;
+  color:rgba(255,255,255,0.85);cursor:pointer;
   display:flex;align-items:center;justify-content:center;
 }
 
-/* ── 唱片台（整個區域高度固定，不讓它 flex:1 撐大）── */
+/* ══ 唱片台 ══════════════════════════════════════════════════ */
 .vp-vinyl-wrap{
-  /* 關鍵：固定高度，不隨內容撐大 */
   flex-shrink:0;
-  height:min(64vw,260px);
+  /* 高度足夠讓唱片 + 唱針都顯示 */
+  height:min(76vw,310px);
+  position:relative;
   display:flex;align-items:center;justify-content:center;
-  position:relative;
-  margin:16px 0 0;
+  margin:10px 0 0;
+  overflow:visible;
 }
 
-/* 背景紫色光暈（純 CSS 氛圍燈）*/
-.vp-vinyl-wrap::before{
-  content:'';
-  position:absolute;
-  width:min(72vw,280px);height:min(72vw,280px);
-  border-radius:50%;
-  background:radial-gradient(circle,
-    rgba(139,92,246,0.25) 0%,
-    rgba(109,40,217,0.12) 40%,
-    transparent 70%
-  );
-  filter:blur(20px);
-  z-index:0;
-}
-
-/* 唱針臂（從右上延伸到唱片邊緣）*/
-.vp-tonearm{
-  position:absolute;
-  /* 從右上角轉軸點開始 */
-  top:2%;right:8%;
-  width:2.5px;
-  height:52%;
-  /* 金屬光澤漸層 */
-  background:linear-gradient(180deg,
-    #d8d8d8 0%,
-    #c0c0c0 20%,
-    #a8a8a8 50%,
-    #909090 80%,
-    #787878 100%
-  );
-  border-radius:1.5px 1.5px 3px 3px;
-  transform-origin:top center;
-  transform:rotate(20deg);
-  z-index:5;
-  box-shadow:
-    1px 0 3px rgba(0,0,0,0.6),
-    -1px 0 1px rgba(255,255,255,0.15),
-    0 4px 12px rgba(0,0,0,0.5);
-}
-/* 唱針頭（轉軸基座）*/
-.vp-tonearm::before{
-  content:'';
-  position:absolute;
-  top:-16px;left:-7px;
-  width:17px;height:18px;
-  background:radial-gradient(ellipse at 40% 30%,#e0e0e0,#a0a0a0 60%,#707070);
-  border-radius:50% 50% 30% 30%;
-  box-shadow:0 3px 8px rgba(0,0,0,0.7),inset 0 1px rgba(255,255,255,0.4);
-}
-/* 唱針針尖 */
-.vp-tonearm::after{
-  content:'';
-  position:absolute;
-  bottom:-5px;left:-2px;
-  width:7px;height:7px;
-  background:radial-gradient(circle at 40% 30%,#ccc,#888);
-  border-radius:50% 50% 50% 50% / 40% 40% 60% 60%;
-  box-shadow:0 2px 5px rgba(0,0,0,0.7);
-}
-
-/* ── 黑膠唱片本體 ── */
-.vp-record{
-  width:min(64vw,256px);height:min(64vw,256px);
+/* 唱盤外層（旋轉主體）*/
+.vp-record-outer{
+  /* 直徑 = 容器的80% */
+  width:min(68vw,270px);
+  height:min(68vw,270px);
   border-radius:50%;
   position:relative;
+  flex-shrink:0;
   z-index:1;
-  display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;
-  /* 使用真實黑膠唱盤圖片 */
-  background-image:url('../icons/vinyl-record.png');
-  background-size:cover;
-  background-position:center;
-  /* Fallback：無圖片時顯示 CSS 漸層 */
-  background-color:#111;
+  /* 陰影：讓唱盤有懸浮立體感 */
   box-shadow:
-    0 0 60px rgba(139,92,246,0.18),
-    0 0 0 1px rgba(255,255,255,0.05),
-    0 20px 80px rgba(0,0,0,0.95),
-    0 4px 0 rgba(0,0,0,0.8);
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 20px 80px rgba(0,0,0,0.9),
+    0 4px 0 rgba(0,0,0,0.7),
+    0 0 60px rgba(139,92,246,0.15);
+  filter:drop-shadow(0 0 30px rgba(0,0,0,0.8));
 }
-
-/* 音軌溝紋（細密同心圓）*/
-.vp-record-groove{
-  position:absolute;inset:0;border-radius:50%;
-  background:repeating-radial-gradient(
-    circle at 50%,
-    transparent 0%,transparent 1.2%,
-    rgba(255,255,255,0.018) 1.2%,rgba(255,255,255,0.018) 1.5%
-  );
-  /* 遮罩：只在唱片中外圈顯示溝紋，中心標籤區域隱藏 */
-  mask:radial-gradient(circle,
-    transparent 0%,transparent 30%,
-    black 34%,black 100%
-  );
-  -webkit-mask:radial-gradient(circle,
-    transparent 0%,transparent 30%,
-    black 34%,black 100%
-  );
+/* 唱盤圖片本身 */
+.vp-record-img{
+  width:100%;height:100%;
+  border-radius:50%;
+  object-fit:cover;
+  display:block;
 }
-
-/* 光反射（模擬黑膠的光澤感）*/
-.vp-record::before{
-  content:'';position:absolute;inset:0;border-radius:50%;
-  /* 斜向反射光帶 */
-  background:conic-gradient(
-    from 105deg,
-    transparent 0deg,
-    rgba(255,255,255,0.06) 15deg,
-    rgba(255,255,255,0.02) 30deg,
-    transparent 45deg,
-    transparent 170deg,
-    rgba(255,255,255,0.04) 190deg,
-    transparent 210deg,
-    transparent 360deg
-  );
-  pointer-events:none;z-index:2;
-}
-
-/* 邊緣高光（唱片側面光澤）*/
-.vp-record::after{
-  content:'';position:absolute;inset:0;border-radius:50%;
-  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,0.08),
-             inset 0 2px 6px rgba(255,255,255,0.04);
-  pointer-events:none;z-index:2;
-}
-
-/* 中心標籤 */
-.vp-record-label{
-  /* 封面圓形：對應真實唱盤圖片中心標籤大小（約38%）*/
-  width:38%;height:38%;border-radius:50%;
+/* 封面覆蓋圓（貼在唱盤中央）*/
+.vp-record-cover{
+  position:absolute;
+  /* 對應唱盤圖片的中心空白區，約佔35% */
+  width:35%;height:35%;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
   overflow:hidden;
-  background:radial-gradient(circle at 40% 35%,#2d1560,#1a0a3e 60%,#0f0626);
-  display:flex;align-items:center;justify-content:center;
-  z-index:3;position:relative;
+  background:#1a0a2e;
+  cursor:pointer;
+  z-index:2;
   box-shadow:
-    0 4px 16px rgba(0,0,0,0.8),
     0 0 0 2px rgba(255,255,255,0.08),
-    inset 0 1px rgba(255,255,255,0.1);
+    0 4px 16px rgba(0,0,0,0.8);
+  transition:box-shadow .2s;
 }
-.vp-label-text{
-  font-size:9px;font-weight:700;color:rgba(255,255,255,0.8);
-  text-align:center;padding:6px;line-height:1.4;
-  word-break:break-all;
-  text-shadow:0 1px 4px rgba(0,0,0,0.9);
+.vp-record-cover:active{
+  box-shadow:0 0 0 3px rgba(168,85,247,0.5),0 4px 16px rgba(0,0,0,0.8);
 }
+.vp-cover-empty{
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:rgba(255,255,255,0.3);
+  flex-direction:column;gap:4px;
+}
+
 /* 中心孔 */
 .vp-record-center{
   position:absolute;width:7px;height:7px;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%,#aaa,#555);
+  background:radial-gradient(circle at 35% 30%,#ccc,#666);
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:3;
+  box-shadow:0 1px 4px rgba(0,0,0,0.9);
+}
+
+/* ── 唱針圖片（右上角，絕對定位）── */
+.vp-tonearm-img{
+  position:absolute;
+  /* 圖二唱針圖：495×1048，長寬比約1:2.1 */
+  /* 唱針長度約佔唱盤直徑的60% */
+  width:min(28vw,110px);
+  /* height 自動 */
+  height:auto;
+  /* 定位：轉軸中心在右上角 */
+  top:-2%;
+  right:1%;
+  /* 旋轉：使唱針尖端貼在唱盤溝紋處 */
+  transform-origin:20% 8%;
+  transform:rotate(18deg);
   z-index:4;
-  box-shadow:0 1px 4px rgba(0,0,0,0.9),inset 0 1px rgba(255,255,255,0.2);
+  /* 圖片有透明背景 */
+  object-fit:contain;
+  filter:drop-shadow(2px 4px 12px rgba(0,0,0,0.8));
 }
 
 /* 旋轉動畫 */
@@ -1087,132 +1015,120 @@ textarea{resize:vertical;line-height:1.7}
   from{transform:rotate(0deg)}
   to{transform:rotate(360deg)}
 }
+.vp-record-outer.spinning{
+  animation:vinyl-spin 1.8s linear infinite;
+}
 .mar-vinyl.spinning{
   animation:vinyl-spin 2.2s linear infinite;
-}
-.vp-record.spinning{
-  animation:vinyl-spin 1.8s linear infinite;
 }
 
 /* ── 曲目資訊 ── */
 .vp-info{
   display:flex;align-items:center;
-  padding:14px 24px 6px;
+  padding:12px 22px 4px;
   flex-shrink:0;gap:12px;
 }
 .vp-info-text{flex:1;min-width:0}
 .vp-title{
-  font-size:19px;font-weight:800;color:#fff;
+  font-size:20px;font-weight:800;color:#fff;
   margin-bottom:3px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   letter-spacing:-.02em;
 }
-.vp-artist{
-  font-size:13px;color:rgba(255,255,255,0.45);font-weight:400;
-  letter-spacing:.01em;
-}
+.vp-artist{font-size:13px;color:rgba(255,255,255,0.45);font-weight:400}
 .vp-fav-btn{
-  background:none;border:none;
-  font-size:24px;cursor:pointer;
-  color:rgba(255,255,255,0.25);
+  background:none;border:none;cursor:pointer;
   flex-shrink:0;padding:6px;
-  transition:color .2s,transform .15s;
+  transition:transform .15s;
 }
-.vp-fav-btn.on{color:#ec4899}
 .vp-fav-btn:active{transform:scale(1.25)}
 
 /* ── 進度條 ── */
-.vp-progress-wrap{padding:4px 22px 2px;flex-shrink:0}
+.vp-progress-wrap{padding:6px 22px 2px;flex-shrink:0}
 .vp-seek{
   -webkit-appearance:none;width:100%;height:2px;
   border-radius:2px;cursor:pointer;
-  /* 已播放（紫色）/ 未播放（灰色）動態填色，由 JS 更新 --seek-pct */
   background:linear-gradient(
     to right,
     #a855f7 0%,
-    #a855f7 var(--seek-pct, 0%),
-    rgba(255,255,255,0.15) var(--seek-pct, 0%),
+    #a855f7 var(--seek-pct,0%),
+    rgba(255,255,255,0.15) var(--seek-pct,0%),
     rgba(255,255,255,0.15) 100%
   );
 }
 .vp-seek::-webkit-slider-thumb{
   -webkit-appearance:none;
-  width:12px;height:12px;border-radius:50%;
+  width:14px;height:14px;border-radius:50%;
   background:radial-gradient(circle at 38% 32%,#e9d5ff,#a855f7 60%);
   cursor:pointer;
-  box-shadow:0 0 6px rgba(168,85,247,0.9),0 1px 3px rgba(0,0,0,0.6);
-  /* 懸浮時放大 */
-  transition:transform .1s;
+  box-shadow:0 0 8px rgba(168,85,247,0.9),0 1px 3px rgba(0,0,0,0.6);
 }
-.vp-seek:active::-webkit-slider-thumb{
-  transform:scale(1.3);
-}
+.vp-seek:active::-webkit-slider-thumb{transform:scale(1.3)}
 .vp-times{
   display:flex;justify-content:space-between;
   font-size:11px;color:rgba(255,255,255,0.3);
-  margin-top:4px;font-variant-numeric:tabular-nums;letter-spacing:.02em;
+  margin-top:5px;font-variant-numeric:tabular-nums;
 }
 
-/* ── 主控制列 ── */
+/* ── 主控制列（圖三風格）── */
 .vp-controls{
   display:flex;align-items:center;justify-content:center;
-  gap:16px;padding:6px 0 4px;flex-shrink:0;
+  gap:10px;padding:8px 16px 4px;flex-shrink:0;
 }
-.vpc-btn{
-  background:rgba(255,255,255,0.06);
-  border:1px solid rgba(255,255,255,0.1);
-  color:rgba(255,255,255,0.7);
-  font-size:22px;cursor:pointer;
-  width:46px;height:46px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  backdrop-filter:blur(8px);
-  transition:color .12s,transform .1s,background .15s;
-}
-.vpc-btn:active{
-  color:#fff;transform:scale(.88);
-  background:rgba(255,255,255,0.12);
-}
+/* 大播放鍵 */
 .vpc-main{
-  width:62px;height:62px;border-radius:50%;
-  /* 懸浮玻璃感：不用純色，用半透明 + 邊框 */
-  background:rgba(255,255,255,0.12);
-  backdrop-filter:blur(16px);
-  -webkit-backdrop-filter:blur(16px);
-  border:1.5px solid rgba(255,255,255,0.22);
+  width:64px;height:64px;border-radius:50%;
+  background:linear-gradient(145deg,#9333ea 0%,#a855f7 50%,#7c3aed 100%);
   display:flex;align-items:center;justify-content:center;
-  font-size:22px;color:#fff;
   box-shadow:
-    0 8px 32px rgba(0,0,0,0.4),
-    0 2px 8px rgba(0,0,0,0.3),
-    inset 0 1px rgba(255,255,255,0.3);
-  transition:transform .12s,box-shadow .15s,background .15s;
-  cursor:pointer;
+    0 8px 28px rgba(168,85,247,0.55),
+    0 2px 8px rgba(0,0,0,0.5),
+    inset 0 1px rgba(255,255,255,0.25);
+  border:none;cursor:pointer;
+  transition:transform .12s,box-shadow .15s;
+  flex-shrink:0;
 }
 .vpc-main:active{
   transform:scale(.91);
-  background:rgba(255,255,255,0.18);
-  box-shadow:0 4px 16px rgba(0,0,0,0.35);
+  box-shadow:0 4px 16px rgba(168,85,247,0.4);
 }
+/* 側邊按鍵（上/下首、循環、隨機）*/
+.vpc-side{
+  width:46px;height:46px;border-radius:50%;
+  background:rgba(255,255,255,0.07);
+  border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.75);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  transition:background .15s,color .12s,transform .1s;
+  flex-shrink:0;
+}
+.vpc-side:active{
+  background:rgba(255,255,255,0.14);
+  color:#fff;transform:scale(.88);
+}
+/* 舊 vpc-btn 保持相容 */
+.vpc-btn{ background:none;border:none;cursor:pointer;padding:0; }
 
 /* ── 工具列 ── */
 .vp-tools{
   display:flex;justify-content:space-around;
-  padding:4px 20px 18px;flex-shrink:0;
+  padding:6px 16px 16px;flex-shrink:0;
 }
 .vpt-btn{
   background:none;border:none;
   color:rgba(255,255,255,0.4);
   font-size:11px;cursor:pointer;
   display:flex;flex-direction:column;align-items:center;gap:4px;
-  padding:6px 14px;border-radius:12px;
+  padding:6px 12px;border-radius:12px;
   transition:color .15s,background .15s;
-  letter-spacing:.03em;
 }
 .vpt-btn:active{
   color:rgba(255,255,255,0.85);
   background:rgba(255,255,255,0.06);
 }
-.vpt-icon{font-size:17px}
+.vpt-icon{display:flex;align-items:center;justify-content:center}
+.vpt-lbl{font-size:10px;letter-spacing:.02em}
 
 
 /* ── 影片播放器 ─────────────────────────────────────────────── */
