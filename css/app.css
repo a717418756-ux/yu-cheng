@@ -630,34 +630,64 @@ textarea{resize:vertical;line-height:1.7}
 
 /* ── 書架容器 ─────────────────────────────────────────────── */
 .bookshelf{
-  /* 木紋書架：深色木質感 */
-  background:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 139px,
-      rgba(0,0,0,0.55) 139px,
-      rgba(0,0,0,0.55) 159px,
-      rgba(80,40,10,0.35) 159px,
-      rgba(80,40,10,0.35) 161px
-    ),
-    linear-gradient(180deg,#2a1a0a 0%,#3d2510 40%,#2a1a0a 100%);
-  padding:18px 16px 8px;
-  min-height:160px;
+  /* 木紋書架：高質感木質 */
+  position:relative;
+  margin:8px 0 0;
+  padding:0;
+  min-height:200px;
   display:flex;
-  flex-wrap:wrap;
-  align-content:flex-start;
-  gap:4px;
-  row-gap:20px;
-  margin:8px 0 4px;
+  flex-direction:column;
+  gap:0;
+  background:linear-gradient(180deg,#1e0f04 0%,#2d1a08 100%);
+}
+
+/* 每一排書架列 */
+.shelf-row{
+  display:flex;
+  flex-direction:row;
+  align-items:flex-end;   /* ★ 書背下緣對齊 */
+  gap:3px;
+  padding:14px 14px 0;
+  min-height:180px;
+  position:relative;
+}
+
+/* 書架板（每排底部的木板）*/
+.shelf-plank{
+  position:relative;
+  height:18px;
+  margin:0;
+  background:
+    linear-gradient(180deg,
+      #4a2a0a 0%,
+      #6b3d12 20%,
+      #7d4a18 40%,
+      #5c3010 80%,
+      #3a1e08 100%
+    );
+  box-shadow:
+    0 4px 12px rgba(0,0,0,0.7),
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.4);
+  width:100%;
+}
+/* 木紋紋理：橫向細線 */
+.shelf-plank::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(
+    90deg,
+    transparent,transparent 40px,
+    rgba(0,0,0,0.06) 40px,rgba(0,0,0,0.06) 41px
+  );
 }
 
 /* ── 書背 ──────────────────────────────────────────────────── */
 .book-spine{
-  border-radius:2px 3px 3px 2px;
+  border-radius:1px 3px 3px 1px;
   cursor:pointer;
   position:relative;
   overflow:hidden;
+  flex-shrink:0;
   flex-shrink:0;
   box-shadow:
     2px 2px 6px rgba(0,0,0,0.5),
@@ -676,22 +706,19 @@ textarea{resize:vertical;line-height:1.7}
   position:absolute;
   inset:0;
   display:flex;
-  align-items:center;
-  justify-content:center;
+  align-items:center;      /* 垂直置中 */
+  justify-content:center;  /* 水平置中（書背寬度方向）*/
   writing-mode:vertical-rl;
   text-orientation:mixed;
   font-size:11px;
   font-weight:600;
-  color:rgba(255,255,255,0.88);
-  letter-spacing:.04em;
-  line-height:1;
-  padding:6px 2px;
-  text-shadow:0 1px 3px rgba(0,0,0,0.8);
+  color:rgba(255,255,255,0.9);
+  letter-spacing:.06em;
+  line-height:1.2;
+  padding:8px 3px;
+  text-shadow:0 1px 4px rgba(0,0,0,0.9);
   overflow:hidden;
-  /* 多行書名裁切 */
-  display:-webkit-box;
-  -webkit-line-clamp:6;
-  -webkit-box-orient:vertical;
+  text-align:center;
   white-space:normal;
   word-break:break-all;
 }
@@ -846,52 +873,89 @@ textarea{resize:vertical;line-height:1.7}
 /* ── 黑膠播放器（全螢幕）────────────────────────────────────── */
 .vp-topbar{
   display:flex;align-items:center;justify-content:space-between;
-  padding:12px 16px 4px;
-  background:transparent;
+  padding:14px 20px 0;
+  position:relative;z-index:1;
 }
 .vp-back{
-  background:none;border:none;
-  color:rgba(255,255,255,0.7);font-size:22px;cursor:pointer;
-  padding:4px 8px;
+  background:rgba(255,255,255,0.1);border:none;
+  color:rgba(255,255,255,0.85);font-size:20px;cursor:pointer;
+  width:36px;height:36px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);
 }
+.vp-back:active{background:rgba(255,255,255,0.2)}
 .vp-mode-lbl{
-  font-size:13px;font-weight:700;
-  color:rgba(255,255,255,0.85);letter-spacing:.04em;
+  font-size:14px;font-weight:700;
+  color:rgba(255,255,255,0.9);letter-spacing:.06em;
 }
 .vp-more{
-  background:none;border:none;
-  color:rgba(255,255,255,0.6);font-size:22px;cursor:pointer;padding:4px 8px;
+  background:rgba(255,255,255,0.1);border:none;
+  color:rgba(255,255,255,0.85);font-size:18px;cursor:pointer;
+  width:36px;height:36px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
 }
 
 /* 唱片台 */
 .vp-vinyl-wrap{
-  flex:1;display:flex;align-items:center;justify-content:center;
-  position:relative;padding:16px;
-  min-height:0;
+  flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+  padding:20px 16px 8px;
+  height:min(75vw,320px);
 }
-/* 唱針（CSS純繪製）*/
+
+/* 唱針 */
 .vp-tonearm{
-  position:absolute;top:18%;right:12%;
-  width:2px;height:40%;
-  background:linear-gradient(180deg,#ccc 0%,#888 100%);
-  border-radius:1px;
+  position:absolute;
+  top:12%;right:10%;
+  width:3px;
+  height:46%;
+  background:linear-gradient(180deg,#e8e8e8 0%,#a0a0a0 60%,#787878 100%);
+  border-radius:2px 2px 4px 4px;
   transform-origin:top center;
-  transform:rotate(22deg);
-  z-index:2;
-  box-shadow:0 0 4px rgba(0,0,0,0.5);
+  transform:rotate(18deg);
+  z-index:5;
+  box-shadow:0 2px 8px rgba(0,0,0,0.6),inset 1px 0 rgba(255,255,255,0.3);
+  /* 唱針本體比較細長 */
+}
+.vp-tonearm::before{
+  content:'';position:absolute;top:-14px;left:-5px;
+  width:13px;height:16px;
+  background:linear-gradient(180deg,#c8c8c8,#909090);
+  border-radius:50% 50% 2px 2px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.5);
 }
 .vp-tonearm::after{
-  content:'';position:absolute;bottom:-6px;left:-4px;
-  width:10px;height:8px;
-  background:#aaa;border-radius:2px;
+  content:'';position:absolute;bottom:-4px;left:-3px;
+  width:9px;height:6px;
+  background:#b0b0b0;border-radius:1px 1px 3px 3px;
+  box-shadow:0 2px 4px rgba(0,0,0,0.6);
 }
+
 /* 黑膠唱片 */
 .vp-record{
-  width:min(72vw,300px);height:min(72vw,300px);
+  width:min(68vw,290px);height:min(68vw,290px);
   border-radius:50%;
-  background:radial-gradient(circle,#2a2a3a 0%,#111 25%,#222 50%,#111 75%,#1a1a1a 100%);
+  /* 高質感黑膠 */
+  background:
+    radial-gradient(circle at 50% 50%,
+      #3a3a4a 0%,
+      #1a1a22 8%,
+      #111118 15%,
+      #1c1c24 22%,
+      #111118 30%,
+      #1e1e28 38%,
+      #111118 46%,
+      #1c1c24 54%,
+      #111118 62%,
+      #1a1a22 70%,
+      #0e0e14 100%
+    );
   position:relative;
-  box-shadow:0 8px 40px rgba(0,0,0,0.8),0 0 0 1px rgba(255,255,255,0.06);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.05),
+    0 12px 60px rgba(0,0,0,0.9),
+    inset 0 0 40px rgba(0,0,0,0.3);
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
 }
@@ -899,98 +963,175 @@ textarea{resize:vertical;line-height:1.7}
   position:absolute;inset:0;border-radius:50%;
   background:repeating-radial-gradient(
     circle at 50%,
-    transparent 0px,transparent 3px,
-    rgba(255,255,255,0.015) 3px,rgba(255,255,255,0.015) 4px
+    transparent 0px,transparent 2px,
+    rgba(255,255,255,0.012) 2px,rgba(255,255,255,0.012) 3px
   );
+  /* 高光反射 */
+  mask:radial-gradient(circle,transparent 32%,black 100%);
+  -webkit-mask:radial-gradient(circle,transparent 32%,black 100%);
 }
+/* 反射光暈 */
+.vp-record::before{
+  content:'';position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(
+    from 120deg,
+    transparent 0deg,
+    rgba(255,255,255,0.04) 30deg,
+    transparent 60deg,
+    transparent 180deg,
+    rgba(255,255,255,0.03) 220deg,
+    transparent 260deg
+  );
+  pointer-events:none;
+}
+
 .vp-record-label{
-  width:38%;height:38%;border-radius:50%;
+  width:36%;height:36%;border-radius:50%;
   overflow:hidden;
   background:linear-gradient(135deg,#1a0a2e,#2a1050);
   display:flex;align-items:center;justify-content:center;
   z-index:1;position:relative;
-  box-shadow:0 2px 8px rgba(0,0,0,0.6);
+  box-shadow:
+    0 3px 12px rgba(0,0,0,0.7),
+    inset 0 0 0 1px rgba(255,255,255,0.08);
 }
 .vp-label-text{
-  font-size:10px;font-weight:700;color:rgba(255,255,255,0.8);
-  text-align:center;padding:4px;line-height:1.3;
+  font-size:10px;font-weight:700;color:rgba(255,255,255,0.85);
+  text-align:center;padding:6px;line-height:1.3;
   word-break:break-all;
+  text-shadow:0 1px 3px rgba(0,0,0,0.8);
 }
 .vp-record-center{
-  position:absolute;width:10px;height:10px;border-radius:50%;
-  background:#888;z-index:2;
+  position:absolute;width:8px;height:8px;border-radius:50%;
+  background:radial-gradient(circle,#ccc,#888);
+  z-index:2;
+  box-shadow:0 0 4px rgba(0,0,0,0.8);
 }
 
 /* 曲目資訊 */
 .vp-info{
-  text-align:center;padding:8px 24px 4px;
+  text-align:left;padding:10px 24px 6px;
+  display:flex;align-items:center;justify-content:space-between;
 }
+.vp-info-text{flex:1;min-width:0}
 .vp-title{
-  font-size:18px;font-weight:700;color:#fff;
+  font-size:20px;font-weight:800;color:#fff;
   margin-bottom:4px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  letter-spacing:-.01em;
 }
-.vp-artist{font-size:13px;color:rgba(255,255,255,0.5)}
+.vp-artist{font-size:13px;color:rgba(255,255,255,0.5);font-weight:500}
+.vp-fav-btn{
+  background:none;border:none;
+  font-size:24px;cursor:pointer;
+  color:rgba(255,255,255,0.3);
+  flex-shrink:0;padding:4px 8px;
+  transition:color .2s,transform .15s;
+}
+.vp-fav-btn.on{color:#f5c518}
+.vp-fav-btn:active{transform:scale(1.3)}
 
 /* 進度條 */
-.vp-progress-wrap{padding:8px 20px 0}
+.vp-progress-wrap{padding:6px 20px 2px}
 .vp-seek{
-  -webkit-appearance:none;width:100%;height:3px;
-  background:rgba(255,255,255,0.15);border-radius:2px;
+  -webkit-appearance:none;width:100%;height:4px;
+  background:rgba(255,255,255,0.12);border-radius:2px;
   cursor:pointer;
+  /* 已播放部分用紫色填充 */
 }
 .vp-seek::-webkit-slider-thumb{
-  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
-  background:#a855f7;cursor:pointer;
-  box-shadow:0 0 6px rgba(168,85,247,0.6);
+  -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+  background:radial-gradient(circle,#c084fc,#a855f7);
+  cursor:pointer;
+  box-shadow:0 0 10px rgba(168,85,247,0.7),0 2px 6px rgba(0,0,0,0.4);
 }
 .vp-times{
   display:flex;justify-content:space-between;
-  font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;
+  font-size:11px;color:rgba(255,255,255,0.35);
+  margin-top:5px;font-variant-numeric:tabular-nums;
 }
 
 /* 主控制列 */
 .vp-controls{
   display:flex;align-items:center;justify-content:center;
-  gap:28px;padding:12px 0 6px;
+  gap:20px;padding:8px 0 4px;
 }
 .vpc-btn{
-  background:none;border:none;color:rgba(255,255,255,0.75);
-  font-size:22px;cursor:pointer;padding:6px;
-  transition:color .15s,transform .1s;
+  background:none;border:none;color:rgba(255,255,255,0.6);
+  font-size:24px;cursor:pointer;padding:8px;
+  transition:color .15s,transform .12s;
 }
-.vpc-btn:active{color:#fff;transform:scale(.9)}
+.vpc-btn:active{color:#fff;transform:scale(.88)}
 .vpc-main{
-  width:58px;height:58px;border-radius:50%;
-  background:linear-gradient(135deg,#7c3aed,#a855f7);
+  width:64px;height:64px;border-radius:50%;
+  background:linear-gradient(145deg,#9333ea,#a855f7,#7c3aed);
   display:flex;align-items:center;justify-content:center;
-  font-size:22px;color:#fff;
-  box-shadow:0 4px 20px rgba(168,85,247,0.5);
+  font-size:24px;color:#fff;
+  box-shadow:
+    0 6px 24px rgba(168,85,247,0.6),
+    0 2px 8px rgba(0,0,0,0.4),
+    inset 0 1px rgba(255,255,255,0.2);
+  transition:transform .12s,box-shadow .15s;
 }
-.vpc-main:active{transform:scale(.93)}
+.vpc-main:active{transform:scale(.92);box-shadow:0 3px 14px rgba(168,85,247,0.5)}
 
 /* 工具列 */
 .vp-tools{
   display:flex;justify-content:space-around;
-  padding:6px 20px 16px;
+  padding:4px 24px 14px;
 }
 .vpt-btn{
   background:none;border:none;
-  color:rgba(255,255,255,0.55);font-size:12px;cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;gap:2px;
-  padding:4px 10px;
+  color:rgba(255,255,255,0.45);font-size:12px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 12px;border-radius:10px;
+  transition:color .15s,background .15s;
 }
-.vpt-btn:active{color:#fff}
+.vpt-btn:active{color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.06)}
+.vpt-icon{font-size:16px}
+
 
 /* ── 影片播放器 ─────────────────────────────────────────────── */
 .vvp-topbar{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:10px 14px;background:rgba(0,0,0,0.8);
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;background:rgba(0,0,0,0.85);
+  backdrop-filter:blur(8px);
+}
+.vvp-back{
+  background:none;border:none;color:#fff;
+  font-size:20px;cursor:pointer;padding:4px 8px;
+  flex-shrink:0;
+}
+.vvp-title{
+  flex:1;font-size:14px;font-weight:600;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.vvp-more{
+  background:none;border:none;color:rgba(255,255,255,0.7);
+  font-size:20px;cursor:pointer;padding:4px 8px;flex-shrink:0;
 }
 .vvp-toolbar{
-  display:flex;align-items:center;justify-content:center;
-  gap:16px;padding:10px;background:rgba(0,0,0,0.8);
+  display:flex;align-items:center;justify-content:space-around;
+  padding:10px 16px;background:rgba(0,0,0,0.85);
+  backdrop-filter:blur(8px);
 }
+.vvp-tool-btn{
+  background:none;border:none;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 16px;border-radius:10px;
+  transition:background .15s;
+}
+.vvp-tool-btn:active{background:rgba(255,255,255,0.08)}
+.vvp-tool-val{font-size:15px;font-weight:700;color:#fff}
+.vvp-tool-lbl{font-size:10px;color:rgba(255,255,255,0.5)}
+
+/* ── 音頻列表更多按鈕 ─────────────────────────────────────── */
+.mar-more{
+  background:none;border:none;
+  color:rgba(255,255,255,0.4);font-size:16px;
+  cursor:pointer;padding:4px 6px;letter-spacing:.1em;
+}
+.mar-more:active{color:#fff}
 
 /* ── 迷你播放列 ─────────────────────────────────────────────── */
 .media-mini-bar{
