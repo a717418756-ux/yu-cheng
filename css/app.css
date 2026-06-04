@@ -1555,11 +1555,13 @@ textarea{resize:vertical;line-height:1.7}
 }
 /* 側邊按鍵（上/下首、循環、隨機）*/
 .vpc-sm{
-  width:36px;height:36px;border-radius:50%;
+  width:40px;height:40px;border-radius:50%;
   background:none;border:none;
   display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:1px;
   cursor:pointer;
-  transition:color .15s;
+  color:rgba(255,255,255,0.4);
+  transition:color .15s,opacity .15s;
 }
 .vpc-sm:active{opacity:.6}
 
@@ -2757,26 +2759,19 @@ textarea{resize:vertical;line-height:1.7}
 .media-sec-hd-row::after{
   content:'';
   position:absolute;
-  bottom:0;left:0;right:0;
-  height:1px;
-  /* 更強的白色炫光線：從標題文字下方延伸 */
+  bottom:0;left:14px;
+  width:120px;
+  height:1.5px;
+  border-radius:1px;
   background:linear-gradient(
     90deg,
-    transparent 0%,
-    rgba(255,255,255,0.04) 5%,
-    rgba(255,255,255,0.3) 20%,
-    rgba(255,255,255,0.55) 40%,
-    rgba(255,255,255,0.6) 50%,
-    rgba(255,255,255,0.55) 60%,
-    rgba(255,255,255,0.3) 80%,
-    rgba(255,255,255,0.04) 95%,
+    rgba(255,255,255,0.8) 0%,
+    rgba(255,255,255,0.5) 60%,
     transparent 100%
   );
-  /* 強炫光暈 */
   box-shadow:
-    0 0 4px rgba(255,255,255,0.5),
-    0 0 12px rgba(255,255,255,0.2),
-    0 0 24px rgba(255,255,255,0.08);
+    0 0 4px rgba(255,255,255,0.6),
+    0 0 10px rgba(255,255,255,0.2);
 }
 
 /* 標題大字不再用漸層（改純白，更清晰有質感）*/
@@ -2798,24 +2793,25 @@ textarea{resize:vertical;line-height:1.7}
   padding-top:8px;
 }
 
-/* 每個 section 末尾細白線（下緣，在內容下方更多空間）*/
+/* section 內容下緣炫光長線 */
 .media-hscroll-row::after,
 .media-video-grid::after,
 .media-audio-list::after{
   content:'';
   display:block;
   height:1px;
-  margin:24px 0 0;
+  margin:28px 0 0;
   background:linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255,255,255,0.05) 10%,
-    rgba(255,255,255,0.14) 35%,
-    rgba(255,255,255,0.18) 50%,
-    rgba(255,255,255,0.14) 65%,
-    rgba(255,255,255,0.05) 90%,
+    rgba(255,255,255,0.06) 5%,
+    rgba(255,255,255,0.22) 30%,
+    rgba(255,255,255,0.3) 50%,
+    rgba(255,255,255,0.22) 70%,
+    rgba(255,255,255,0.06) 95%,
     transparent 100%
   );
+  box-shadow:0 0 4px rgba(255,255,255,0.06);
 }
 
 
@@ -2835,3 +2831,15 @@ textarea{resize:vertical;line-height:1.7}
   text-decoration-thickness:1.5px;
   text-underline-offset:3px;
 }
+
+/* 速率按鈕 span 確保顯示 */
+.vpt-speed-btn > span{
+  color:rgba(255,255,255,0.6);
+  font-size:13px !important;
+  font-weight:700;
+}
+
+/* section 內容底部空間（讓下緣線不緊貼內容）*/
+.media-hscroll-row{ padding-bottom:0; }
+.media-video-grid{ padding-bottom:4px; }
+.media-audio-list{ padding-bottom:4px; }
