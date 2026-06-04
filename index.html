@@ -372,13 +372,7 @@
     </div>
   </div>
   <div class="sb"><span class="ic">🔍</span><input id="books-si" type="search" placeholder="搜尋書名、作者、分類…" oninput="searchBooks()"></div>
-  <div class="chips" id="books-chips">
-    <button class="chip on" onclick="setBooksFilter(this,'all')">全部</button>
-    <button class="chip" onclick="setBooksFilter(this,'recent')">最近閱讀</button>
-    <button class="chip" onclick="setBooksFilter(this,'fav')">收藏</button>
-    <button class="chip" onclick="setBooksFilter(this,'pdf')">PDF</button>
-    <button class="chip" onclick="setBooksFilter(this,'epub')">ePub</button>
-  </div>
+  <!-- 書庫篩選改由模式列切換，chips 已移除 -->
   <div style="font-size:11px;color:var(--t2);padding:2px 14px 6px" id="books-count"></div>
   <div id="books-list"></div>
 </div>
@@ -728,7 +722,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js"></script>
 <!-- JS 模組（載入順序不可更動）-->
 <script src="js/db.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
+<script src="js/epub.min.js"></script>
 <script src="js/books.js"></script>
 <script src="js/media.js"></script>
 <script src="js/utils.js"></script>
