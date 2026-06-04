@@ -3,7 +3,7 @@
    ★ 每次更新程式只需修改 APP_VERSION
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.7.3';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 快取資源（不包含 index.html）────────────────────────────
@@ -13,6 +13,7 @@ const ASSETS = [
   './css/app.css',
   './css/splash.css',
   'https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js',
   './js/db.js',
   './js/books.js',
   './js/media.js',
