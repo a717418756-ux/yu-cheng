@@ -736,11 +736,32 @@ async function openBookReader(id){
             style="width:100%;height:100%;border:none;background:#111"></iframe>`
         : ext==='epub'
         ? `<div id="reader-epub-wrap"
-            style="width:100%;height:100%;overflow-y:auto;
-            background:var(--reader-bg,#111);color:var(--reader-fg,#e8e8e8);
-            font-size:var(--reader-fs,17px);line-height:1.75;
-            padding:20px 20px 60px;box-sizing:border-box">
-            <div id="reader-epub-content" style="max-width:680px;margin:0 auto"></div>
+            style="width:100%;height:100%;position:relative;
+            background:var(--reader-bg,#111);display:flex;flex-direction:column">
+            <!-- epub.js 渲染區 -->
+            <div id="epub-viewer"
+              style="flex:1;overflow:hidden;position:relative"></div>
+            <!-- 左右翻頁觸控區 -->
+            <div id="epub-prev-zone"
+              style="position:absolute;left:0;top:0;width:30%;height:100%;
+              z-index:5;cursor:pointer;-webkit-tap-highlight-color:transparent"
+              onclick="_epubPrev()"></div>
+            <div id="epub-next-zone"
+              style="position:absolute;right:0;top:0;width:30%;height:100%;
+              z-index:5;cursor:pointer;-webkit-tap-highlight-color:transparent"
+              onclick="_epubNext()"></div>
+            <!-- 底部進度列 -->
+            <div id="epub-progress-bar"
+              style="height:2px;background:rgba(255,255,255,0.1);position:relative;flex-shrink:0">
+              <div id="epub-progress-fill"
+                style="height:100%;background:var(--acc);width:0%;transition:width .3s"></div>
+            </div>
+            <!-- 頁碼提示 -->
+            <div id="epub-page-info"
+              style="text-align:center;font-size:11px;color:rgba(255,255,255,0.3);
+              padding:4px 0 6px;flex-shrink:0;font-variant-numeric:tabular-nums">
+              載入中…
+            </div>
           </div>`
         : ext==='txt'
         ? `<div id="reader-txt"
@@ -800,22 +821,132 @@ async function openBookReader(id){
     };
     reader.readAsText(book.blob,'UTF-8');
   } else if(ext==='epub'){
-    // epub 為 zip，嘗試讀取純文字
-    const el=document.getElementById('reader-epub-content');
-    if(el) el.innerHTML=`<div style="color:rgba(255,255,255,0.4);text-align:center;padding:40px">
-      epub 預覽功能開發中，請使用下載後在外部閱讀器開啟。<br><br>
-      <button onclick="downloadBook(${id})" style="padding:10px 24px;
-      background:rgba(37,98,200,0.85);color:#fff;border:none;border-radius:10px;
-      cursor:pointer;font-size:14px">⬇ 下載</button></div>`;
+    // epub.js 初始化
+    _initEpubReader(url, book.lastPage||0);
   }
 
-  // 恢復閱讀位置（僅 txt）
+  // 恢復閱讀位置（txt：scrollTop 數字；epub：由 _initEpubReader 處理）
   if(ext==='txt' && book.lastPage>0){
     setTimeout(()=>{
       const el=document.getElementById('reader-txt');
       if(el) el.scrollTop = book.lastPage;
     },300);
   }
+}
+
+
+// ════════════════════════════════════════════════════════════
+// epub.js 閱讀器
+// ════════════════════════════════════════════════════════════
+
+async function _initEpubReader(url, savedCfi){
+  // 確認 epub.js 已載入
+  if(typeof ePub === 'undefined'){
+    const el=document.getElementById('epub-viewer');
+    if(el) el.innerHTML=`<div style="padding:30px;text-align:center;color:rgba(255,255,255,0.4)">
+      epub.js 載入失敗，請確認網路連線後重試。<br><br>
+      <button onclick="location.reload()" style="padding:8px 20px;background:rgba(37,98,200,0.8);
+      color:#fff;border:none;border-radius:8px;cursor:pointer">重新載入</button></div>`;
+    return;
+  }
+
+  try{
+    const book = ePub(url);
+    window._epubBook = book;
+
+    const rendition = book.renderTo('epub-viewer', {
+      width:  '100%',
+      height: '100%',
+      spread: 'none',      // 手機單頁模式
+      flow:   'paginated', // 分頁模式
+    });
+    window._epubRendition = rendition;
+
+    // 設定主題（深色預設）
+    rendition.themes.register('dark', {
+      'body': {
+        'background': '#111 !important',
+        'color': '#e8e8e8 !important',
+        'font-family': "'Noto Serif TC', 'Noto Serif SC', Georgia, serif !important",
+        'font-size': '17px !important',
+        'line-height': '1.85 !important',
+        'padding': '0 8px !important',
+      },
+      'p': { 'text-indent': '2em', 'margin': '0.4em 0' },
+      'h1,h2,h3,h4': { 'color': '#fff !important', 'margin': '1em 0 0.5em' },
+      'a': { 'color': '#6ea8fe !important' },
+    });
+    rendition.themes.register('sepia', {
+      'body': {
+        'background': '#2d2416 !important',
+        'color': '#d4b896 !important',
+        'font-family': "'Noto Serif TC', Georgia, serif !important",
+        'font-size': '17px !important',
+        'line-height': '1.85 !important',
+      },
+      'p': { 'text-indent': '2em', 'margin': '0.4em 0' },
+    });
+    rendition.themes.register('light', {
+      'body': {
+        'background': '#f5f5f0 !important',
+        'color': '#222 !important',
+        'font-family': "'Noto Serif TC', Georgia, serif !important",
+        'font-size': '17px !important',
+        'line-height': '1.85 !important',
+      },
+      'p': { 'text-indent': '2em', 'margin': '0.4em 0' },
+    });
+    rendition.themes.select('dark');
+
+    // 顯示（從上次位置或開頭）
+    if(savedCfi && typeof savedCfi === 'string' && savedCfi.startsWith('epubcfi')){
+      await rendition.display(savedCfi);
+    } else {
+      await rendition.display();
+    }
+
+    // 翻頁後更新進度
+    rendition.on('relocated', loc=>{
+      _updateEpubProgress(book, loc);
+    });
+
+    // 觸控滑動翻頁
+    rendition.on('touchstart', e=>{ _epubTouchStart = e.touches[0].clientX; });
+    rendition.on('touchend',   e=>{
+      if(_epubTouchStart === null) return;
+      const diff = e.changedTouches[0].clientX - _epubTouchStart;
+      if(diff > 50)       rendition.prev();
+      else if(diff < -50) rendition.next();
+      _epubTouchStart = null;
+    });
+
+  }catch(err){
+    logError('_initEpubReader', err);
+    const el=document.getElementById('epub-viewer');
+    if(el) el.innerHTML=`<div style="padding:30px;text-align:center;color:rgba(255,255,255,0.4)">
+      epub 載入失敗（${esc(err.message||'未知錯誤')}）<br><br>
+      可能原因：epub 格式不標準或檔案損壞。</div>`;
+  }
+}
+
+let _epubTouchStart = null;
+
+function _updateEpubProgress(book, loc){
+  if(!loc) return;
+  // 進度條
+  book.locations.percentageFromCfi(loc.start.cfi).then(pct=>{
+    const fill=document.getElementById('epub-progress-fill');
+    if(fill) fill.style.width=(pct*100).toFixed(1)+'%';
+    const info=document.getElementById('epub-page-info');
+    if(info) info.textContent=`${Math.round(pct*100)}%`;
+  }).catch(()=>{});
+}
+
+function _epubNext(){
+  if(window._epubRendition) window._epubRendition.next();
+}
+function _epubPrev(){
+  if(window._epubRendition) window._epubRendition.prev();
 }
 
 let _readerFontSz = 17;
@@ -831,7 +962,10 @@ function _readerFontSize(delta){
   const lbl=document.getElementById('reader-fs-lbl');
   if(lbl) lbl.textContent=_readerFontSz+'px';
   document.getElementById('reader-txt')?.style.setProperty('font-size',_readerFontSz+'px');
-  document.getElementById('reader-epub-wrap')?.style.setProperty('font-size',_readerFontSz+'px');
+  // epub.js 字體調整
+  if(window._epubRendition){
+    window._epubRendition.themes.fontSize(_readerFontSz+'px');
+  }
 }
 
 function _readerTheme(theme){
@@ -845,22 +979,43 @@ function _readerTheme(theme){
   if(!ov) return;
   ov.style.background=t.bg;
   const txt=document.getElementById('reader-txt');
-  const epub=document.getElementById('reader-epub-wrap');
   if(txt){txt.style.background=t.bg;txt.style.color=t.fg;}
-  if(epub){epub.style.background=t.bg;epub.style.color=t.fg;}
+  // epub.js 主題
+  if(window._epubRendition){
+    window._epubRendition.themes.override('color', t.fg);
+    window._epubRendition.themes.override('background', t.bg);
+    const viewer=document.getElementById('epub-viewer');
+    if(viewer) viewer.style.background=t.bg;
+  }
 }
 
 async function closeBookReader(id){
   const ov=document.getElementById('book-reader-ov');
   if(!ov) return;
-  // 儲存閱讀位置（txt）
+  // 儲存閱讀位置
   try{
     const txt=document.getElementById('reader-txt');
-    if(txt){
-      const book=await dg('ebooks',id);
-      if(book){book.lastPage=txt.scrollTop;book.lastRead=Date.now();await dp('ebooks',book);}
+    const book=await dg('ebooks',id);
+    if(book){
+      book.lastRead=Date.now();
+      if(txt){
+        book.lastPage=txt.scrollTop;  // txt: scrollTop
+      } else if(window._epubRendition){
+        // epub: CFI 字串（存在 lastCfi 欄位）
+        const loc=window._epubRendition.currentLocation();
+        if(loc?.start?.cfi) book.lastCfi=loc.start.cfi;
+      }
+      await dp('ebooks',book);
+      const idx=_B.allBooks.findIndex(b=>b.id===id);
+      if(idx>=0){ _B.allBooks[idx].lastRead=book.lastRead; }
     }
   }catch(_){}
+  // 清理 epub 實例
+  if(window._epubBook){
+    try{ window._epubBook.destroy(); }catch(_){}
+    window._epubBook=null;
+    window._epubRendition=null;
+  }
   if(ov._objectUrl) URL.revokeObjectURL(ov._objectUrl);
   ov.remove();
 }
