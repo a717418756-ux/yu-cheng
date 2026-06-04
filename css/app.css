@@ -213,16 +213,29 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 主 FAB */
 #fab-main{
-  width:52px;height:52px;border-radius:50%;
-  background:var(--acc2);
-  border:2px solid rgba(110,168,254,0.4);
-  box-shadow:0 4px 20px rgba(37,98,200,.5);
+  width:56px;height:56px;border-radius:50%;
+  background:linear-gradient(135deg,#1d4ed8,#3b82f6);
+  border:none;
+  box-shadow:
+    0 8px 32px rgba(37,99,235,0.5),
+    0 2px 8px rgba(0,0,0,0.4),
+    inset 0 1px rgba(255,255,255,0.2);
   font-size:22px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  transition:transform .28s cubic-bezier(.4,0,.2,1),background .2s;
+  transition:transform .28s cubic-bezier(.4,0,.2,1),box-shadow .2s;
   flex-shrink:0;color:#fff;pointer-events:auto;
+  animation:fab-pulse 3.5s infinite;
 }
-#fab-main.open{transform:rotate(45deg);background:#1a3d7a}
+@keyframes fab-pulse{
+  0%  { box-shadow:0 8px 32px rgba(37,99,235,0.5),0 0 0 0 rgba(59,130,246,0.45); }
+  60% { box-shadow:0 8px 32px rgba(37,99,235,0.5),0 0 0 14px rgba(59,130,246,0); }
+  100%{ box-shadow:0 8px 32px rgba(37,99,235,0.5),0 0 0 0 rgba(59,130,246,0); }
+}
+#fab-main.open{
+  transform:rotate(45deg);
+  background:linear-gradient(135deg,#1e3a8a,#1d4ed8);
+  animation:none;
+}
 
 /* ── 4. 通用元件 ─────────────────────────────────────────────── */
 /* Header */
@@ -890,39 +903,51 @@ textarea{resize:vertical;line-height:1.7}
 
 /* ── 書背 ── */
 .book-spine{
-  border-radius:1px 2px 2px 1px;
+  border-radius:3px 2px 2px 3px;
   cursor:pointer;
   position:relative;
   overflow:hidden;
   flex-shrink:0;
-  /* 書背側面陰影（立體感）*/
+  /* 書本立體厚度感 */
   box-shadow:
-    2px 0 6px rgba(0,0,0,0.55),
-    -1px 0 0 rgba(0,0,0,0.6),
-    inset -2px 0 3px rgba(0,0,0,0.35),
-    inset 1px 0 1px rgba(255,255,255,0.07);
-  /* 抽書動畫 */
-  transition:transform .2s cubic-bezier(.2,.8,.3,1),
-             box-shadow .2s,filter .15s;
+    3px 0 8px rgba(0,0,0,0.6),
+    -2px 0 0 rgba(0,0,0,0.7),
+    inset -8px 0 16px rgba(0,0,0,0.3),
+    inset 6px 0 12px rgba(255,255,255,0.06),
+    0 8px 16px rgba(0,0,0,0.45);
+  transition:transform .22s cubic-bezier(.2,.8,.3,1),
+             box-shadow .22s,filter .15s;
   will-change:transform;
 }
 /* 書本被抽出效果 */
 .book-spine.pulling{
-  transform:translateY(-16px) scale(1.03);
+  transform:translateY(-18px) scale(1.05);
   box-shadow:
-    4px 12px 24px rgba(0,0,0,0.8),
-    -1px 0 0 rgba(0,0,0,0.6);
-  filter:brightness(1.12);
+    4px 20px 36px rgba(0,0,0,0.85),
+    -2px 0 0 rgba(0,0,0,0.7),
+    inset -8px 0 16px rgba(0,0,0,0.25),
+    inset 6px 0 12px rgba(255,255,255,0.08);
+  filter:brightness(1.15);
   z-index:10;
 }
 
-/* 書背頂部光澤（模擬印刷光澤）*/
+/* 書脊左側光邊（書本厚度感關鍵）*/
 .book-spine::before{
   content:'';position:absolute;
-  top:0;left:0;right:0;height:30%;
-  background:linear-gradient(180deg,
-    rgba(255,255,255,0.06) 0%,
+  top:0;left:0;width:7px;height:100%;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,0.14) 0%,
+    rgba(255,255,255,0.04) 60%,
     transparent 100%
+  );
+  pointer-events:none;z-index:2;
+}
+/* 書背頂部光澤 */
+.book-spine::after{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:25%;
+  background:linear-gradient(180deg,
+    rgba(255,255,255,0.07) 0%,transparent 100%
   );
   pointer-events:none;z-index:1;
 }
@@ -1089,15 +1114,28 @@ textarea{resize:vertical;line-height:1.7}
   background:rgba(255,255,255,0.06);
 }
 .media-hcard-thumb.video{
-  width:130px;height:88px;   /* 更高，視覺平衡 */
-  border-radius:10px;
+  width:140px;height:90px;
+  border-radius:12px;
   flex-shrink:0;
+  box-shadow:
+    0 6px 20px rgba(0,0,0,0.6),
+    0 0 0 0.5px rgba(255,255,255,0.06);
+  position:relative;overflow:hidden;
+}
+.media-hcard-thumb.video::before{
+  content:'';position:absolute;inset:0;z-index:1;
+  background:linear-gradient(135deg,rgba(255,255,255,0.06) 0%,transparent 40%);
+  pointer-events:none;
 }
 .media-hcard-thumb.audio{
-  width:100px;height:100px;  /* 1:1 黑膠圓形 */
+  width:96px;height:96px;
   border-radius:50%;
   flex-shrink:0;
-  box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  box-shadow:
+    0 0 0 1.5px rgba(255,255,255,0.08),
+    0 8px 24px rgba(0,0,0,0.65),
+    0 0 28px rgba(168,85,247,0.07);
+  position:relative;
 }
 .media-hcard-nothumb{
   width:100%;height:100%;
@@ -1272,9 +1310,11 @@ textarea{resize:vertical;line-height:1.7}
 }
 .media-arow{
   display:flex;align-items:center;gap:12px;
-  padding:10px 0;
-  border-bottom:1px solid rgba(255,255,255,0.05);
+  padding:11px 12px;
+  border-radius:12px;
+  margin:0 2px;
   cursor:default;
+  transition:background .15s;
 }
 .mar-vinyl{
   width:46px;height:46px;border-radius:50%;
@@ -2393,11 +2433,29 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 影片卡片：懸浮效果 */
 .media-vcard{
-  transition:transform .15s,box-shadow .15s;
+  background:#0f1014;
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:
+    0 8px 24px rgba(0,0,0,0.45),
+    0 1px 0 rgba(255,255,255,0.04) inset;
+  transition:transform .18s,box-shadow .18s;
+  position:relative;
+}
+/* 玻璃反光 */
+.media-vcard::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(
+    130deg,
+    rgba(255,255,255,0.055) 0%,
+    transparent 40%
+  );
+  pointer-events:none;z-index:1;border-radius:inherit;
 }
 .media-vcard:active{
-  transform:scale(0.96);
-  box-shadow:0 2px 12px rgba(0,0,0,0.6);
+  transform:scale(0.96) translateY(2px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.5);
 }
 
 /* 音頻橫列：按壓效果 */
@@ -2426,34 +2484,64 @@ textarea{resize:vertical;line-height:1.7}
 /* 頂部 header 加毛玻璃（書庫/影音庫共用）*/
 #pg-books .hd,
 #pg-media .hd{
-  background:rgba(10,10,10,0.88);
-  backdrop-filter:blur(20px);
-  -webkit-backdrop-filter:blur(20px);
+  background:rgba(8,9,12,0.85);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
   border-bottom:1px solid rgba(255,255,255,0.06);
+  box-shadow:0 1px 20px rgba(0,0,0,0.4);
+}
+#pg-books .hd .hdt,
+#pg-media .hd .hdt{
+  font-size:17px;
+  letter-spacing:-.01em;
+  background:linear-gradient(90deg,#fff 60%,rgba(255,255,255,0.6));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
 }
 
 /* 搜尋列加深色質感 */
 #pg-media .sb,
 #pg-books .sb{
+  margin:10px 12px;
   background:rgba(255,255,255,0.05);
-  border-bottom:1px solid rgba(255,255,255,0.04);
+  border-bottom:none;
+}
+#pg-media .sb input,
+#pg-books .sb input{
+  height:44px;
+  background:rgba(255,255,255,0.055);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.09);
+  border-radius:14px;
+  color:var(--t0);
+  font-size:13px;
+  padding-left:36px;
+  transition:border-color .2s,box-shadow .2s;
+}
+#pg-media .sb input:focus,
+#pg-books .sb input:focus{
+  border-color:rgba(110,168,254,0.45);
+  box-shadow:0 0 0 3px rgba(110,168,254,0.1);
+  background:rgba(255,255,255,0.07);
+  outline:none;
 }
 
 /* ── 影音庫頁面背景深度處理 ─────────────────────────────────*/
-/* pg-media 高質感黑色背景 */
+/* pg-media 高質感背景 */
 #pg-media{
   background:
-    /* 極淡的雜訊質感（模擬高級 OLED 螢幕的黑色）*/
-    repeating-linear-gradient(
-      0deg,
-      transparent,transparent 2px,
-      rgba(255,255,255,0.004) 2px,rgba(255,255,255,0.004) 3px
-    ),
-    /* 左上角超淡藍紫暈光（高級感科技感）*/
-    radial-gradient(ellipse at -10% -10%,rgba(60,40,120,0.08) 0%,transparent 55%),
-    /* 右下角極淡暖色暈光（平衡）*/
-    radial-gradient(ellipse at 110% 110%,rgba(40,20,60,0.06) 0%,transparent 50%),
-    #080808;
+    radial-gradient(circle at 50% -5%,rgba(45,70,140,0.22) 0%,transparent 45%),
+    radial-gradient(circle at 95% 80%,rgba(30,20,80,0.15) 0%,transparent 40%),
+    #08090c;
+}
+
+/* pg-books 深木色空間感 */
+#pg-books{
+  background:
+    radial-gradient(circle at 50% 0%,rgba(80,40,10,0.18) 0%,transparent 50%),
+    #080604;
 }
 
 /* section 之間的視覺分隔 */
@@ -2466,8 +2554,10 @@ textarea{resize:vertical;line-height:1.7}
 /* section header row 加細膩底線 */
 .media-sec-hd-row{
   display:flex;align-items:center;justify-content:space-between;
-  padding:22px 14px 10px;
+  padding:24px 14px 12px;
   position:relative;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  margin-bottom:2px;
 }
 
 /* 橫向捲動列底部 */
@@ -2622,4 +2712,66 @@ textarea{resize:vertical;line-height:1.7}
       rgba(255,255,255,0.003) 2px,rgba(255,255,255,0.003) 3px
     ),
     #080808;
+}
+
+/* 書庫/影音庫 chip 質感升級 */
+#pg-books .chip,
+#pg-media .chip{
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.08);
+  color:rgba(255,255,255,0.5);
+  border-radius:20px;
+  backdrop-filter:blur(10px);
+  font-size:12px;font-weight:600;
+  transition:all .18s;
+}
+#pg-books .chip.on,
+#pg-media .chip.on{
+  background:rgba(59,130,246,0.18);
+  border-color:rgba(59,130,246,0.4);
+  color:rgba(110,168,254,0.95);
+}
+
+/* 書庫模式切換按鈕質感 */
+.shelf-mode-btn{
+  padding:5px 12px;border-radius:14px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.07);
+  color:rgba(255,255,255,0.4);
+  font-size:11px;font-weight:600;cursor:pointer;
+  transition:all .18s;
+  backdrop-filter:blur(8px);
+}
+.shelf-mode-btn.on{
+  background:rgba(255,180,60,0.12);
+  border-color:rgba(255,180,60,0.25);
+  color:rgba(255,210,100,0.9);
+}
+
+/* 最近閱讀標題升級 */
+.shelf-recent-title{
+  font-size:12px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;
+  color:rgba(255,190,80,0.65);
+  margin-bottom:14px;padding-left:2px;
+  display:flex;align-items:center;gap:8px;
+}
+.shelf-recent-title::after{
+  content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(255,180,60,0.2),transparent);
+}
+
+/* 書庫模式列標題升級 */
+.shelf-mode-title{
+  font-size:11px;color:rgba(255,190,80,0.5);
+  font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+}
+
+/* 影音庫空狀態文字 */
+#pg-media .empty{
+  background:rgba(255,255,255,0.02);
+  border:1px dashed rgba(255,255,255,0.06);
+  border-radius:16px;
+  margin:20px 14px;
+  padding:40px 20px;
 }
