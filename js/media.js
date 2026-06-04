@@ -1020,30 +1020,23 @@ function openVpPlaylist(){
   const titleBar = document.createElement('div');
   titleBar.style.cssText = `
     display:flex;align-items:center;justify-content:space-between;
-    padding:12px 16px 10px;
+    padding:10px 16px 8px;
     border-bottom:1px solid rgba(255,255,255,0.05);`;
   const _listCategory = _M.playlist[0]?.category || '';
   titleBar.innerHTML = `
-    <div>
-      <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.85);
-        margin-bottom:2px">
-        ${_listCategory ? esc(_listCategory) : '播放清單'}
-      </div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.35)">
-        共 ${_M.playlist.length} 首
-      </div>
+    <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.85)">
+      ${_listCategory ? esc(_listCategory) : '播放清單'}
     </div>
-    <button onclick="openVpPlaylist()"
-      style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
-      color:rgba(255,255,255,0.4);width:28px;height:28px;border-radius:50%;
-      font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>`;
+    <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-left:auto">
+      共 ${_M.playlist.length} 首
+    </div>`;
   panel.appendChild(titleBar);
 
   // 橫向捲動列
   const row = document.createElement('div');
   row.style.cssText = `
     display:flex;flex-direction:row;align-items:center;gap:12px;
-    padding:14px 16px 0;
+    padding:8px 16px 0;
     overflow-x:auto;overflow-y:hidden;
     scrollbar-width:none;-webkit-overflow-scrolling:touch;`;
 
@@ -1100,7 +1093,7 @@ function openVpPlaylist(){
   panel.appendChild(row);
   wrap.innerHTML = '';
   wrap.appendChild(panel);
-  wrap.style.maxHeight = '240px';
+  wrap.style.maxHeight = '200px';
 
   // 捲動到當前播放項目
   setTimeout(()=>{
