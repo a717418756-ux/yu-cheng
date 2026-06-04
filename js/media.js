@@ -241,50 +241,63 @@ function _showVinylPlayer(meta, url, full){
 
   const isFav = meta.favorite || false;
   ov.innerHTML=`
-    <!-- 頂部列 -->
+    <!-- ── 頂部列 ── -->
     <div class="vp-topbar">
       <button class="vp-back" onclick="closeVinylPlayer()">
-        <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
-          <path d="M1 5H13M1 5L5 1M1 5L5 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
-      <div class="vp-mode-lbl">黑膠模式</div>
+      <div style="text-align:center">
+        <div class="vp-mode-lbl">黑膠模式</div>
+      </div>
       <button class="vp-more" onclick="openMediaDetail(${meta.id})">
-        <svg width="18" height="4" viewBox="0 0 18 4" fill="currentColor">
-          <circle cx="2" cy="2" r="2"/><circle cx="9" cy="2" r="2"/><circle cx="16" cy="2" r="2"/>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
         </svg>
       </button>
     </div>
 
-    <!-- 黑膠唱片 -->
-    <div class="vp-vinyl-wrap">
-      <div class="vp-tonearm"></div>
-      <!-- 唱盤底圖（真實唱盤圖片） -->
-      <div class="vp-record" id="vp-record">
-        <div class="vp-record-groove"></div>
-        <!-- 封面圖疊在中央，自動裁圓 -->
-        <div class="vp-record-label" id="vp-label-inner">
+    <!-- ── 唱片台：唱盤圖 + 唱針圖 + 封面裁圓 ── -->
+    <div class="vp-vinyl-wrap" id="vp-vinyl-wrap">
+      <!-- 唱針圖片（絕對定位，右上角） -->
+      <img class="vp-tonearm-img" id="vp-tonearm-img"
+        src="icons/tonearm.png" alt="">
+      <!-- 唱盤圖片（旋轉主體） -->
+      <div class="vp-record-outer" id="vp-record">
+        <img class="vp-record-img" src="icons/vinyl-record.png" alt="">
+        <!-- 封面：點擊可裁剪 -->
+        <div class="vp-record-cover" id="vp-cover-ring" onclick="_openCoverCrop(${meta.id})">
           ${meta.thumbnail
-            ?`<img src="${meta.thumbnail}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;">`
-            :`<div class="vp-label-text">${esc(meta.title||'')}</div>`}
+            ? `<img id="vp-cover-img" src="${meta.thumbnail}"
+                style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;
+                transform:scale(var(--cover-scale,1)) translate(var(--cover-x,0),var(--cover-y,0))">`
+            : `<div class="vp-cover-empty">＋封面</div>`}
         </div>
-        <div class="vp-record-center"></div>
       </div>
     </div>
 
-    <!-- 曲目資訊 + 喜愛 -->
+    <!-- ── 曲目資訊 + 喜愛 ── -->
     <div class="vp-info">
       <div class="vp-info-text">
         <div class="vp-title">${esc(meta.title||'未命名')}</div>
         <div class="vp-artist">${esc(meta.category||'Y.C. 影音庫')}</div>
       </div>
       <button class="vp-fav-btn${isFav?' on':''}" id="vp-fav-btn"
-        onclick="_vpToggleFav(${meta.id},this)">${isFav?'♥':'♡'}</button>
+        onclick="_vpToggleFav(${meta.id},this)">
+        <svg width="22" height="22" viewBox="0 0 24 24"
+          fill="${isFav?'#ec4899':'none'}"
+          stroke="${isFav?'#ec4899':'rgba(255,255,255,0.4)'}" stroke-width="2">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+      </button>
     </div>
 
-    <!-- 進度條 -->
+    <!-- ── 進度條 ── -->
     <div class="vp-progress-wrap">
-      <input type="range" id="vp-seek" class="vp-seek" value="0" min="0" max="100" step="0.1"
+      <input type="range" id="vp-seek" class="vp-seek"
+        value="0" min="0" max="100" step="0.1"
         oninput="_vpSeek(this.value)" style="width:100%">
       <div class="vp-times">
         <span id="vp-cur">0:00</span>
@@ -292,23 +305,57 @@ function _showVinylPlayer(meta, url, full){
       </div>
     </div>
 
-    <!-- 控制按鈕 -->
+    <!-- ── 控制按鈕（圖三風格）── -->
     <div class="vp-controls">
-      <button class="vpc-btn" onclick="_vpPrev()">⏮</button>
-      <button class="vpc-btn vpc-main" id="vp-play-btn" onclick="_vpToggle()">▶</button>
-      <button class="vpc-btn" onclick="_vpNext()">⏭</button>
+      <button class="vpc-btn vpc-side" onclick="" title="循環" style="opacity:.45;cursor:default">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+          <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        </svg>
+      </button>
+      <button class="vpc-btn vpc-side" onclick="_vpPrev()">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+      <button class="vpc-btn vpc-main" id="vp-play-btn" onclick="_vpToggle()">
+        <svg id="vp-play-icon" width="26" height="26" viewBox="0 0 24 24" fill="white">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+      </button>
+      <button class="vpc-btn vpc-side" onclick="_vpNext()">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+      <button class="vpc-btn vpc-side" onclick="" title="隨機" style="opacity:.45;cursor:default">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+          <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+        </svg>
+      </button>
     </div>
 
-    <!-- 下排工具列 -->
+    <!-- ── 工具列 ── -->
     <div class="vp-tools">
       <button class="vpt-btn" onclick="_vpCycleSpeed(this)">
-        <span class="vpt-icon">🎚</span>1.0×
+        <span class="vpt-icon" style="font-size:13px;font-weight:700">1.0×</span>
+        <span class="vpt-lbl">倍速</span>
       </button>
       <button class="vpt-btn" onclick="_vpSleepTimer(this)" id="vp-sleep-btn">
-        <span class="vpt-icon">⏱</span>定時
+        <svg class="vpt-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span class="vpt-lbl">定時</span>
       </button>
       <button class="vpt-btn" onclick="openVpPlaylist()">
-        <span class="vpt-icon">≡</span>列表
+        <svg class="vpt-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/>
+          <line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+        <span class="vpt-lbl">播放列表</span>
       </button>
     </div>
 
@@ -332,7 +379,7 @@ function _showVinylPlayer(meta, url, full){
   };
   _audioEl.onended=_vpNext;
   _audioEl.play().then(()=>{
-    document.getElementById('vp-play-btn').textContent='⏸';
+    _setPlayIcon(true);
     _startVinylSpin();
     _setupMediaSession(meta);
   }).catch(()=>{});
@@ -352,6 +399,123 @@ function _setupMediaSession(meta){
   navigator.mediaSession.setActionHandler('previoustrack',()=>_vpPrev());
   navigator.mediaSession.setActionHandler('nexttrack',    ()=>_vpNext());
   navigator.mediaSession.setActionHandler('seekto', e=>{ if(_audioEl && e.seekTime!=null) _audioEl.currentTime=e.seekTime; });
+}
+
+// 封面裁剪（點擊封面區域開啟）
+function _openCoverCrop(mediaId){
+  // 如果已有縮圖，允許重新上傳封面
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = async e => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      _showCoverCropUI(ev.target.result, mediaId);
+    };
+    reader.readAsDataURL(file);
+  };
+  inp.click();
+}
+
+function _showCoverCropUI(dataUrl, mediaId){
+  const existing = document.getElementById('cover-crop-ui');
+  if(existing) existing.remove();
+
+  const ui = document.createElement('div');
+  ui.id = 'cover-crop-ui';
+  ui.style.cssText = `position:fixed;inset:0;z-index:700;
+    background:rgba(0,0,0,0.92);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:16px`;
+
+  let scale = 1, tx = 0, ty = 0;
+
+  ui.innerHTML = `
+    <div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">調整封面位置</div>
+    <div style="position:relative;width:220px;height:220px;border-radius:50%;
+      overflow:hidden;border:2px solid rgba(255,255,255,0.3);flex-shrink:0">
+      <img id="crop-preview" src="${dataUrl}"
+        style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)
+          scale(${scale}) translate(${tx}px,${ty}px);
+          width:100%;height:100%;object-fit:cover;touch-action:none">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;width:240px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;color:rgba(255,255,255,0.5);width:30px">縮放</span>
+        <input type="range" id="crop-scale" min="0.5" max="3" step="0.05" value="1"
+          style="flex:1;accent-color:#a855f7" oninput="_cropUpdate()">
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;color:rgba(255,255,255,0.5);width:30px">左右</span>
+        <input type="range" id="crop-x" min="-100" max="100" step="1" value="0"
+          style="flex:1;accent-color:#a855f7" oninput="_cropUpdate()">
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;color:rgba(255,255,255,0.5);width:30px">上下</span>
+        <input type="range" id="crop-y" min="-100" max="100" step="1" value="0"
+          style="flex:1;accent-color:#a855f7" oninput="_cropUpdate()">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="document.getElementById('cover-crop-ui').remove()"
+        style="padding:10px 24px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+        color:#fff;border-radius:24px;font-size:13px;cursor:pointer">取消</button>
+      <button onclick="_applyCoverCrop(${mediaId},'${dataUrl}')"
+        style="padding:10px 28px;background:#a855f7;border:none;
+        color:#fff;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer">確定</button>
+    </div>`;
+  document.body.appendChild(ui);
+}
+
+function _cropUpdate(){
+  const s = parseFloat(document.getElementById('crop-scale')?.value||1);
+  const x = parseFloat(document.getElementById('crop-x')?.value||0);
+  const y = parseFloat(document.getElementById('crop-y')?.value||0);
+  const img = document.getElementById('crop-preview');
+  if(img) img.style.transform =
+    `translate(-50%,-50%) scale(${s}) translate(${x}px,${y}px)`;
+}
+
+async function _applyCoverCrop(mediaId, dataUrl){
+  // 用 Canvas 裁出圓形封面縮圖
+  const s = parseFloat(document.getElementById('crop-scale')?.value||1);
+  const x = parseFloat(document.getElementById('crop-x')?.value||0);
+  const y = parseFloat(document.getElementById('crop-y')?.value||0);
+
+  const SIZE = 300; // 輸出尺寸
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = SIZE;
+  const ctx = canvas.getContext('2d');
+
+  const img = new Image(); img.src = dataUrl;
+  await new Promise(r=>{ img.onload=r; });
+
+  // 裁剪：畫圓形遮罩
+  ctx.beginPath();
+  ctx.arc(SIZE/2, SIZE/2, SIZE/2, 0, Math.PI*2);
+  ctx.clip();
+
+  const drawW = img.width * s;
+  const drawH = img.height * s;
+  const drawX = (SIZE - drawW)/2 + x * s;
+  const drawY = (SIZE - drawH)/2 + y * s;
+  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+  const thumb = canvas.toDataURL('image/jpeg', 0.88);
+
+  // 存回 DB
+  try{
+    const m = await dg('leisuremedia', mediaId);
+    if(m){ m.thumbnail = thumb; await dp('leisuremedia', m);
+      // 更新播放器封面
+      const coverEl = document.getElementById('vp-cover-img');
+      if(coverEl) coverEl.src = thumb;
+      // 更新列表縮圖
+      const idx = _M.allMedia.findIndex(x=>x.id===mediaId);
+      if(idx>=0) _M.allMedia[idx].thumbnail = thumb;
+    }
+    toast('封面已更新');
+  }catch(e){ logError('_applyCoverCrop',e); }
+  document.getElementById('cover-crop-ui')?.remove();
 }
 
 // 收藏切換（黑膠播放器內）
@@ -422,11 +586,26 @@ function _vpSeek(val){
 }
 function _vpToggle(){
   if(!_audioEl) return;
-  const btn=document.getElementById('vp-play-btn');
   if(_audioEl.paused){
-    _audioEl.play(); btn.textContent='⏸'; _startVinylSpin();
+    _audioEl.play();
+    _setPlayIcon(true);
+    _startVinylSpin();
   } else {
-    _audioEl.pause(); btn.textContent='▶'; _stopVinylSpin();
+    _audioEl.pause();
+    _setPlayIcon(false);
+    _stopVinylSpin();
+  }
+}
+
+function _setPlayIcon(playing){
+  const icon = document.getElementById('vp-play-icon');
+  if(!icon) return;
+  if(playing){
+    // 暫停圖示
+    icon.innerHTML = '<rect x="6" y="4" width="4" height="16" fill="white"/><rect x="14" y="4" width="4" height="16" fill="white"/>';
+  } else {
+    // 播放圖示
+    icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3" fill="white"/>';
   }
 }
 function _vpPrev(){
