@@ -2775,3 +2775,70 @@ textarea{resize:vertical;line-height:1.7}
   margin:20px 14px;
   padding:40px 20px;
 }
+
+/* ══ 影音庫 section 標題行升級（螢光白線）══════════════════ */
+
+/* 標題行：加白色螢光底線 */
+.media-sec-hd-row{
+  position:relative;
+  padding-bottom:14px;
+}
+.media-sec-hd-row::after{
+  content:'';
+  position:absolute;
+  bottom:0;left:14px;right:14px;
+  height:1px;
+  /* 白色螢光線：中央亮、兩端漸淡 */
+  background:linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.08) 10%,
+    rgba(255,255,255,0.22) 30%,
+    rgba(255,255,255,0.28) 50%,
+    rgba(255,255,255,0.22) 70%,
+    rgba(255,255,255,0.08) 90%,
+    transparent 100%
+  );
+  /* 白色螢光感 */
+  box-shadow:0 0 6px rgba(255,255,255,0.12);
+}
+
+/* 標題大字不再用漸層（改純白，更清晰有質感）*/
+.media-sec-hd-big{
+  font-size:22px;
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-.02em;
+  background:none;
+  -webkit-text-fill-color:#fff;
+}
+
+/* 內容列距離標題增加（下移）*/
+.media-hscroll-row{
+  padding-top:14px;
+}
+.media-video-grid{
+  padding-top:14px;
+}
+.media-audio-list{
+  padding-top:8px;
+}
+
+/* 每個 section 末尾加細白線（下緣分隔）*/
+.media-hscroll-row::after,
+.media-video-grid::after,
+.media-audio-list::after{
+  content:'';
+  display:block;
+  height:1px;
+  margin:16px 14px 0;
+  background:linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.06) 15%,
+    rgba(255,255,255,0.12) 50%,
+    rgba(255,255,255,0.06) 85%,
+    transparent 100%
+  );
+}
+
