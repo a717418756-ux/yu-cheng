@@ -218,7 +218,7 @@ function _showVinylPlayer(meta, url, full){
   const ov=document.createElement('div');
   ov.id='vinyl-player-ov';
   ov.style.cssText=`position:fixed;inset:0;z-index:600;
-    background:linear-gradient(180deg,#0a0a12 0%,#12101a 100%);
+    background:linear-gradient(160deg,#0d0818 0%,#130d22 40%,#0a0a14 100%);
     display:flex;flex-direction:column;overflow:hidden`;
 
   const lastPos=full.lastPos||0;
