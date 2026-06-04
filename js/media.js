@@ -625,7 +625,9 @@ function _showVinylPlayer(meta, url, full){
 
     <!-- 播放列表容器（在控制列下方展開，不蓋工具列）-->
     <div id="vp-playlist-wrap"
-      style="overflow:hidden;flex-shrink:0;max-height:0;transition:max-height .28s ease"></div>
+      style="overflow:hidden;flex-shrink:0;max-height:0;
+             transition:max-height .28s ease;margin-top:4px;
+             border-top:1px solid rgba(255,255,255,0)"></div>
 
     <!-- 隱藏 audio 元素 -->
     <audio id="vp-audio" src="${url}" style="display:none"></audio>`;
@@ -1013,7 +1015,7 @@ function openVpPlaylist(){
     background:rgba(10,10,14,0.95);
     border-top:1px solid rgba(255,255,255,0.07);
     border-bottom:1px solid rgba(255,255,255,0.07);
-    padding:10px 0 12px;`;
+    padding:14px 0 14px;`;
 
   // 橫向捲動列
   const row = document.createElement('div');
@@ -1076,7 +1078,7 @@ function openVpPlaylist(){
   panel.appendChild(row);
   wrap.innerHTML = '';
   wrap.appendChild(panel);
-  wrap.style.maxHeight = '130px';
+  wrap.style.maxHeight = '170px';
 
   // 捲動到當前播放項目
   setTimeout(()=>{
@@ -1153,23 +1155,19 @@ async function _openVideoMenu(id, btn){
   sheet.onclick = e=>{ if(e.target===sheet) sheet.remove(); };
   // 先讀取資料再顯示
   const _m = await dg('leisuremedia', id);
-  const _favTxt = _m?.favorite ? '♥ 已收藏' : '♡ 收藏';
+  const _favTxt = _m?.favorite ? '已收藏' : '收藏';
   const _favClr = _m?.favorite ? '#ec4899' : 'rgba(255,255,255,0.7)';
   sheet.innerHTML = `
     <div style="width:100%;max-width:520px;margin:0 auto;
       background:var(--bg1);border-radius:20px 20px 0 0;padding:8px 0 32px">
       <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:10px auto 14px"></div>
-      <!-- 詳細資料直接顯示（不需按鈕）-->
-      <div style="padding:0 20px 16px;border-bottom:1px solid rgba(255,255,255,0.06)">
-        <div style="font-size:16px;font-weight:700;color:var(--t0);margin-bottom:6px">
+      <!-- 詳細資料（精簡一行）-->
+      <div style="padding:10px 20px 14px;border-bottom:1px solid rgba(255,255,255,0.06)">
+        <div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:4px">
           ${esc(_m?.title||'未命名')}
         </div>
-        <div style="font-size:12px;color:var(--t2);line-height:1.8">
-          <div>🎬 影片</div>
-          ${_m?.category?`<div>分類：${esc(_m.category)}</div>`:''}
-          ${_m?.fileSize?`<div>大小：${_fmtSize(_m.fileSize)}</div>`:''}
-          <div>新增：${_m?.createdAt?new Date(_m.createdAt).toLocaleDateString('zh-TW'):'-'}</div>
-          ${_m?.lastPlay?`<div>上次播放：${new Date(_m.lastPlay).toLocaleDateString('zh-TW')}</div>`:''}
+        <div style="font-size:11px;color:var(--t2)">
+          🎬 影片${_m?.category?' · '+esc(_m.category):''}${_m?.fileSize?' · '+_fmtSize(_m.fileSize):''}
         </div>
       </div>
       <!-- 操作按鈕 -->
@@ -1198,7 +1196,7 @@ async function _vvpToggleFavMenu(id, btn){
     const lbl  = document.getElementById('vvp-menu-fav-lbl');
     const favBtn = document.getElementById('vvp-menu-fav-btn');
     if(icon) icon.textContent = m.favorite ? '♥' : '♡';
-    if(lbl)  lbl.textContent  = m.favorite ? '♥ 已收藏' : '♡ 收藏';
+    if(lbl)  lbl.textContent  = m.favorite ? '已收藏' : '收藏';
     if(favBtn) favBtn.style.color = m.favorite ? '#ec4899' : 'rgba(255,255,255,0.7)';
     const idx = _M.allMedia.findIndex(x=>x.id===id);
     if(idx>=0) _M.allMedia[idx].favorite = m.favorite;
@@ -1206,22 +1204,7 @@ async function _vvpToggleFavMenu(id, btn){
   }catch(e){ logError('_vvpToggleFavMenu',e); }
 }
 
-async function _vvpToggleFav(id, btn){
-  try{
-    const m = await dg('leisuremedia', id);
-    if(!m) return;
-    m.favorite = !m.favorite;
-    await dp('leisuremedia', m);
-    const icon = document.getElementById('vvp-fav-icon');
-    if(icon) icon.textContent = m.favorite ? '♥' : '♡';
-    const lbl = btn.querySelector('.vvp-tool-lbl');
-    if(lbl) lbl.textContent = m.favorite ? '已收藏' : '收藏';
-    btn.style.color = m.favorite ? '#ec4899' : '';
-    const idx = _M.allMedia.findIndex(x=>x.id===id);
-    if(idx>=0) _M.allMedia[idx].favorite = m.favorite;
-    toast(m.favorite ? '已加入收藏' : '已取消收藏');
-  }catch(e){ logError('_vvpToggleFav',e); }
-}
+
 
 async function closeVideoPlayer(id){
   const ov=document.getElementById('video-player-ov');
