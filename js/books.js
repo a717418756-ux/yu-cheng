@@ -304,6 +304,24 @@ function _mkShelf(books, total){
     shelf.appendChild(plankEl);
   }
 
+  // 填充層：讓書架延伸到 min-height 時不出現無書板的裸木背景
+  // 加一個純空書架層（頂板 + 空位 + 底板）當視覺填充
+  const fillTop = document.createElement('div');
+  fillTop.className = 'shelf-top-plank';
+  shelf.appendChild(fillTop);
+
+  const fillRow = document.createElement('div');
+  fillRow.className = 'shelf-row shelf-fill-row';
+  fillRow.style.cssText = 'flex:1;min-height:60px';  // 撐滿剩餘空間
+  const fillSlot = document.createElement('div');
+  fillSlot.className = 'shelf-empty-slot';
+  fillRow.appendChild(fillSlot);
+  shelf.appendChild(fillRow);
+
+  const fillPlank = document.createElement('div');
+  fillPlank.className = 'shelf-plank';
+  shelf.appendChild(fillPlank);
+
   return shelf;
 }
 

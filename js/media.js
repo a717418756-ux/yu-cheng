@@ -153,7 +153,7 @@ function _mkHScrollSection(title, type, items, showMore=true){
 
   if(!items.length){
     const empty = document.createElement('div');
-    empty.style.cssText='padding:12px 14px 18px;font-size:12px;color:var(--t2)';
+    empty.style.cssText='padding:12px 14px 18px;font-size:12px;color:var(--t2);background:transparent';
     empty.textContent = title==='收藏' ? '尚未收藏任何影音' : '尚無內容';
     wrap.appendChild(empty);
     return wrap;
@@ -243,11 +243,11 @@ function _renderExpandMode(el){
   hd.innerHTML=`
     <button class="media-expand-back" onclick="_closeExpandMode()">‹ 返回</button>
     <div class="media-expand-title">${title}</div>
-    <button class="media-expand-bulk" id="bulk-btn"
+    ${isSearchMode?'<span></span>':`<button class="media-expand-bulk" id="bulk-btn"
       onclick="_toggleBulkMode()"
       style="font-size:12px;font-weight:600;color:var(--acc);background:none;border:none;cursor:pointer;padding:4px 8px">
-      ${isSearchMode?'':isFavMode?'批量移除':'批量刪除'}
-    </button>`;
+      ${isFavMode?'批量移除':'批量刪除'}
+    </button>`}`;
   el.appendChild(hd);
 
   // 類別標籤（影片和音頻模式下才顯示）
