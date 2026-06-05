@@ -379,9 +379,15 @@
 
 <!-- ══ 影音庫頁面 ══ -->
 <div id="pg-media" class="page hide">
-  <div class="hd">
-    <div class="hdt">影音庫</div>
-    <button class="hd-btn blue" onclick="openAddMedia()" style="font-size:13px">＋ 新增</button>
+  <div class="hd" id="media-hd">
+    <div id="media-hd-left" style="display:flex;align-items:center;gap:6px">
+      <!-- 返回按鈕（展開模式時插入）-->
+    </div>
+    <div id="media-hd-title" class="hdt">影音庫</div>
+    <div id="media-hd-right" style="display:flex;align-items:center;gap:6px">
+      <!-- 批量刪除（展開模式時插入）-->
+      <button class="hd-btn blue" onclick="openAddMedia()" style="font-size:13px">＋ 新增</button>
+    </div>
   </div>
   <div class="sb"><span class="ic">🔍</span><input id="media-si" type="search" placeholder="搜尋標題、分類、標籤…" oninput="searchMedia()"></div>
   <!-- 影音庫篩選改用各 section 的「更多」按鈕，chips 移除 -->
