@@ -1065,16 +1065,6 @@ textarea{resize:vertical;line-height:1.7}
   overflow-y:visible;
   -webkit-overflow-scrolling:touch;
   scrollbar-width:none;
-  /* 卡片底部長線：直接用 border-bottom，位置永遠在卡片列正下方 */
-  border-bottom:0.5px solid transparent;
-  border-image:linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255,255,255,0.22) 15%,
-    rgba(255,255,255,0.32) 50%,
-    rgba(255,255,255,0.22) 85%,
-    transparent 100%
-  ) 1;
 }
 /* 長白線：緊接在卡片列正下方，長度≈標題文字寬（約4中文字≈88px）*/
 
