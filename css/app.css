@@ -1058,13 +1058,30 @@ textarea{resize:vertical;line-height:1.7}
 .media-hscroll-row{
   display:flex;
   flex-direction:row;
-  align-items:stretch;  /* 卡片等高，內容可垂直置中 */
+  align-items:stretch;
   gap:12px;
-  padding:8px 14px 16px;
+  padding:8px 14px 20px;
   overflow-x:auto;
   overflow-y:visible;
   -webkit-overflow-scrolling:touch;
   scrollbar-width:none;
+}
+/* 長白線：緊接在卡片列正下方，長度≈標題文字寬（約4中文字≈88px）*/
+.media-hscroll-row::after{
+  content:'';
+  display:block;
+  flex-shrink:0;
+  width:88px;
+  height:1px;
+  margin-top:20px;
+  align-self:flex-end;
+  background:linear-gradient(
+    90deg,
+    rgba(255,255,255,0.45) 0%,
+    rgba(255,255,255,0.22) 60%,
+    transparent 100%
+  );
+  box-shadow:0 0 4px rgba(255,255,255,0.15),0 0 10px rgba(255,255,255,0.06);
 }
 .media-hscroll-row::-webkit-scrollbar{display:none}
 
@@ -1074,9 +1091,10 @@ textarea{resize:vertical;line-height:1.7}
   width:130px;
   display:flex;flex-direction:column;
   align-items:center;
-  justify-content:center;   /* 整體垂直置中 */
+  justify-content:flex-end;  /* 圖片和文字靠下 */
   gap:8px;
   cursor:pointer;
+  padding-bottom:4px;
 }
 
 /* 縮圖容器 */
@@ -2803,27 +2821,11 @@ textarea{resize:vertical;line-height:1.7}
 /* section 外層容器：負責底部長線 */
 .media-sec-wrap{
   position:relative;
-  padding-bottom:24px;
+  padding-bottom:0;
 }
 
 /* 底部長線：在卡片列結束後，長度≈螢幕寬2/3，左對齊 */
-.media-sec-wrap::after{
-  content:'';
-  position:absolute;
-  bottom:8px;
-  left:14px;
-  width:calc(100% - 28px);  /* 螢幕全寬扣兩側 padding */
-  max-width:none;
-  height:1px;
-  background:linear-gradient(
-    90deg,
-    rgba(255,255,255,0.22) 0%,
-    rgba(255,255,255,0.14) 40%,
-    rgba(255,255,255,0.06) 75%,
-    transparent 100%
-  );
-  box-shadow:0 0 4px rgba(255,255,255,0.06);
-}
+/* media-sec-wrap::after 已移至 media-hscroll-row::after */
 
 /* ══ eink 主題：書庫 ═══════════════════════════════════════════ */
 [data-theme="eink"] .bookshelf{
