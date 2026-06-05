@@ -895,6 +895,11 @@ async function openBookReader(id){
   document.body.appendChild(ov);
   ov._objectUrl = url;
 
+  // eink 模式：自動套用白色主題（最適合電子紙閱讀）
+  if(document.documentElement.dataset.theme==='eink'){
+    setTimeout(()=>{ _readerTheme('light'); }, 80);
+  }
+
   // 載入文字內容（txt / epub 純文字模式）
   if(ext==='txt'){
     const reader = new FileReader();
