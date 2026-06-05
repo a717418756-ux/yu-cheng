@@ -1,129 +1,127 @@
-# Y.C. 多功能專用平台 README
+# Y.C. 多功能專用平台
+
+> 版本 1.9.3 ｜ PWA 離線應用 ｜ 部署於 GitHub Pages
 
 ---
 
-## 檔案結構
+## 功能概覽
 
-```
-根目錄/
-  index.html              主頁面
-  sw.js                   Service Worker（離線快取 + 自動更新）
-  manifest.json           PWA 安裝設定
-  splash-logo-icon.png    載入畫面 LOGO（人形圓圈）
-css/
-  app.css                 主樣式
-  splash.css              載入畫面樣式
-js/
-  db.js          ← 版本號在這裡，IndexedDB 核心
-  utils.js       工具函式、全域狀態 S 物件
-  quiz.js        刷題邏輯
-  data.js        題目管理、法條、大量貼題
-  stats.js       統計分析
-  settings.js    設定、雲端備份
-  countdown.js   考試倒數
-  app.js         頁面導覽、FAB、SW 更新偵測、初始化
-icons/
-  splash-logo.png         載入畫面門框水墨圖
-  icon-72~512.png         PWA 各尺寸圖示
-```
+### 📚 考試區
+- 題庫匯入（TXT/PDF OCR 後貼入）
+- 單題 / 組題模式作答
+- 即時批改、錯題統計
+- 法條查詢（全文搜尋）
+- 倒數計時器
+- Google Apps Script 雲端備份
 
-> JS 載入順序不可更動：db → utils → quiz → data → stats → settings → countdown → app
+### 🎬 影音庫
+- 影片 / 音頻本地儲存（IndexedDB Blob）
+- 橫向捲動首頁（最近播放、收藏、影片、音頻）
+- 黑膠唱片播放器（倍速、循環、隨機、定時）
+- 收藏、批量刪除、展開模式
 
----
+### 📖 書庫
+- PDF / ePub / TXT 閱讀器
+- 木質書架 UI（書架 / 封面 / 清單三種顯示模式）
+- 最近閱讀、藏書 / 收藏切換
+- epub.js 分頁閱讀，閱讀位置 CFI 記憶
+- 字體大小調整、深色 / 護眼 / 白色主題
 
-## 版本管理（每次更新必做）
-
-版本號定義在 `js/db.js` 開頭：
-
-```js
-const APP_VERSION  = '1.1.7';   // 程式版本：改 HTML/CSS/JS/SW 時遞增
-const DATA_VERSION = '1150531-3'; // 題庫版本：大批更新題庫時才改
-```
-
-**每次更新程式只需改兩個地方：**
-
-| 檔案 | 位置 | 說明 |
-|------|------|------|
-| `js/db.js` | 第一行 `APP_VERSION` | 改版本號 |
-| `sw.js` | 第一行 `APP_VERSION` | 改成一樣的版本號 |
-
-改完推 GitHub，等 Actions 綠勾後使用者開啟 PWA 會自動收到「發現新版本」通知，按「立即更新」即可。**不需要手動清快取。**
+### ⚙️ 設定
+- 深色 / 淺色 / eink 電子紙主題
+- eink 模式：無動畫、標楷體、大字、加框線（對應 BOOX 閱讀器）
+- Google Apps Script 備份設定
 
 ---
 
-## 顯示模式
+## 技術架構
 
-設定頁可切換兩種模式：
-
-| 模式 | 適用 | 說明 |
-|------|------|------|
-| 🌙 標準 | 手機 | 深色主題，完整動畫效果 |
-| 📖 電子紙 | Boox 電子書 | 米白底、標楷體、關閉動畫，適合 E-ink 螢幕 |
-
-切換後自動儲存，重開 APP 自動套用。
-
----
-
-## 雲端備份（Apps Script）
-
-架構：PWA → POST → Google Apps Script → Google Drive
-
-**設定只需做一次：**
-1. 前往 [script.google.com](https://script.google.com)，新增專案，貼上 `gas_backup.gs`
-2. 修改 `const PASSWORD = '你的密碼'`
-3. 部署 → 網路應用程式 → 執行身分：我 → 存取權：所有人
-4. 複製網址，填入 PWA 設定頁的「Apps Script 網址」和密碼
-
-備份檔名：`YC_Platform_backup.json`，存於 Google Drive 根目錄。
-
-**更新 Apps Script 後必須重新部署新版本**（部署 → 管理部署作業 → 建立新版本）。
-
----
-
-## 題組題功能
-
-新增題目時勾選「📋 題組題（共同題幹）」：
-
-| 欄位 | 說明 |
+| 項目 | 說明 |
 |------|------|
-| 共同題幹 | 所有子題共用的情境描述，貼一次 |
-| 題組 ID | 同組子題填相同 ID，例如 `113_警佐_g1` |
-| 第幾題 | 這是第幾個子題（1、2、3...） |
+| 儲存 | IndexedDB（Dexie.js 4.0.8） |
+| 離線 | Service Worker（Cache First） |
+| epub | epub.js 0.3.93 + JSZip 3.10.1（本地） |
+| 圖表 | Chart.js 4.4.0（CDN） |
+| 部署 | GitHub Pages |
 
-刷題時有共同題幹的題目，會在題幹上方顯示藍色左邊框的區塊。現有題目完全相容不影響。
+### 檔案結構
+```
+├── index.html          主頁面
+├── sw.js               Service Worker
+├── manifest.json       PWA 設定
+├── css/
+│   ├── app.css         主樣式（2900+ 行）
+│   └── splash.css      啟動畫面樣式
+├── js/
+│   ├── app.js          主程式（導航、SW 更新）
+│   ├── db.js           IndexedDB 操作（Dexie）
+│   ├── data.js         題庫資料
+│   ├── quiz.js         考試區邏輯
+│   ├── books.js        書庫邏輯（含 epub 閱讀器）
+│   ├── media.js        影音庫邏輯（含黑膠播放器）
+│   ├── utils.js        工具函式
+│   ├── stats.js        統計
+│   ├── settings.js     設定
+│   ├── countdown.js    倒數計時
+│   ├── epub.min.js     epub.js 0.3.93（本地，218KB）
+│   └── jszip.min.js    JSZip 3.10.1（本地，95KB）
+└── icons/
+    ├── vinyl-record.png 黑膠唱盤圖示
+    ├── tonearm.png      唱針圖示
+    └── icon-*.png       PWA 圖示（各尺寸）
+```
 
 ---
 
-## 常見修改速查
+## 部署說明
 
-| 想改的功能 | 動哪個檔案 |
-|-----------|-----------|
-| 程式版本號 | `db.js` + `sw.js`（同步） |
-| 題庫版本號 | `db.js` |
-| 配色、字型、間距 | `css/app.css` |
-| 載入畫面樣式 | `css/splash.css` |
-| 刷題邏輯、計分 | `js/quiz.js` |
-| 題目欄位 | `js/data.js` + `index.html` |
-| 遺忘曲線間隔 | `js/db.js`（`REVIEW_INTERVALS`） |
-| 統計圖表 | `js/stats.js` |
-| 備份檔名 | `js/settings.js`（`GAS_BACKUP_FILE`） |
-| PWA 名稱/圖示 | `manifest.json` |
-| 離線快取清單 | `sw.js`（`ASSETS` 陣列） |
+1. 將所有檔案上傳至 GitHub repository
+2. Settings → Pages → Deploy from branch（main）
+3. 首次開啟會安裝 Service Worker，之後離線可用
+
+### ⚠️ 首次部署需上傳的新增檔案
+- `js/epub.min.js`（epub.js 本地版，218KB）
+- `js/jszip.min.js`（JSZip 本地版，95KB）
 
 ---
 
-## 部署注意事項
+## 資料儲存說明
 
-1. 上傳後等 GitHub Actions **綠勾** 才算完成，不要急著測試
-2. 手機 PWA 更新：等通知 → 按「立即更新」
-3. 手動強制更新：Chrome 開發者工具 → Application → Service Workers → Unregister → 重新整理
-4. PWA 圖示更新：需解除安裝後重新從瀏覽器安裝
+所有資料均儲存於**瀏覽器本機 IndexedDB**，不上傳至任何伺服器。
+
+| Store | 內容 |
+|-------|------|
+| `questions` | 題庫題目 |
+| `attempts` | 作答記錄 |
+| `laws` | 法條資料 |
+| `countdowns` | 倒數計時設定 |
+| `ebooks` | 書籍 metadata + Blob 檔案 |
+| `leisuremedia` | 影音 metadata + Blob 檔案 |
+| `usageLogs` | 使用時間記錄 |
 
 ---
 
-## 注意事項
+## 更新紀錄
 
-- `sw.js` 的 `APP_VERSION` 必須與 `db.js` **完全一致**，否則更新通知不會觸發
-- 題庫資料存在 IndexedDB，不會因為更新版本號而清空
-- 電子紙模式使用標楷體，Windows/macOS/iOS 有內建，Android 無則 fallback 到 Noto Serif TC
-- Apps Script 使用 `text/plain` Content-Type 傳送，避免 CORS preflight 問題
+### v1.9.3（當前）
+- CSS 死碼清理（`.ov`、`.sh`、`.shdl` 重複定義移除）
+- `media-audio-list`、`media-hcard-thumb` 片段合併
+- books.js 死碼注釋行移除
+- 影音庫標題右側裝飾線 + 卡片底部分隔線最終版
+
+### v1.9.x
+- 影音庫標題行 `order` 控制（標題→裝飾線→更多按鈕）
+- eink 主題完整覆蓋（書庫、閱讀器、影音庫、黑膠播放器）
+- epub.js + JSZip 改為本地引入，解決 JSZip 依賴問題
+- Service Worker 改為 install 後立即 skipWaiting，自動更新
+
+### v1.8.x
+- 書庫藏書/收藏切換（同頁書架篩選）
+- 收藏操作移至書籍資訊視窗
+- 黑膠播放器播放清單標題重構（移除叉叉）
+- CSS 大規模死碼清理（重複 class 整合）
+
+### v1.7.x
+- epub.js 閱讀器（分頁模式、CFI 位置記憶）
+- SW 核心/可選資源分離（解決安裝失敗問題）
+- 影音庫首頁結構重構（media-sec-wrap）
