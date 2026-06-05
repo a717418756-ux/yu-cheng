@@ -245,20 +245,24 @@ function _renderExpandMode(el){
   const isFavMode = (type==='fav');
   const isSearchMode = (type==='search');
 
-  // 展開模式：直接修改頁面 hd（標題改主旨，新增按鈕左側加返回和批量刪除）
+  // 展開模式：修改頁面 hd（先清除舊的，再插入新的）
   const pageHd = document.querySelector('#pg-media .hd');
   if(pageHd){
-    // 改標題文字
+    // 先清除可能殘留的舊按鈕
+    document.getElementById('expand-back-btn')?.remove();
+    document.getElementById('bulk-btn')?.remove();
+    // 改標題文字（備份原始）
     const hdtEl = pageHd.querySelector('.hdt');
-    if(hdtEl){ hdtEl._origText = hdtEl.textContent; hdtEl.textContent = title; }
-    // 在 hd 最左側加返回按鈕
+    if(hdtEl && !hdtEl._origText){ hdtEl._origText = hdtEl.textContent; }
+    if(hdtEl){ hdtEl.textContent = title; }
+    // 返回按鈕：插到最左側
     const backBtn = document.createElement('button');
     backBtn.id = 'expand-back-btn';
     backBtn.onclick = ()=>_closeExpandMode();
     backBtn.style.cssText = 'background:none;border:none;color:var(--acc);font-size:15px;font-weight:600;cursor:pointer;padding:4px 8px 4px 0;flex-shrink:0';
     backBtn.textContent = '‹ 返回';
     pageHd.insertBefore(backBtn, pageHd.firstChild);
-    // 在新增按鈕左側加批量刪除
+    // 批量刪除：插到新增按鈕左側
     if(!isSearchMode){
       const addBtn = pageHd.querySelector('.hd-btn');
       const bulkBtn = document.createElement('button');
@@ -516,9 +520,13 @@ async function playAudio(id){
   // 讀取 Blob
   const full=await dg('leisuremedia',id);
   if(!full?.blob){
-    // 無附加檔案，但仍可開詳情視窗讓使用者刪除
-    openMediaDetail(id);
-    toast('此音頻無附加檔案，可在詳情中刪除');
+    // 無附加檔案：如果是自動播放（播放列表）就跳下一首，手動點擊才開詳情
+    if(_M.playlist.length > 1){
+      _vpNext();
+    } else {
+      openMediaDetail(id);
+      toast('此音頻無附加檔案，可在詳情中刪除');
+    }
     return;
   }
 

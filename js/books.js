@@ -334,8 +334,8 @@ function _mkSpine(b, dispW, dispH){
 
   const t = _SPINE_THEMES[(b.id||0) % _SPINE_THEMES.length];
 
-  // 書背永遠顯示純色書背+書名（這才是真正的書背視覺）
-  if(false){  // 不使用縮圖覆蓋
+  // 書背：純色漸層+書名（標準書背視覺）
+  if(true){  // 永遠顯示純色書背
     // 純色書背 + 漸層光澤
     div.style.background=
       `linear-gradient(90deg,${t.dark} 0%,${t.bg} 30%,${t.light}22 50%,${t.bg} 70%,${t.dark} 100%)`;
@@ -702,13 +702,18 @@ async function openBookDetail(id){
   ov.id='book-detail-ov';
   ov.style.cssText='position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end';
   const ext=(book.fileType||'').toUpperCase();
+  // coverThumb 可能是 Blob（新版）或 base64 字串（舊版）
+  const coverSrc = book.coverThumb instanceof Blob
+    ? URL.createObjectURL(book.coverThumb)
+    : (book.coverThumb || '');
   ov.innerHTML=`
     <div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);
       border-radius:20px 20px 0 0;padding:20px 16px 32px">
       <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 14px"></div>
       <div style="display:flex;gap:14px;margin-bottom:16px">
-        ${book.coverThumb
-          ?`<img src="${book.coverThumb}" style="width:60px;height:80px;object-fit:cover;border-radius:4px;flex-shrink:0">`
+        ${coverSrc
+          ?`<img src="${coverSrc}" style="width:60px;height:80px;object-fit:cover;border-radius:4px;flex-shrink:0"
+              onload="if('${coverSrc}'.startsWith('blob:'))URL.revokeObjectURL('${coverSrc}')">`
           :`<div style="width:60px;height:80px;border-radius:4px;background:rgba(255,255,255,0.06);
               display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">📚</div>`}
         <div style="flex:1;min-width:0">
