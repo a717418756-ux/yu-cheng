@@ -1254,6 +1254,16 @@ textarea{resize:vertical;line-height:1.7}
   -webkit-box-orient:vertical;overflow:hidden;
   line-height:1.35;x;
 }
+/* 影音收藏按鈕：移除瀏覽器預設白色背景 */
+.mv-fav-btn{
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:2px 4px;
+  font-size:16px;
+  color:rgba(255,255,255,0.3);
+  line-height:1;
+}
 .mv-fav-btn.on{color:#f5c518}
 
 /* ── 音頻列表（黑膠縮圖列）────────────────────────────────── */
