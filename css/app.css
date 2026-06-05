@@ -2449,15 +2449,6 @@ textarea{resize:vertical;line-height:1.7}
     #080604;
 }
 
-/* section 之間的視覺分隔 */
-.media-hscroll-row + .media-sec-hd-row,
-.media-video-grid + .media-sec-hd-row,
-.media-audio-list + 
-
-/* section header row 加細膩底線 */
-
-/* 橫向捲動列底部 */
-
 /* 影片海報牆：卡片加質感邊框 */
 .media-vcard{
   background:rgba(255,255,255,0.03);
@@ -2730,25 +2721,7 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 標題大字 */
 
-/* 標題下緣短線用 ::after 實現（更好控制發光）*/
 
-.media-sec-hd-big::after{
-  content:'';
-  position:absolute;
-  bottom:0;
-  left:0;
-  width:100%;      /* 跟標題文字同寬（文字有多寬這條線就多長）*/
-  height:1.5px;
-  background:linear-gradient(
-    90deg,
-    rgba(255,255,255,0.8) 0%,
-    rgba(255,255,255,0.5) 60%,
-    transparent 100%
-  );
-  box-shadow:
-    0 0 4px rgba(255,255,255,0.6),
-    0 0 8px rgba(255,255,255,0.2);
-}
 
 
 [data-theme="eink"] .bookshelf{
