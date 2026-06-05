@@ -1060,7 +1060,7 @@ textarea{resize:vertical;line-height:1.7}
   flex-direction:row;
   align-items:stretch;
   gap:12px;
-  padding:8px 14px 16px;
+  padding:14px 14px 20px;   /* 上下加大，卡片不被切，離標題有距離 */
   overflow-x:auto;
   overflow-y:visible;
   -webkit-overflow-scrolling:touch;
@@ -1069,6 +1069,44 @@ textarea{resize:vertical;line-height:1.7}
 /* 長白線：緊接在卡片列正下方，長度≈標題文字寬（約4中文字≈88px）*/
 
 .media-hscroll-row::-webkit-scrollbar{display:none}
+
+/* ── 影音庫裝飾線 ─────────────────────────────────────────
+   線1（標題右側延伸線）：緊接標題文字右方，向右漸隱，金屬感
+   線2（卡片底部分隔線）：在 media-sec-wrap 底部，中央亮兩側淡
+   ─────────────────────────────────────────────────────── */
+
+/* 線1：標題行右側延伸裝飾線（flex 自然延伸，跟書庫 shelf-recent-title::after 同風格）*/
+.media-sec-hd-row::after{
+  content:'';
+  flex:1;
+  order:1;           /* 標題(order:0) → 線(order:1) → 更多按鈕(order:2) */
+  height:1px;
+  margin-left:10px;
+  margin-right:8px;
+  align-self:center;
+  background:linear-gradient(
+    90deg,
+    rgba(255,255,255,0.2) 0%,
+    rgba(255,255,255,0.09) 55%,
+    transparent 100%
+  );
+}
+
+/* 線2：卡片列底部分隔線，長度約標題文字寬，柔和 Glow */
+.media-sec-wrap::before{
+  content:'';
+  display:block;
+  height:1px;
+  margin:0 14px;
+  background:linear-gradient(
+    90deg,
+    rgba(255,255,255,0.35) 0%,
+    rgba(255,255,255,0.55) 40%,
+    rgba(255,255,255,0.35) 70%,
+    transparent 100%
+  );
+  box-shadow:0 0 6px rgba(255,255,255,0.15);
+}
 
 /* 橫向卡片（影片 + 音頻共用外框）*/
 .media-hcard{
@@ -1199,6 +1237,7 @@ textarea{resize:vertical;line-height:1.7}
 /* 新：大字 section header 行 */
 
 .media-sec-more{
+  order:2;
   background:rgba(255,255,255,0.06);
   border:1px solid rgba(255,255,255,0.1);
   color:rgba(255,255,255,0.55);
@@ -1209,10 +1248,6 @@ textarea{resize:vertical;line-height:1.7}
 
   flex-shrink:0;
   margin-left:8px;
-}
-.media-sec-more:active{
-  background:rgba(255,255,255,0.12);
-  colorba(110,168,254,0.35);
 }
 
 /* ── 影片海報牆 ─────────────────────────────────────────────── */
@@ -2379,13 +2414,6 @@ textarea{resize:vertical;line-height:1.7}
   border-radius:10px;
 }
 
-/* 更多按鈕質感 */
-.media-sec-more:active,.media-sec-more.active{
-  background:rgba(255,255,255,0.1);
-  color:rgba(255,255,255,0.85);
-  border-color:rgba(255,255,255,0.18);
-}
-
 /* 頂部 header 加毛玻璃（書庫/影音庫共用）*/
 #pg-books .hd,
 #pg-media .hd{
@@ -2721,9 +2749,6 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 標題大字 */
 
-
-
-
 [data-theme="eink"] .bookshelf{
   background:#d8d0c0;
   background-image:
@@ -2803,15 +2828,19 @@ textarea{resize:vertical;line-height:1.7}
   background:var(--bg0);
 }
 [data-theme="eink"] .media-sec-hd-big{
-  color:var(--t0);
-  -webkit-text-fill-color:var(--t0);
+  font-size:22px;
+  font-weight:800;
+  letter-spacing:-.02em;
+  color:#fff;
+  -webkit-text-fill-color:#fff;
+  flex-shrink:0;
 }
 
 .media-sec-hd-row{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:22px 14px 6px;
+  padding:28px 14px 10px;   /* 上方加大，離上面卡片列更遠 */
   position:relative;
 }
 .media-sec-hd-big{
@@ -2832,8 +2861,6 @@ textarea{resize:vertical;line-height:1.7}
    線2：卡片列結束後的長線（::after on media-sec-wrap）
    兩條都用絕對定位，不進入 flex 排列，位置穩定
    ─────────────────────────────────────────────────────── */
-
-
 
 /* 線2：卡片列底部長線，在 wrap 底部，長度=標題寬度（對齊，約88px）*/
 /* media-sec-wrap::after 改用 hscroll border-bottom */
