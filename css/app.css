@@ -2336,7 +2336,7 @@ textarea{resize:vertical;line-height:1.7}
 /* 黑膠圓形（無封面）加質感紋路 */
 .media-hcard-vinyl{
   width:100%;height:100%;
-  border-radius:50%;
+  border-radius:8px;   /* 跟 audio thumb 一致的圓角 */
   position:relative;
   background:
     radial-gradient(circle at 50%,
@@ -2478,15 +2478,20 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 橫向卡片唱盤光澤質感提升 */
 .media-hcard-thumb.audio{
+  width:96px; height:96px;        /* Spotify 風格正方形 */
+  border-radius:8px;              /* 小圓角正方形，非圓形 */
+  flex-shrink:0;
   box-shadow:
-    0 0 0 1px rgba(255,255,255,0.07),
-    0 8px 24px rgba(0,0,0,0.65),
-    inset 0 1px rgba(255,255,255,0.05);
+    0 4px 16px rgba(0,0,0,0.6),
+    0 0 0 0.5px rgba(255,255,255,0.06);
 }
 .media-hcard-thumb.video{
+  width:140px; height:90px;       /* 16:9 橫向縮圖 */
+  border-radius:10px;
+  flex-shrink:0;
   box-shadow:
     0 4px 20px rgba(0,0,0,0.6),
-    0 0 0 1px rgba(255,255,255,0.05);
+    0 0 0 0.5px rgba(255,255,255,0.05);
 }
 
 /* 更多按鈕升級 */
@@ -2546,7 +2551,7 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 卡片縮圖加漸層反光 */
 .media-hcard-thumb.audio::after{
-  content:'';position:absolute;inset:0;border-radius:50%;
+  content:'';position:absolute;inset:0;border-radius:8px;
   background:radial-gradient(circle at 35% 25%,rgba(255,255,255,0.06),transparent 60%);
   pointer-events:none;
 }
