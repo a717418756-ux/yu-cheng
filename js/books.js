@@ -684,9 +684,8 @@ async function saveNewBook(){
     coverThumb = await _compressImage(coverInp.files[0], 200, Math.round(200*pxH/pxW));
     // 書背圖：優先用上傳的書背圖，否則從封面裁切左側
     if(spineInp?.files[0]){
+      // 有上傳書背圖才生成 spineThumb，否則保持 null 讓書架顯示純色+書名
       spineThumb = await _compressImage(spineInp.files[0], Math.round(pxS*SPINE_SCALE*2), pxH*2);
-    } else {
-      spineThumb = await _compressImage(coverInp.files[0], Math.round(pxS*SPINE_SCALE*2), pxH*2);
     }
   }
 
