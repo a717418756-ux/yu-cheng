@@ -1165,7 +1165,11 @@ textarea{resize:vertical;line-height:1.7}
 
 /* ── 展開模式頂部 ── */
 .media-expand-hd{
-  display:flex;align-items:center;justify-content:space-between;
+  display:flex;
+  flex-direction:row;
+  flex-wrap:nowrap;
+  align-items:center;
+  justify-content:space-between;
   padding:10px 14px 6px;
   position:sticky;top:0;
   background:rgba(10,10,10,0.85);
@@ -2345,6 +2349,9 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 黑膠圓形（無封面）加質感紋路 */
 .media-hcard-vinyl{
+  width:100%;height:100%;
+  border-radius:50%;
+  position:relative;
   background:
     radial-gradient(circle at 50%,
       #3a3a48 0%,
@@ -2853,3 +2860,8 @@ textarea{resize:vertical;line-height:1.7}
   background:var(--bg1);border-top:2px solid var(--bd);
 }
 
+
+/* 空狀態的 section wrap 不顯示底部分隔線 */
+.media-sec-wrap:has(.media-empty-sec)::before{
+  display:none;
+}
