@@ -245,19 +245,31 @@ function _renderExpandMode(el){
   const isFavMode = (type==='fav');
   const isSearchMode = (type==='search');
 
-  // 展開模式頂部：在 media-list 內放標題列
-  const hd = document.createElement('div');
-  hd.className='media-expand-hd';
-  hd.innerHTML=`
-    <button class="media-expand-back" onclick="_closeExpandMode()">‹ 返回</button>
-    <div class="media-expand-title">${title}</div>
-    ${isSearchMode?'<span></span>':`<button class="media-expand-bulk" id="bulk-btn"
-      onclick="_toggleBulkMode()"
-      style="font-size:12px;font-weight:600;color:var(--acc);
-      background:none;border:none;cursor:pointer;padding:4px 8px">
-      ${isFavMode?'批量移除':'批量刪除'}
-    </button>`}`;
-  el.appendChild(hd);
+  // 展開模式：直接修改頁面 hd（標題改主旨，新增按鈕左側加返回和批量刪除）
+  const pageHd = document.querySelector('#pg-media .hd');
+  if(pageHd){
+    // 改標題文字
+    const hdtEl = pageHd.querySelector('.hdt');
+    if(hdtEl){ hdtEl._origText = hdtEl.textContent; hdtEl.textContent = title; }
+    // 在 hd 最左側加返回按鈕
+    const backBtn = document.createElement('button');
+    backBtn.id = 'expand-back-btn';
+    backBtn.onclick = ()=>_closeExpandMode();
+    backBtn.style.cssText = 'background:none;border:none;color:var(--acc);font-size:15px;font-weight:600;cursor:pointer;padding:4px 8px 4px 0;flex-shrink:0';
+    backBtn.textContent = '‹ 返回';
+    pageHd.insertBefore(backBtn, pageHd.firstChild);
+    // 在新增按鈕左側加批量刪除
+    if(!isSearchMode){
+      const addBtn = pageHd.querySelector('.hd-btn');
+      const bulkBtn = document.createElement('button');
+      bulkBtn.id = 'bulk-btn';
+      bulkBtn.onclick = ()=>_toggleBulkMode();
+      bulkBtn.style.cssText = 'background:none;border:none;color:var(--acc);font-size:13px;font-weight:600;cursor:pointer;padding:4px 8px;flex-shrink:0';
+      bulkBtn.textContent = isFavMode?'批量移除':'批量刪除';
+      if(addBtn) pageHd.insertBefore(bulkBtn, addBtn);
+      else pageHd.appendChild(bulkBtn);
+    }
+  }
 
   // 類別標籤（影片和音頻模式下才顯示）
   if(type==='video'||type==='audio'){
@@ -336,6 +348,17 @@ function _renderExpandMode(el){
 }
 
 function _closeExpandMode(){
+  // 還原頁面 hd
+  const pageHd = document.querySelector('#pg-media .hd');
+  if(pageHd){
+    // 移除返回按鈕
+    document.getElementById('expand-back-btn')?.remove();
+    // 移除批量刪除按鈕
+    document.getElementById('bulk-btn')?.remove();
+    // 還原標題
+    const hdtEl = pageHd.querySelector('.hdt');
+    if(hdtEl && hdtEl._origText){ hdtEl.textContent = hdtEl._origText; delete hdtEl._origText; }
+  }
   _M.expandMode = null;
   _M.bulkMode = false;
   _M.bulkSelected = new Set();

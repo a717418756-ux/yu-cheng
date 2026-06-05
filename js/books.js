@@ -334,9 +334,8 @@ function _mkSpine(b, dispW, dispH){
 
   const t = _SPINE_THEMES[(b.id||0) % _SPINE_THEMES.length];
 
-  // spineThumb 從 allBooks 排除（_fillThumb lazy 讀取後覆蓋）
-  if(b.id){ _fillThumb(div, b.id, 'spine'); }
-  if(!b.spineThumb){  // 預設書背（等縮圖 lazy 載入後覆蓋）
+  // 書背永遠顯示純色書背+書名（這才是真正的書背視覺）
+  if(false){  // 不使用縮圖覆蓋
     // 純色書背 + 漸層光澤
     div.style.background=
       `linear-gradient(90deg,${t.dark} 0%,${t.bg} 30%,${t.light}22 50%,${t.bg} 70%,${t.dark} 100%)`;
