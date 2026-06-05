@@ -1126,6 +1126,7 @@ textarea{resize:vertical;line-height:1.7}
   border-radius:10px;
   overflow:hidden;
   background:rgba(255,255,255,0.06);
+  transition:transform .15s;
 }
 .media-hcard-thumb.video{
   width:140px;height:90px;
@@ -1298,6 +1299,9 @@ textarea{resize:vertical;line-height:1.7}
 .media-audio-list{
   display:flex;flex-direction:column;
   gap:0;padding:0 14px 16px;
+  padding-top:8px;
+  position:relative;
+  padding-bottom:0;
 }
 
 .mar-vinyl{
@@ -1842,10 +1846,9 @@ textarea{resize:vertical;line-height:1.7}
 .lb{flex:1;overflow-y:auto;padding:12px 12px 80px}
 
 /* ── 9. 彈出層 ───────────────────────────────────────────────── */
-.ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:flex-end;justify-content:center}
+
 .ov.on{display:flex}
-.sh{background:var(--bg1);border-radius:20px 20px 0 0;width:100%;max-width:520px;max-height:94vh;overflow-y:auto;padding-bottom:env(safe-area-inset-bottom,16px);animation:sup .23s cubic-bezier(.4,0,.2,1)}
-.shdl{width:36px;height:4px;background:var(--bg3);border-radius:2px;margin:10px auto 6px}
+
 .sht{font-size:17px;font-weight:700;padding:6px 16px 13px;display:flex;align-items:center;justify-content:space-between}
 .shx{background:var(--bg2);border:none;color:var(--t2);width:27px;height:27px;border-radius:50%;font-size:14px;cursor:pointer}
 
@@ -2358,9 +2361,6 @@ textarea{resize:vertical;line-height:1.7}
   transform:scale(0.94);
   transition:transform .12s;
 }
-.media-hcard-thumb{
-  transition:transform .15s;
-}
 
 /* 音頻圓形：增加光暈邊框 */
 .media-hcard-thumb.audio{
@@ -2675,10 +2675,6 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 內容列距離標題增加（下移）*/
 
-.media-audio-list{
-  padding-top:8px;
-}
-
 /* section 內容下緣炫光長線 */
 
 /* 書庫 藏書/收藏 切換 tab */
@@ -2726,10 +2722,6 @@ textarea{resize:vertical;line-height:1.7}
    用 padding-bottom + ::after 實現，長度約等於標題文字 */
 .media-hscroll-row,
 .media-video-grid,
-.media-audio-list{
-  padding-bottom:0;
-  position:relative;
-}
 
 /* section 容器底部分隔線：寬度 ~80px（≈4個中文字），柔和 Glow */
 
