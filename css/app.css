@@ -2779,23 +2779,9 @@ textarea{resize:vertical;line-height:1.7}
 }
 .media-sec-wrap{
   position:relative;
-  padding-bottom:20px;
+  padding-bottom:4px;
 }
-.media-sec-wrap::after{
-  content:'';
-  position:absolute;
-  bottom:6px; left:14px;
-  width:calc(100% - 28px);
-  height:1px;
-  background:linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255,255,255,0.12) 20%,
-    rgba(255,255,255,0.18) 50%,
-    rgba(255,255,255,0.12) 80%,
-    transparent 100%
-  );
-}
+
 
 /* ── 影音庫兩條線（最終版）─────────────────────────────────
    線1：標題文字正下方短線（::before on media-sec-hd-row）
@@ -2812,17 +2798,18 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* section 底部分隔線（每個 section 卡片列下方）*/
+
 .media-sec-wrap::after{
   content:'';
   display:block;
   height:1px;
-  margin:20px 14px 0;
+  margin:16px 14px 0;
   background:linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255,255,255,0.12) 20%,
-    rgba(255,255,255,0.18) 50%,
-    rgba(255,255,255,0.12) 80%,
+    rgba(255,255,255,0.35) 15%,
+    rgba(255,255,255,0.5) 50%,
+    rgba(255,255,255,0.35) 85%,
     transparent 100%
   );
 }
