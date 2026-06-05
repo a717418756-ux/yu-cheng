@@ -133,13 +133,13 @@ function _renderMediaPage(){
 
   if(recent.length) el.appendChild(_mkHScrollSection('最近播放','recent',recent, false));
   el.appendChild(_mkHScrollSection('收藏','fav',favs));  // 無收藏也顯示（空狀態）
-  if(videos.length) el.appendChild(_mkHScrollSection('影片','video',videos));
+  if(videos.length) el.appendChild(_mkHScrollSection('影片','video',videos,true,true));
   if(audios.length) el.appendChild(_mkHScrollSection('音頻','audio',audios));
   setTimeout(()=>_fillMediaThumbs(el), 0);
 }
 
 // ── 橫向捲動 section ──────────────────────────────────────
-function _mkHScrollSection(title, type, items, showMore=true){
+function _mkHScrollSection(title, type, items, showMore=true, featured=false){
   // 外層 wrap 負責底部分隔線
   const wrap = document.createElement('div');
   wrap.className = 'media-sec-wrap';
@@ -163,8 +163,14 @@ function _mkHScrollSection(title, type, items, showMore=true){
   const preview = items.slice(0,5);
   const row = document.createElement('div');
   row.className='media-hscroll-row';
-  preview.forEach(m=>{
-    row.appendChild(m.type==='audio' ? _mkAudioCard(m) : _mkVideoThumbCard(m));
+  preview.forEach((m, i)=>{
+    if(m.type==='audio'){
+      row.appendChild(_mkAudioCard(m));
+    } else if(featured && i===0){
+      row.appendChild(_mkVideoThumbCard(m, true));   // 第1張大卡
+    } else {
+      row.appendChild(_mkVideoThumbCard(m, false));
+    }
   });
   wrap.appendChild(row);
   return wrap;
@@ -184,13 +190,13 @@ function _mkAudioCard(m){
 }
 
 // 影片縮圖卡片（橫向捲動用）
-function _mkVideoThumbCard(m){
+function _mkVideoThumbCard(m, isFeatured=false){
   const div=document.createElement('div');
-  div.className='media-hcard';
+  div.className = isFeatured ? 'media-hcard media-hcard-featured' : 'media-hcard';
   div.onclick=()=>playVideo(m.id);
   const dur=m.duration?_fmtDur(m.duration):'';
   div.innerHTML=`
-    <div class="media-hcard-thumb video" data-mid="${m.id}">
+    <div class="${isFeatured?'media-hcard-thumb video featured':'media-hcard-thumb video'}" data-mid="${m.id}">
       <div class="media-hcard-nothumb">🎬</div>
       ${dur?`<div class="media-hcard-dur">${dur}</div>`:''}
     </div>
@@ -239,26 +245,19 @@ function _renderExpandMode(el){
   const isFavMode = (type==='fav');
   const isSearchMode = (type==='search');
 
-  // 接管頁面頂部 hd：返回按鈕 + 標題 + 批量刪除（搜尋列上方）
-  const pageHd = document.querySelector('#pg-media .hd');
-  if(pageHd){
-    pageHd.dataset.origHtml = pageHd.innerHTML;  // 備份原始內容
-    pageHd.innerHTML=`
-      <button onclick="_closeExpandMode()"
-        style="background:none;border:none;color:var(--acc);font-size:15px;
-        font-weight:600;cursor:pointer;padding:4px 8px 4px 0;display:flex;align-items:center;gap:4px">
-        ‹ 返回
-      </button>
-      <div style="font-size:18px;font-weight:800;color:var(--t0);flex:1">${title}</div>
-      ${isSearchMode?'':`<button id="bulk-btn" onclick="_toggleBulkMode()"
-        style="font-size:12px;font-weight:600;color:var(--acc);
-        background:none;border:none;cursor:pointer;padding:4px 8px">
-        ${isFavMode?'批量移除':'批量刪除'}
-      </button>`}`;
-  }
-  // 搜尋列展開模式下隱藏
-  const pageSb = document.querySelector('#pg-media .sb');
-  if(pageSb) pageSb.style.display='none';
+  // 展開模式頂部：在 media-list 內放標題列
+  const hd = document.createElement('div');
+  hd.className='media-expand-hd';
+  hd.innerHTML=`
+    <button class="media-expand-back" onclick="_closeExpandMode()">‹ 返回</button>
+    <div class="media-expand-title">${title}</div>
+    ${isSearchMode?'<span></span>':`<button class="media-expand-bulk" id="bulk-btn"
+      onclick="_toggleBulkMode()"
+      style="font-size:12px;font-weight:600;color:var(--acc);
+      background:none;border:none;cursor:pointer;padding:4px 8px">
+      ${isFavMode?'批量移除':'批量刪除'}
+    </button>`}`;
+  el.appendChild(hd);
 
   // 類別標籤（影片和音頻模式下才顯示）
   if(type==='video'||type==='audio'){
@@ -337,14 +336,6 @@ function _renderExpandMode(el){
 }
 
 function _closeExpandMode(){
-  // 還原頁面 hd 和搜尋列
-  const pageHd = document.querySelector('#pg-media .hd');
-  if(pageHd && pageHd.dataset.origHtml){
-    pageHd.innerHTML = pageHd.dataset.origHtml;
-    delete pageHd.dataset.origHtml;
-  }
-  const pageSb = document.querySelector('#pg-media .sb');
-  if(pageSb) pageSb.style.display='';
   _M.expandMode = null;
   _M.bulkMode = false;
   _M.bulkSelected = new Set();
@@ -403,14 +394,6 @@ async function _executeBulk(){
 }
 
 function _closeExpandMode(){
-  // 還原頁面 hd 和搜尋列
-  const pageHd = document.querySelector('#pg-media .hd');
-  if(pageHd && pageHd.dataset.origHtml){
-    pageHd.innerHTML = pageHd.dataset.origHtml;
-    delete pageHd.dataset.origHtml;
-  }
-  const pageSb = document.querySelector('#pg-media .sb');
-  if(pageSb) pageSb.style.display='';
   _M.expandMode = null;
   _M.bulkMode = false;
   _M.bulkSelected = new Set();
@@ -497,7 +480,7 @@ function _mkAudioRow(m,i){
 // 音頻播放器（黑膠模式）
 // ════════════════════════════════════════════════════════════
 async function playAudio(id){
-  const meta=_M.allMedia.find(m=>m.id===id);
+  let meta=_M.allMedia.find(m=>m.id===id);
   if(!meta) return;
 
   // 建立播放列表（同頁面所有音頻，按顯示順序）

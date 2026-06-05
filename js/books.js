@@ -1005,8 +1005,8 @@ async function openBookReader(id){
             <!-- 頁碼提示 -->
             <div id="epub-page-info"
               style="text-align:center;font-size:11px;color:rgba(255,255,255,0.3);
-              padding:4px 0 6px;flex-shrink:0;font-variant-numeric:tabular-nums">
-              載入中…
+              padding:4px 0 6px;flex-shrink:0;font-variant-numeric:tabular-nums;
+              display:none">
             </div>
           </div>`
         : ext==='txt'
@@ -1195,12 +1195,14 @@ let _epubTouchStart = null;
 
 function _updateEpubProgress(book, loc){
   if(!loc) return;
-  // 進度條
   book.locations.percentageFromCfi(loc.start.cfi).then(pct=>{
     const fill=document.getElementById('epub-progress-fill');
     if(fill) fill.style.width=(pct*100).toFixed(1)+'%';
     const info=document.getElementById('epub-page-info');
-    if(info) info.textContent=`${Math.round(pct*100)}%`;
+    if(info){
+      info.textContent=`${Math.round(pct*100)}%`;
+      info.style.display='block';  // 有進度才顯示
+    }
   }).catch(()=>{});
 }
 
