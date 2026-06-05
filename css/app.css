@@ -2760,50 +2760,7 @@ textarea{resize:vertical;line-height:1.7}
     0 0 8px rgba(255,255,255,0.2);
 }
 
-/* 內容底部長分隔線（在 .media-sec-wrap::after）*/
 
-/* ══ 影音庫 section 標題行（最終版）══════════════════════════
-   結構：
-   ┌─────────────────────────────┐
-   │ 標題文字（左）   更多按鈕（右） │  ← media-sec-hd-row
-   │ ────（短線，貼標題下緣）      │  ← ::after，寬≈標題文字
-   └─────────────────────────────┘
-   [卡片列]
-   ─────────────────────  ← media-sec-wrap::after 長線，螢幕2/3
-   ════════════════════════════════════════════════════════ */
-
-/* 標題行：左對齊，更多按鈕推右 */
-.media-sec-hd-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:22px 14px 6px;   /* 底部縮小，讓短線更貼近標題 */
-  position:relative;
-}
-
-/* 標題大字：左側，不縮放 */
-.media-sec-hd-big{
-  font-size:22px;
-  font-weight:800;
-  color:#fff;
-  letter-spacing:-.02em;
-  -webkit-text-fill-color:#fff;
-  flex-shrink:0;
-}
-
-/* 短線：貼在標題文字正下緣，長度≈標題文字寬（約80px≈4中文字）
-   用 ::after 絕對定位，left:14px 對齊標題，不橫跨整行 */
-
-/* section 外層容器：負責底部長線 */
-.media-sec-wrap{
-  position:relative;
-  padding-bottom:8px;
-}
-
-/* 底部長線：在卡片列結束後，長度≈螢幕寬2/3，左對齊 */
-/* media-sec-wrap::after 已移至 media-hscroll-row::after */
-
-/* ══ eink 主題：書庫 ═══════════════════════════════════════════ */
 [data-theme="eink"] .bookshelf{
   background:#d8d0c0;
   background-image:
@@ -2885,6 +2842,26 @@ textarea{resize:vertical;line-height:1.7}
 [data-theme="eink"] .media-sec-hd-big{
   color:var(--t0);
   -webkit-text-fill-color:var(--t0);
+}
+
+.media-sec-hd-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:22px 14px 6px;
+  position:relative;
+}
+.media-sec-hd-big{
+  font-size:22px;
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-.02em;
+  -webkit-text-fill-color:#fff;
+  flex-shrink:0;
+}
+.media-sec-wrap{
+  position:relative;
+  padding-bottom:8px;
 }
 
 /* ── 影音庫兩條線（最終版）─────────────────────────────────
