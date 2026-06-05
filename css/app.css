@@ -645,8 +645,8 @@ textarea{resize:vertical;line-height:1.7}
 .bookshelf{
   position:relative;
   margin:0;
-  padding:0;
-  min-height:200px;
+  padding:0 0 20px;
+  min-height:calc(100vh - 280px);  /* 填滿剩餘空間，書少時無黑色 */
   display:flex;
   flex-direction:column;
   gap:0;
@@ -2749,24 +2749,11 @@ textarea{resize:vertical;line-height:1.7}
 /* ══ 影音庫 section 標題行升級（螢光白線）══════════════════ */
 
 /* 標題行：加白色螢光底線 */
-.media-sec-hd-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:22px 14px 14px;
-  position:relative;
-}
-/* media-sec-hd-row::after removed */
+
+
 
 /* 標題大字不再用漸層（改純白，更清晰有質感）*/
-.media-sec-hd-big{
-  font-size:22px;
-  font-weight:800;
-  color:#fff;
-  letter-spacing:-.02em;
-  background:none;
-  -webkit-text-fill-color:#fff;
-}
+
 
 /* 內容列距離標題增加（下移）*/
 
@@ -2778,7 +2765,7 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* section 內容下緣炫光長線 */
-/* old section bottom lines removed */
+
 
 
 /* 書庫 藏書/收藏 切換 tab */
@@ -2806,9 +2793,9 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* section 內容底部空間（讓下緣線不緊貼內容）*/
-.media-hscroll-row{ padding-bottom:0; }
-.media-video-grid{ padding-bottom:4px; }
-.media-audio-list{ padding-bottom:4px; }
+
+
+
 
 /* ══ 影音庫分隔線重構（最終版）══════════════════════════════
    結構：
@@ -2818,38 +2805,13 @@ textarea{resize:vertical;line-height:1.7}
    ════════════════════════════════════════════════════════ */
 
 /* 標題行：flex 排版讓標題+裝飾線在同一行 */
-.media-sec-hd-row{
-  display:flex;
-  align-items:center;
-  padding:22px 14px 12px;
-  position:relative;
-  gap:0;
-}
+
 
 /* 標題文字 */
-.media-sec-hd-big{
-  font-size:22px;
-  font-weight:800;
-  color:#fff;
-  letter-spacing:-.02em;
-  -webkit-text-fill-color:#fff;
-  flex-shrink:0;
-}
+
 
 /* 標題右側裝飾線：緊接標題右方，延伸剩餘70%寬 */
-.media-sec-hd-row::before{
-  content:'';
-  flex:1;
-  max-width:70%;
-  height:1px;
-  margin-left:10px;
-  background:linear-gradient(
-    90deg,
-    rgba(255,255,255,0.18) 0%,
-    rgba(255,255,255,0.08) 40%,
-    transparent 100%
-  );
-}
+
 
 /* 「更多」按鈕不擠壓裝飾線 */
 .media-sec-more{
@@ -2867,25 +2829,124 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* section 容器底部分隔線：寬度 ~80px（≈4個中文字），柔和 Glow */
-.media-sec-wrap{
-  position:relative;
-  padding-bottom:20px;
+
+
+
+
+/* ══════════════════════════════════════════════════════════
+   影音庫 Section 標題區塊（最終版，2025）
+   結構說明：
+   
+   最近播放                    （標題靠左）
+   ──────  ← 標題文字下緣短線（inline，同文字寬）
+   [卡片] [卡片] [卡片]
+   ─────────────────  ← 內容底部長線（全寬70%）
+   ══════════════════════════════════════════════════════════ */
+
+/* 外層容器（每個 section）*/
+
+
+/* 標題行：標題靠左，更多按鈕靠右 */
+
+
+/* 標題大字 */
+
+
+/* 標題下緣短線用 ::after 實現（更好控制發光）*/
+
+.media-sec-hd-big::after{
+  content:'';
+  position:absolute;
+  bottom:0;
+  left:0;
+  width:100%;      /* 跟標題文字同寬（文字有多寬這條線就多長）*/
+  height:1.5px;
+  background:linear-gradient(
+    90deg,
+    rgba(255,255,255,0.8) 0%,
+    rgba(255,255,255,0.5) 60%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 4px rgba(255,255,255,0.6),
+    0 0 8px rgba(255,255,255,0.2);
 }
-.media-sec-wrap::after{
+
+/* 內容底部長分隔線（在 .media-sec-wrap::after）*/
+
+
+
+/* ══ 影音庫 section 標題行（最終版）══════════════════════════
+   結構：
+   ┌─────────────────────────────┐
+   │ 標題文字（左）   更多按鈕（右） │  ← media-sec-hd-row
+   │ ────（短線，貼標題下緣）      │  ← ::after，寬≈標題文字
+   └─────────────────────────────┘
+   [卡片列]
+   ─────────────────────  ← media-sec-wrap::after 長線，螢幕2/3
+   ════════════════════════════════════════════════════════ */
+
+/* 標題行：左對齊，更多按鈕推右 */
+.media-sec-hd-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:22px 14px 12px;
+  position:relative;
+}
+
+/* 標題大字：左側，不縮放 */
+.media-sec-hd-big{
+  font-size:22px;
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-.02em;
+  -webkit-text-fill-color:#fff;
+  flex-shrink:0;
+}
+
+/* 短線：貼在標題文字正下緣，長度≈標題文字寬（約80px≈4中文字）
+   用 ::after 絕對定位，left:14px 對齊標題，不橫跨整行 */
+.media-sec-hd-row::after{
   content:'';
   position:absolute;
   bottom:0;
   left:14px;
-  width:80px;
-  height:1px;
+  width:88px;   /* ≈ 4個22px中文字的寬度 */
+  height:1.5px;
   background:linear-gradient(
     90deg,
-    rgba(255,255,255,0.55) 0%,
-    rgba(255,255,255,0.25) 60%,
+    rgba(255,255,255,0.65) 0%,
+    rgba(255,255,255,0.35) 65%,
     transparent 100%
   );
   box-shadow:
-    0 0 4px rgba(255,255,255,0.3),
-    0 0 10px rgba(255,255,255,0.1);
+    0 0 4px rgba(255,255,255,0.4),
+    0 0 10px rgba(255,255,255,0.12);
+}
+
+/* section 外層容器：負責底部長線 */
+.media-sec-wrap{
+  position:relative;
+  padding-bottom:24px;
+}
+
+/* 底部長線：在卡片列結束後，長度≈螢幕寬2/3，左對齊 */
+.media-sec-wrap::after{
+  content:'';
+  position:absolute;
+  bottom:8px;
+  left:14px;
+  width:calc(100% - 28px);  /* 螢幕全寬扣兩側 padding */
+  max-width:none;
+  height:1px;
+  background:linear-gradient(
+    90deg,
+    rgba(255,255,255,0.22) 0%,
+    rgba(255,255,255,0.14) 40%,
+    rgba(255,255,255,0.06) 75%,
+    transparent 100%
+  );
+  box-shadow:0 0 4px rgba(255,255,255,0.06);
 }
 
