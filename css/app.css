@@ -1067,22 +1067,7 @@ textarea{resize:vertical;line-height:1.7}
   scrollbar-width:none;
 }
 /* 長白線：緊接在卡片列正下方，長度≈標題文字寬（約4中文字≈88px）*/
-.media-hscroll-row::after{
-  content:'';
-  display:block;
-  flex-shrink:0;
-  width:88px;
-  height:1px;
-  margin-top:20px;
-  align-self:flex-end;
-  background:linear-gradient(
-    90deg,
-    rgba(255,255,255,0.45) 0%,
-    rgba(255,255,255,0.22) 60%,
-    transparent 100%
-  );
-  box-shadow:0 0 4px rgba(255,255,255,0.15),0 0 10px rgba(255,255,255,0.06);
-}
+
 .media-hscroll-row::-webkit-scrollbar{display:none}
 
 /* 橫向卡片（影片 + 音頻共用外框）*/
@@ -2798,30 +2783,12 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 短線：貼在標題文字正下緣，長度≈標題文字寬（約80px≈4中文字）
    用 ::after 絕對定位，left:14px 對齊標題，不橫跨整行 */
-.media-sec-hd-row::after{
-  content:'';
-  position:absolute;
-  /* 貼緊標題行底部，不再有 padding 距離 */
-  bottom:0;
-  left:14px;
-  /* 原本 88px（≈4字寬），縮為五分之二 ≈ 35px */
-  width:35px;
-  height:1.5px;
-  background:linear-gradient(
-    90deg,
-    rgba(255,255,255,0.7) 0%,
-    rgba(255,255,255,0.35) 70%,
-    transparent 100%
-  );
-  box-shadow:
-    0 0 4px rgba(255,255,255,0.45),
-    0 0 10px rgba(255,255,255,0.15);
-}
 
 /* section 外層容器：負責底部長線 */
 .media-sec-wrap{
   position:relative;
-  padding-bottom:0;
+  /* 上方留給標題短線（::before），下方留給卡片底長線（::after）*/
+  padding-bottom:20px;
 }
 
 /* 底部長線：在卡片列結束後，長度≈螢幕寬2/3，左對齊 */
@@ -2910,6 +2877,47 @@ textarea{resize:vertical;line-height:1.7}
   color:var(--t0);
   -webkit-text-fill-color:var(--t0);
 }
+
+/* ── 影音庫兩條線（最終版）─────────────────────────────────
+   線1：標題文字正下方短線（::before on media-sec-hd-row）
+   線2：卡片列結束後的長線（::after on media-sec-wrap）
+   兩條都用絕對定位，不進入 flex 排列，位置穩定
+   ─────────────────────────────────────────────────────── */
+
+/* 線1：標題正下方短線，長度=標題文字寬（約88px），貼緊文字下緣 */
+.media-sec-hd-row::after{
+  content:'';
+  position:absolute;
+  bottom:0;
+  left:14px;
+  width:88px;
+  height:1.5px;
+  background:linear-gradient(
+    90deg,
+    rgba(255,255,255,0.75) 0%,
+    rgba(255,255,255,0.4)  60%,
+    transparent 100%
+  );
+  box-shadow:0 0 5px rgba(255,255,255,0.4),0 0 12px rgba(255,255,255,0.12);
+}
+
+/* 線2：卡片列底部長線，在 wrap 底部，長度=標題寬度（對齊，約88px）*/
+.media-sec-wrap::after{
+  content:'';
+  position:absolute;
+  bottom:6px;
+  left:14px;
+  width:88px;
+  height:1px;
+  background:linear-gradient(
+    90deg,
+    rgba(255,255,255,0.35) 0%,
+    rgba(255,255,255,0.15) 60%,
+    transparent 100%
+  );
+  box-shadow:0 0 4px rgba(255,255,255,0.12);
+}
+
 [data-theme="eink"] .media-sec-hd-row::after{
   background:linear-gradient(90deg,rgba(0,0,0,0.4) 0%,rgba(0,0,0,0.15) 70%,transparent 100%);
   box-shadow:none;
