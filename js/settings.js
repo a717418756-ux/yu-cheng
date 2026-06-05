@@ -70,26 +70,49 @@ async function gdriveRestore(){ try{
   const { url, pwd } = await _gasGetConfig();
   if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
   cfm('從雲端還原','現有資料將被覆蓋，確定繼續？', async()=>{
-    toast('還原中…');
-    const res  = await fetch(url, {
-      method:'POST',
-      headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({ password:pwd, action:'restore', filename:GAS_BACKUP_FILE })
-    });
-    const json = await res.json();
-    if(!json.ok){ toast('還原失敗：'+(json.error||'未知錯誤')); return; }
-    const bk = JSON.parse(json.data);
-    await dc('questions'); await dc('laws'); await dc('attempts'); await dc('countdowns');
-    if(bk.questions?.length) await bulkPut('questions', bk.questions);
-    if(bk.laws?.length)      await bulkPut('laws',      bk.laws);
-    if(bk.attempts?.length)  await bulkPut('attempts',  bk.attempts);
-    if(bk.countdowns?.length)await bulkPut('countdowns',bk.countdowns);
-    if(bk.motto) await setSetting('examMotto', bk.motto);
-    _cacheInvalidate();
-    const rt = new Date().toLocaleString('zh-TW');
-    await setSetting('lastRestoreTime', rt);
-    toast('還原完成，重新整理頁面中…');
-    setTimeout(()=>location.reload(), 1200);
+    // ── callback 內有獨立的 try-catch（cfm 是非同步，外層 catch 無法攔截）──
+    try{
+      toast('還原中…');
+      const res  = await fetch(url, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ password:pwd, action:'restore', filename:GAS_BACKUP_FILE })
+      });
+      const json = await res.json();
+      if(!json.ok){ toast('還原失敗：'+(json.error||'未知錯誤')); return; }
+
+      // json.data 可能是字串或已解析的物件（依 GAS 實作而定）
+      const bk = (typeof json.data === 'string') ? JSON.parse(json.data) : json.data;
+      if(!bk || typeof bk !== 'object'){
+        toast('還原失敗：備份資料格式錯誤'); return;
+      }
+
+      // 驗證資料有效性再清除（避免清空後發現備份是空的）
+      const hasData = (bk.questions?.length || bk.laws?.length || bk.attempts?.length);
+      if(!hasData){
+        toast('還原失敗：備份資料為空，請先備份再還原'); return;
+      }
+
+      // 清除現有資料
+      await dc('questions'); await dc('laws');
+      await dc('attempts'); await dc('countdowns');
+
+      // 寫入備份資料
+      if(bk.questions?.length) await bulkPut('questions', bk.questions);
+      if(bk.laws?.length)      await bulkPut('laws',      bk.laws);
+      if(bk.attempts?.length)  await bulkPut('attempts',  bk.attempts);
+      if(bk.countdowns?.length)await bulkPut('countdowns',bk.countdowns);
+      if(bk.motto)             await setSetting('examMotto', bk.motto);
+
+      _cacheInvalidate();
+      const rt = new Date().toLocaleString('zh-TW');
+      await setSetting('lastRestoreTime', rt);
+      toast('還原完成，重新整理頁面中…');
+      setTimeout(()=>location.reload(), 1200);
+    } catch(innerErr){
+      logError('gdriveRestore-inner', innerErr);
+      toast('還原失敗：'+innerErr.message);
+    }
   });
 }catch(e){ logError('gdriveRestore',e); toast('還原失敗：'+e.message); }}
 
@@ -114,6 +137,21 @@ async function renderSet(){  try{
       `程式版本：<b>v${av}</b>　題庫版本：<b>${dv}</b><br>` +
       `最後備份：<span style="color:var(--t2)">${lastBk}</span>　` +
       `最後還原：<span style="color:var(--t2)">${lastRs}</span>`;
+
+    // 診斷資訊：錯誤日誌
+    const diagEl = document.getElementById('set-diag-info');
+    if(diagEl){
+      const errs = typeof _errLog !== 'undefined' ? _errLog : [];
+      if(errs.length === 0){
+        diagEl.innerHTML = '<span style="color:var(--grn)">✓ 無錯誤記錄</span>';
+      } else {
+        const errHtml = errs.slice(-5).reverse().map(e=>
+          `<div style="color:var(--red2,#c00);font-size:11px;border-left:2px solid var(--red);padding-left:6px;margin-bottom:4px">` +
+          `<b>${e.ctx}</b>：${e.msg}<br><span style="color:var(--t2)">${e.t.replace('T',' ').slice(0,19)}</span></div>`
+        ).join('');
+        diagEl.innerHTML = `<div style="color:var(--t2);font-size:11px;margin-bottom:4px">最近 ${errs.length} 筆錯誤（顯示最後5筆）：</div>${errHtml}`;
+      }
+    }
   }
   }catch(e){ logError('renderSet',e); }}
 async function expJSON(){  try{

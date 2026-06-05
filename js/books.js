@@ -59,7 +59,36 @@ async function renderBooks(){
 
 async function _getBooksMetaList(){
   const all = await _db.ebooks.toArray();
-  return all.map(({blob:_b, coverBlob:_cb, ...meta}) => meta);
+  // blob/coverBlob（大檔）和 coverThumb/spineThumb（縮圖）都排除
+  // 縮圖透過 _getBookThumb(id) 按需讀取，避免清單載入時一次吃掉所有縮圖記憶體
+  return all.map(({blob:_b, coverBlob:_cb, coverThumb:_ct, spineThumb:_st, ...meta}) => meta);
+}
+
+// 按需讀取單本縮圖（回傳 {coverThumb, spineThumb} 或 {}）
+async function _getBookThumb(id){
+  try{
+    const row = await _db.ebooks.get(id);
+    return { coverThumb: row?.coverThumb, spineThumb: row?.spineThumb };
+  }catch(e){ return {}; }
+}
+
+// 非同步填充縮圖到指定元素
+async function _fillThumb(el, id, type){
+  try{
+    const th = await _getBookThumb(id);
+    const raw = type==='spine' ? th.spineThumb : th.coverThumb;
+    if(!raw || !el || !el.isConnected) return;
+    // 相容舊 base64 字串和新 Blob
+    const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
+    const img = document.createElement('img');
+    img.loading = 'lazy'; img.alt = '';
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+    if(raw instanceof Blob){
+      img.onload = ()=> URL.revokeObjectURL(src);  // 顯示後立即釋放
+    }
+    img.src = src;
+    if(el.isConnected){ el.innerHTML=''; el.appendChild(img); }
+  }catch(e){}
 }
 
 // ── 主渲染邏輯 ───────────────────────────────────────────────
@@ -145,6 +174,9 @@ function _mkRecentSection(books){
     cover.className = 'shelf-recent-cover';
     if(b.coverThumb){
       cover.innerHTML=`<img src="${b.coverThumb}" loading="lazy" alt="">`;
+    } else if(b.id){
+      // _B.allBooks 不含縮圖，非同步填充
+      _fillThumb(cover, b.id, 'cover');
     } else {
       cover.innerHTML=`<div class="shelf-recent-cover-placeholder">${esc(b.title||'')}</div>`;
       const t = _SPINE_THEMES[(b.id||0) % _SPINE_THEMES.length];
@@ -345,7 +377,7 @@ function _mkCoverGrid(books, total){
     const img=document.createElement('div');
     img.className='shelf-cover-img';
     if(b.coverThumb){
-      img.innerHTML=`<img src="${b.coverThumb}" loading="lazy" alt="">`;
+      _fillThumb(img, b.id, 'cover');
     } else {
       img.style.background=`linear-gradient(160deg,${t.bg},${t.dark})`;
       img.innerHTML=`<div style="width:100%;height:100%;display:flex;align-items:center;
@@ -387,6 +419,9 @@ function _mkListView(books, total){
     cover.className='shelf-list-cover';
     if(b.coverThumb){
       cover.innerHTML=`<img src="${b.coverThumb}" loading="lazy" alt="">`;
+    } else if(b.id){
+      // _B.allBooks 不含縮圖，非同步填充
+      _fillThumb(cover, b.id, 'cover');
     } else {
       cover.style.background=`linear-gradient(160deg,${t.bg},${t.dark})`;
     }
@@ -409,7 +444,7 @@ function _mkListView(books, total){
     favBtn.onclick=e=>{e.stopPropagation();_quickToggleBookFav(b.id,favBtn);};
     item.appendChild(cover);
     item.appendChild(info);
-    // if(favBtn) item.appendChild(favBtn);
+
     wrap.appendChild(item);
   });
   return wrap;
@@ -631,7 +666,8 @@ function _compressImage(file,maxW,maxH){
         canvas.width=Math.round(w*scale);
         canvas.height=Math.round(h*scale);
         canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-        resolve(canvas.toDataURL('image/jpeg',0.82));
+        // Blob 比 base64 少 33% 空間
+        canvas.toBlob(blob=>resolve(blob),'image/jpeg',0.82);
       };
       img.src=e.target.result;
     };
@@ -921,7 +957,6 @@ async function openBookReader(id){
     },300);
   }
 }
-
 
 // ════════════════════════════════════════════════════════════
 // epub.js 閱讀器

@@ -38,9 +38,41 @@ async function renderMedia(){
   }catch(e){ logError('renderMedia',e); }
 }
 
+// 批量填充影音縮圖（渲染後非同步填入）
+async function _fillMediaThumbs(container){
+  const els = (container||document).querySelectorAll('[data-mid]');
+  for(const el of els){
+    const id = parseInt(el.dataset.mid);
+    if(!id || !el.isConnected) continue;
+    const raw = await _getMediaThumb(id);
+    if(!raw || !el.isConnected) continue;
+    const isAudio = el.classList.contains('audio');
+    const durEl = el.querySelector('.media-hcard-dur');
+    // 相容舊 base64 字串和新 Blob
+    const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.style.cssText = `width:100%;height:100%;object-fit:cover;border-radius:${isAudio?'50%':'10px'}`;
+    if(raw instanceof Blob){ img.onload = ()=> URL.revokeObjectURL(src); }
+    img.src = src;
+    if(el.isConnected){ el.innerHTML=''; el.appendChild(img); }
+    if(durEl && el.isConnected) el.appendChild(durEl);
+  }
+}
+
 async function _getMediaMetaList(){
   const all = await _db.leisuremedia.toArray();
-  return all.map(({blob:_b, ...meta}) => meta);
+  // blob（大檔）和 thumbnail（縮圖）都排除
+  // 縮圖透過 _getMediaThumb(id) 按需讀取
+  return all.map(({blob:_b, thumbnail:_th, ...meta}) => meta);
+}
+
+// 按需讀取單筆縮圖
+async function _getMediaThumb(id){
+  try{
+    const row = await _db.leisuremedia.get(id);
+    return row?.thumbnail || null;
+  }catch(e){ return null; }
 }
 
 function _filteredMedia(){
@@ -103,6 +135,7 @@ function _renderMediaPage(){
   el.appendChild(_mkHScrollSection('收藏','fav',favs));  // 無收藏也顯示（空狀態）
   if(videos.length) el.appendChild(_mkHScrollSection('影片','video',videos));
   if(audios.length) el.appendChild(_mkHScrollSection('音頻','audio',audios));
+  setTimeout(()=>_fillMediaThumbs(el), 0);
 }
 
 // ── 橫向捲動 section ──────────────────────────────────────
@@ -142,10 +175,8 @@ function _mkAudioCard(m){
   div.className='media-hcard';
   div.onclick=()=>playAudio(m.id);
   div.innerHTML=`
-    <div class="media-hcard-thumb audio">
-      ${m.thumbnail
-        ?`<img src="${m.thumbnail}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
-        :`<div class="media-hcard-vinyl"></div>`}
+    <div class="media-hcard-thumb audio" data-mid="${m.id}">
+      <div class="media-hcard-vinyl"></div>
     </div>
     <div class="media-hcard-name">${esc(m.title||'未命名')}</div>`;
   return div;
@@ -158,10 +189,8 @@ function _mkVideoThumbCard(m){
   div.onclick=()=>playVideo(m.id);
   const dur=m.duration?_fmtDur(m.duration):'';
   div.innerHTML=`
-    <div class="media-hcard-thumb video">
-      ${m.thumbnail
-        ?`<img src="${m.thumbnail}" style="width:100%;height:100%;object-fit:cover;border-radius:10px">`
-        :`<div class="media-hcard-nothumb">🎬</div>`}
+    <div class="media-hcard-thumb video" data-mid="${m.id}">
+      <div class="media-hcard-nothumb">🎬</div>
       ${dur?`<div class="media-hcard-dur">${dur}</div>`:''}
     </div>
     <div class="media-hcard-name">${esc(m.title||'未命名')}</div>`;
@@ -468,6 +497,13 @@ async function playAudio(id){
   const url=URL.createObjectURL(full.blob);
 
   // 顯示黑膠播放器
+  // thumbnail 可能是 Blob（新）或 base64 字串（舊），統一轉為可顯示的 URL
+  if(full.thumbnail instanceof Blob){
+    meta = {...meta, thumbnail: URL.createObjectURL(full.thumbnail)};
+    meta._thumbIsBlob = true;  // 標記需要 revoke
+  } else if(full.thumbnail){
+    meta = {...meta, thumbnail: full.thumbnail};
+  }
   _showVinylPlayer(meta, url, full);
 
   // 更新播放記錄
@@ -820,15 +856,20 @@ async function _applyCoverCrop(mediaId, dataUrl){
   const drawY = (SIZE - drawH)/2 + y * s;
   ctx.drawImage(img, drawX, drawY, drawW, drawH);
 
-  const thumb = canvas.toDataURL('image/jpeg', 0.88);
+  // 裁剪後改存 Blob（比 base64 少 33%）
+  const thumb = await new Promise(res=>canvas.toBlob(b=>res(b),'image/jpeg',0.88));
 
   // 存回 DB
   try{
     const m = await dg('leisuremedia', mediaId);
     if(m){ m.thumbnail = thumb; await dp('leisuremedia', m);
-      // 更新播放器封面
+      // 更新播放器封面（Blob 需要 createObjectURL）
       const coverEl = document.getElementById('vp-cover-img');
-      if(coverEl) coverEl.src = thumb;
+      if(coverEl){
+        const url = (thumb instanceof Blob) ? URL.createObjectURL(thumb) : thumb;
+        coverEl.onload = ()=>{ if(thumb instanceof Blob) URL.revokeObjectURL(url); };
+        coverEl.src = url;
+      }
       // 更新列表縮圖
       const idx = _M.allMedia.findIndex(x=>x.id===mediaId);
       if(idx>=0) _M.allMedia[idx].thumbnail = thumb;
@@ -868,6 +909,9 @@ function _clearVinyl(){
 function closeVinylPlayer(){
   const ov=document.getElementById('vinyl-player-ov');
   if(!ov) return;
+  // revoke 黑膠封面 blob URL（避免記憶體洩漏）
+  const coverImg = document.getElementById('vp-cover-img');
+  if(coverImg?.src?.startsWith('blob:')) URL.revokeObjectURL(coverImg.src);
   // 儲存播放位置
   if(_audioEl && _M.nowId){
     const pos=Math.floor(_audioEl.currentTime);
@@ -1449,7 +1493,8 @@ function _compressMediaThumb(file){
         canvas.width=Math.round(w*scale);
         canvas.height=Math.round(h*scale);
         canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-        resolve(canvas.toDataURL('image/jpeg',0.8));
+        // Blob 比 base64 少 33% 空間
+        canvas.toBlob(blob=>resolve(blob),'image/jpeg',0.8);
       };
       img.src=e.target.result;
     };
