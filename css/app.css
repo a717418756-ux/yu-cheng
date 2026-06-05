@@ -1057,17 +1057,7 @@ textarea{resize:vertical;line-height:1.7}
   background:var(--acc);border-radius:1px;
 }
 
-/* ── eink 主題 ── */
-[data-theme="eink"] .bookshelf{background:#d8d0c0}
-[data-theme="eink"] .shelf-top-plank{background:#b0a890}
-[data-theme="eink"] .shelf-plank{background:#b0a890}
-[data-theme="eink"] .book-spine{
-  box-shadow:1px 1px 0 rgba(0,0,0,0.4);
-  transition:none;
-}
-[data-theme="eink"] .book-spine.pulling{
-  transform:none;filter:none;
-}
+
 
 /* ── finput（新增書籍表單用）── */
 .finput{
@@ -1086,9 +1076,9 @@ textarea{resize:vertical;line-height:1.7}
 .media-hscroll-row{
   display:flex;
   flex-direction:row;
-  align-items:center;  /* 圖片中心點水平一直線對齊 */
+  align-items:stretch;  /* 卡片等高，內容可垂直置中 */
   gap:12px;
-  padding:0 14px 16px;
+  padding:8px 14px 16px;
   overflow-x:auto;
   overflow-y:visible;
   -webkit-overflow-scrolling:touch;
@@ -1102,7 +1092,8 @@ textarea{resize:vertical;line-height:1.7}
   width:130px;
   display:flex;flex-direction:column;
   align-items:center;
-  gap:6px;
+  justify-content:center;   /* 整體垂直置中 */
+  gap:8px;
   cursor:pointer;
 }
 
@@ -2891,7 +2882,7 @@ textarea{resize:vertical;line-height:1.7}
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:22px 14px 12px;
+  padding:22px 14px 6px;   /* 底部縮小，讓短線更貼近標題 */
   position:relative;
 }
 
@@ -2910,19 +2901,21 @@ textarea{resize:vertical;line-height:1.7}
 .media-sec-hd-row::after{
   content:'';
   position:absolute;
+  /* 貼緊標題行底部，不再有 padding 距離 */
   bottom:0;
   left:14px;
-  width:88px;   /* ≈ 4個22px中文字的寬度 */
+  /* 原本 88px（≈4字寬），縮為五分之二 ≈ 35px */
+  width:35px;
   height:1.5px;
   background:linear-gradient(
     90deg,
-    rgba(255,255,255,0.65) 0%,
-    rgba(255,255,255,0.35) 65%,
+    rgba(255,255,255,0.7) 0%,
+    rgba(255,255,255,0.35) 70%,
     transparent 100%
   );
   box-shadow:
-    0 0 4px rgba(255,255,255,0.4),
-    0 0 10px rgba(255,255,255,0.12);
+    0 0 4px rgba(255,255,255,0.45),
+    0 0 10px rgba(255,255,255,0.15);
 }
 
 /* section 外層容器：負責底部長線 */
@@ -2948,5 +2941,142 @@ textarea{resize:vertical;line-height:1.7}
     transparent 100%
   );
   box-shadow:0 0 4px rgba(255,255,255,0.06);
+}
+
+
+/* ══ eink 主題：書庫 ═══════════════════════════════════════════ */
+[data-theme="eink"] .bookshelf{
+  background:#d8d0c0;
+  background-image:
+    repeating-linear-gradient(180deg,transparent,transparent 3px,rgba(0,0,0,0.02) 3px,rgba(0,0,0,0.02) 4px);
+}
+[data-theme="eink"] .shelf-top-plank{
+  background:#b8aa90;
+  box-shadow:0 2px 6px rgba(0,0,0,0.3);
+}
+[data-theme="eink"] .shelf-plank{
+  background:linear-gradient(180deg,#c8b898 0%,#b0a080 50%,#987860 100%);
+  box-shadow:0 3px 8px rgba(0,0,0,0.3);
+}
+[data-theme="eink"] .book-spine{
+  box-shadow:1px 1px 0 rgba(0,0,0,0.4),2px 2px 0 rgba(0,0,0,0.15);
+  filter:none;
+}
+[data-theme="eink"] .book-spine.pulling{
+  transform:translateY(-8px);
+  box-shadow:2px 6px 12px rgba(0,0,0,0.3);
+  filter:none;
+}
+[data-theme="eink"] .shelf-recent-wrap{
+  background:#d0c8b0;
+  border-bottom:2px solid #a09070;
+}
+[data-theme="eink"] .shelf-mode-bar{
+  background:#d8d0c0;
+  border-bottom:1.5px solid #a09070;
+}
+[data-theme="eink"] .shelf-mode-btn{
+  background:#c8c0a8;border:1.5px solid #a09070;
+  color:#111;font-size:12px;
+}
+[data-theme="eink"] .shelf-mode-btn.on{
+  background:#111;color:#f0ece0;border-color:#111;
+}
+[data-theme="eink"] .shelf-section-tab{ color:#555; }
+[data-theme="eink"] .shelf-section-tab.on{ color:#111; }
+
+/* ══ eink 主題：閱讀器 ══════════════════════════════════════════ */
+[data-theme="eink"] .reader-topbar{
+  background:#f0ece0;
+  border-bottom:2px solid #888;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+[data-theme="eink"] .reader-title{
+  color:#111;
+  font-family:'標楷體','DFKai-SB','BiauKai',Georgia,serif;
+  font-size:15px;font-weight:700;
+}
+[data-theme="eink"] .reader-btn{
+  background:#e0dcc8;border:1.5px solid #888;
+  color:#111;font-size:15px;border-radius:6px;
+}
+[data-theme="eink"] #reader-settings{
+  background:#f0ece0 !important;
+  border:1.5px solid #888 !important;
+  color:#111 !important;
+}
+[data-theme="eink"] #reader-settings button{
+  border:1.5px solid #888 !important;
+  font-size:13px;min-height:36px;
+}
+[data-theme="eink"] #epub-page-info{
+  color:#555 !important;font-size:13px;
+  background:#f0ece0;border-top:1px solid #ccc;
+  padding:6px 0;
+}
+[data-theme="eink"] #epub-progress-fill{
+  background:#111 !important;
+}
+
+/* ══ eink 主題：影音庫 ══════════════════════════════════════════ */
+[data-theme="eink"] #pg-media{
+  background:var(--bg0);
+}
+[data-theme="eink"] .media-sec-hd-big{
+  color:var(--t0);
+  -webkit-text-fill-color:var(--t0);
+}
+[data-theme="eink"] .media-sec-hd-row::after{
+  background:linear-gradient(90deg,rgba(0,0,0,0.4) 0%,rgba(0,0,0,0.15) 70%,transparent 100%);
+  box-shadow:none;
+}
+[data-theme="eink"] .media-sec-wrap::after{
+  background:linear-gradient(90deg,rgba(0,0,0,0.15) 0%,rgba(0,0,0,0.06) 50%,transparent 100%);
+  box-shadow:none;
+}
+[data-theme="eink"] .media-hcard-name{ color:var(--t0); }
+[data-theme="eink"] .media-sec-more{
+  background:var(--bg2);border:1.5px solid var(--bd);color:var(--t1);
+}
+[data-theme="eink"] .media-hcard-thumb.audio{
+  box-shadow:1px 1px 0 rgba(0,0,0,0.3);
+}
+[data-theme="eink"] .media-hcard-vinyl{
+  background:radial-gradient(circle at 50%,#888 0%,#555 30%,#333 60%,#222 100%);
+}
+[data-theme="eink"] .media-vcard{
+  background:var(--bg1);border:1.5px solid var(--bd);
+  box-shadow:1px 1px 0 rgba(0,0,0,0.15);
+}
+
+/* ══ eink 主題：黑膠播放器 ══════════════════════════════════════ */
+[data-theme="eink"] #vinyl-player-ov{
+  background:var(--bg0) !important;
+}
+[data-theme="eink"] .vp-topbar{
+  background:var(--bg1);border-bottom:2px solid var(--bd);
+}
+[data-theme="eink"] .vp-back,
+[data-theme="eink"] .vp-more{
+  background:var(--bg2);border:1.5px solid var(--bd);color:var(--t0);
+}
+[data-theme="eink"] .vp-mode-lbl{ color:var(--t0); }
+[data-theme="eink"] .vp-title{ color:var(--t0);-webkit-text-fill-color:var(--t0); }
+[data-theme="eink"] .vp-artist{ color:var(--t2); }
+[data-theme="eink"] .vp-seek::-webkit-slider-runnable-track{
+  background:linear-gradient(to right,var(--t0) 0%,var(--t0) var(--seek-pct,0%),var(--bd) var(--seek-pct,0%),var(--bd) 100%);
+}
+[data-theme="eink"] .vp-seek::-webkit-slider-thumb{ background:var(--t0); }
+[data-theme="eink"] .vpc-main{
+  background:var(--t0) !important;border:none !important;
+}
+[data-theme="eink"] .vpc-side{
+  background:var(--bg2);border:1.5px solid var(--bd);color:var(--t0);
+}
+[data-theme="eink"] .vpc-sm{ color:var(--t1); }
+[data-theme="eink"] .vpt-btn{ color:var(--t2); }
+[data-theme="eink"] #vp-playlist-wrap{
+  background:var(--bg1);border-top:2px solid var(--bd);
 }
 
