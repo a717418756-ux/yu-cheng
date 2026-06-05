@@ -720,6 +720,12 @@ async function openBookDetail(id){
           <div style="font-size:11px;color:var(--t2)">
             ${ext||'—'} · ${_fmtSize(book.fileSize||0)||'—'}
           </div>
+          <button onclick="_openBookEdit(${id})"
+            style="margin-top:8px;padding:4px 10px;font-size:11px;
+            background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
+            color:var(--t2);border-radius:8px;cursor:pointer">
+            ✏ 編輯資訊
+          </button>
         </div>
       </div>
       <!-- 收藏按鈕 -->
@@ -759,6 +765,85 @@ async function openBookDetail(id){
 }
 
 // 補充附加檔案（書本無 blob 時）
+// 書籍資訊編輯視窗
+async function _openBookEdit(id){
+  const book = await dg('ebooks', id);
+  if(!book) return;
+  document.getElementById('book-detail-ov')?.remove();
+
+  const ov = document.createElement('div');
+  ov.id = 'book-edit-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:610;background:rgba(0,0,0,0.8);display:flex;align-items:flex-end';
+  ov.innerHTML=`
+    <div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);
+      border-radius:20px 20px 0 0;padding:20px 16px 32px">
+      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 16px"></div>
+      <div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:16px">編輯書籍資訊</div>
+
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">書名</div>
+        <input id="bedit-title" class="finput" value="${esc(book.title||'')}"
+          style="width:100%;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">作者</div>
+        <input id="bedit-author" class="finput" value="${esc(book.author||'')}"
+          style="width:100%;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">分類</div>
+        <input id="bedit-category" class="finput" value="${esc(book.category||'')}"
+          style="width:100%;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">標籤（逗號分隔）</div>
+        <input id="bedit-tags" class="finput" value="${esc((book.tags||[]).join(','))}"
+          style="width:100%;box-sizing:border-box">
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('book-edit-ov').remove();openBookDetail(${id})"
+          style="flex:1;padding:11px;background:rgba(255,255,255,0.06);
+          border:1px solid var(--bd);color:var(--t1);border-radius:10px;cursor:pointer;font-size:13px">
+          取消
+        </button>
+        <button onclick="_saveBookEdit(${id})"
+          style="flex:2;padding:11px;background:rgba(37,98,200,0.85);
+          color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700">
+          儲存
+        </button>
+      </div>
+    </div>`;
+  ov.onclick=e=>{if(e.target===ov){ov.remove();openBookDetail(id);}};
+  document.body.appendChild(ov);
+}
+
+async function _saveBookEdit(id){
+  const book = await dg('ebooks', id);
+  if(!book) return;
+  const title    = document.getElementById('bedit-title')?.value.trim();
+  const author   = document.getElementById('bedit-author')?.value.trim();
+  const category = document.getElementById('bedit-category')?.value.trim();
+  const tagsRaw  = document.getElementById('bedit-tags')?.value.trim();
+  const tags = tagsRaw ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
+
+  if(!title){ toast('書名不能為空'); return; }
+  book.title    = title;
+  book.author   = author;
+  book.category = category;
+  book.tags     = tags;
+  await dp('ebooks', book);
+
+  // 同步更新 allBooks 快取
+  const idx = _B.allBooks.findIndex(b=>b.id===id);
+  if(idx>=0) Object.assign(_B.allBooks[idx], {title, author, category, tags});
+
+  toast('書籍資訊已更新');
+  document.getElementById('book-edit-ov')?.remove();
+  openBookDetail(id);
+  _renderBooksPage();
+}
+
 // 書籍資訊視窗收藏切換
 async function _detailToggleBookFav(id, btn){
   try{
@@ -1051,6 +1136,12 @@ async function _initEpubReader(url, savedCfi){
     } else {
       await rendition.display();
     }
+
+    // 生成位置索引（讓 percentageFromCfi 能正確計算進度）
+    book.locations.generate(1024).then(()=>{
+      const loc = rendition.currentLocation();
+      if(loc) _updateEpubProgress(book, loc);
+    }).catch(()=>{});
 
     // 翻頁後更新進度
     rendition.on('relocated', loc=>{

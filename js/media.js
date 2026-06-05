@@ -153,7 +153,8 @@ function _mkHScrollSection(title, type, items, showMore=true){
 
   if(!items.length){
     const empty = document.createElement('div');
-    empty.style.cssText='padding:12px 14px 18px;font-size:12px;color:var(--t2);background:transparent';
+    empty.className='media-empty-sec';
+    empty.style.cssText='padding:12px 14px 18px;font-size:12px;color:var(--t2)';
     empty.textContent = title==='收藏' ? '尚未收藏任何影音' : '尚無內容';
     wrap.appendChild(empty);
     return wrap;
