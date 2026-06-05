@@ -1073,20 +1073,7 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* 線2：卡片列底部分隔線，長度約標題文字寬，柔和 Glow */
-.media-sec-wrap::before{
-  content:'';
-  display:block;
-  height:1px;
-  margin:0 14px;
-  background:linear-gradient(
-    90deg,
-    rgba(255,255,255,0.35) 0%,
-    rgba(255,255,255,0.55) 40%,
-    rgba(255,255,255,0.35) 70%,
-    transparent 100%
-  );
-  box-shadow:0 0 6px rgba(255,255,255,0.15);
-}
+
 
 /* 橫向卡片（影片 + 音頻共用外框）*/
 .media-hcard{
@@ -2779,7 +2766,7 @@ textarea{resize:vertical;line-height:1.7}
 }
 .media-sec-wrap{
   position:relative;
-  padding-bottom:4px;
+  padding-bottom:16px;  /* 讓 ::after 底部線跟下個 section 標題拉開距離 */
 }
 
 
@@ -2863,9 +2850,7 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* 空狀態的 section wrap 不顯示底部分隔線 */
-.media-sec-wrap:has(.media-empty-sec)::before{
-  display:none;
-}
+
 
 /* 影片 featured 大卡（首張，類 Netflix 橫版大圖）*/
 .media-hcard-featured{
@@ -2881,7 +2866,16 @@ textarea{resize:vertical;line-height:1.7}
     0 0 0 1px rgba(255,255,255,0.06);
 }
 
-/* 搜尋欄下方第一個 section 不顯示頂部線 */
-#media-list .media-sec-wrap:first-child::before{
-  display:none;
+
+
+/* 影音庫標題靠左 */
+#media-hd-title{
+  flex:1;
+  text-align:left;
+}
+
+/* 影音庫標題靠左（展開模式時標題也靠左）*/
+#media-hd-title{
+  flex:1;
+  text-align:left;
 }
