@@ -236,20 +236,29 @@ function _renderExpandMode(el){
 
   el.innerHTML='';
 
-  // 頂部：標題 + 返回首頁 + 類別篩選（影片/音頻模式下）
   const isFavMode = (type==='fav');
   const isSearchMode = (type==='search');
-  const hd = document.createElement('div');
-  hd.className='media-expand-hd';
-  hd.innerHTML=`
-    <button class="media-expand-back" onclick="_closeExpandMode()">‹ 返回</button>
-    <div class="media-expand-title">${title}</div>
-    ${isSearchMode?'<span></span>':`<button class="media-expand-bulk" id="bulk-btn"
-      onclick="_toggleBulkMode()"
-      style="font-size:12px;font-weight:600;color:var(--acc);background:none;border:none;cursor:pointer;padding:4px 8px">
-      ${isFavMode?'批量移除':'批量刪除'}
-    </button>`}`;
-  el.appendChild(hd);
+
+  // 接管頁面頂部 hd：返回按鈕 + 標題 + 批量刪除（搜尋列上方）
+  const pageHd = document.querySelector('#pg-media .hd');
+  if(pageHd){
+    pageHd.dataset.origHtml = pageHd.innerHTML;  // 備份原始內容
+    pageHd.innerHTML=`
+      <button onclick="_closeExpandMode()"
+        style="background:none;border:none;color:var(--acc);font-size:15px;
+        font-weight:600;cursor:pointer;padding:4px 8px 4px 0;display:flex;align-items:center;gap:4px">
+        ‹ 返回
+      </button>
+      <div style="font-size:18px;font-weight:800;color:var(--t0);flex:1">${title}</div>
+      ${isSearchMode?'':`<button id="bulk-btn" onclick="_toggleBulkMode()"
+        style="font-size:12px;font-weight:600;color:var(--acc);
+        background:none;border:none;cursor:pointer;padding:4px 8px">
+        ${isFavMode?'批量移除':'批量刪除'}
+      </button>`}`;
+  }
+  // 搜尋列展開模式下隱藏
+  const pageSb = document.querySelector('#pg-media .sb');
+  if(pageSb) pageSb.style.display='none';
 
   // 類別標籤（影片和音頻模式下才顯示）
   if(type==='video'||type==='audio'){
@@ -328,6 +337,14 @@ function _renderExpandMode(el){
 }
 
 function _closeExpandMode(){
+  // 還原頁面 hd 和搜尋列
+  const pageHd = document.querySelector('#pg-media .hd');
+  if(pageHd && pageHd.dataset.origHtml){
+    pageHd.innerHTML = pageHd.dataset.origHtml;
+    delete pageHd.dataset.origHtml;
+  }
+  const pageSb = document.querySelector('#pg-media .sb');
+  if(pageSb) pageSb.style.display='';
   _M.expandMode = null;
   _M.bulkMode = false;
   _M.bulkSelected = new Set();
@@ -386,6 +403,14 @@ async function _executeBulk(){
 }
 
 function _closeExpandMode(){
+  // 還原頁面 hd 和搜尋列
+  const pageHd = document.querySelector('#pg-media .hd');
+  if(pageHd && pageHd.dataset.origHtml){
+    pageHd.innerHTML = pageHd.dataset.origHtml;
+    delete pageHd.dataset.origHtml;
+  }
+  const pageSb = document.querySelector('#pg-media .sb');
+  if(pageSb) pageSb.style.display='';
   _M.expandMode = null;
   _M.bulkMode = false;
   _M.bulkSelected = new Set();

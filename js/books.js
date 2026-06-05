@@ -334,10 +334,9 @@ function _mkSpine(b, dispW, dispH){
 
   const t = _SPINE_THEMES[(b.id||0) % _SPINE_THEMES.length];
 
-  if(b.spineThumb){
-    div.innerHTML=`<img src="${b.spineThumb}"
-      style="width:100%;height:100%;object-fit:cover;display:block;">`;
-  } else {
+  // spineThumb 從 allBooks 排除（_fillThumb lazy 讀取後覆蓋）
+  if(b.id){ _fillThumb(div, b.id, 'spine'); }
+  if(!b.spineThumb){  // 預設書背（等縮圖 lazy 載入後覆蓋）
     // 純色書背 + 漸層光澤
     div.style.background=
       `linear-gradient(90deg,${t.dark} 0%,${t.bg} 30%,${t.light}22 50%,${t.bg} 70%,${t.dark} 100%)`;
@@ -795,10 +794,28 @@ async function _openBookEdit(id){
         <input id="bedit-category" class="finput" value="${esc(book.category||'')}"
           style="width:100%;box-sizing:border-box">
       </div>
-      <div style="margin-bottom:16px">
+      <div style="margin-bottom:10px">
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">標籤（逗號分隔）</div>
         <input id="bedit-tags" class="finput" value="${esc((book.tags||[]).join(','))}"
           style="width:100%;box-sizing:border-box">
+      </div>
+      <div style="font-size:11px;color:var(--t2);margin-bottom:6px">書本尺寸（mm）</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">厚度</div>
+          <input id="bedit-thick" type="number" class="finput" min="5" max="100"
+            value="${book.thickMM||20}" style="text-align:center;box-sizing:border-box;width:100%">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">高度</div>
+          <input id="bedit-height" type="number" class="finput" min="100" max="300"
+            value="${book.heightMM||210}" style="text-align:center;box-sizing:border-box;width:100%">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px">寬度</div>
+          <input id="bedit-width" type="number" class="finput" min="80" max="220"
+            value="${book.widthMM||148}" style="text-align:center;box-sizing:border-box;width:100%">
+        </div>
       </div>
 
       <div style="display:flex;gap:8px">
@@ -827,16 +844,23 @@ async function _saveBookEdit(id){
   const tagsRaw  = document.getElementById('bedit-tags')?.value.trim();
   const tags = tagsRaw ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
 
+  const thickMM  = parseInt(document.getElementById('bedit-thick')?.value)  || 20;
+  const heightMM = parseInt(document.getElementById('bedit-height')?.value) || 210;
+  const widthMM  = parseInt(document.getElementById('bedit-width')?.value)  || 148;
+
   if(!title){ toast('書名不能為空'); return; }
   book.title    = title;
   book.author   = author;
   book.category = category;
   book.tags     = tags;
+  book.thickMM  = thickMM;
+  book.heightMM = heightMM;
+  book.widthMM  = widthMM;
   await dp('ebooks', book);
 
   // 同步更新 allBooks 快取
   const idx = _B.allBooks.findIndex(b=>b.id===id);
-  if(idx>=0) Object.assign(_B.allBooks[idx], {title, author, category, tags});
+  if(idx>=0) Object.assign(_B.allBooks[idx], {title, author, category, tags, thickMM, heightMM, widthMM});
 
   toast('書籍資訊已更新');
   document.getElementById('book-edit-ov')?.remove();
