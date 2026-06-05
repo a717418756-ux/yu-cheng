@@ -2563,14 +2563,7 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* 展開模式背景加質感 */
-#media-list:has(.media-expand-hd){
-  background:
-    repeating-linear-gradient(
-      0deg,transparent,transparent 2px,
-      rgba(255,255,255,0.003) 2px,rgba(255,255,255,0.003) 3px
-    ),
-    #080808;
-}
+
 
 /* 書庫/影音庫 chip 質感升級 */
 #pg-books .chip,
@@ -2786,7 +2779,22 @@ textarea{resize:vertical;line-height:1.7}
 }
 .media-sec-wrap{
   position:relative;
-  padding-bottom:8px;
+  padding-bottom:20px;
+}
+.media-sec-wrap::after{
+  content:'';
+  position:absolute;
+  bottom:6px; left:14px;
+  width:calc(100% - 28px);
+  height:1px;
+  background:linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.12) 20%,
+    rgba(255,255,255,0.18) 50%,
+    rgba(255,255,255,0.12) 80%,
+    transparent 100%
+  );
 }
 
 /* ── 影音庫兩條線（最終版）─────────────────────────────────
@@ -2801,6 +2809,22 @@ textarea{resize:vertical;line-height:1.7}
 [data-theme="eink"] .media-sec-hd-row::after{
   background:linear-gradient(90deg,rgba(0,0,0,0.4) 0%,rgba(0,0,0,0.15) 70%,transparent 100%);
   box-shadow:none;
+}
+
+/* section 底部分隔線（每個 section 卡片列下方）*/
+.media-sec-wrap::after{
+  content:'';
+  display:block;
+  height:1px;
+  margin:20px 14px 0;
+  background:linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.12) 20%,
+    rgba(255,255,255,0.18) 50%,
+    rgba(255,255,255,0.12) 80%,
+    transparent 100%
+  );
 }
 [data-theme="eink"] .media-sec-wrap::after{
   background:linear-gradient(90deg,rgba(0,0,0,0.15) 0%,rgba(0,0,0,0.06) 50%,transparent 100%);
@@ -2868,4 +2892,9 @@ textarea{resize:vertical;line-height:1.7}
   box-shadow:
     0 8px 24px rgba(0,0,0,0.65),
     0 0 0 1px rgba(255,255,255,0.06);
+}
+
+/* 搜尋欄下方第一個 section 不顯示頂部線 */
+#media-list .media-sec-wrap:first-child::before{
+  display:none;
 }
