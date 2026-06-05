@@ -86,7 +86,12 @@ function _renderBooksPage(){
   el.appendChild(_mkModeBar());
 
   if(!filtered.length){
-    el.innerHTML += `<div class="empty" style="padding:30px 0"><span class="ic">📚</span><span>尚無書籍</span></div>`;
+    const emptyDiv = document.createElement('div');
+    emptyDiv.className='empty';
+    emptyDiv.style.cssText='padding:40px 0';
+    emptyDiv.innerHTML='<span class="ic">📚</span><span>' +
+      (_B.filter==='fav' ? '尚未收藏任何書籍' : '尚無書籍') + '</span>';
+    el.appendChild(emptyDiv);
     return;
   }
 
@@ -204,7 +209,12 @@ function _mkShelf(books, total){
   const shelf = document.createElement('div');
   shelf.className = 'bookshelf';
 
-  const containerW = Math.min(window.innerWidth, 540) - 28;
+  // 取書架容器的實際寬度，避免計算時容器還未渲染（fallback 用 window.innerWidth）
+  const shelfEl = document.getElementById('books-list');
+  const containerW = Math.min(
+    (shelfEl ? shelfEl.clientWidth : window.innerWidth) || window.innerWidth,
+    540
+  ) - 28;
   const GAP = 2;
 
   let rowDiv = null, plankEl = null, topEl = null;
