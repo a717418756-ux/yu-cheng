@@ -1058,9 +1058,9 @@ textarea{resize:vertical;line-height:1.7}
 .media-hscroll-row{
   display:flex;
   flex-direction:row;
-  align-items:stretch;
+  align-items:flex-end;   /* 卡片底部對齊，視覺垂直置中 */
   gap:12px;
-  padding:14px 14px 20px;   /* 上下加大，卡片不被切，離標題有距離 */
+  padding:14px 14px 20px;
   overflow-x:auto;
   overflow-y:visible;
   -webkit-overflow-scrolling:touch;
@@ -1128,30 +1128,13 @@ textarea{resize:vertical;line-height:1.7}
   background:rgba(255,255,255,0.06);
   transition:transform .15s;
 }
-.media-hcard-thumb.video{
-  width:140px;height:90px;
-  border-radius:12px;
-  flex-shrink:0;
-  box-shadow:
-    0 6px 20px rgba(0,0,0,0.6),
-    0 0 0 0.5px rgba(255,255,255,0.06);
-  position:relative;overflow:hidden;
-}
+
 .media-hcard-thumb.video::before{
   content:'';position:absolute;inset:0;z-index:1;
   background:linear-gradient(135deg,rgba(255,255,255,0.06) 0%,transparent 40%);
   pointer-events:none;
 }
-.media-hcard-thumb.audio{
-  width:96px;height:96px;
-  border-radius:50%;
-  flex-shrink:0;
-  box-shadow:
-    0 0 0 1.5px rgba(255,255,255,0.08),
-    0 8px 24px rgba(0,0,0,0.65),
-    0 0 28px rgba(168,85,247,0.07);
-  position:relative;
-}
+
 .media-hcard-nothumb{
   width:100%;height:100%;
   display:flex;align-items:center;justify-content:center;
@@ -1159,13 +1142,7 @@ textarea{resize:vertical;line-height:1.7}
   background:rgba(255,255,255,0.04);
 }
 /* 黑膠唱盤（無封面時）*/
-.media-hcard-vinyl{
-  width:100%;height:100%;border-radius:50%;
-  background:
-    radial-gradient(circle at 50%,
-      #2a2a36 0%,#111 20%,#1c1c24 35%,#111 50%,#1a1a22 65%,#0e0e12 100%
-    );
-}
+
 /* 時長標籤 */
 .media-hcard-dur{
   position:absolute;bottom:4px;right:6px;
@@ -2363,16 +2340,8 @@ textarea{resize:vertical;line-height:1.7}
 }
 
 /* 音頻圓形：增加光暈邊框 */
-.media-hcard-thumb.audio{
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.06),
-    0 6px 20px rgba(0,0,0,0.6);
-}
 
 /* 影片縮圖：底部漸層遮罩（讓時長標籤更清晰）*/
-.media-hcard-thumb.video{
-  box-shadow:0 4px 16px rgba(0,0,0,0.5);
-}
 
 /* 黑膠圓形（無封面）加質感紋路 */
 .media-hcard-vinyl{
