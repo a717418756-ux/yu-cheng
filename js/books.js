@@ -72,6 +72,26 @@ async function _getBookThumb(id){
   }catch(e){ return {}; }
 }
 
+// 書背縮圖 lazy 覆蓋（有 spineThumb 才覆蓋，無則保持純色書背）
+async function _fillSpineThumb(div, id, dispW, dispH){
+  try{
+    const th = await _getBookThumb(id);
+    const raw = th.spineThumb;
+    if(!raw || !div.isConnected) return;
+    const src = raw instanceof Blob ? URL.createObjectURL(raw) : raw;
+    const img = document.createElement('img');
+    img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit';
+    if(raw instanceof Blob) img.onload=()=>URL.revokeObjectURL(src);
+    img.src=src;
+    if(div.isConnected){
+      div.style.position='relative';
+      // 隱藏書名 label（有縮圖不需要）
+      div.querySelectorAll('.spine-label,.spine-author').forEach(el=>el.style.display='none');
+      div.appendChild(img);
+    }
+  }catch(e){}
+}
+
 // 非同步填充縮圖到指定元素
 async function _fillThumb(el, id, type){
   try{
@@ -334,9 +354,9 @@ function _mkSpine(b, dispW, dispH){
 
   const t = _SPINE_THEMES[(b.id||0) % _SPINE_THEMES.length];
 
-  // 書背：純色漸層+書名（標準書背視覺）
-  if(true){  // 永遠顯示純色書背
-    // 純色書背 + 漸層光澤
+  // 書背：先顯示純色書背+書名，如有 spineThumb 則 lazy 覆蓋
+  if(b.id){ _fillSpineThumb(div, b.id, dispW, dispH); }
+  if(true){  // 預設：純色書背
     div.style.background=
       `linear-gradient(90deg,${t.dark} 0%,${t.bg} 30%,${t.light}22 50%,${t.bg} 70%,${t.dark} 100%)`;
 
@@ -498,7 +518,7 @@ function searchBooks(){
 // 點書背 → 封面彈窗
 // ════════════════════════════════════════════════════════════
 async function openBookCover(id){
-  const b = _B.allBooks.find(x=>x.id===id);
+  const b = await dg('ebooks',id);
   if(!b) return;
 
   const bookW = b.widthMM  ? mmToPx(b.widthMM)  : (b.bookW||mmToPx(_BOOK_DEFAULT_MM.widthMM));
@@ -514,11 +534,14 @@ async function openBookCover(id){
   ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
 
   const t=_SPINE_THEMES[(b.id||0)%_SPINE_THEMES.length];
-  const coverHtml = b.coverThumb
-    ? `<img src="${b.coverThumb}"
+  const _thumbRaw = b.coverThumb;
+  const _thumbSrc = _thumbRaw instanceof Blob ? URL.createObjectURL(_thumbRaw) : (_thumbRaw||'');
+  const coverHtml = _thumbSrc
+    ? `<img src="${_thumbSrc}"
         style="width:${dispW}px;height:${dispH}px;object-fit:cover;
         border-radius:4px 8px 8px 4px;
-        box-shadow:-4px 0 0 rgba(0,0,0,0.6),6px 12px 40px rgba(0,0,0,0.8)">`
+        box-shadow:-4px 0 0 rgba(0,0,0,0.6),6px 12px 40px rgba(0,0,0,0.8)"
+        onload="if(this.src.startsWith('blob:'))URL.revokeObjectURL(this.src)">`
     : `<div style="width:${dispW}px;height:${dispH}px;border-radius:4px 8px 8px 4px;
         background:linear-gradient(160deg,${t.bg},${t.dark});
         display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -568,6 +591,16 @@ function openAddBook(){
         </div>
         <input type="file" id="ab-cover-inp" accept="image/*" style="display:none"
           onchange="previewBookCover(this)">
+        <!-- 書背圖上傳 -->
+        <div id="ab-spine-preview" onclick="document.getElementById('ab-spine-inp').click()"
+          style="width:36px;height:96px;border-radius:4px;background:rgba(255,255,255,0.06);
+          border:1.5px dashed rgba(255,255,255,0.2);cursor:pointer;flex-shrink:0;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;
+          gap:2px;font-size:9px;color:var(--t2)">
+          <span style="font-size:14px">📖</span>書背
+        </div>
+        <input type="file" id="ab-spine-inp" accept="image/*" style="display:none"
+          onchange="_previewSpine(this)">
         <div style="flex:1;display:flex;flex-direction:column;gap:8px">
           <input id="ab-title" placeholder="書名 *" class="finput">
           <input id="ab-author" placeholder="作者" class="finput">
@@ -645,10 +678,16 @@ async function saveNewBook(){
   const fileInp  = document.getElementById('ab-file-inp');
 
   let coverThumb=null, spineThumb=null;
+  const spineInp = document.getElementById('ab-spine-inp');
   if(coverInp?.files[0]){
     const pxW=mmToPx(widthMM), pxH=mmToPx(heightMM), pxS=mmToPx(thickMM);
     coverThumb = await _compressImage(coverInp.files[0], 200, Math.round(200*pxH/pxW));
-    spineThumb = await _compressImage(coverInp.files[0], Math.round(pxS*SPINE_SCALE*2), pxH*2);
+    // 書背圖：優先用上傳的書背圖，否則從封面裁切左側
+    if(spineInp?.files[0]){
+      spineThumb = await _compressImage(spineInp.files[0], Math.round(pxS*SPINE_SCALE*2), pxH*2);
+    } else {
+      spineThumb = await _compressImage(coverInp.files[0], Math.round(pxS*SPINE_SCALE*2), pxH*2);
+    }
   }
 
   const book={
@@ -669,6 +708,18 @@ async function saveNewBook(){
     renderBooks();
   }catch(e){logError('saveNewBook',e);toast('儲存失敗：'+e.message);}
 }
+
+function _previewSpine(inp){
+  if(!inp.files[0]) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const prev=document.getElementById('ab-spine-preview');
+    if(prev) prev.innerHTML=`<img src="${e.target.result}"
+      style="width:100%;height:100%;object-fit:cover;border-radius:4px">`;
+  };
+  reader.readAsDataURL(inp.files[0]);
+}
+
 
 function _compressImage(file,maxW,maxH){
   return new Promise(resolve=>{
@@ -706,16 +757,25 @@ async function openBookDetail(id){
   const coverSrc = book.coverThumb instanceof Blob
     ? URL.createObjectURL(book.coverThumb)
     : (book.coverThumb || '');
-  ov.innerHTML=`
-    <div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);
-      border-radius:20px 20px 0 0;padding:20px 16px 32px">
-      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 14px"></div>
-      <div style="display:flex;gap:14px;margin-bottom:16px">
-        ${coverSrc
-          ?`<img src="${coverSrc}" style="width:60px;height:80px;object-fit:cover;border-radius:4px;flex-shrink:0"
-              onload="if('${coverSrc}'.startsWith('blob:'))URL.revokeObjectURL('${coverSrc}')">`
-          :`<div style="width:60px;height:80px;border-radius:4px;background:rgba(255,255,255,0.06);
-              display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">📚</div>`}
+  const detailPanel = document.createElement('div');
+  detailPanel.style.cssText='width:100%;max-width:520px;margin:0 auto;background:var(--bg1);border-radius:20px 20px 0 0;padding:20px 16px 32px';
+  // 封面圖：用 DOM 操作，避免 blob URL 在 template literal 裡斷裂
+  const coverEl = coverSrc
+    ? (() => {
+        const img = document.createElement('img');
+        img.src = coverSrc;
+        img.style.cssText='width:60px;height:80px;object-fit:cover;border-radius:4px;flex-shrink:0';
+        if(book.coverThumb instanceof Blob){
+          img.onload=()=>URL.revokeObjectURL(coverSrc);
+        }
+        return img.outerHTML;
+      })()
+    : '<div style="width:60px;height:80px;border-radius:4px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">📚</div>';
+
+  detailPanel.innerHTML=`
+    <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 14px"></div>
+    <div style="display:flex;gap:14px;margin-bottom:16px">
+      ${coverEl}
         <div style="flex:1;min-width:0">
           <div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:4px">
             ${esc(book.title||'未命名')}</div>
@@ -763,6 +823,7 @@ async function openBookDetail(id){
       </div>
     </div>`;
   ov.onclick=e=>{if(e.target===ov) ov.remove();};
+  ov.appendChild(detailPanel);
   document.body.appendChild(ov);
   await updateEbookProgress(id, book.lastPage||0);
 }

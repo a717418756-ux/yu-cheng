@@ -108,7 +108,11 @@ function _renderMediaPage(){
     return;
   }
 
-  // ── 首頁模式：四個橫向捲動區塊 ──
+  // ── 首頁模式：確保清除展開模式殘留按鈕，還原標題 ──
+  document.getElementById('expand-back-btn')?.remove();
+  document.getElementById('expand-bulk-btn')?.remove();
+  const _hdTitle = document.getElementById('media-hd-title');
+  if(_hdTitle && _hdTitle.textContent !== '影音庫') _hdTitle.textContent = '影音庫';
   el.innerHTML='';
 
   if(!all.length){
@@ -245,33 +249,36 @@ function _renderExpandMode(el){
   const isFavMode = (type==='fav');
   const isSearchMode = (type==='search');
 
-  // 展開模式：修改頁面 hd（先清除舊的，再插入新的）
-  const pageHd = document.querySelector('#pg-media .hd');
-  if(pageHd){
-    // 先清除可能殘留的舊按鈕
+  // 展開模式：操作固定的 hd 三區容器
+  const hdLeft  = document.getElementById('media-hd-left');
+  const hdTitle = document.getElementById('media-hd-title');
+  const hdRight = document.getElementById('media-hd-right');
+  if(hdLeft && hdTitle && hdRight){
+    // 清除舊的返回和批量按鈕
     document.getElementById('expand-back-btn')?.remove();
-    document.getElementById('bulk-btn')?.remove();
-    // 改標題文字（備份原始）
-    const hdtEl = pageHd.querySelector('.hdt');
-    if(hdtEl && !hdtEl._origText){ hdtEl._origText = hdtEl.textContent; }
-    if(hdtEl){ hdtEl.textContent = title; }
-    // 返回按鈕：插到最左側
+    document.getElementById('expand-bulk-btn')?.remove();
+    // 左側：返回按鈕
     const backBtn = document.createElement('button');
-    backBtn.id = 'expand-back-btn';
-    backBtn.onclick = ()=>_closeExpandMode();
-    backBtn.style.cssText = 'background:none;border:none;color:var(--acc);font-size:15px;font-weight:600;cursor:pointer;padding:4px 8px 4px 0;flex-shrink:0';
-    backBtn.textContent = '‹ 返回';
-    pageHd.insertBefore(backBtn, pageHd.firstChild);
-    // 批量刪除：插到新增按鈕左側
+    backBtn.id='expand-back-btn';
+    backBtn.className='hd-btn';
+    backBtn.style.cssText='font-size:13px;color:var(--acc)';
+    backBtn.textContent='‹ 返回';
+    backBtn.onclick=()=>_closeExpandMode();
+    hdLeft.appendChild(backBtn);
+    // 中間：標題改為主旨
+    hdTitle.textContent = title;
+    // 右側：批量刪除（新增按鈕前面）
     if(!isSearchMode){
-      const addBtn = pageHd.querySelector('.hd-btn');
       const bulkBtn = document.createElement('button');
-      bulkBtn.id = 'bulk-btn';
-      bulkBtn.onclick = ()=>_toggleBulkMode();
-      bulkBtn.style.cssText = 'background:none;border:none;color:var(--acc);font-size:13px;font-weight:600;cursor:pointer;padding:4px 8px;flex-shrink:0';
-      bulkBtn.textContent = isFavMode?'批量移除':'批量刪除';
-      if(addBtn) pageHd.insertBefore(bulkBtn, addBtn);
-      else pageHd.appendChild(bulkBtn);
+      bulkBtn.id='expand-bulk-btn';
+      bulkBtn.className='hd-btn';
+      bulkBtn.style.cssText=`font-size:12px;color:${isFavMode?'var(--acc)':'var(--red)'}`;
+      bulkBtn.textContent=isFavMode?'批量移除':'批量刪除';
+      bulkBtn.onclick=()=>_toggleBulkMode();
+      // 插在新增按鈕前面
+      const addBtn = hdRight.querySelector('.hd-btn.blue');
+      if(addBtn) hdRight.insertBefore(bulkBtn, addBtn);
+      else hdRight.appendChild(bulkBtn);
     }
   }
 
@@ -353,16 +360,11 @@ function _renderExpandMode(el){
 
 function _closeExpandMode(){
   // 還原頁面 hd
-  const pageHd = document.querySelector('#pg-media .hd');
-  if(pageHd){
-    // 移除返回按鈕
-    document.getElementById('expand-back-btn')?.remove();
-    // 移除批量刪除按鈕
-    document.getElementById('bulk-btn')?.remove();
-    // 還原標題
-    const hdtEl = pageHd.querySelector('.hdt');
-    if(hdtEl && hdtEl._origText){ hdtEl.textContent = hdtEl._origText; delete hdtEl._origText; }
-  }
+  // 清除展開模式的按鈕，還原標題
+  document.getElementById('expand-back-btn')?.remove();
+  document.getElementById('expand-bulk-btn')?.remove();
+  const hdTitle = document.getElementById('media-hd-title');
+  if(hdTitle) hdTitle.textContent = '影音庫';
   _M.expandMode = null;
   _M.bulkMode = false;
   _M.bulkSelected = new Set();
@@ -376,6 +378,9 @@ function _toggleBulkMode(){
   // 重新渲染展開模式（加勾選框）
   const el = document.getElementById('media-list');
   if(el) _renderExpandMode(el);
+  // 更新批量按鈕文字
+  const bulkBtn = document.getElementById('expand-bulk-btn');
+  if(bulkBtn) bulkBtn.style.color = _M.bulkMode ? 'rgba(255,255,255,0.5)' : '';
 }
 
 // 勾選切換
