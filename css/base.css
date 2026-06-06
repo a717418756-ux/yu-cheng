@@ -472,6 +472,8 @@ textarea{resize:vertical;line-height:1.7}
   border:1px solid rgba(255,255,255,0.07);
   border-radius:14px;
   padding:12px 14px 10px;
+  overflow-x:auto;          /* 讓 heatmap-grid 橫向捲動在 wrap 內完成（page 有 overflow-x:hidden）*/
+  -webkit-overflow-scrolling:touch;
 }
 .heatmap-header{
   display:flex;align-items:baseline;gap:8px;margin-bottom:8px;
@@ -480,13 +482,19 @@ textarea{resize:vertical;line-height:1.7}
 .heatmap-sub{font-size:10px;color:var(--t2)}
 .heatmap-grid{
   display:grid;
-  grid-template-columns:repeat(35,1fr);
-  gap:3px;
+  grid-template-columns:repeat(35,minmax(32px,1fr));
+  gap:4px;
   margin-bottom:6px;
+  /* 橫向可滑動，格子固定最小 32px 確保好按 */
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:4px;
 }
 .hm-cell{
   aspect-ratio:1;
-  border-radius:3px;
+  min-width:32px;
+  min-height:32px;
+  border-radius:5px;
   background:var(--hm0);
   cursor:pointer;
   transition:transform .12s,filter .12s;
