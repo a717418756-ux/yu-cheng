@@ -464,7 +464,27 @@
       </button>
     </div>
     <div style="font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.5">
-      備份檔名：<code style="color:var(--acc)">YC_Platform_backup.json</code>，儲存於你的 Google Drive 根目錄
+      ☁️ 備份範圍：<b>題庫 + 法條</b>（考試區）｜備份檔名：<code style="color:var(--acc)">YC_Platform_backup.json</code>
+    </div>
+  </div>
+
+  <!-- 本地完整備份 -->
+  <div class="sec">本地完整備份（全部資料）</div>
+  <div class="scard" style="padding:12px 14px">
+    <div style="font-size:12px;color:var(--t2);margin-bottom:10px;line-height:1.6">
+      選擇本機資料夾，一鍵備份或還原所有資料（題庫、法條、書庫、影音庫完整檔案）。<br>
+      <span style="color:var(--org)">⚠ 需使用 Chrome / Edge 瀏覽器</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn bg" style="flex:1;padding:10px;font-size:12px" onclick="localBackup()">
+        <span style="font-size:14px">💾</span> 備份到資料夾
+      </button>
+      <button class="btn bg" style="flex:1;padding:10px;font-size:12px" onclick="localRestore()">
+        <span style="font-size:14px">📂</span> 從資料夾還原
+      </button>
+    </div>
+    <div style="font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.5">
+      備份內容：<code style="color:var(--acc)">exam_data.json</code>（題庫+法條）、<code style="color:var(--acc)">ebooks/</code>（書庫）、<code style="color:var(--acc)">media/</code>（影音庫）
     </div>
   </div>
 
