@@ -356,7 +356,9 @@ function _mkSpine(b, dispW, dispH){
     div.appendChild(auth);
   }
 
-  // Lazy 讀取書背縮圖：有 spineThumb 才覆蓋（隱藏書名），否則保持純色+書名
+  // Lazy 讀取書背縮圖：
+  // - hasSpineImg=true（有上傳書背圖）→ 覆蓋後隱藏書名（書背圖本身已有資訊）
+  // - hasSpineImg=false（模糊封面）→ 覆蓋後保留書名疊在上面（模糊圖+書名）
   if(b.id){
     _getBookThumb(b.id).then(th=>{
       const raw = th.spineThumb;
@@ -368,9 +370,21 @@ function _mkSpine(b, dispW, dispH){
       img.src = src;
       if(div.isConnected){
         div.style.position = 'relative';
-        // 有書背圖：隱藏純色底色的書名和作者（書背圖已包含資訊）
-        div.querySelectorAll('.spine-label,.spine-author').forEach(el=>el.style.display='none');
-        div.appendChild(img);
+        if(b.hasSpineImg){
+          // 有上傳書背圖：隱藏文字，書背圖本身就是書背
+          div.querySelectorAll('.spine-label,.spine-author').forEach(el=>el.style.display='none');
+          div.appendChild(img);
+        } else {
+          // 模糊封面：圖在最底層，書名作者疊在上面（z-index 區分）
+          img.style.zIndex = '0';
+          div.querySelectorAll('.spine-label,.spine-author').forEach(el=>{
+            el.style.position = 'relative';
+            el.style.zIndex   = '1';
+            el.style.color    = '#fff';
+            el.style.textShadow = '0 1px 3px rgba(0,0,0,0.8)';
+          });
+          div.insertBefore(img, div.firstChild);
+        }
       }
     }).catch(()=>{});
   }
@@ -685,11 +699,11 @@ async function saveNewBook(){
     const spineTargetW = Math.round(pxS * SPINE_SCALE * 2);
     const spineTargetH = Math.round(pxH * 2);
     if(spineInp?.files[0]){
-      // 有上傳書背圖：直接壓縮使用
-      spineThumb = await _compressImage(spineInp.files[0], spineTargetW, spineTargetH);
+      // 有上傳書背圖：cover 模式填滿（置中裁切，不留空白）
+      spineThumb = await _compressSpineCover(spineInp.files[0], spineTargetW, spineTargetH);
     } else {
-      // 沒傳書背圖：從封面最左側裁切同書背寬度的圖
-      spineThumb = await _cropSpineFromCover(coverInp.files[0], spineTargetW, spineTargetH);
+      // 沒傳書背圖：封面 cover 填滿 + 模糊 + 半透明遮罩（書名作者由 _mkSpine DOM 疊加）
+      spineThumb = await _makeBlurredSpineFromCover(coverInp.files[0], spineTargetW, spineTargetH);
     }
   }
 
@@ -698,6 +712,7 @@ async function saveNewBook(){
     category:document.getElementById('ab-category')?.value.trim()||'',
     fileType: fileInp?.files[0]?.name.split('.').pop().toLowerCase()||'',
     fileSize: fileInp?.files[0]?.size||0,
+    hasSpineImg: !!(spineInp?.files[0]),  // 有上傳書背圖（true）vs 模糊封面（false）
     blob:     fileInp?.files[0]||null,
     coverThumb, spineThumb,
     thickMM, heightMM, widthMM,
@@ -723,8 +738,9 @@ function _previewSpine(inp){
   reader.readAsDataURL(inp.files[0]);
 }
 
-// 從封面圖左側裁切書背寬度的圖（用於無書背圖時）
-function _cropSpineFromCover(file, targetW, targetH){
+// 書背圖壓縮：cover 模式（置中裁切填滿 targetW×targetH，不留空白）
+// 用於有上傳書背圖的情況
+function _compressSpineCover(file, targetW, targetH){
   return new Promise(resolve=>{
     const reader = new FileReader();
     reader.onload = e=>{
@@ -734,15 +750,56 @@ function _cropSpineFromCover(file, targetW, targetH){
         canvas.width  = targetW;
         canvas.height = targetH;
         const ctx = canvas.getContext('2d');
-        // 從封面最左側裁切，寬度 = 書背寬，高度 = 書高
-        // 封面圖的左側 targetW/img.width 比例的寬度
-        const srcW = Math.round(img.width * targetW / targetH * (img.height / img.height));
-        // 更直接：按比例縮放後取左側 targetW
-        const scale = targetH / img.height;
-        const scaledW = Math.round(img.width * scale);
-        // 先繪製整張封面縮放到 targetH 高度，再取左側 targetW
-        ctx.drawImage(img, 0, 0, scaledW, targetH);
+        // cover 模式：縮放到能完整填滿 canvas 的最小比例，置中裁切
+        const scaleX = targetW / img.width;
+        const scaleY = targetH / img.height;
+        const scale  = Math.max(scaleX, scaleY);  // 取大的，確保完整填滿
+        const drawW  = img.width  * scale;
+        const drawH  = img.height * scale;
+        const offsetX = (targetW - drawW) / 2;   // 置中 X
+        const offsetY = (targetH - drawH) / 2;   // 置中 Y
+        ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
         canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// 從封面圖生成模糊書背（用於無書背圖時）
+// 做法：封面 cover 填滿書背尺寸，疊加模糊濾鏡，上層書名作者由 _mkSpine DOM 處理
+function _makeBlurredSpineFromCover(file, targetW, targetH){
+  return new Promise(resolve=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const canvas = document.createElement('canvas');
+        canvas.width  = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        // cover 模式填滿
+        const scaleX = targetW / img.width;
+        const scaleY = targetH / img.height;
+        const scale  = Math.max(scaleX, scaleY);
+        const drawW  = img.width  * scale;
+        const drawH  = img.height * scale;
+        const offsetX = (targetW - drawW) / 2;
+        const offsetY = (targetH - drawH) / 2;
+        // 模糊效果：先在較大 canvas 繪製後縮小，達到模糊效果
+        const bigCanvas = document.createElement('canvas');
+        const blur = 4;  // 模糊強度（縮放倍數）
+        bigCanvas.width  = targetW  * blur;
+        bigCanvas.height = targetH  * blur;
+        const bCtx = bigCanvas.getContext('2d');
+        bCtx.drawImage(img, offsetX * blur, offsetY * blur, drawW * blur, drawH * blur);
+        // 縮回目標尺寸（自然模糊）
+        ctx.drawImage(bigCanvas, 0, 0, targetW, targetH);
+        // 疊加半透明深色遮罩，讓書名文字更清晰
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(0, 0, targetW, targetH);
+        canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.82);
       };
       img.src = e.target.result;
     };
