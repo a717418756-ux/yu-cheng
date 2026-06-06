@@ -1,0 +1,260 @@
+
+/* 內容列距離標題增加（下移）*/
+
+/* section 內容下緣炫光長線 */
+
+/* 書庫 藏書/收藏 切換 tab */
+.shelf-section-tab{
+  background:none;border:none;cursor:pointer;
+  font-size:14px;font-weight:700;letter-spacing:.06em;
+  color:rgba(255,200,80,0.35);
+  padding:3px 6px;
+  transition:color .18s;
+  text-transform:uppercase;
+  font-size:11px;
+}
+.shelf-section-tab.on{
+  color:rgba(255,200,80,0.75);
+  text-decoration:underline;
+  text-decoration-thickness:1.5px;
+  text-underline-offset:3px;
+}
+
+/* 速率按鈕 span 確保顯示 */
+.vpt-speed-btn > span{
+  color:rgba(255,255,255,0.6);
+  font-size:13px !important;
+  font-weight:700;
+}
+
+/* section 內容底部空間（讓下緣線不緊貼內容）*/
+
+/* ══ 影音庫分隔線重構（最終版）══════════════════════════════
+   結構：
+   [標題文字]  ─────────────── (裝飾線，flex:1，右側延伸)
+   [卡片列]
+   ──────── (底部分隔線，寬度≈標題文字寬，置左)
+   ════════════════════════════════════════════════════════ */
+
+/* 標題文字 */
+
+/* 標題右側裝飾線：緊接標題右方，延伸剩餘70%寬 */
+
+/* 「更多」按鈕不擠壓裝飾線 */
+
+/* 每個 section 的底部分隔線：DOM 結構加在 hscroll-row 後面
+   用 padding-bottom + ::after 實現，長度約等於標題文字 */
+
+[data-theme="eink"] .bookshelf{
+  background:#d8d0c0;
+  background-image:
+    repeating-linear-gradient(180deg,transparent,transparent 3px,rgba(0,0,0,0.02) 3px,rgba(0,0,0,0.02) 4px);
+}
+[data-theme="eink"] .shelf-top-plank{
+  background:#b8aa90;
+  box-shadow:0 2px 6px rgba(0,0,0,0.3);
+}
+[data-theme="eink"] .shelf-plank{
+  background:linear-gradient(180deg,#c8b898 0%,#b0a080 50%,#987860 100%);
+  box-shadow:0 3px 8px rgba(0,0,0,0.3);
+}
+[data-theme="eink"] .book-spine{
+  box-shadow:1px 1px 0 rgba(0,0,0,0.4),2px 2px 0 rgba(0,0,0,0.15);
+  filter:none;
+}
+[data-theme="eink"] .book-spine.pulling{
+  transform:translateY(-8px);
+  box-shadow:2px 6px 12px rgba(0,0,0,0.3);
+  filter:none;
+}
+[data-theme="eink"] .shelf-recent-wrap{
+  background:#d0c8b0;
+  border-bottom:2px solid #a09070;
+}
+[data-theme="eink"] .shelf-mode-bar{
+  background:#d8d0c0;
+  border-bottom:1.5px solid #a09070;
+}
+[data-theme="eink"] .shelf-mode-btn{
+  background:#c8c0a8;border:1.5px solid #a09070;
+  color:#111;font-size:12px;
+}
+[data-theme="eink"] .shelf-mode-btn.on{
+  background:#111;color:#f0ece0;border-color:#111;
+}
+[data-theme="eink"] .shelf-section-tab{ color:#555; }
+[data-theme="eink"] .shelf-section-tab.on{ color:#111; }
+
+/* ══ eink 主題：閱讀器 ══════════════════════════════════════════ */
+[data-theme="eink"] .reader-topbar{
+  background:#f0ece0;
+  border-bottom:2px solid #888;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+[data-theme="eink"] .reader-title{
+  color:#111;
+  font-family:'標楷體','DFKai-SB','BiauKai',Georgia,serif;
+  font-size:15px;font-weight:700;
+}
+[data-theme="eink"] .reader-btn{
+  background:#e0dcc8;border:1.5px solid #888;
+  color:#111;font-size:15px;border-radius:6px;
+}
+[data-theme="eink"] #reader-settings{
+  background:#f0ece0 !important;
+  border:1.5px solid #888 !important;
+  color:#111 !important;
+}
+[data-theme="eink"] #reader-settings button{
+  border:1.5px solid #888 !important;
+  font-size:13px;min-height:36px;
+}
+[data-theme="eink"] #epub-page-info{
+  color:#555 !important;font-size:13px;
+  background:#f0ece0;border-top:1px solid #ccc;
+  padding:6px 0;
+}
+[data-theme="eink"] #epub-progress-fill{
+  background:#111 !important;
+}
+
+/* ══ eink 主題：影音庫 ══════════════════════════════════════════ */
+[data-theme="eink"] #pg-media{
+  background:var(--bg0);
+}
+[data-theme="eink"] .media-sec-hd-big{
+  font-size:22px;
+  font-weight:800;
+  letter-spacing:-.02em;
+  color:#fff;
+  -webkit-text-fill-color:#fff;
+  flex-shrink:0;
+}
+
+.media-sec-hd-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:28px 14px 10px;   /* 上方加大，離上面卡片列更遠 */
+  position:relative;
+}
+.media-sec-hd-big{
+  font-size:22px;
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-.02em;
+  -webkit-text-fill-color:#fff;
+  flex-shrink:0;
+}
+.media-sec-wrap{
+  position:relative;
+  padding-bottom:16px;  /* 讓 ::after 底部線跟下個 section 標題拉開距離 */
+}
+
+/* ── 影音庫兩條線（最終版）─────────────────────────────────
+   線1：標題文字正下方短線（::before on media-sec-hd-row）
+   線2：卡片列結束後的長線（::after on media-sec-wrap）
+   兩條都用絕對定位，不進入 flex 排列，位置穩定
+   ─────────────────────────────────────────────────────── */
+
+/* 線2：卡片列底部長線，在 wrap 底部，長度=標題寬度（對齊，約88px）*/
+/* media-sec-wrap::after 改用 hscroll border-bottom */
+
+[data-theme="eink"] .media-sec-hd-row::after{
+  background:linear-gradient(90deg,rgba(0,0,0,0.4) 0%,rgba(0,0,0,0.15) 70%,transparent 100%);
+  box-shadow:none;
+}
+
+/* section 底部分隔線（每個 section 卡片列下方）*/
+
+.media-sec-wrap::after{
+  content:'';
+  display:block;
+  height:1px;
+  margin:16px 14px 0;
+  background:linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.35) 15%,
+    rgba(255,255,255,0.5) 50%,
+    rgba(255,255,255,0.35) 85%,
+    transparent 100%
+  );
+}
+[data-theme="eink"] .media-sec-wrap::after{
+  background:linear-gradient(90deg,rgba(0,0,0,0.15) 0%,rgba(0,0,0,0.06) 50%,transparent 100%);
+  box-shadow:none;
+}
+[data-theme="eink"] .media-hcard-name{ color:var(--t0); }
+[data-theme="eink"] .media-sec-more{
+  background:var(--bg2);border:1.5px solid var(--bd);color:var(--t1);
+}
+[data-theme="eink"] .media-hcard-thumb.audio{
+  box-shadow:1px 1px 0 rgba(0,0,0,0.3);
+}
+[data-theme="eink"] .media-hcard-vinyl{
+  background:radial-gradient(circle at 50%,#888 0%,#555 30%,#333 60%,#222 100%);
+}
+[data-theme="eink"] .media-vcard{
+  background:var(--bg1);border:1.5px solid var(--bd);
+  box-shadow:1px 1px 0 rgba(0,0,0,0.15);
+}
+
+/* ══ eink 主題：黑膠播放器 ══════════════════════════════════════ */
+[data-theme="eink"] #vinyl-player-ov{
+  background:var(--bg0) !important;
+}
+[data-theme="eink"] .vp-topbar{
+  background:var(--bg1);border-bottom:2px solid var(--bd);
+}
+[data-theme="eink"] .vp-back,
+[data-theme="eink"] .vp-more{
+  background:var(--bg2);border:1.5px solid var(--bd);color:var(--t0);
+}
+[data-theme="eink"] .vp-mode-lbl{ color:var(--t0); }
+[data-theme="eink"] .vp-title{ color:var(--t0);-webkit-text-fill-color:var(--t0); }
+[data-theme="eink"] .vp-artist{ color:var(--t2); }
+[data-theme="eink"] .vp-seek::-webkit-slider-runnable-track{
+  background:linear-gradient(to right,var(--t0) 0%,var(--t0) var(--seek-pct,0%),var(--bd) var(--seek-pct,0%),var(--bd) 100%);
+}
+[data-theme="eink"] .vp-seek::-webkit-slider-thumb{ background:var(--t0); }
+[data-theme="eink"] .vpc-main{
+  background:var(--t0) !important;border:none !important;
+}
+[data-theme="eink"] .vpc-side{
+  background:var(--bg2);border:1.5px solid var(--bd);color:var(--t0);
+}
+[data-theme="eink"] .vpc-sm{ color:var(--t1); }
+[data-theme="eink"] .vpt-btn{ color:var(--t2); }
+[data-theme="eink"] #vp-playlist-wrap{
+  background:var(--bg1);border-top:2px solid var(--bd);
+}
+
+/* 空狀態的 section wrap 不顯示底部分隔線 */
+
+/* 影片 featured 大卡（首張，類 Netflix 橫版大圖）*/
+.media-hcard-featured{
+  width:220px;
+}
+.media-hcard-thumb.video.featured{
+  width:220px;
+  height:124px;
+  border-radius:12px;
+  flex-shrink:0;
+  box-shadow:
+    0 8px 24px rgba(0,0,0,0.65),
+    0 0 0 1px rgba(255,255,255,0.06);
+}
+
+/* 影音庫標題靠左 */
+#media-hd-title{
+  flex:1;
+  text-align:left;
+}
+
+/* 影音庫標題靠左（展開模式時標題也靠左）*/
+#media-hd-title{
+  flex:1;
+  text-align:left;
+}

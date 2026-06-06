@@ -1,0 +1,1244 @@
+/* ══ 影音庫橫向捲動區塊 ══════════════════════════════════════*/
+.media-hscroll-row{
+  display:flex;
+  flex-direction:row;
+  align-items:flex-end;   /* 卡片底部對齊，視覺垂直置中 */
+  gap:12px;
+  padding:14px 14px 20px;
+  overflow-x:auto;
+  overflow-y:visible;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+/* 長白線：緊接在卡片列正下方，長度≈標題文字寬（約4中文字≈88px）*/
+
+.media-hscroll-row::-webkit-scrollbar{display:none}
+
+/* ── 影音庫裝飾線 ─────────────────────────────────────────
+   線1（標題右側延伸線）：緊接標題文字右方，向右漸隱，金屬感
+   線2（卡片底部分隔線）：在 media-sec-wrap 底部，中央亮兩側淡
+   ─────────────────────────────────────────────────────── */
+
+/* 線1：標題行右側延伸裝飾線（flex 自然延伸，跟書庫 shelf-recent-title::after 同風格）*/
+.media-sec-hd-row::after{
+  content:'';
+  flex:1;
+  order:1;           /* 標題(order:0) → 線(order:1) → 更多按鈕(order:2) */
+  height:1px;
+  margin-left:10px;
+  margin-right:8px;
+  align-self:center;
+  background:linear-gradient(
+    90deg,
+    rgba(255,255,255,0.2) 0%,
+    rgba(255,255,255,0.09) 55%,
+    transparent 100%
+  );
+}
+
+/* 線2：卡片列底部分隔線，長度約標題文字寬，柔和 Glow */
+
+/* 橫向卡片（影片 + 音頻共用外框）*/
+.media-hcard{
+  flex-shrink:0;
+  width:130px;
+  display:flex;flex-direction:column;
+  align-items:center;
+  justify-content:flex-end;  /* 圖片和文字靠下 */
+  gap:8px;
+  cursor:pointer;
+  padding-bottom:4px;
+}
+
+/* 縮圖容器 */
+.media-hcard-thumb{
+  position:relative;
+  border-radius:10px;
+  overflow:hidden;
+  background:rgba(255,255,255,0.06);
+  transition:transform .15s;
+}
+
+.media-hcard-thumb.video::before{
+  content:'';position:absolute;inset:0;z-index:1;
+  background:linear-gradient(135deg,rgba(255,255,255,0.06) 0%,transparent 40%);
+  pointer-events:none;
+}
+
+.media-hcard-nothumb{
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;
+  background:rgba(255,255,255,0.04);
+}
+/* 黑膠唱盤（無封面時）*/
+
+/* 時長標籤 */
+.media-hcard-dur{
+  position:absolute;bottom:4px;right:6px;
+  background:rgba(0,0,0,0.75);color:#fff;
+  font-size:10px;font-weight:700;
+  padding:1px 5px;border-radius:4px;
+}
+/* 卡片名稱 */
+.media-hcard-name{
+  font-size:12px;font-weight:600;color:var(--t0);
+  line-height:1.3;text-align:center;
+  display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;
+  padding:0 2px;
+  /* 固定文字高度，確保所有卡片文字位置相同 */
+  min-height:32px;
+}
+/* 橫向列統一用中心對齊（圖片中心點水平對齊）*/
+.media-hscroll-row 
+
+/* ── 展開模式頂部 ── */
+.media-expand-hd{
+  display:flex;
+  flex-direction:row;
+  flex-wrap:nowrap;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 14px 6px;
+  position:sticky;top:0;
+  background:rgba(10,10,10,0.85);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  z-index:10;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.media-expand-back{
+  background:none;border:none;
+  color:var(--acc);font-size:15px;font-weight:600;
+  cursor:pointer;padding:4px 8px;
+}
+.media-expand-title{
+  font-size:16px;font-weight:800;color:var(--t0);
+  letter-spacing:-.01em;
+
+  background:linear-gradient(90deg,#fff 60%,rgba(255,255,255,0.55) 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+
+/* 類別標籤列 */
+.media-expand-cats{
+  display:flex;gap:8px;
+  padding:10px 14px 6px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.media-expand-cats::-webkit-scrollbar{display:none}
+.mec-chip{
+  flex-shrink:0;
+  padding:5px 14px;border-radius:20px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  color:var(--t2);font-size:12px;font-weight:600;
+  cursor:pointer;white-space:nowrap;
+  transition:background .15s,color .15s,border-color .15s;
+}
+.mec-chip.on{
+  background:rgba(110,168,254,0.15);
+  color:var(--acc);
+  borase;
+  padding:14px 14px 8px;
+}
+/* 新：大字 section header 行 */
+
+.media-sec-more{
+  order:2;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.55);
+  font-size:13px;font-weight:600;
+  padding:5px 14px;border-radius:20px;
+  cursor:pointer;
+  transition:background .15s,color .15s;
+
+  flex-shrink:0;
+  margin-left:8px;
+}
+
+/* ── 影片海報牆 ─────────────────────────────────────────────── */
+.media-video-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+  padding:0 14px 14px;
+
+  padding-top:14px;
+}
+
+.mvc-poster{
+  width:100%;aspect-ratio:16/9;
+  background:#111;
+  position:relative;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+
+.mvc-dur-badge{
+  position:absolute;bottom:5px;right:6px;
+  background:rgba(0,0,0,0.75);color:#fff;
+  font-size:10px;font-weight:700;
+  padding:1px 5px;border-radius:4px;
+}
+.mvc-play-icon{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;color:rgba(255,255,255,0);
+  transition:color .18s;
+}
+.mvc-poster:active .mvc-play-icon{color:rgba(255,255,255,0.85)}
+.mvc-meta-row{
+  display:flex;align-items:center;
+  padding:8px 10px 2px;gap:6px;
+}
+.mvc-title-txt{
+  flex:1;font-size:12px;font-weight:600;color:var(--t0);
+  cursor:pointer;
+  display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;
+  line-height:1.35;x;
+}
+/* 影音收藏按鈕：移除瀏覽器預設白色背景 */
+.mv-fav-btn{
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:2px 4px;
+  font-size:16px;
+  color:rgba(255,255,255,0.3);
+  line-height:1;
+}
+.mv-fav-btn.on{color:#f5c518}
+
+/* ── 音頻列表（黑膠縮圖列）────────────────────────────────── */
+.media-audio-list{
+  display:flex;flex-direction:column;
+  gap:0;padding:0 14px 16px;
+  padding-top:8px;
+  position:relative;
+  padding-bottom:0;
+}
+
+.mar-vinyl{
+  width:46px;height:46px;border-radius:50%;
+  background:radial-gradient(circle,#1a1a2e 30%,#111 60%,#1a1a2e 100%);
+  flex-shrink:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  box-shadow:0 2px 8px rgba(0,0,0,0.5);
+  position:relative;
+}
+.mar-vinyl-inner{
+  width:100%;height:100%;border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 50%, #333 0%, #111 30%, #222 55%, #1a1a1a 70%, #111 100%);
+}
+/* 旋轉動畫 */
+/* vinyl-spin 旋轉動畫已移至黑膠播放器 CSS 區塊 */
+.mar-info{flex:1;min-width:0;cursor:pointer}
+.mar-title{
+  font-size:13px;font-weight:600;color:var(--t0);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.mar-title.playing{color:#a855f7}
+.mar-meta{font-size:10px;color:var(--t2);margin-top:2px}
+.mar-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.mar-dur{font-size:11px;color:var(--t2)}
+.mar-del{
+  background:none;border:none;color:var(--t2);
+  font-size:14px;cursor:pointer;padding:2px 4px;
+}
+
+/* ── 黑膠播放器（全螢幕）────────────────────────────────────── */
+.vp-topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px 0;flex-shrink:0;
+}
+.vp-back{
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(255,255,255,0.08);border:none;
+  color:rgba(255,255,255,0.85);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  transition:background .15s;
+}
+.vp-back:active{background:rgba(255,255,255,0.16)}
+.vp-mode-lbl{
+  font-size:14px;font-weight:700;
+  color:rgba(255,255,255,0.9);letter-spacing:.05em;
+}
+.vp-more{
+  width:38px;height:38px;border-radius:50%;
+  background:rgba(255,255,255,0.08);border:none;
+  color:rgba(255,255,255,0.85);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.vp-more:active{background:rgba(255,255,255,0.16)}
+
+/* ══ 唱片台 ══════════════════════════════════════════════════ */
+.vp-vinyl-wrap{
+  flex-shrink:0;
+  /* 高度足夠讓唱片 + 唱針都顯示 */
+  height:min(76vw,310px);
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  margin:10px 0 0;
+  overflow:visible;
+}
+
+/* 唱盤外層（旋轉主體）*/
+.vp-record-outer{
+  /* 直徑 = 容器的80% */
+  width:min(68vw,270px);
+  height:min(68vw,270px);
+  border-radius:50%;
+  position:relative;
+  flex-shrink:0;
+  z-index:1;
+  /* 陰影：讓唱盤有懸浮立體感 */
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 20px 80px rgba(0,0,0,0.9),
+    0 4px 0 rgba(0,0,0,0.7),
+    0 0 60px rgba(139,92,246,0.15);
+  filter:drop-shadow(0 0 30px rgba(0,0,0,0.8));
+}
+/* 唱盤圖片本身 */
+.vp-record-img{
+  width:100%;height:100%;
+  border-radius:50%;
+  object-fit:cover;
+  display:block;
+}
+/* 封面覆蓋圓（貼在唱盤中央）*/
+.vp-record-cover{
+  position:absolute;
+  /* 對應唱盤圖片的中心空白區，約佔35% */
+  width:35%;height:35%;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  overflow:hidden;
+  background:#1a0a2e;
+  cursor:pointer;
+  z-index:2;
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,0.08),
+    0 4px 16px rgba(0,0,0,0.8);
+  transition:box-shadow .2s;
+}
+.vp-record-cover:active{
+  box-shadow:0 0 0 3px rgba(255,255,255,0.4),0 4px 16px rgba(0,0,0,0.8);
+}
+.vp-cover-empty{
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:rgba(255,255,255,0.3);
+  flex-direction:column;gap:4px;
+}
+
+/* 中心孔 */
+.vp-record-center{
+  position:absolute;width:7px;height:7px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#ccc,#666);
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:3;
+  box-shadow:0 1px 4px rgba(0,0,0,0.9);
+}
+
+/* ── 唱針圖片（右上角，絕對定位）── */
+.vp-tonearm-img{
+  position:absolute;
+  /* 圖二唱針圖：495×1048，長寬比約1:2.1 */
+  /* 唱針長度約佔唱盤直徑的60% */
+  width:min(28vw,110px);
+  /* height 自動 */
+  height:auto;
+  /* 定位：轉軸中心在右上角 */
+  top:-2%;
+  right:1%;
+  /* 旋轉：使唱針尖端貼在唱盤溝紋處 */
+  transform-origin:20% 8%;
+  transform:rotate(18deg);
+  z-index:4;
+  /* 圖片有透明背景 */
+  object-fit:contain;
+  filter:drop-shadow(2px 4px 12px rgba(0,0,0,0.8));
+}
+
+/* 旋轉動畫 */
+@keyframes vinyl-spin{
+  from{transform:rotate(0deg)}
+  to{transform:rotate(360deg)}
+}
+.vp-record-outer.spinning{
+  animation:vinyl-spin 1.8s linear infinite;
+}
+.mar-vinyl.spinning{
+  animation:vinyl-spin 2.2s linear infinite;
+}
+
+/* ── 曲目資訊 ── */
+.vp-info{
+  display:flex;align-items:center;
+  padding:10px 14px 4px;
+  flex-shrink:0;gap:6px;
+}
+.vp-info-text{flex:1;min-width:0}
+.vp-title{
+  font-size:19px;font-weight:800;color:#fff;
+  margin-bottom:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  letter-spacing:-.02em;
+}
+.vp-artist{font-size:12px;color:rgba(255,255,255,0.45);font-weight:400}
+.vp-fav-btn{
+  background:none;border:none;cursor:pointer;
+  flex-shrink:0;padding:6px;
+  transition:transform .15s;
+}
+.vp-fav-btn:active{transform:scale(1.25)}
+
+/* ── 進度條 ── */
+.vp-progress-wrap{padding:6px 22px 2px;flex-shrink:0}
+.vp-seek{
+  -webkit-appearance:none;width:100%;
+  /* 設定足夠高度讓 thumb 可以互動，視覺用 transform 壓扁 */
+  height:20px;
+  cursor:pointer;
+  background:transparent;
+  display:flex;align-items:center;
+}
+.vp-seek::-webkit-slider-runnable-track{
+  height:2px;
+  border-radius:1px;
+  background:linear-gradient(
+    to right,
+    rgba(255,255,255,0.85) 0%,
+    rgba(255,255,255,0.85) var(--seek-pct,0%),
+    rgba(255,255,255,0.18) var(--seek-pct,0%),
+    rgba(255,255,255,0.18) 100%
+  );
+}
+.vp-seek::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:12px;height:12px;border-radius:50%;
+  background:#fff;
+  border:none;cursor:pointer;
+  margin-top:-5px;
+  box-shadow:0 0 0 1px rgba(255,255,255,0.15),0 2px 8px rgba(0,0,0,0.5);
+}
+.vp-seek:active::-webkit-slider-thumb{transform:scale(1.18)}
+.vp-times{
+  display:flex;justify-content:space-between;
+  font-size:11px;color:rgba(255,255,255,0.3);
+  margin-top:5px;font-variant-numeric:tabular-nums;
+}
+
+/* ── 主控制列（圖三風格）── */
+.vp-controls{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 16px 4px;flex-shrink:0;
+}
+/* 大播放鍵 */
+.vpc-main{
+  width:64px;height:64px;border-radius:50%;
+  background:rgba(255,255,255,0.14);
+  border:1.5px solid rgba(255,255,255,0.25);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:
+    0 0 0 6px rgba(255,255,255,0.06),
+    0 8px 32px rgba(0,0,0,0.5),
+    inset 0 1px rgba(255,255,255,0.3);
+  cursor:pointer;
+  transition:transform .12s,box-shadow .15s,background .15s;
+  flex-shrink:0;
+}
+.vpc-main:active{
+  transform:scale(.91);
+  background:rgba(255,255,255,0.22);
+  box-shadow:0 0 0 8px rgba(255,255,255,0.08),0 4px 16px rgba(0,0,0,0.4);
+}
+/* 側邊按鍵（上/下首、循環、隨機）*/
+.vpc-sm{
+  width:40px;height:40px;border-radius:50%;
+  background:none;border:none;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:1px;
+  cursor:pointer;
+  color:rgba(255,255,255,0.4);
+  transition:color .15s,opacity .15s;
+}
+.vpc-sm:active{opacity:.6}
+
+.vpc-side{
+  width:46px;height:46px;border-radius:50%;
+  background:rgba(255,255,255,0.07);
+  border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.75);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  transition:background .15s,color .12s,transform .1s;
+  flex-shrink:0;
+}
+.vpc-side:active{
+  background:rgba(255,255,255,0.14);
+  color:#fff;transform:scale(.88);
+}
+/* 舊 vpc-btn 保持相容 */
+.vpc-btn{ background:none;border:none;cursor:pointer;padding:0; }
+
+/* ── 工具列 ── */
+.vp-tools{
+  display:flex;justify-content:center;
+  padding:4px 16px 12px;flex-shrink:0;
+}
+.vpt-btn{
+  background:none;border:none;
+  color:rgba(255,255,255,0.4);
+  font-size:11px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:6px 12px;border-radius:12px;
+  transition:color .15s,background .15s;
+}
+.vpt-btn:active{
+  color:rgba(255,255,255,0.85);
+  background:rgba(255,255,255,0.06);
+}
+.vpt-icon{display:flex;align-items:center;justify-content:center}
+.vpt-lbl{font-size:10px;letter-spacing:.02em}
+
+/* ── 影片播放器 ─────────────────────────────────────────────── */
+.vvp-topbar{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;background:rgba(0,0,0,0.85);
+  backdrop-filter:blur(8px);
+}
+.vvp-back{
+  background:none;border:none;color:#fff;
+  font-size:20px;cursor:pointer;padding:4px 8px;
+  flex-shrink:0;
+}
+.vvp-title{
+  flex:1;font-size:14px;font-weight:600;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.vvp-more{
+  background:none;border:none;color:rgba(255,255,255,0.7);
+  font-size:20px;cursor:pointer;padding:4px 8px;flex-shrink:0;
+}
+.vvp-toolbar{
+  display:flex;align-items:center;justify-content:space-around;
+  padding:10px 16px;background:rgba(0,0,0,0.85);
+  backdrop-filter:blur(8px);
+}
+.vvp-tool-btn{
+  background:none;border:none;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 16px;border-radius:10px;
+  transition:background .15s;
+}
+.vvp-tool-btn:active{background:rgba(255,255,255,0.08)}
+.vvp-tool-val{font-size:15px;font-weight:700;color:#fff}
+.vvp-tool-lbl{font-size:10px;color:rgba(255,255,255,0.5)}
+
+/* ── 音頻列表更多按鈕 ─────────────────────────────────────── */
+.mar-more{
+  background:none;border:none;
+  color:rgba(255,255,255,0.4);font-size:16px;
+  cursor:pointer;padding:4px 6px;letter-spacing:.1em;
+}
+.mar-more:active{color:#fff}
+
+/* ── 迷你播放列 ─────────────────────────────────────────────── */
+.media-mini-bar{
+  position:sticky;bottom:0;left:0;right:0;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(20,16,30,0.96);
+  border-top:1px solid rgba(168,85,247,0.25);
+  padding:8px 12px;
+  backdrop-filter:blur(16px);
+  z-index:50;
+}
+.mmb-vinyl{
+  width:40px;height:40px;border-radius:50%;
+  background:radial-gradient(circle,#2a1050,#111);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;cursor:pointer;flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,0,0,0.5);
+}
+.mmb-thumb{
+  width:40px;height:40px;border-radius:8px;
+  background:#111;display:flex;align-items:center;
+  justify-content:center;font-size:18px;cursor:pointer;flex-shrink:0;
+}
+.mmb-info{flex:1;min-width:0;cursor:pointer}
+.mmb-title{
+  font-size:13px;font-weight:600;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.mmb-status{font-size:10px;color:#a855f7;margin-top:1px}
+.mmb-btn{
+  background:none;border:none;color:rgba(255,255,255,0.6);
+  font-size:18px;cursor:pointer;padding:4px 6px;flex-shrink:0;
+}
+.mmb-btn:active{color:#fff}
+
+/* ══════════════════════════════════════════════════════════════
+   主題系統補充樣式
+   ══════════════════════════════════════════════════════════════ */
+
+/* ══ 淺色模式完整 override ═════════════════════════════════════ */
+
+/* header / nav */
+
+/* 硬編碼深色背景 → 淺色 */
+
+/* FAB */
+
+/* 卡片 */
+
+/* overlay / modal */
+
+/* chip */
+
+/* sec 標籤 */
+
+/* tag */
+
+/* 文字顏色確保可見 */
+
+/* 勉勵語 */
+
+/* 數據橫條 */
+
+/* zone card */
+
+/* srow */
+
+/* 答題選項 */
+
+/* pi 區塊 */
+
+/* lsp 排序 popup */
+
+/* zone-card */
+
+.zone-panel{
+  margin:0 14px;border-radius:14px;overflow:hidden;
+  border:1px solid rgba(255,255,255,0.07);
+  background:rgba(12,12,18,0.6);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  max-height:0;opacity:0;
+  margin-bottom:0;
+  transition:max-height .36s cubic-bezier(.4,0,.2,1),opacity .26s,margin-bottom .36s;
+}
+.zone-panel.open{max-height:720px;opacity:1;margin-bottom:10px}
+.zone-panel-inner{padding:4px 0}
+
+/* 面板主按鈕（測驗 toggle） */
+.zpanel-main{
+  display:flex;align-items:center;gap:13px;
+  padding:13px 15px;cursor:pointer;border:none;
+  background:none;width:100%;text-align:left;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  transition:background .14s;
+}
+.zpanel-main:active{background:rgba(255,255,255,0.05)}
+.zpanel-main-icon{font-size:22px;flex-shrink:0}
+.zpanel-main-text .t{font-size:13.5px;font-weight:700;color:var(--t0);letter-spacing:.01em}
+.zpanel-main-text .s{font-size:10.5px;color:var(--t2);margin-top:2px}
+.zpanel-main-arrow{margin-left:auto;font-size:13px;color:var(--t2);transition:transform .28s;flex-shrink:0}
+.zpanel-main-arrow.open{transform:rotate(90deg)}
+
+/* 測驗子選單 grid */
+.zpanel-quiz{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:1px;background:rgba(255,255,255,0.05);
+  max-height:0;overflow:hidden;
+  transition:max-height .3s cubic-bezier(.4,0,.2,1);
+}
+.zpanel-quiz.open{max-height:420px}
+.zqb{
+  background:linear-gradient(160deg,rgba(20,30,70,0.55) 0%,rgba(10,15,40,0.35) 100%);
+  border:none;border-top:1px solid rgba(255,255,255,0.05);
+  padding:13px 8px;text-align:center;cursor:pointer;
+  transition:background .16s;position:relative;overflow:hidden;
+}
+.zqb::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(110,168,254,0.07) 0%,transparent 60%);
+  pointer-events:none;
+}
+.zqb:active{background:linear-gradient(160deg,rgba(37,98,200,0.28) 0%,rgba(20,40,120,0.2) 100%)}
+.zqb-icon{font-size:20px;margin-bottom:4px;display:block}
+.zqb-label{font-size:11.5px;font-weight:700;color:var(--t0);letter-spacing:.01em}
+.zqb-desc{font-size:9.5px;color:var(--t2);margin-top:2px;line-height:1.3}
+
+/* 面板次要列（題目閱覽） */
+.zpanel-row{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 15px;cursor:pointer;border:none;
+  background:none;width:100%;text-align:left;
+  border-top:1px solid rgba(255,255,255,0.06);
+  transition:background .14s;
+}
+.zpanel-row:active{background:rgba(255,255,255,0.05)}
+.zpanel-row-icon{font-size:19px;flex-shrink:0}
+.zpanel-row-text .t{font-size:13px;font-weight:600;color:var(--t0);letter-spacing:.01em}
+.zpanel-row-text .s{font-size:10.5px;color:var(--t2);margin-top:1px}
+
+/* 學習區 wip */
+.zpanel-wip{
+  display:flex;flex-direction:column;align-items:center;
+  padding:28px 20px;gap:8px;text-align:center;
+}
+.zpanel-wip-icon{font-size:36px}
+.zpanel-wip-t{font-size:14px;font-weight:700;color:var(--t0);letter-spacing:.01em}
+.zpanel-wip-s{font-size:11.5px;color:var(--t2);line-height:1.65}
+
+/* 閱覽區子選單（zpanel-browse）*/
+.zpanel-browse-sub{
+  display:flex;flex-direction:column;
+  max-height:0;overflow:hidden;
+  transition:max-height .3s cubic-bezier(.4,0,.2,1);
+}
+.zpanel-browse-sub.open{max-height:200px}
+.zpanel-browse-opt{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 15px 11px 20px;
+  cursor:pointer;border:none;background:none;
+  width:100%;text-align:left;
+  border-top:1px solid rgba(255,255,255,0.05);
+  background:linear-gradient(90deg,rgba(255,255,255,0.02) 0%,transparent 100%);
+  transition:background .14s;
+}
+.zpanel-browse-opt:active{background:rgba(110,168,254,0.08)}
+.zpanel-browse-opt-icon{font-size:17px;flex-shrink:0}
+.zpanel-browse-opt-text .t{font-size:12.5px;font-weight:600;color:var(--t0)}
+.zpanel-browse-opt-text .s{font-size:10.5px;color:var(--t2);margin-top:1px}
+
+/* ── 7. 測驗 ─────────────────────────────────────────────────── */
+#qv{display:none;position:fixed;inset:0;background:var(--bg0);z-index:200;flex-direction:column;max-width:520px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom,0)}
+#qv.on{display:flex}
+.qhd{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid var(--bd);background:var(--bg1)}
+.qpw{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.qpb{height:5px;background:var(--acc);border-radius:3px;transition:width .4s}
+.qbody{flex:1;overflow-y:auto;padding:14px 12px}
+.qstemb{font-size:16px;line-height:1.85;color:var(--t0);margin-bottom:16px;font-weight:500;letter-spacing:.01em}
+.qos{display:flex;flex-direction:column;gap:8px}
+.qopt{background:var(--bg1);border:2px solid var(--bd);border-radius:var(--r);padding:12px;display:flex;align-items:flex-start;gap:10px;cursor:pointer;transition:all var(--tr)}
+.qopt.correct{background:rgba(76,175,80,0.14);border-color:var(--grn)}
+.qopt.missed{background:var(--org2);border-color:var(--org);color:var(--org)}
+.qopt.wrong{background:rgba(232,73,68,0.14);border-color:var(--red)}
+.qopt.selected-opt{border-color:var(--acc);background:rgba(110,168,254,.10)}
+.qopt.selected{border-color:var(--acc);background:rgba(88,166,255,.18);transform:scale(.98)}
+.qopt.dim{opacity:.5}
+.qok{width:29px;height:29px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--acc);flex-shrink:0}
+.qopt.correct .qok{background:var(--grn);color:#fff}
+.qopt.wrong .qok{background:var(--red);color:#fff}
+.qov{font-size:14px;line-height:1.6;color:var(--t1);flex:1;padding-top:3px;word-break:break-all}
+.qres{margin-top:12px;padding:12px;border-radius:var(--r);display:none}
+.qres.on{display:block}
+.qres.c{background:var(--grn2);border:1px solid var(--grn)}
+.qres.w{background:var(--red2);border:1px solid var(--red)}
+.qres.r{background:var(--bg2);border:1px solid var(--bd)}
+.qfoot{padding:10px 12px;border-top:1px solid var(--bd);background:var(--bg1);display:flex;gap:7px}
+.qfb{flex:1;padding:14px;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;transition:all var(--tr)}
+.qstar{width:46px;height:46px;border-radius:50%;background:var(--bg2);font-size:19px;border:1px solid var(--bd);color:var(--t2);flex:none}
+.qstar.on{background:var(--org2);border-color:var(--org);color:var(--org)}
+.qnxt{background:var(--acc2);color:#fff}
+.qskip{background:var(--bg2);color:var(--t2)}
+.qdone{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:28px 20px;text-align:center;gap:13px}
+#qv .qhd{border-bottom:1px solid rgba(110,168,254,0.12)}
+
+/* ── 8. 法規閱讀器 ───────────────────────────────────────────── */
+#lv{display:none;position:fixed;inset:0;background:var(--bg0);z-index:200;flex-direction:column;max-width:520px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom,0)}
+#lv.on{display:flex}
+.lb{flex:1;overflow-y:auto;padding:12px 12px 80px}
+
+/* ── 9. 彈出層 ───────────────────────────────────────────────── */
+
+.ov.on{display:flex}
+
+.sht{font-size:17px;font-weight:700;padding:6px 16px 13px;display:flex;align-items:center;justify-content:space-between}
+.shx{background:var(--bg2);border:none;color:var(--t2);width:27px;height:27px;border-radius:50%;font-size:14px;cursor:pointer}
+
+.cov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:center;justify-content:center;padding:16px}
+.cov.on{display:flex}
+.cbox{background:var(--bg1);border:1px solid var(--bd);border-radius:13px;padding:20px 17px;width:100%;max-width:290px;text-align:center}
+.cbt{font-size:15px;font-weight:700;margin-bottom:6px}
+.cbs{font-size:13px;color:var(--t2);margin-bottom:16px}
+.cbn{display:flex;gap:7px}
+
+/* ── Google Drive 同步 UI ─── */
+#gdrive-status{transition:background .2s}
+#gdrive-backup-btn:disabled,#gdrive-restore-btn:disabled{opacity:.4;cursor:not-allowed}
+/* ── 10. 工具 ────────────────────────────────────────────────── */
+.toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%) translateY(14px);background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:8px 15px;font-size:13px;color:var(--t0);white-space:nowrap;z-index:600;opacity:0;transition:all .27s;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%)}
+
+@keyframes sup{from{transform:translateY(100%)}to{transform:none}}
+.fdi{animation:fdi .2s ease}
+@keyframes fdi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+@supports (height:100dvh){#qv,#lv{height:100dvh}}
+
+/* ══════════════════════════════════════════════════════════════
+   主題系統補充樣式
+   ══════════════════════════════════════════════════════════════ */
+
+/* ══ 淺色模式完整 override ═════════════════════════════════════ */
+
+/* header / nav */
+
+/* 硬編碼深色背景 → 淺色 */
+
+/* FAB */
+
+/* 卡片 */
+
+/* overlay / modal */
+
+/* chip */
+
+/* sec 標籤 */
+
+/* tag */
+
+/* 文字顏色確保可見 */
+
+/* 勉勵語 */
+
+/* 數據橫條 */
+
+/* zone card */
+
+/* srow */
+
+/* 答題選項 */
+
+/* pi 區塊 */
+
+/* lsp 排序 popup */
+
+/* zone-card */
+
+/* zone-panel（展開面板）*/
+
+/* zpanel quiz grid */
+
+/* zpanel row */
+
+/* hdb 數據橫條 */
+
+/* plan-badge */
+
+/* home motto */
+
+/* FAB overlay */
+
+/* hcd 倒數列 */
+
+/* sec 分隔標題 */
+
+/* lw-card 法條卡片 */
+
+/* cov overlay */
+
+/* bottom sheet modal */
+
+/* ══ 電子紙模式：關閉動畫與特效 ════════════════════════════════ */
+[data-theme="eink"] *{
+  animation:none !important;
+  transition:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+}
+[data-theme="eink"] body{
+  background:var(--bg0);color:var(--t0);
+  font-size:var(--fs-body);
+  line-height:var(--lh-body);
+  /* 電子紙使用標楷體，閱讀更舒適 */
+  font-family:'標楷體','DFKai-SB','BiauKai','KaiTi',
+    'Noto Serif TC','Source Han Serif TC',
+    'AR PL UKai TW',Georgia,serif;
+}
+[data-theme="eink"] input,
+[data-theme="eink"] textarea,
+[data-theme="eink"] select{
+  background:var(--bg2);color:var(--t0);
+  border-color:var(--bd);border-width:1.5px;
+  font-size:var(--fs-body);
+  min-height:var(--btn-h);
+}
+[data-theme="eink"] select option{ background:var(--bg2);color:var(--t0); }
+
+/* 電子紙：header / nav */
+[data-theme="eink"] .hd{
+  background:var(--bg1);border-bottom:2px solid var(--bd);
+}
+[data-theme="eink"] .nav{
+  background:var(--bg1);border-top:2px solid var(--bd);
+}
+[data-theme="eink"] .hdt{ font-size:17px;font-weight:800;color:var(--t0); }
+
+/* 電子紙：卡片加框線 */
+[data-theme="eink"] .card,
+[data-theme="eink"] .qc,
+[data-theme="eink"] .cc,
+[data-theme="eink"] .sc,
+[data-theme="eink"] .stb,
+[data-theme="eink"] .qb{
+  background:var(--bg1);
+  border:1.5px solid var(--bd);
+}
+
+/* 電子紙：FAB → 純文字按鈕，不用圓型 */
+[data-theme="eink"] #fab-list{
+  background:var(--bg1);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .fab-btn{
+  background:var(--bg2);color:var(--t0);
+  border:1.5px solid var(--bd);border-radius:8px;
+  font-size:13px;
+}
+[data-theme="eink"] #fab-main{
+  background:var(--t0);color:var(--bg0);
+  border:2px solid var(--t0);
+}
+
+/* 電子紙：題目字體放大 */
+[data-theme="eink"] .q-stem,
+[data-theme="eink"] .qstem,
+[data-theme="eink"] #q-stem,
+[data-theme="eink"] .qst{
+  font-size:var(--fs-q) !important;
+  line-height:var(--lh-body);
+  letter-spacing:.04em;
+  font-weight:500;
+}
+[data-theme="eink"] .law-content,
+[data-theme="eink"] .law-text{
+  font-size:var(--fs-law) !important;
+  line-height:var(--lh-body);
+  letter-spacing:.03em;
+}
+[data-theme="eink"] .pi-s,
+[data-theme="eink"] .pi-n{ font-size:calc(var(--fs-body) - 1px); }
+
+/* 電子紙：按鈕加高、加粗邊線 */
+[data-theme="eink"] .btn,
+[data-theme="eink"] .nb,
+[data-theme="eink"] button{ min-height:var(--btn-h);font-size:15px; }
+[data-theme="eink"] .btn.bg{
+  background:var(--bg2);color:var(--t0);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .btn.bp{
+  background:var(--t0);color:var(--bg0);border:none;
+}
+
+/* 電子紙：chip */
+[data-theme="eink"] .chip{
+  background:var(--bg2);color:var(--t0);
+  border:1.5px solid var(--bd);font-size:13px;
+  padding:7px 14px;
+}
+[data-theme="eink"] .chip.on{
+  background:var(--t0);color:var(--bg0);border-color:var(--t0);
+}
+
+/* 電子紙：答題選項更清晰 */
+[data-theme="eink"] .qabn{
+  background:var(--bg2);color:var(--t0);
+  border:1.5px solid var(--bd);
+  padding:10px 14px;font-size:15px;
+}
+
+/* 電子紙：單欄版面 */
+[data-theme="eink"] .grid-2,
+[data-theme="eink"] [style*="grid-template-columns"]{
+  grid-template-columns:1fr !important;
+}
+
+/* 電子紙：勉勵語 */
+[data-theme="eink"] .h-motto{
+  font-size:22px;font-weight:800;color:var(--t0);letter-spacing:-.01em;
+}
+
+/* 電子紙：scrollbar */
+[data-theme="eink"] .page::-webkit-scrollbar-thumb{ background:var(--bd); }
+
+/* 電子紙：zone-card */
+[data-theme="eink"] .zone-card{
+  background:var(--bg1);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .zone-card.zone-active{ border-color:var(--t0); }
+[data-theme="eink"] .zone-exam .zone-title{ color:var(--t0); }
+[data-theme="eink"] .zone-study .zone-title{ color:var(--t0); }
+
+/* FAB overlay */
+
+/* hcd 倒數列 */
+
+/* sec 分隔標題 */
+
+/* lw-card 法條卡片 */
+
+/* cov overlay */
+
+/* bottom sheet modal */
+
+/* ══ 電子紙模式：關閉動畫與特效 ════════════════════════════════ */
+[data-theme="eink"] *{
+  animation:none !important;
+  transition:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+}
+[data-theme="eink"] body{
+  background:var(--bg0);color:var(--t0);
+  font-size:var(--fs-body);
+  line-height:var(--lh-body);
+  /* 電子紙使用標楷體，閱讀更舒適 */
+  font-family:'標楷體','DFKai-SB','BiauKai','KaiTi',
+    'Noto Serif TC','Source Han Serif TC',
+    'AR PL UKai TW',Georgia,serif;
+}
+[data-theme="eink"] input,
+[data-theme="eink"] textarea,
+[data-theme="eink"] select{
+  background:var(--bg2);color:var(--t0);
+  border-color:var(--bd);border-width:1.5px;
+  font-size:var(--fs-body);
+  min-height:var(--btn-h);
+}
+[data-theme="eink"] select option{ background:var(--bg2);color:var(--t0); }
+
+/* 電子紙：header / nav */
+[data-theme="eink"] .hd{
+  background:var(--bg1);border-bottom:2px solid var(--bd);
+}
+[data-theme="eink"] .nav{
+  background:var(--bg1);border-top:2px solid var(--bd);
+}
+[data-theme="eink"] .hdt{ font-size:17px;font-weight:800;color:var(--t0); }
+
+/* 電子紙：卡片加框線 */
+[data-theme="eink"] .card,
+[data-theme="eink"] .qc,
+[data-theme="eink"] .cc,
+[data-theme="eink"] .sc,
+[data-theme="eink"] .stb,
+[data-theme="eink"] .qb{
+  background:var(--bg1);
+  border:1.5px solid var(--bd);
+}
+
+/* 電子紙：FAB → 純文字按鈕，不用圓型 */
+[data-theme="eink"] #fab-list{
+  background:var(--bg1);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .fab-btn{
+  background:var(--bg2);color:var(--t0);
+  border:1.5px solid var(--bd);border-radius:8px;
+  font-size:13px;
+}
+[data-theme="eink"] #fab-main{
+  background:var(--t0);color:var(--bg0);
+  border:2px solid var(--t0);
+}
+
+/* 電子紙：題目字體放大 */
+[data-theme="eink"] .q-stem,
+[data-theme="eink"] .qstem,
+[data-theme="eink"] #q-stem,
+[data-theme="eink"] .qst{
+  font-size:var(--fs-q) !important;
+  line-height:var(--lh-body);
+  letter-spacing:.04em;
+  font-weight:500;
+}
+[data-theme="eink"] .law-content,
+[data-theme="eink"] .law-text{
+  font-size:var(--fs-law) !important;
+  line-height:var(--lh-body);
+  letter-spacing:.03em;
+}
+[data-theme="eink"] .pi-s,
+[data-theme="eink"] .pi-n{ font-size:calc(var(--fs-body) - 1px); }
+
+/* 電子紙：按鈕加高、加粗邊線 */
+[data-theme="eink"] .btn,
+[data-theme="eink"] .nb,
+[data-theme="eink"] button{ min-height:var(--btn-h);font-size:15px; }
+[data-theme="eink"] .btn.bg{
+  background:var(--bg2);color:var(--t0);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .btn.bp{
+  background:var(--t0);color:var(--bg0);border:none;
+}
+
+/* 電子紙：chip */
+
+[data-theme="eink"] .chip.on{
+  background:var(--t0);color:var(--bg0);border-color:var(--t0);
+}
+
+/* 電子紙：答題選項更清晰 */
+[data-theme="eink"] .qabn{
+  background:var(--bg2);color:var(--t0);
+  border:1.5px solid var(--bd);
+  padding:10px 14px;font-size:15px;
+}
+
+/* 電子紙：單欄版面 */
+[data-theme="eink"] .grid-2,
+[data-theme="eink"] [style*="grid-template-columns"]{
+  grid-template-columns:1fr !important;
+}
+
+/* 電子紙：勉勵語 */
+[data-theme="eink"] .h-motto{
+  font-size:22px;font-weight:800;color:var(--t0);letter-spacing:-.01em;
+}
+
+/* 電子紙：scrollbar */
+[data-theme="eink"] .page::-webkit-scrollbar-thumb{ background:var(--bd); }
+
+/* 電子紙：zone-card */
+[data-theme="eink"] .zone-card{
+  background:var(--bg1);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .zone-card.zone-active{ border-color:var(--t0); }
+[data-theme="eink"] .zone-exam .zone-title{ color:var(--t0); }
+[data-theme="eink"] .zone-leisure .zone-title{ color:var(--t0); }
+[data-theme="eink"] .zone-study .zone-title{ color:var(--t0); }
+
+/* 電子紙：zone-panel */
+[data-theme="eink"] .zone-panel{
+  background:var(--bg1);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .zpanel-main{ border-bottom:1px solid var(--bd); }
+[data-theme="eink"] .zpanel-main-text .t{ color:var(--t0);font-size:15px; }
+[data-theme="eink"] .zpanel-main-text .s{ color:var(--t2); }
+[data-theme="eink"] .zpanel-quiz{ background:var(--bd); }
+[data-theme="eink"] .zqb{
+  background:var(--bg2);border-top:1px solid var(--bd);
+}
+[data-theme="eink"] .zqb::before{ display:none; }
+[data-theme="eink"] .zqb-label{ color:var(--t0);font-size:13px; }
+[data-theme="eink"] .zqb-desc{ color:var(--t2);font-size:11px; }
+[data-theme="eink"] .zpanel-row{ border-top:1px solid var(--bd); }
+[data-theme="eink"] .zpanel-row-text .t{ color:var(--t0);font-size:15px; }
+[data-theme="eink"] .zpanel-row-text .s{ color:var(--t2); }
+
+/* 電子紙：數據橫條 */
+[data-theme="eink"] .hdb-cell{
+  background:var(--bg1);border:1px solid var(--bd);
+}
+
+/* 電子紙：hcd 倒數 */
+[data-theme="eink"] .hcd-row{ border-bottom:1px solid var(--bd); }
+[data-theme="eink"] .hcd-name{ color:var(--t0);font-size:15px; }
+[data-theme="eink"] .hcd-days{ font-size:28px; }
+
+/* 電子紙：FAB */
+[data-theme="eink"] #fab-list{
+  background:var(--bg1);border:1.5px solid var(--bd);
+}
+[data-theme="eink"] .fab-item-label{ color:var(--t0);font-size:13px; }
+
+/* 電子紙：lw-card */
+[data-theme="eink"] .lw-card{ background:var(--bg1);border:1.5px solid var(--bd); }
+
+/* 電子紙：FAB label（深色半透明 → 不透明深色）*/
+[data-theme="eink"] .fab-label{
+  background:var(--t0) !important;
+  color:var(--bg0) !important;
+  border:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+  font-size:14px;
+  font-weight:700;
+}
+[data-theme="eink"] .fab-btn{
+  background:var(--t0) !important;
+  border:none !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+  font-size:18px;
+}
+[data-theme="eink"] #fab-main{
+  background:var(--t0) !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+
+/* 電子紙：hd-home 無邊框無背景 */
+[data-theme="eink"] .hd-home{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+/* 電子紙：一般 hd（非首頁）用不透明背景 */
+[data-theme="eink"] .hd:not(.hd-home){
+  background:var(--bg1) !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  border-bottom:1.5px solid var(--bd) !important;
+}
+/* 電子紙：hd 統一 */
+[data-theme="eink"] .hd{
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+[data-theme="eink"] .zone-card{
+  background:var(--bg1) !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+[data-theme="eink"] .zone-panel{
+  background:var(--bg1) !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+[data-theme="eink"] .zqb{
+  background:var(--bg2) !important;
+}
+[data-theme="eink"] .zpanel-quiz{
+  background:var(--bd) !important;
+}
+[data-theme="eink"] .btn.bg,
+[data-theme="eink"] .hd-btn.bg{
+  background:var(--bg2) !important;
+  color:var(--t0) !important;
+  border:1.5px solid var(--bd) !important;
+}
+[data-theme="eink"] #fab-overlay.open{
+  background:rgba(0,0,0,0.5) !important;
+}
+[data-theme="eink"] #fab-list{
+  background:var(--bg1) !important;
+  border:1.5px solid var(--bd) !important;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  box-shadow:none !important;
+}
+/* plan-badges 底部分隔 */
+[data-theme="eink"] .plan-badges{
+  border-bottom:1px solid var(--bd);
+}

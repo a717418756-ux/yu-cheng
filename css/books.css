@@ -1,0 +1,412 @@
+/* ══ 書庫 (books.js) — 書架書背模式 ══════════════════════════*/
+
+/* ── 書架容器 ─────────────────────────────────────────────── */
+.bookshelf{
+  position:relative;
+  margin:0;
+  padding:0 0 20px;
+  min-height:calc(100vh - 280px);  /* 填滿剩餘空間，書少時無黑色 */
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  /* 深胡桃木背景 */
+  background:
+    /* 木紋橫紋（淡）*/
+    repeating-linear-gradient(
+      180deg,
+      transparent,
+      transparent 3px,
+      rgba(0,0,0,0.04) 3px,
+      rgba(0,0,0,0.04) 4px
+    ),
+    /* 直紋（更淡）*/
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 28px,
+      rgba(255,255,255,0.012) 28px,
+      rgba(255,255,255,0.012) 29px
+    ),
+    /* 基礎木色漸層 */
+    linear-gradient(180deg,
+      #1c0e06 0%,
+      #2a1608 15%,
+      #231208 30%,
+      #2e1a0a 45%,
+      #1e0f06 60%,
+      #2a1608 75%,
+      #1c0e06 100%
+    );
+}
+
+/* ── 最近閱讀區（書庫頂部封面橫向捲動）── */
+.shelf-recent-wrap{
+  padding:16px 14px 16px;
+  /* 實木書架頂部投燈效果：中央亮、邊緣暗 */
+  background:
+    radial-gradient(ellipse at 50% 0%,rgba(255,160,60,0.08) 0%,transparent 60%),
+    linear-gradient(180deg,
+      #231208 0%,
+      #1a0d06 50%,
+      #140a04 100%
+    );
+  border-bottom:2px solid rgba(0,0,0,0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255,180,60,0.1),
+    inset 0 -1px 0 rgba(0,0,0,0.5),
+    0 4px 20px rgba(0,0,0,0.5);
+}
+
+.shelf-recent-row{
+  display:flex;flex-direction:row;gap:10px;
+  overflow-x:auto;overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;padding-bottom:4px;
+}
+.shelf-recent-row::-webkit-scrollbar{display:none}
+.shelf-recent-card{
+  flex-shrink:0;
+  width:70px;
+  display:flex;flex-direction:column;gap:5px;
+  cursor:pointer;
+}
+.shelf-recent-cover{
+  width:70px;height:98px; /* 2:3 比例 */
+  border-radius:3px 5px 5px 3px;
+  overflow:hidden;
+  background:linear-gradient(135deg,#1a0a2e,#2a1050);
+  box-shadow:
+    4px 6px 16px rgba(0,0,0,0.8),
+    -2px 0 0 rgba(0,0,0,0.7),
+    inset -2px 0 4px rgba(0,0,0,0.4),
+    0 0 0 0.5px rgba(255,200,100,0.08);
+  position:relative;
+  transition:transform .18s,box-shadow .18s;
+}
+/* 封面書脊左側暗邊 */
+.shelf-recent-cover::before{
+  content:'';position:absolute;
+  top:0;left:0;width:4px;height:100%;
+  background:linear-gradient(90deg,rgba(0,0,0,0.6),transparent);
+  z-index:1;pointer-events:none;
+}
+.shelf-recent-cover:active{
+  transform:translateY(-4px) scale(1.04);
+  box-shadow:3px 8px 20px rgba(0,0,0,0.8);
+}
+.shelf-recent-cover img{
+  width:100%;height:100%;object-fit:cover;display:block;
+}
+.shelf-recent-cover-placeholder{
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:rgba(255,255,255,0.5);
+  text-align:center;padding:6px;line-height:1.4;
+  word-break:break-all;
+  writing-mode:vertical-rl;
+}
+.shelf-recent-name{
+  font-size:10px;color:rgba(255,255,255,0.55);
+  text-align:center;line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;
+}
+
+/* ── 模式切換列 ── */
+.shelf-mode-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px 6px;
+  background:rgba(0,0,0,0.2);
+}
+
+.shelf-mode-btns{display:flex;gap:4px}
+
+.shelf-mode-btn.on{
+  background:rgba(255,220,140,0.12);
+  border-color:rgba(255,220,140,0.25);
+  color:rgba(255,220,160,0.9);
+}
+
+/* ── 書架每排：真實書櫃結構 ── */
+.shelf-row{
+  display:flex;
+  flex-direction:row;
+  align-items:flex-end;
+  gap:2px;
+  /* 頂板陰影：模擬上方燈光投下的暗影 */
+  padding:20px 14px 0;
+  position:relative;
+  min-height:160px;
+  /* 頂部暗影（層板下方暗處）*/
+  background:
+    linear-gradient(180deg,
+      rgba(0,0,0,0.35) 0%,
+      rgba(0,0,0,0.08) 30%,
+      transparent 100%
+    );
+}
+
+/* 頂板（每排上方的木板）*/
+.shelf-top-plank{
+  position:absolute;
+  top:0;left:0;right:0;
+  height:14px;
+  background:
+    linear-gradient(180deg,
+      #3d1f08 0%,
+      #5c3010 40%,
+      #4a2508 80%,
+      #3a1e08 100%
+    );
+  box-shadow:
+    0 3px 10px rgba(0,0,0,0.6),
+    inset 0 1px rgba(255,255,255,0.07),
+    inset 0 -1px rgba(0,0,0,0.5);
+  /* 木紋 */
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent,transparent 35px,
+      rgba(0,0,0,0.07) 35px,rgba(0,0,0,0.07) 36px
+    ),
+    linear-gradient(180deg,#3d1f08 0%,#5c3010 40%,#4a2508 80%,#3a1e08 100%);
+}
+/* 頂板暖色燈光效果 */
+.shelf-top-plank::after{
+  content:'';position:absolute;
+  bottom:0;left:0;right:0;height:6px;
+  background:linear-gradient(180deg,
+    rgba(255,180,60,0.08) 0%,
+    transparent 100%
+  );
+}
+
+/* 底板（書本站立的層板）*/
+.shelf-plank{
+  position:relative;
+  height:20px;
+  width:100%;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,transparent 32px,
+      rgba(0,0,0,0.06) 32px,rgba(0,0,0,0.06) 33px
+    ),
+    linear-gradient(180deg,
+      #5c3010 0%,
+      #7d4a18 15%,
+      #6b3d12 40%,
+      #5a2e0e 75%,
+      #3a1e08 100%
+    );
+  box-shadow:
+    0 5px 14px rgba(0,0,0,0.75),
+    inset 0 2px 0 rgba(255,255,255,0.1),
+    inset 0 -1px 0 rgba(0,0,0,0.5);
+}
+/* 底板前緣高光 */
+.shelf-plank::before{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,
+    rgba(255,200,100,0.15),
+    rgba(255,200,100,0.07) 30%,
+    rgba(255,200,100,0.15) 70%,
+    rgba(255,200,100,0.07)
+  );
+}
+/* 底板陰影投射 */
+.shelf-plank::after{
+  content:'';position:absolute;
+  bottom:-8px;left:5%;right:5%;height:8px;
+  background:radial-gradient(ellipse at 50% 0%,
+    rgba(0,0,0,0.4) 0%,transparent 100%
+  );
+}
+
+/* 空位槽（書沒放滿的地方）*/
+.shelf-empty-slot{
+  flex:1;min-width:20px;
+  /* 淡化木板背景，表示有空間 */
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,transparent 8px,
+      rgba(255,255,255,0.008) 8px,rgba(255,255,255,0.008) 9px
+    );
+  align-self:stretch;
+  position:relative;
+}
+/* 空位底部細線 */
+.shelf-empty-slot::after{
+  content:'';position:absolute;
+  bottom:0;left:0;right:0;height:1px;
+  background:rgba(255,255,255,0.04);
+}
+
+/* ── 書背 ── */
+.book-spine{
+  border-radius:3px 2px 2px 3px;
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+  flex-shrink:0;
+  /* 書本立體厚度感 */
+  box-shadow:
+    3px 0 8px rgba(0,0,0,0.6),
+    -2px 0 0 rgba(0,0,0,0.7),
+    inset -8px 0 16px rgba(0,0,0,0.3),
+    inset 6px 0 12px rgba(255,255,255,0.06),
+    0 8px 16px rgba(0,0,0,0.45);
+  transition:transform .22s cubic-bezier(.2,.8,.3,1),
+             box-shadow .22s,filter .15s;
+  will-change:transform;
+}
+/* 書本被抽出效果 */
+.book-spine.pulling{
+  transform:translateY(-18px) scale(1.05);
+  box-shadow:
+    4px 20px 36px rgba(0,0,0,0.85),
+    -2px 0 0 rgba(0,0,0,0.7),
+    inset -8px 0 16px rgba(0,0,0,0.25),
+    inset 6px 0 12px rgba(255,255,255,0.08);
+  filter:brightness(1.15);
+  z-index:10;
+}
+
+/* 書脊左側光邊（書本厚度感關鍵）*/
+.book-spine::before{
+  content:'';position:absolute;
+  top:0;left:0;width:7px;height:100%;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,0.14) 0%,
+    rgba(255,255,255,0.04) 60%,
+    transparent 100%
+  );
+  pointer-events:none;z-index:2;
+}
+/* 書背頂部光澤 */
+.book-spine::after{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:25%;
+  background:linear-gradient(180deg,
+    rgba(255,255,255,0.07) 0%,transparent 100%
+  );
+  pointer-events:none;z-index:1;
+}
+
+/* 書名垂直文字 */
+.spine-label{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  writing-mode:vertical-rl;
+  text-orientation:mixed;
+  font-weight:600;
+  color:rgba(255,255,255,0.92);
+  letter-spacing:.05em;
+  line-height:1.2;
+  padding:10px 3px;
+  text-shadow:0 1px 4px rgba(0,0,0,0.95);
+  overflow:hidden;
+  text-align:center;
+  white-space:normal;
+  word-break:break-all;
+  z-index:2;
+  /* 字體大小由 JS 動態設定 */
+}
+
+/* 作者（書背底部）*/
+.spine-author{
+  position:absolute;
+  bottom:6px;left:0;right:0;
+  writing-mode:vertical-rl;
+  font-size:8px;
+  color:rgba(255,255,255,0.35);
+  text-align:center;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  padding:0 2px;z-index:2;
+}
+
+/* ── 封面牆模式 ── */
+.shelf-cover-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  padding:12px 14px;
+}
+.shelf-cover-card{
+  display:flex;flex-direction:column;gap:5px;
+  cursor:pointer;
+}
+.shelf-cover-img{
+  width:100%;aspect-ratio:2/3;
+  border-radius:4px 6px 6px 4px;
+  overflow:hidden;
+  background:linear-gradient(135deg,#1a0a2e,#2a1050);
+  box-shadow:
+    3px 4px 14px rgba(0,0,0,0.7),
+    -1px 0 0 rgba(0,0,0,0.5);
+  transition:transform .18s,box-shadow .18s;
+}
+.shelf-cover-img:active{
+  transform:scale(0.95);
+  box-shadow:1px 2px 8px rgba(0,0,0,0.5);
+}
+.shelf-cover-img img{
+  width:100%;height:100%;object-fit:cover;display:block;
+}
+.shelf-cover-name{
+  font-size:11px;color:var(--t1);text-align:center;
+  display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;
+  line-height:1.4;
+}
+
+/* ── 清單模式（BOOX）── */
+.shelf-list-item{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  cursor:pointer;
+}
+.shelf-list-item:active{background:rgba(255,255,255,0.04)}
+.shelf-list-cover{
+  width:40px;height:56px;
+  border-radius:2px 4px 4px 2px;
+  overflow:hidden;flex-shrink:0;
+  background:rgba(255,255,255,0.08);
+  box-shadow:2px 2px 6px rgba(0,0,0,0.5);
+}
+.shelf-list-cover img{width:100%;height:100%;object-fit:cover}
+.shelf-list-info{flex:1;min-width:0}
+.shelf-list-title{
+  font-size:13px;font-weight:600;color:var(--t0);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  margin-bottom:3px;
+}
+.shelf-list-meta{font-size:11px;color:var(--t2)}
+.shelf-list-progress{
+  height:2px;border-radius:1px;
+  background:rgba(255,255,255,0.1);
+  margin-top:6px;position:relative;overflow:hidden;
+}
+.shelf-list-progress-fill{
+  position:absolute;inset:0;right:auto;
+  background:var(--acc);border-radius:1px;
+}
+
+/* ── finput（新增書籍表單用）── */
+.finput{
+  width:100%;box-sizing:border-box;
+  padding:8px 10px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:8px;
+  color:var(--t0);font-size:13px;
+}
+.finput:focus{outline:none;border-color:var(--acc)}

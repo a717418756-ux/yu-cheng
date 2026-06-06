@@ -1,0 +1,334 @@
+/* ── 淺色模式：FAB label 修正 ── */
+
+/* ── 主題切換按鈕（設定頁）── */
+#theme-switcher{
+  display:flex;gap:8px;padding:0 12px 12px;
+}
+.theme-btn{
+  flex:1;padding:10px 4px;border-radius:10px;
+  border:1px solid var(--bd);
+  background:var(--bg2);color:var(--t1);
+  font-size:12px;text-align:center;cursor:pointer;
+  line-height:1.5;font-weight:500;
+}
+.theme-btn.active{
+  border-color:var(--acc);
+  background:rgba(110,168,254,0.1);
+  color:var(--acc);font-weight:700;
+}
+[data-theme="eink"] .theme-btn{
+  background:var(--bg2);color:var(--t0);
+  border:1.5px solid var(--bd);font-size:14px;
+}
+[data-theme="eink"] .theme-btn.active{
+  border:2px solid var(--t0);background:var(--t0);color:var(--bg0);
+}
+
+/* ══ 影音庫美化 ══════════════════════════════════════════════*/
+
+/* section 標題大字加漸層 */
+
+/* 橫向卡片：按壓回饋 */
+.media-hcard:active .media-hcard-thumb{
+  transform:scale(0.94);
+  transition:transform .12s;
+}
+
+/* 音頻圓形：增加光暈邊框 */
+
+/* 影片縮圖：底部漸層遮罩（讓時長標籤更清晰）*/
+
+/* 黑膠圓形（無封面）加質感紋路 */
+.media-hcard-vinyl{
+  width:100%;height:100%;
+  border-radius:8px;   /* 跟 audio thumb 一致的圓角 */
+  position:relative;
+  background:
+    radial-gradient(circle at 50%,
+      #3a3a48 0%,
+      #111 18%,
+      #1e1e28 30%,
+      #111 42%,
+      #1c1c24 55%,
+      #111 68%,
+      #181820 80%,
+      #0c0c10 100%
+    );
+}
+
+/* 展開模式頂部 sticky 背景加毛玻璃 */
+
+/* 展開模式標題文字漸層 */
+
+/* 影片卡片：懸浮效果 */
+.media-vcard::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(
+    130deg,
+    rgba(255,255,255,0.055) 0%,
+    transparent 40%
+  );
+  pointer-events:none;z-index:1;border-radius:inherit;
+}
+.media-vcard:active{
+  transform:scale(0.96) translateY(2px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.5);
+}
+
+/* 音頻橫列：按壓效果 */
+.media-arow:active{
+  background:rgba(255,255,255,0.04);
+  border-radius:10px;
+}
+
+/* 頂部 header 加毛玻璃（書庫/影音庫共用）*/
+#pg-books .hd,
+#pg-media .hd{
+  background:rgba(8,9,12,0.85);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  box-shadow:0 1px 20px rgba(0,0,0,0.4);
+}
+#pg-books .hd .hdt,
+#pg-media .hd .hdt{
+  font-size:17px;
+  letter-spacing:-.01em;
+  background:linear-gradient(90deg,#fff 60%,rgba(255,255,255,0.6));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+
+/* 搜尋列加深色質感 */
+#pg-media .sb,
+#pg-books .sb{
+  margin:10px 12px;
+  background:rgba(255,255,255,0.05);
+  border-bottom:none;
+}
+#pg-media .sb input,
+#pg-books .sb input{
+  height:44px;
+  background:rgba(255,255,255,0.055);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid rgba(255,255,255,0.09);
+  border-radius:14px;
+  color:var(--t0);
+  font-size:13px;
+  padding-left:36px;
+  transition:border-color .2s,box-shadow .2s;
+}
+#pg-media .sb input:focus,
+#pg-books .sb input:focus{
+  border-color:rgba(110,168,254,0.45);
+  box-shadow:0 0 0 3px rgba(110,168,254,0.1);
+  background:rgba(255,255,255,0.07);
+  outline:none;
+}
+
+/* ── 影音庫頁面背景深度處理 ─────────────────────────────────*/
+/* pg-media 高質感背景 */
+#pg-media{
+  background:
+    radial-gradient(circle at 50% -5%,rgba(45,70,140,0.22) 0%,transparent 45%),
+    radial-gradient(circle at 95% 80%,rgba(30,20,80,0.15) 0%,transparent 40%),
+    #08090c;
+}
+
+/* pg-books 深木色空間感 */
+#pg-books{
+  background:
+    radial-gradient(circle at 50% 0%,rgba(80,40,10,0.18) 0%,transparent 50%),
+    #080604;
+}
+
+/* 影片海報牆：卡片加質感邊框 */
+.media-vcard{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;overflow:hidden;
+  transition:transform .15s,box-shadow .15s,border-color .15s;
+}
+.media-vcard:active{
+  transform:scale(0.96);
+  box-shadow:0 2px 12px rgba(0,0,0,0.6);
+  border-color:rgba(255,255,255,0.12);
+}
+
+/* 音頻列：每行之間更精緻的分隔 */
+.media-arow{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  cursor:default;
+  transition:background .12s;
+}
+.media-arow:active{
+  background:rgba(255,255,255,0.04);
+  border-radius:10px;
+  padding-left:8px;padding-right:8px;
+}
+
+/* section 標題大字更精緻 */
+
+/* 影片縮圖無圖時更有質感 */
+.mvc-no-poster{
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:32px;
+  background:linear-gradient(135deg,rgba(30,30,45,1),rgba(15,15,25,1));
+}
+
+/* 橫向卡片唱盤光澤質感提升 */
+.media-hcard-thumb.audio{
+  width:96px; height:96px;        /* Spotify 風格正方形 */
+  border-radius:8px;              /* 小圓角正方形，非圓形 */
+  flex-shrink:0;
+  box-shadow:
+    0 4px 16px rgba(0,0,0,0.6),
+    0 0 0 0.5px rgba(255,255,255,0.06);
+}
+.media-hcard-thumb.video{
+  width:140px; height:90px;       /* 16:9 橫向縮圖 */
+  border-radius:10px;
+  flex-shrink:0;
+  box-shadow:
+    0 4px 20px rgba(0,0,0,0.6),
+    0 0 0 0.5px rgba(255,255,255,0.05);
+}
+
+/* 更多按鈕升級 */
+.media-sec-more:active,.media-sec-more.active{
+  background:rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.9);
+  border-color:rgba(255,255,255,0.2);
+  transform:scale(0.97);
+}
+
+/* ══ 電子書閱讀器 ════════════════════════════════════════════*/
+.reader-topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;
+  background:rgba(0,0,0,0.85);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  flex-shrink:0;
+  position:relative;z-index:5;
+}
+.reader-title{
+  flex:1;font-size:14px;font-weight:600;color:#fff;
+  text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:0 12px;
+}
+.reader-btn{
+  background:rgba(255,255,255,0.08);border:none;
+  color:rgba(255,255,255,0.85);font-size:16px;
+  cursor:pointer;padding:6px 12px;border-radius:8px;
+  flex-shrink:0;
+}
+.reader-btn:active{background:rgba(255,255,255,0.15)}
+
+/* ── 影音庫 section 質感加強 ──────────────────────────────── */
+
+/* 最近播放/收藏 section 頂部加細緻分隔線 */
+
+.media-sec-hd-row:first-of-type{
+  border-top:none;
+}
+
+/* 影片海報：加底部文字漸層遮罩讓標題更清晰 */
+.mvc-poster::after{
+  content:'';position:absolute;inset:auto 0 0 0;
+  height:45%;
+  background:linear-gradient(0deg,rgba(0,0,0,0.75) 0%,transparent 100%);
+  pointer-events:none;border-radius:0 0 10px 10px;
+}
+
+/* 音頻列表背景：每行交替極淡背景 */
+.media-arow:nth-child(even){
+  background:rgba(255,255,255,0.012);
+  border-radius:8px;
+}
+
+/* 卡片縮圖加漸層反光 */
+.media-hcard-thumb.audio::after{
+  content:'';position:absolute;inset:0;border-radius:8px;
+  background:radial-gradient(circle at 35% 25%,rgba(255,255,255,0.06),transparent 60%);
+  pointer-events:none;
+}
+
+/* 音頻列表的正在播放行 */
+.media-arow:has(.mar-title.playing){
+  background:rgba(168,85,247,0.06);
+  border-radius:8px;
+}
+
+/* 展開模式背景加質感 */
+
+/* 書庫/影音庫 chip 質感升級 */
+#pg-books .chip,
+#pg-media .chip{
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.08);
+  color:rgba(255,255,255,0.5);
+  border-radius:20px;
+  backdrop-filter:blur(10px);
+  font-size:12px;font-weight:600;
+  transition:all .18s;
+}
+#pg-books .chip.on,
+#pg-media .chip.on{
+  background:rgba(59,130,246,0.18);
+  border-color:rgba(59,130,246,0.4);
+  color:rgba(110,168,254,0.95);
+}
+
+/* 書庫模式切換按鈕質感 */
+.shelf-mode-btn{
+  padding:5px 12px;border-radius:14px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.07);
+  color:rgba(255,255,255,0.4);
+  font-size:11px;font-weight:600;cursor:pointer;
+  transition:all .18s;
+  backdrop-filter:blur(8px);
+}
+.shelf-mode-btn.on{
+  background:rgba(255,180,60,0.12);
+  border-color:rgba(255,180,60,0.25);
+  color:rgba(255,210,100,0.9);
+}
+
+/* 最近閱讀標題升級 */
+.shelf-recent-title{
+  font-size:12px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;
+  color:rgba(255,190,80,0.65);
+  margin-bottom:14px;padding-left:2px;
+  display:flex;align-items:center;gap:8px;
+}
+.shelf-recent-title::after{
+  content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(255,180,60,0.2),transparent);
+}
+
+/* 書庫模式列標題升級 */
+.shelf-mode-title{
+  font-size:11px;color:rgba(255,190,80,0.5);
+  font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+}
+
+/* 影音庫空狀態文字 */
+#pg-media .empty{
+  background:rgba(255,255,255,0.02);
+  border:1px dashed rgba(255,255,255,0.06);
+  border-radius:16px;
+  margin:20px 14px;
+  padding:40px 20px;
+}
+
+/* ══ 影音庫 section 標題行升級（螢光白線）══════════════════ */
