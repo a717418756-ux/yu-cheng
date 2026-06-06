@@ -738,10 +738,7 @@ textarea{resize:vertical;line-height:1.7}
   padding:8px 14px 6px;
   background:rgba(0,0,0,0.2);
 }
-.shelf-mode-title{
-  font-size:11px;color:rgba(255,220,160,0.55);
-  font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-}
+
 .shelf-mode-btns{display:flex;gap:4px}
 
 .shelf-mode-btn.on{
@@ -1074,7 +1071,6 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 線2：卡片列底部分隔線，長度約標題文字寬，柔和 Glow */
 
-
 /* 橫向卡片（影片 + 音頻共用外框）*/
 .media-hcard{
   flex-shrink:0;
@@ -1216,7 +1212,7 @@ textarea{resize:vertical;line-height:1.7}
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
 }
-.mvc-no-poster{font-size:36px}
+
 .mvc-dur-badge{
   position:absolute;bottom:5px;right:6px;
   background:rgba(0,0,0,0.75);color:#fff;
@@ -2551,7 +2547,6 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 展開模式背景加質感 */
 
-
 /* 書庫/影音庫 chip 質感升級 */
 #pg-books .chip,
 #pg-media .chip{
@@ -2769,7 +2764,6 @@ textarea{resize:vertical;line-height:1.7}
   padding-bottom:16px;  /* 讓 ::after 底部線跟下個 section 標題拉開距離 */
 }
 
-
 /* ── 影音庫兩條線（最終版）─────────────────────────────────
    線1：標題文字正下方短線（::before on media-sec-hd-row）
    線2：卡片列結束後的長線（::after on media-sec-wrap）
@@ -2851,7 +2845,6 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 空狀態的 section wrap 不顯示底部分隔線 */
 
-
 /* 影片 featured 大卡（首張，類 Netflix 橫版大圖）*/
 .media-hcard-featured{
   width:220px;
@@ -2865,8 +2858,6 @@ textarea{resize:vertical;line-height:1.7}
     0 8px 24px rgba(0,0,0,0.65),
     0 0 0 1px rgba(255,255,255,0.06);
 }
-
-
 
 /* 影音庫標題靠左 */
 #media-hd-title{
