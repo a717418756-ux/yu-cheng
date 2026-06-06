@@ -338,24 +338,41 @@ function _mkSpine(b, dispW, dispH){
 
   const t = _SPINE_THEMES[(b.id||0) % _SPINE_THEMES.length];
 
-  if(true){  // 純色書背+書名
-    div.style.background=
-      `linear-gradient(90deg,${t.dark} 0%,${t.bg} 30%,${t.light}22 50%,${t.bg} 70%,${t.dark} 100%)`;
+  // 底層：純色漸層+書名（當作佔位，有書背圖時 lazy 覆蓋）
+  div.style.background =
+    `linear-gradient(90deg,${t.dark} 0%,${t.bg} 30%,${t.light}22 50%,${t.bg} 70%,${t.dark} 100%)`;
 
-    // 書名字體大小依書背寬度自動調整
-    const fontSize = Math.max(9, Math.min(13, Math.round(dispW * 0.38)));
-    const label = document.createElement('div');
-    label.className='spine-label';
-    label.style.fontSize = fontSize+'px';
-    label.textContent = b.title||'未命名';
-    div.appendChild(label);
+  const fontSize = Math.max(9, Math.min(13, Math.round(dispW * 0.38)));
+  const label = document.createElement('div');
+  label.className = 'spine-label';
+  label.style.fontSize = fontSize + 'px';
+  label.textContent = b.title || '未命名';
+  div.appendChild(label);
 
-    if(b.author && dispW >= 20){
-      const auth = document.createElement('div');
-      auth.className='spine-author';
-      auth.textContent = b.author;
-      div.appendChild(auth);
-    }
+  if(b.author && dispW >= 20){
+    const auth = document.createElement('div');
+    auth.className = 'spine-author';
+    auth.textContent = b.author;
+    div.appendChild(auth);
+  }
+
+  // Lazy 讀取書背縮圖：有 spineThumb 才覆蓋（隱藏書名），否則保持純色+書名
+  if(b.id){
+    _getBookThumb(b.id).then(th=>{
+      const raw = th.spineThumb;
+      if(!raw || !div.isConnected) return;
+      const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
+      const img = document.createElement('img');
+      img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block';
+      if(raw instanceof Blob) img.onload = ()=> URL.revokeObjectURL(src);
+      img.src = src;
+      if(div.isConnected){
+        div.style.position = 'relative';
+        // 有書背圖：隱藏純色底色的書名和作者（書背圖已包含資訊）
+        div.querySelectorAll('.spine-label,.spine-author').forEach(el=>el.style.display='none');
+        div.appendChild(img);
+      }
+    }).catch(()=>{});
   }
 
   // 收藏操作已移至書籍資訊視窗（openBookDetail）
@@ -665,9 +682,14 @@ async function saveNewBook(){
     const pxW=mmToPx(widthMM), pxH=mmToPx(heightMM), pxS=mmToPx(thickMM);
     coverThumb = await _compressImage(coverInp.files[0], 200, Math.round(200*pxH/pxW));
     // 書背圖：優先用上傳的書背圖，否則從封面裁切左側
+    const spineTargetW = Math.round(pxS * SPINE_SCALE * 2);
+    const spineTargetH = Math.round(pxH * 2);
     if(spineInp?.files[0]){
-      // 有上傳書背圖才生成 spineThumb，否則保持 null 讓書架顯示純色+書名
-      spineThumb = await _compressImage(spineInp.files[0], Math.round(pxS*SPINE_SCALE*2), pxH*2);
+      // 有上傳書背圖：直接壓縮使用
+      spineThumb = await _compressImage(spineInp.files[0], spineTargetW, spineTargetH);
+    } else {
+      // 沒傳書背圖：從封面最左側裁切同書背寬度的圖
+      spineThumb = await _cropSpineFromCover(coverInp.files[0], spineTargetW, spineTargetH);
     }
   }
 
@@ -699,6 +721,33 @@ function _previewSpine(inp){
       style="width:100%;height:100%;object-fit:cover;border-radius:4px">`;
   };
   reader.readAsDataURL(inp.files[0]);
+}
+
+// 從封面圖左側裁切書背寬度的圖（用於無書背圖時）
+function _cropSpineFromCover(file, targetW, targetH){
+  return new Promise(resolve=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const canvas = document.createElement('canvas');
+        canvas.width  = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        // 從封面最左側裁切，寬度 = 書背寬，高度 = 書高
+        // 封面圖的左側 targetW/img.width 比例的寬度
+        const srcW = Math.round(img.width * targetW / targetH * (img.height / img.height));
+        // 更直接：按比例縮放後取左側 targetW
+        const scale = targetH / img.height;
+        const scaledW = Math.round(img.width * scale);
+        // 先繪製整張封面縮放到 targetH 高度，再取左側 targetW
+        ctx.drawImage(img, 0, 0, scaledW, targetH);
+        canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function _compressImage(file,maxW,maxH){
