@@ -40,20 +40,13 @@ async function gdriveBackup(){ try{
   const { url, pwd } = await _gasGetConfig();
   if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
   toast('備份中…');
-  const [qs, ls, ats, cds] = await Promise.all([
-    da('questions'), da('laws'), da('attempts'), da('countdowns')
-  ]);
-  const motto  = await getSetting('examMotto','');
-  // ebooks/media：只備份 metadata（排除 blob，太大無法上傳 GAS）
-  const ebooksAll  = await da('ebooks');
-  const mediaAll   = await da('leisuremedia');
-  const ebooksMeta = ebooksAll.map(({blob:_b,coverBlob:_cb,coverThumb:_ct,spineThumb:_st,...m})=>m);
-  const mediaMeta  = mediaAll.map(({blob:_b,thumbnail:_th,...m})=>m);
+  // 雲端備份只含考試區：題庫 + 法條
+  const [qs, ls] = await Promise.all([da('questions'), da('laws')]);
   const payload = {
     password: pwd,
     action:   'backup',
     filename: GAS_BACKUP_FILE,
-    data: JSON.stringify({ questions:qs, laws:ls, attempts:ats, countdowns:cds, motto, ebooksMeta, mediaMeta })
+    data: JSON.stringify({ questions:qs, laws:ls })
   };
   const res  = await fetch(url, {
     method:'POST',
@@ -92,32 +85,16 @@ async function gdriveRestore(){ try{
         toast('還原失敗：備份資料格式錯誤'); return;
       }
 
-      // 驗證資料有效性再清除（避免清空後發現備份是空的）
-      const hasData = (bk.questions?.length || bk.laws?.length ||
-                       bk.attempts?.length  || bk.ebooksMeta?.length || bk.mediaMeta?.length);
+      // 驗證資料有效性（雲端備份只含 questions + laws）
+      const hasData = (bk.questions?.length || bk.laws?.length);
       if(!hasData){
         toast('還原失敗：備份資料為空，請先備份再還原'); return;
       }
 
-      // 清除現有資料
+      // 清除並還原 questions + laws
       await dc('questions'); await dc('laws');
-      await dc('attempts'); await dc('countdowns');
-
-      // 寫入備份資料
       if(bk.questions?.length) await bulkPut('questions', bk.questions);
       if(bk.laws?.length)      await bulkPut('laws',      bk.laws);
-      if(bk.attempts?.length)  await bulkPut('attempts',  bk.attempts);
-      if(bk.countdowns?.length)await bulkPut('countdowns',bk.countdowns);
-      if(bk.motto)             await setSetting('examMotto', bk.motto);
-      // ebooks/media metadata 還原（不含實際檔案 blob，只還原書目資料）
-      if(bk.ebooksMeta?.length){
-        await dc('ebooks');
-        await bulkPut('ebooks', bk.ebooksMeta);
-      }
-      if(bk.mediaMeta?.length){
-        await dc('leisuremedia');
-        await bulkPut('leisuremedia', bk.mediaMeta);
-      }
 
       _cacheInvalidate();
       const rt = new Date().toLocaleString('zh-TW');
@@ -278,4 +255,190 @@ function toggleGasHelp(){
   const el = document.getElementById('gas-help');
   if(!el) return;
   el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+// ════════════════════════════════════════════════════════════
+// 本地完整備份 / 還原（書庫 + 影音庫，含實際 Blob 檔案）
+// 使用 File System Access API（Chrome/Edge/Android Chrome 支援）
+// ════════════════════════════════════════════════════════════
+
+// 備份：選擇本地資料夾，將所有書庫和影音庫逐檔案寫入
+async function localBackup(){
+  if(!window.showDirectoryPicker){
+    toast('你的瀏覽器不支援資料夾存取，請用 Chrome 或 Edge');
+    return;
+  }
+  try{
+    const dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
+    toast('備份中…請稍候');
+
+    const [ebooks, media] = await Promise.all([
+      da('ebooks'), da('leisuremedia')
+    ]);
+
+    let count = 0;
+
+    // ── 書庫備份 ──
+    const ebooksDir = await dirHandle.getDirectoryHandle('ebooks', { create:true });
+    for(const book of ebooks){
+      // metadata（不含 blob 欄位）寫成 JSON
+      const { blob:_b, coverBlob:_cb, ...meta } = book;
+      // 縮圖（coverThumb, spineThumb）是 Blob，轉成 base64 存在 meta JSON 裡
+      const metaOut = { ...meta };
+      if(meta.coverThumb instanceof Blob){
+        metaOut.coverThumb = await _blobToBase64(meta.coverThumb);
+        metaOut._coverThumbIsBase64 = true;
+      }
+      if(meta.spineThumb instanceof Blob){
+        metaOut.spineThumb = await _blobToBase64(meta.spineThumb);
+        metaOut._spineThumbIsBase64 = true;
+      }
+      const metaHandle = await ebooksDir.getFileHandle(`${book.id}.meta.json`, { create:true });
+      const metaWriter = await metaHandle.createWritable();
+      await metaWriter.write(JSON.stringify(metaOut));
+      await metaWriter.close();
+
+      // 實際書檔 blob
+      if(book.blob){
+        const ext = book.fileType || 'bin';
+        const fileHandle = await ebooksDir.getFileHandle(`${book.id}.${ext}`, { create:true });
+        const writer = await fileHandle.createWritable();
+        await writer.write(book.blob);
+        await writer.close();
+      }
+      count++;
+    }
+
+    // ── 影音庫備份 ──
+    const mediaDir = await dirHandle.getDirectoryHandle('media', { create:true });
+    for(const m of media){
+      // metadata
+      const { blob:_b, ...meta } = m;
+      const metaOut = { ...meta };
+      if(meta.thumbnail instanceof Blob){
+        metaOut.thumbnail = await _blobToBase64(meta.thumbnail);
+        metaOut._thumbnailIsBase64 = true;
+      }
+      const metaHandle = await mediaDir.getFileHandle(`${m.id}.meta.json`, { create:true });
+      const metaWriter = await metaHandle.createWritable();
+      await metaWriter.write(JSON.stringify(metaOut));
+      await metaWriter.close();
+
+      // 實際媒體 blob
+      if(m.blob){
+        const ext = m.mimeType?.split('/')[1] || m.type || 'bin';
+        const fileHandle = await mediaDir.getFileHandle(`${m.id}.${ext}`, { create:true });
+        const writer = await fileHandle.createWritable();
+        await writer.write(m.blob);
+        await writer.close();
+      }
+      count++;
+    }
+
+    toast(`備份完成！共 ${count} 個項目 ✓`);
+  }catch(e){
+    if(e.name === 'AbortError') return;  // 使用者取消
+    logError('localBackup', e);
+    toast('備份失敗：' + e.message);
+  }
+}
+
+// 還原：選擇備份資料夾，讀取並還原所有項目
+async function localRestore(){
+  if(!window.showDirectoryPicker){
+    toast('你的瀏覽器不支援資料夾存取，請用 Chrome 或 Edge');
+    return;
+  }
+  cfm('本地完整還原', '書庫和影音庫的現有資料將被覆蓋，確定繼續？', async()=>{
+    try{
+      const dirHandle = await window.showDirectoryPicker({ mode:'read' });
+      toast('還原中…請稍候');
+
+      let count = 0;
+
+      // ── 書庫還原 ──
+      try{
+        const ebooksDir = await dirHandle.getDirectoryHandle('ebooks');
+        await dc('ebooks');
+        for await(const [name, handle] of ebooksDir.entries()){
+          if(!name.endsWith('.meta.json')) continue;
+          const file = await handle.getFile();
+          const meta = JSON.parse(await file.text());
+
+          // 還原縮圖 Blob
+          if(meta._coverThumbIsBase64 && meta.coverThumb){
+            meta.coverThumb = await _base64ToBlob(meta.coverThumb, 'image/jpeg');
+            delete meta._coverThumbIsBase64;
+          }
+          if(meta._spineThumbIsBase64 && meta.spineThumb){
+            meta.spineThumb = await _base64ToBlob(meta.spineThumb, 'image/jpeg');
+            delete meta._spineThumbIsBase64;
+          }
+
+          // 讀取書檔 blob
+          const ext = meta.fileType || 'bin';
+          try{
+            const blobHandle = await ebooksDir.getFileHandle(`${meta.id}.${ext}`);
+            meta.blob = await blobHandle.getFile();
+          }catch(e){ meta.blob = null; }
+
+          await dp('ebooks', meta);
+          count++;
+        }
+      }catch(e){ /* ebooks 資料夾不存在就跳過 */ }
+
+      // ── 影音庫還原 ──
+      try{
+        const mediaDir = await dirHandle.getDirectoryHandle('media');
+        await dc('leisuremedia');
+        for await(const [name, handle] of mediaDir.entries()){
+          if(!name.endsWith('.meta.json')) continue;
+          const file = await handle.getFile();
+          const meta = JSON.parse(await file.text());
+
+          // 還原縮圖 Blob
+          if(meta._thumbnailIsBase64 && meta.thumbnail){
+            meta.thumbnail = await _base64ToBlob(meta.thumbnail, 'image/jpeg');
+            delete meta._thumbnailIsBase64;
+          }
+
+          // 讀取媒體 blob
+          const ext = meta.mimeType?.split('/')[1] || meta.type || 'bin';
+          try{
+            const blobHandle = await mediaDir.getFileHandle(`${meta.id}.${ext}`);
+            meta.blob = await blobHandle.getFile();
+          }catch(e){ meta.blob = null; }
+
+          await dp('leisuremedia', meta);
+          count++;
+        }
+      }catch(e){ /* media 資料夾不存在就跳過 */ }
+
+      _cacheInvalidate?.();
+      toast(`還原完成！共 ${count} 個項目，重新整理中…`);
+      setTimeout(()=>location.reload(), 1200);
+    }catch(e){
+      if(e.name === 'AbortError') return;
+      logError('localRestore', e);
+      toast('還原失敗：' + e.message);
+    }
+  });
+}
+
+// 輔助：Blob → base64 字串
+function _blobToBase64(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload  = ()=> resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// 輔助：base64 字串 → Blob
+function _base64ToBlob(b64, mimeType='image/jpeg'){
+  const bytes = atob(b64);
+  const arr = new Uint8Array(bytes.length);
+  for(let i=0; i<bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return Promise.resolve(new Blob([arr], { type:mimeType }));
 }
