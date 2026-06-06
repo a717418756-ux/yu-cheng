@@ -1252,17 +1252,6 @@ async function playVideo(id){
   _showMiniBar(full.title,'video');
 }
 
-function _vvpCycleSpeed(btn){
-  const vidEl = document.getElementById('video-el');
-  if(!vidEl) return;
-  const speeds = [0.75, 1, 1.25, 1.5, 2];
-  const cur = vidEl.playbackRate;
-  const nxt = speeds[(speeds.indexOf(cur)+1)%speeds.length];
-  vidEl.playbackRate = nxt;
-  const span = btn.querySelector('span');
-  if(span) span.textContent = nxt.toFixed(2).replace('.00','').replace(/\.?0+$/,'');
-}
-
 // 影片右上三點選單
 async function _openVideoMenu(id, btn){
   document.getElementById('video-menu-sheet')?.remove();
@@ -1321,8 +1310,6 @@ async function _vvpToggleFavMenu(id, btn){
     toast(m.favorite ? '已加入收藏' : '已取消收藏');
   }catch(e){ logError('_vvpToggleFavMenu',e); }
 }
-
-
 
 async function closeVideoPlayer(id){
   const ov=document.getElementById('video-player-ov');
@@ -1597,15 +1584,6 @@ async function _detailToggleFav(id, btn){
   }catch(e){ logError('_detailToggleFav',e); }
 }
 
-async function downloadMedia(id){
-  const m=await dg('leisuremedia',id);
-  if(!m?.blob){toast('無附加檔案');return;}
-  const url=URL.createObjectURL(m.blob);
-  const a=document.createElement('a');
-  a.href=url;a.download=(m.title||'media')+'.'+(m.fileType||'mp4');
-  a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
-}
-
 async function toggleMediaFav(id,btn){
   try{
     const m=await dg('leisuremedia',id);if(!m)return;
@@ -1628,18 +1606,8 @@ async function confirmDeleteMedia(id){
 // ════════════════════════════════════════════════════════════
 // 篩選 / 搜尋觸發
 // ════════════════════════════════════════════════════════════
-function setMediaFilter(btn,filter){
-  document.querySelectorAll('#media-chips .chip').forEach(c=>c.classList.remove('on'));
-  if(btn) btn.classList.add('on');
-  _M.filter=filter;_M.page=0;_renderMediaPage();
-}
 
 // 點「更多」切換篩選；已在該篩選則切回全部（toggle）
-function _filterToType(type){
-  _M.filter = (_M.filter === type) ? 'all' : type;
-  _M.page = 0;
-  _renderMediaPage();
-}
 function searchMedia(){
   _M.kw=(document.getElementById('media-si')?.value||'').trim();
   _M.page=0;

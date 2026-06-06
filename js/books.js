@@ -73,24 +73,6 @@ async function _getBookThumb(id){
 }
 
 // 書背縮圖 lazy 覆蓋（有 spineThumb 才覆蓋，無則保持純色書背）
-async function _fillSpineThumb(div, id, dispW, dispH){
-  try{
-    const th = await _getBookThumb(id);
-    const raw = th.spineThumb;
-    if(!raw || !div.isConnected) return;
-    const src = raw instanceof Blob ? URL.createObjectURL(raw) : raw;
-    const img = document.createElement('img');
-    img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit';
-    if(raw instanceof Blob) img.onload=()=>URL.revokeObjectURL(src);
-    img.src=src;
-    if(div.isConnected){
-      div.style.position='relative';
-      // 隱藏書名 label（有縮圖不需要）
-      div.querySelectorAll('.spine-label,.spine-author').forEach(el=>el.style.display='none');
-      div.appendChild(img);
-    }
-  }catch(e){}
-}
 
 // 非同步填充縮圖到指定元素
 async function _fillThumb(el, id, type){
@@ -303,10 +285,12 @@ function _mkShelf(books, total){
   books.forEach(b=>{
     const thickMM  = b.thickMM  || _BOOK_DEFAULT_MM.thickMM;
     const heightMM = b.heightMM || _BOOK_DEFAULT_MM.heightMM;
-    // 書背寬（加視覺修正）
-    const dispW = Math.round(mmToPx(thickMM) * SPINE_SCALE);
-    // 書高
-    const dispH = Math.round(mmToPx(heightMM) * HEIGHT_SCALE);
+    // 書架高度固定（讓所有書等高，視覺整齊）
+    const SHELF_H = 160;   // 固定書架顯示高度（px）
+    const MIN_W   = 18;    // 最薄書的最小寬度（px）
+    const dispH = SHELF_H;
+    // 書背寬按真實比例（厚度/高度），最小 MIN_W 避免太窄
+    const dispW = Math.max(MIN_W, Math.round(SHELF_H * thickMM / heightMM));
 
     if(rowUsed + dispW + GAP > containerW && rowUsed > 0){
       _newRow();
@@ -354,9 +338,7 @@ function _mkSpine(b, dispW, dispH){
 
   const t = _SPINE_THEMES[(b.id||0) % _SPINE_THEMES.length];
 
-  // 書背：先顯示純色書背+書名，如有 spineThumb 則 lazy 覆蓋
-  if(b.id){ _fillSpineThumb(div, b.id, dispW, dispH); }
-  if(true){  // 預設：純色書背
+  if(true){  // 純色書背+書名
     div.style.background=
       `linear-gradient(90deg,${t.dark} 0%,${t.bg} 30%,${t.light}22 50%,${t.bg} 70%,${t.dark} 100%)`;
 
@@ -719,7 +701,6 @@ function _previewSpine(inp){
   reader.readAsDataURL(inp.files[0]);
 }
 
-
 function _compressImage(file,maxW,maxH){
   return new Promise(resolve=>{
     const reader=new FileReader();
@@ -979,10 +960,6 @@ async function downloadBook(id){
   const a=document.createElement('a');
   a.href=url; a.download=(book.title||'book')+'.'+(book.fileType||'pdf');
   a.click(); setTimeout(()=>URL.revokeObjectURL(url),3000);
-}
-
-async function toggleBookFav(id,btn){
-  await _quickToggleBookFav(id,btn);
 }
 
 // 快速收藏切換（只更新按鈕外觀，不重渲染整頁）
