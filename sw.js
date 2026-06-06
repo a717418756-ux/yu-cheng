@@ -3,13 +3,17 @@
    ★ 每次更新程式只需修改 APP_VERSION
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '2.0.8';
+const APP_VERSION = '2.1.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗會重試）────────────
 const CORE_ASSETS = [
   './manifest.json',
-  './css/app.css',
+  './css/base.css',
+  './css/books.css',
+  './css/media.css',
+  './css/quiz.css',
+  './css/eink.css',
   './css/splash.css',
   './js/db.js',
   './js/books.js',
