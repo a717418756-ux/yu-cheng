@@ -380,8 +380,10 @@ function _mkSpine(b, dispW, dispH){
           div.querySelectorAll('.spine-label,.spine-author').forEach(el=>el.style.display='none');
           div.appendChild(img);
         } else {
-          // 模糊封面：圖在最底層，書名置中疊在上面（不顯示作者）
-          img.style.zIndex = '0';
+          // 模糊封面：圖在最底層加 CSS blur，書名置中疊在上面（不顯示作者）
+          img.style.zIndex    = '0';
+          img.style.filter    = 'blur(8px)';    // 加大 blur，搭配 canvas 縮放雙重模糊
+          img.style.transform = 'scale(1.25)';  // 放大避免 blur 邊緣透明
           const spineLabel = div.querySelector('.spine-label');
           const spineAuth  = div.querySelector('.spine-author');
           if(spineLabel){
@@ -792,16 +794,22 @@ function _makeBlurredSpineFromCover(file, targetW, targetH){
         // 步驟2：縮到極小尺寸（1/8），再放大回來，產生強烈模糊
         // 用 imageSmoothingEnabled=false 讓像素化更明顯，
         // 再次縮放時自動平滑化 → 色塊清楚但細節消失
-        const tiny = document.createElement('canvas');
-        const factor = 8;
-        tiny.width  = Math.max(1, Math.round(targetW / factor));
-        tiny.height = Math.max(1, Math.round(targetH / factor));
-        const tCtx = tiny.getContext('2d');
-        tCtx.imageSmoothingEnabled = true;
-        tCtx.imageSmoothingQuality = 'low';
-        tCtx.drawImage(step1, 0, 0, tiny.width, tiny.height);
+        // 多次縮放疊加：8→4→2→1（每次縮半，累積模糊效果）
+        const factors = [8, 4, 2, 1];
+        let current = step1;
+        for(const f of factors){
+          const tmp = document.createElement('canvas');
+          tmp.width  = Math.max(1, Math.round(targetW / f));
+          tmp.height = Math.max(1, Math.round(targetH / f));
+          const tc = tmp.getContext('2d');
+          tc.imageSmoothingEnabled = true;
+          tc.imageSmoothingQuality = 'low';
+          tc.drawImage(current, 0, 0, tmp.width, tmp.height);
+          current = tmp;
+        }
+        const tiny = current;
 
-        // 步驟3：放大回原尺寸，用 'high' 平滑化讓邊緣柔和
+        // 最終：放大回原尺寸，'high' 平滑化讓邊緣柔和
         const final = document.createElement('canvas');
         final.width  = targetW;
         final.height = targetH;
@@ -1402,12 +1410,44 @@ function _readerTheme(theme){
   ov.style.background=t.bg;
   const txt=document.getElementById('reader-txt');
   if(txt){txt.style.background=t.bg;txt.style.color=t.fg;}
-  // epub.js 主題：用 select 切換已 register 的完整主題（含 !important）
+  // epub.js 主題切換
   if(window._epubRendition){
-    const epubTheme = (theme === 'light') ? 'light' : (theme === 'sepia') ? 'sepia' : 'dark';
+    const epubTheme = (theme==='light')?'light':(theme==='sepia')?'sepia':'dark';
     window._epubRendition.themes.select(epubTheme);
+    // epub-viewer 容器背景
     const viewer = document.getElementById('epub-viewer');
-    if(viewer) viewer.style.background = t.bg;
+    if(viewer){ viewer.style.background=t.bg; }
+    // iframe 背景強制設定（epub.js themes.select 有延遲，需直接操作 iframe DOM）
+    const applyIframeTheme = ()=>{
+      try{
+        const iframes = viewer?.querySelectorAll('iframe');
+        iframes?.forEach(iframe=>{
+          const doc = iframe.contentDocument || iframe.contentWindow?.document;
+          if(doc?.body){
+            doc.body.style.cssText += `;background:${t.bg}!important;color:${t.fg}!important`;
+          }
+          if(doc?.documentElement){
+            doc.documentElement.style.cssText += `;background:${t.bg}!important`;
+          }
+        });
+      }catch(e){}
+    };
+    applyIframeTheme();
+    // 延遲再執行一次（epub.js 渲染後可能覆蓋）
+    setTimeout(applyIframeTheme, 200);
+    setTimeout(applyIframeTheme, 800);
+    try{
+    }catch(e){}
+    // 重新 apply 一次確保生效
+    setTimeout(()=>{
+      try{
+        const iframe = document.querySelector('#epub-viewer iframe');
+        if(iframe?.contentDocument?.body){
+          iframe.contentDocument.body.style.background=t.bg;
+          iframe.contentDocument.body.style.color=t.fg;
+        }
+      }catch(e){}
+    }, 100);
   }
 }
 
