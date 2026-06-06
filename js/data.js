@@ -1320,6 +1320,14 @@ function openBulkQ(){
     if(dl) dl.innerHTML=subs.map(s=>`<option value="${s}">`).join('');
   }).catch(()=>{});
   document.getElementById('bulk-ov').classList.add('on');
+  // overlay 動畫完成後 focus textarea（延遲確保 IME 正確初始化）
+  setTimeout(()=>{
+    const ta = document.getElementById('bi-text');
+    if(!ta) return;
+    ta.focus();
+    // 手動觸發 input 事件，讓 Android WebView 正確初始化中文 IME
+    ta.dispatchEvent(new Event('input', {bubbles:true}));
+  }, 400);
 }
 function closeBulkQ(){ document.getElementById('bulk-ov').classList.remove('on'); }
 

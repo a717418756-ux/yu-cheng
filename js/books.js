@@ -401,8 +401,12 @@ function _mkSpine(b, dispW, dispH){
 
   // 收藏操作已移至書籍資訊視窗（openBookDetail）
 
+  // 排序模式：cursor grab，不觸發點擊（拖拉才操作）
   // 批量模式：勾選；一般模式：抽書動畫
-  if(_B.bulkMode){
+  if(_sortMode){
+    // 排序模式：drag 已在 _enableDragSort 設定，onclick 不執行任何動作
+    div.onclick = e => e.stopPropagation();
+  } else if(_B.bulkMode){
     div.style.cursor='pointer';
     if(_B.bulkSelected.has(b.id)) div.style.outline='3px solid var(--acc)';
     div.onclick = ()=> _toggleBookSelect(b.id, div);
@@ -1515,9 +1519,15 @@ function toggleBooksSort(btn){
 // 排序模式下的拖拉邏輯（只在書架模式下運作）
 function _enableDragSort(shelfEl, books){
   let dragId = null, dragEl = null;
+
+  // touch 拖拉：記錄起始元素
+  let touchStartEl = null;
+
   shelfEl.querySelectorAll('.book-spine').forEach(el=>{
     el.setAttribute('draggable','true');
     el.style.cursor = 'grab';
+
+    // ── Desktop: HTML5 drag ──
     el.addEventListener('dragstart', e=>{
       dragId = parseInt(el.dataset.bid);
       dragEl = el;
@@ -1536,17 +1546,52 @@ function _enableDragSort(shelfEl, books){
       e.preventDefault();
       const targetId = parseInt(el.dataset.bid);
       if(dragId === targetId || !dragId) return;
-      // 交換 books 陣列中的位置
-      const dragIdx   = books.findIndex(b=>b.id===dragId);
-      const targetIdx = books.findIndex(b=>b.id===targetId);
-      if(dragIdx<0||targetIdx<0) return;
-      const [moved] = books.splice(dragIdx, 1);
-      books.splice(targetIdx, 0, moved);
-      _saveBooksOrder(books);
-      _B.allBooks = _getSortedBooks(_B.allBooks);
-      _renderBooksPage();
+      _doSwap(dragId, targetId, books);
+    });
+
+    // ── Mobile: touch events ──
+    el.addEventListener('touchstart', e=>{
+      touchStartEl = el;
+      dragId = parseInt(el.dataset.bid);
+      el.style.opacity = '0.5';
+      el.style.transform = 'scale(1.05)';
+    }, {passive:true});
+
+    el.addEventListener('touchend', e=>{
+      const touch = e.changedTouches[0];
+      const target = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetSpine = target?.closest('.book-spine');
+      if(touchStartEl) {
+        touchStartEl.style.opacity = '';
+        touchStartEl.style.transform = '';
+      }
+      if(targetSpine && targetSpine !== touchStartEl){
+        const targetId = parseInt(targetSpine.dataset.bid);
+        if(dragId && targetId && dragId !== targetId){
+          _doSwap(dragId, targetId, books);
+        }
+      }
+      touchStartEl = null;
+      dragId = null;
+    }, {passive:true});
+    el.addEventListener('drop', e=>{
+      e.preventDefault();
+      const targetId = parseInt(el.dataset.bid);
+      if(dragId === targetId || !dragId) return;
+      _doSwap(dragId, targetId, books);
     });
   });
+}
+
+function _doSwap(dragId, targetId, books){
+  const dragIdx   = books.findIndex(b=>b.id===dragId);
+  const targetIdx = books.findIndex(b=>b.id===targetId);
+  if(dragIdx<0||targetIdx<0) return;
+  const [moved] = books.splice(dragIdx, 1);
+  books.splice(targetIdx, 0, moved);
+  _saveBooksOrder(books);
+  _B.allBooks = _getSortedBooks(_B.allBooks);
+  _renderBooksPage();
 }
 
 function toggleBooksBulk(btn){
