@@ -375,14 +375,18 @@ function _mkSpine(b, dispW, dispH){
           div.querySelectorAll('.spine-label,.spine-author').forEach(el=>el.style.display='none');
           div.appendChild(img);
         } else {
-          // 模糊封面：圖在最底層，書名作者疊在上面（z-index 區分）
+          // 模糊封面：圖在最底層，書名置中疊在上面（不顯示作者）
           img.style.zIndex = '0';
-          div.querySelectorAll('.spine-label,.spine-author').forEach(el=>{
-            el.style.position = 'relative';
-            el.style.zIndex   = '1';
-            el.style.color    = '#fff';
-            el.style.textShadow = '0 1px 3px rgba(0,0,0,0.8)';
-          });
+          const spineLabel = div.querySelector('.spine-label');
+          const spineAuth  = div.querySelector('.spine-author');
+          if(spineLabel){
+            spineLabel.style.position   = 'relative';
+            spineLabel.style.zIndex     = '1';
+            spineLabel.style.color      = '#fff';
+            spineLabel.style.textShadow = '0 1px 4px rgba(0,0,0,0.9),0 0 8px rgba(0,0,0,0.6)';
+            spineLabel.style.textAlign  = 'center';
+          }
+          if(spineAuth) spineAuth.style.display = 'none';  // 作者不顯示
           div.insertBefore(img, div.firstChild);
         }
       }
@@ -738,7 +742,7 @@ function _previewSpine(inp){
   reader.readAsDataURL(inp.files[0]);
 }
 
-// 書背圖壓縮：cover 模式（置中裁切填滿 targetW×targetH，不留空白）
+// 書背圖壓縮：contain 模式（整張圖完整縮放進書背尺寸，不裁切任何部分）
 // 用於有上傳書背圖的情況
 function _compressSpineCover(file, targetW, targetH){
   return new Promise(resolve=>{
@@ -750,14 +754,13 @@ function _compressSpineCover(file, targetW, targetH){
         canvas.width  = targetW;
         canvas.height = targetH;
         const ctx = canvas.getContext('2d');
-        // cover 模式：縮放到能完整填滿 canvas 的最小比例，置中裁切
-        const scaleX = targetW / img.width;
-        const scaleY = targetH / img.height;
-        const scale  = Math.max(scaleX, scaleY);  // 取大的，確保完整填滿
-        const drawW  = img.width  * scale;
-        const drawH  = img.height * scale;
-        const offsetX = (targetW - drawW) / 2;   // 置中 X
-        const offsetY = (targetH - drawH) / 2;   // 置中 Y
+        // contain 模式：整張圖縮放至完全在 canvas 內，不裁切
+        const scale = Math.min(targetW / img.width, targetH / img.height);
+        const drawW = img.width  * scale;
+        const drawH = img.height * scale;
+        // 置中放置
+        const offsetX = (targetW - drawW) / 2;
+        const offsetY = (targetH - drawH) / 2;
         ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
         canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
       };
@@ -768,7 +771,8 @@ function _compressSpineCover(file, targetW, targetH){
 }
 
 // 從封面圖生成模糊書背（用於無書背圖時）
-// 做法：封面 cover 填滿書背尺寸，疊加模糊濾鏡，上層書名作者由 _mkSpine DOM 處理
+// 做法：封面 cover 填滿書背尺寸，縮放產生模糊，保持原始亮度
+// 書名由 _mkSpine DOM 疊加在模糊圖上
 function _makeBlurredSpineFromCover(file, targetW, targetH){
   return new Promise(resolve=>{
     const reader = new FileReader();
@@ -779,7 +783,7 @@ function _makeBlurredSpineFromCover(file, targetW, targetH){
         canvas.width  = targetW;
         canvas.height = targetH;
         const ctx = canvas.getContext('2d');
-        // cover 模式填滿
+        // cover 模式：封面填滿書背尺寸
         const scaleX = targetW / img.width;
         const scaleY = targetH / img.height;
         const scale  = Math.max(scaleX, scaleY);
@@ -787,18 +791,18 @@ function _makeBlurredSpineFromCover(file, targetW, targetH){
         const drawH  = img.height * scale;
         const offsetX = (targetW - drawW) / 2;
         const offsetY = (targetH - drawH) / 2;
-        // 模糊效果：先在較大 canvas 繪製後縮小，達到模糊效果
+        // 模糊效果：縮放6倍再縮回（倍數越大越模糊，顏色仍清楚）
         const bigCanvas = document.createElement('canvas');
-        const blur = 4;  // 模糊強度（縮放倍數）
+        const blur = 6;
         bigCanvas.width  = targetW  * blur;
         bigCanvas.height = targetH  * blur;
-        const bCtx = bigCanvas.getContext('2d');
-        bCtx.drawImage(img, offsetX * blur, offsetY * blur, drawW * blur, drawH * blur);
-        // 縮回目標尺寸（自然模糊）
+        bigCanvas.getContext('2d').drawImage(
+          img,
+          offsetX * blur, offsetY * blur,
+          drawW * blur, drawH * blur
+        );
+        // 縮回目標尺寸（自然模糊，無暗色遮罩，保持原始亮度）
         ctx.drawImage(bigCanvas, 0, 0, targetW, targetH);
-        // 疊加半透明深色遮罩，讓書名文字更清晰
-        ctx.fillStyle = 'rgba(0,0,0,0.45)';
-        ctx.fillRect(0, 0, targetW, targetH);
         canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.82);
       };
       img.src = e.target.result;
