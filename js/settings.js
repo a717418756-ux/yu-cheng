@@ -44,11 +44,16 @@ async function gdriveBackup(){ try{
     da('questions'), da('laws'), da('attempts'), da('countdowns')
   ]);
   const motto  = await getSetting('examMotto','');
+  // ebooks/media：只備份 metadata（排除 blob，太大無法上傳 GAS）
+  const ebooksAll  = await da('ebooks');
+  const mediaAll   = await da('leisuremedia');
+  const ebooksMeta = ebooksAll.map(({blob:_b,coverBlob:_cb,coverThumb:_ct,spineThumb:_st,...m})=>m);
+  const mediaMeta  = mediaAll.map(({blob:_b,thumbnail:_th,...m})=>m);
   const payload = {
     password: pwd,
     action:   'backup',
     filename: GAS_BACKUP_FILE,
-    data: JSON.stringify({ questions:qs, laws:ls, attempts:ats, countdowns:cds, motto })
+    data: JSON.stringify({ questions:qs, laws:ls, attempts:ats, countdowns:cds, motto, ebooksMeta, mediaMeta })
   };
   const res  = await fetch(url, {
     method:'POST',
@@ -88,7 +93,8 @@ async function gdriveRestore(){ try{
       }
 
       // 驗證資料有效性再清除（避免清空後發現備份是空的）
-      const hasData = (bk.questions?.length || bk.laws?.length || bk.attempts?.length);
+      const hasData = (bk.questions?.length || bk.laws?.length ||
+                       bk.attempts?.length  || bk.ebooksMeta?.length || bk.mediaMeta?.length);
       if(!hasData){
         toast('還原失敗：備份資料為空，請先備份再還原'); return;
       }
@@ -103,6 +109,15 @@ async function gdriveRestore(){ try{
       if(bk.attempts?.length)  await bulkPut('attempts',  bk.attempts);
       if(bk.countdowns?.length)await bulkPut('countdowns',bk.countdowns);
       if(bk.motto)             await setSetting('examMotto', bk.motto);
+      // ebooks/media metadata 還原（不含實際檔案 blob，只還原書目資料）
+      if(bk.ebooksMeta?.length){
+        await dc('ebooks');
+        await bulkPut('ebooks', bk.ebooksMeta);
+      }
+      if(bk.mediaMeta?.length){
+        await dc('leisuremedia');
+        await bulkPut('leisuremedia', bk.mediaMeta);
+      }
 
       _cacheInvalidate();
       const rt = new Date().toLocaleString('zh-TW');

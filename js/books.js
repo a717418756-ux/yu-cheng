@@ -128,7 +128,11 @@ function _renderBooksPage(){
 
   const batch = filtered.slice(0, (_B.page+1)*_B.PAGE);
 
-  if(_B.mode === 'spine')      el.appendChild(_mkShelf(batch, filtered.length));
+  if(_B.mode === 'spine'){
+    const shelfEl = _mkShelf(batch, filtered.length);
+    el.appendChild(shelfEl);
+    if(_sortMode) _enableDragSort(shelfEl, _B.allBooks);
+  }
   else if(_B.mode === 'cover') el.appendChild(_mkCoverGrid(batch, filtered.length));
   else                          el.appendChild(_mkListView(batch, filtered.length));
 
@@ -335,6 +339,7 @@ function _mkSpine(b, dispW, dispH){
   div.style.width  = dispW + 'px';
   div.style.height = dispH + 'px';
   div.title = b.title||'';
+  div.dataset.bid  = b.id||'';
 
   const t = _SPINE_THEMES[(b.id||0) % _SPINE_THEMES.length];
 
@@ -507,7 +512,7 @@ function _mkListView(books, total){
 // ════════════════════════════════════════════════════════════
 function _filteredBooks(){
   const kw = _B.kw.toLowerCase();
-  let list = _B.allBooks;
+  let list = _getSortedBooks(_B.allBooks);
   if(_B.filter==='recent') list=[...list].filter(b=>b.lastRead).sort((a,b)=>(b.lastRead||0)-(a.lastRead||0));
   else if(_B.filter==='fav')  list=list.filter(b=>b.favorite);
   else if(_B.filter==='pdf')  list=list.filter(b=>b.fileType==='pdf');
@@ -771,39 +776,41 @@ function _makeBlurredSpineFromCover(file, targetW, targetH){
     reader.onload = e=>{
       const img = new Image();
       img.onload = ()=>{
-        // cover 模式：封面填滿書背尺寸
+        // 步驟1：先把封面 cover 填滿縮到 targetW x targetH（正確尺寸的基準圖）
+        const step1 = document.createElement('canvas');
+        step1.width  = targetW;
+        step1.height = targetH;
         const scaleX = targetW / img.width;
         const scaleY = targetH / img.height;
         const scale  = Math.max(scaleX, scaleY);
         const drawW  = img.width  * scale;
         const drawH  = img.height * scale;
-        const offsetX = (targetW - drawW) / 2;
-        const offsetY = (targetH - drawH) / 2;
+        const offX   = (targetW - drawW) / 2;
+        const offY   = (targetH - drawH) / 2;
+        step1.getContext('2d').drawImage(img, offX, offY, drawW, drawH);
 
-        // 多次縮放疊加模糊：先放大16倍，逐步縮小，每次縮小都加深模糊
-        // 最終效果：顏色可辨，圖像細節完全不可讀
-        const passes = [16, 8, 4, 2];  // 縮放序列
-        let current = document.createElement('canvas');
-        current.width  = targetW * passes[0];
-        current.height = targetH * passes[0];
-        current.getContext('2d').drawImage(
-          img,
-          offsetX * passes[0], offsetY * passes[0],
-          drawW * passes[0], drawH * passes[0]
-        );
-        for(let i = 1; i < passes.length; i++){
-          const next = document.createElement('canvas');
-          next.width  = targetW * passes[i];
-          next.height = targetH * passes[i];
-          next.getContext('2d').drawImage(current, 0, 0, next.width, next.height);
-          current = next;
-        }
-        // 最終縮回目標尺寸
-        const canvas = document.createElement('canvas');
-        canvas.width  = targetW;
-        canvas.height = targetH;
-        canvas.getContext('2d').drawImage(current, 0, 0, targetW, targetH);
-        canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.82);
+        // 步驟2：縮到極小尺寸（1/8），再放大回來，產生強烈模糊
+        // 用 imageSmoothingEnabled=false 讓像素化更明顯，
+        // 再次縮放時自動平滑化 → 色塊清楚但細節消失
+        const tiny = document.createElement('canvas');
+        const factor = 8;
+        tiny.width  = Math.max(1, Math.round(targetW / factor));
+        tiny.height = Math.max(1, Math.round(targetH / factor));
+        const tCtx = tiny.getContext('2d');
+        tCtx.imageSmoothingEnabled = true;
+        tCtx.imageSmoothingQuality = 'low';
+        tCtx.drawImage(step1, 0, 0, tiny.width, tiny.height);
+
+        // 步驟3：放大回原尺寸，用 'high' 平滑化讓邊緣柔和
+        const final = document.createElement('canvas');
+        final.width  = targetW;
+        final.height = targetH;
+        const fCtx = final.getContext('2d');
+        fCtx.imageSmoothingEnabled = true;
+        fCtx.imageSmoothingQuality = 'high';
+        fCtx.drawImage(tiny, 0, 0, targetW, targetH);
+
+        final.toBlob(blob => resolve(blob), 'image/jpeg', 0.82);
       };
       img.src = e.target.result;
     };
@@ -1395,12 +1402,12 @@ function _readerTheme(theme){
   ov.style.background=t.bg;
   const txt=document.getElementById('reader-txt');
   if(txt){txt.style.background=t.bg;txt.style.color=t.fg;}
-  // epub.js 主題
+  // epub.js 主題：用 select 切換已 register 的完整主題（含 !important）
   if(window._epubRendition){
-    window._epubRendition.themes.override('color', t.fg);
-    window._epubRendition.themes.override('background', t.bg);
-    const viewer=document.getElementById('epub-viewer');
-    if(viewer) viewer.style.background=t.bg;
+    const epubTheme = (theme === 'light') ? 'light' : (theme === 'sepia') ? 'sepia' : 'dark';
+    window._epubRendition.themes.select(epubTheme);
+    const viewer = document.getElementById('epub-viewer');
+    if(viewer) viewer.style.background = t.bg;
   }
 }
 
@@ -1438,6 +1445,70 @@ async function closeBookReader(id){
 // ════════════════════════════════════════════════════════════
 // 書庫批量刪除
 // ════════════════════════════════════════════════════════════
+// ── 書庫排序模式 ─────────────────────────────────────────
+// sortOrder：儲存在 localStorage，key = 'booksOrder'，值為 id 陣列
+function _getSortedBooks(books){
+  try{
+    const order = JSON.parse(localStorage.getItem('booksOrder')||'[]');
+    if(!order.length) return books;
+    const map = new Map(books.map(b=>[b.id, b]));
+    const sorted = order.map(id=>map.get(id)).filter(Boolean);
+    const rest   = books.filter(b=>!order.includes(b.id));
+    return [...sorted, ...rest];
+  }catch(e){ return books; }
+}
+function _saveBooksOrder(books){
+  localStorage.setItem('booksOrder', JSON.stringify(books.map(b=>b.id)));
+}
+
+let _sortMode = false;
+function toggleBooksSort(btn){
+  _sortMode = !_sortMode;
+  btn.textContent = _sortMode ? '完成' : '排序';
+  btn.style.color = _sortMode ? 'var(--grn)' : 'var(--acc)';
+  // 批量刪除在排序模式下禁用
+  const bulkBtn = document.getElementById('books-bulk-btn');
+  if(bulkBtn) bulkBtn.disabled = _sortMode;
+  _renderBooksPage();
+}
+
+// 排序模式下的拖拉邏輯（只在書架模式下運作）
+function _enableDragSort(shelfEl, books){
+  let dragId = null, dragEl = null;
+  shelfEl.querySelectorAll('.book-spine').forEach(el=>{
+    el.setAttribute('draggable','true');
+    el.style.cursor = 'grab';
+    el.addEventListener('dragstart', e=>{
+      dragId = parseInt(el.dataset.bid);
+      dragEl = el;
+      el.style.opacity = '0.4';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', ()=>{
+      el.style.opacity = '';
+      dragEl = null;
+    });
+    el.addEventListener('dragover', e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    el.addEventListener('drop', e=>{
+      e.preventDefault();
+      const targetId = parseInt(el.dataset.bid);
+      if(dragId === targetId || !dragId) return;
+      // 交換 books 陣列中的位置
+      const dragIdx   = books.findIndex(b=>b.id===dragId);
+      const targetIdx = books.findIndex(b=>b.id===targetId);
+      if(dragIdx<0||targetIdx<0) return;
+      const [moved] = books.splice(dragIdx, 1);
+      books.splice(targetIdx, 0, moved);
+      _saveBooksOrder(books);
+      _B.allBooks = _getSortedBooks(_B.allBooks);
+      _renderBooksPage();
+    });
+  });
+}
+
 function toggleBooksBulk(btn){
   _B.bulkMode = !_B.bulkMode;
   _B.bulkSelected = new Set();

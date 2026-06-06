@@ -47,18 +47,59 @@ async function renderStats(){  try{
     </div>`;
   }).join('');
 
-  // 近7天練習量
-  const days=7;
-  const labels=[],data=[];
-  for(let i=days-1;i>=0;i--){
-    const d=new Date();d.setDate(d.getDate()-i);
+  // 學習軌跡：顯示最近30天，畫面顯示7天，左右滑動查看
+  const totalDays = 30;
+  const labels=[], data=[];
+  for(let i=totalDays-1;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
     const ds=d.toISOString().slice(0,10);
     labels.push(ds.slice(5));
     data.push(ats.filter(a=>a.date===ds).length);
   }
   const ctx=document.getElementById('dchart');
-  if(_dchart)_dchart.destroy();
-  _dchart=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,backgroundColor:'#58a6ff44',borderColor:'#58a6ff',borderWidth:1,borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'#8b949e'},grid:{color:'#30363d'}},x:{ticks:{color:'#8b949e'},grid:{display:false}}}}});
+  if(_dchart) _dchart.destroy();
+  // 讓 canvas 寬度等於 totalDays/7 倍容器寬（滾動容器）
+  const chartWrap = ctx?.parentElement;
+  if(chartWrap){
+    chartWrap.style.overflowX = 'auto';
+    chartWrap.style.overflowY = 'hidden';
+    chartWrap.style.webkitOverflowScrolling = 'touch';
+    chartWrap.style.scrollSnapType = 'x mandatory';
+    // 先捲到最右（最近的日期）
+    setTimeout(()=>{ chartWrap.scrollLeft = chartWrap.scrollWidth; }, 100);
+  }
+  const visibleDays = 7;
+  const barW = Math.round((ctx?.parentElement?.clientWidth || 320) / visibleDays);
+  if(ctx){
+    ctx.style.width  = (barW * totalDays) + 'px';
+    ctx.style.height = '110px';
+    ctx.width  = barW * totalDays;
+    ctx.height = 110;
+  }
+  _dchart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        data,
+        backgroundColor:'#58a6ff55',
+        borderColor:'#58a6ff',
+        borderWidth:1,
+        borderRadius:4,
+        // 點（bar）加大：用 barThickness
+        barThickness: Math.max(18, barW - 8),
+      }]
+    },
+    options:{
+      animation: false,
+      responsive: false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        y:{ beginAtZero:true, ticks:{ color:'#8b949e', maxTicksLimit:4 }, grid:{ color:'#30363d' } },
+        x:{ ticks:{ color:'#8b949e', maxRotation:0 }, grid:{ display:false } }
+      }
+    }
+  });
 
   // 危險等級分佈
   const wrongEl=document.getElementById('wrong-subs');
