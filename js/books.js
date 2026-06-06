@@ -380,11 +380,10 @@ function _mkSpine(b, dispW, dispH){
           const spineLabel = div.querySelector('.spine-label');
           const spineAuth  = div.querySelector('.spine-author');
           if(spineLabel){
-            spineLabel.style.position   = 'relative';
-            spineLabel.style.zIndex     = '1';
+            // 不覆蓋 position:absolute（CSS 已設 inset:0 確保填滿和水平置中）
+            spineLabel.style.zIndex     = '2';
             spineLabel.style.color      = '#fff';
             spineLabel.style.textShadow = '0 1px 4px rgba(0,0,0,0.9),0 0 8px rgba(0,0,0,0.6)';
-            spineLabel.style.textAlign  = 'center';
           }
           if(spineAuth) spineAuth.style.display = 'none';  // 作者不顯示
           div.insertBefore(img, div.firstChild);
@@ -742,7 +741,7 @@ function _previewSpine(inp){
   reader.readAsDataURL(inp.files[0]);
 }
 
-// 書背圖壓縮：contain 模式（整張圖完整縮放進書背尺寸，不裁切任何部分）
+// 書背圖壓縮：強制拉伸填滿書背（不維持比例，完整填滿 targetW×targetH）
 // 用於有上傳書背圖的情況
 function _compressSpineCover(file, targetW, targetH){
   return new Promise(resolve=>{
@@ -753,15 +752,8 @@ function _compressSpineCover(file, targetW, targetH){
         const canvas = document.createElement('canvas');
         canvas.width  = targetW;
         canvas.height = targetH;
-        const ctx = canvas.getContext('2d');
-        // contain 模式：整張圖縮放至完全在 canvas 內，不裁切
-        const scale = Math.min(targetW / img.width, targetH / img.height);
-        const drawW = img.width  * scale;
-        const drawH = img.height * scale;
-        // 置中放置
-        const offsetX = (targetW - drawW) / 2;
-        const offsetY = (targetH - drawH) / 2;
-        ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+        // 強制拉伸：直接用 targetW×targetH 繪製，不維持比例
+        canvas.getContext('2d').drawImage(img, 0, 0, targetW, targetH);
         canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
       };
       img.src = e.target.result;
@@ -771,7 +763,7 @@ function _compressSpineCover(file, targetW, targetH){
 }
 
 // 從封面圖生成模糊書背（用於無書背圖時）
-// 做法：封面 cover 填滿書背尺寸，縮放產生模糊，保持原始亮度
+// 做法：封面 cover 填滿書背，多次縮放疊加產生強烈模糊，保持原始亮度
 // 書名由 _mkSpine DOM 疊加在模糊圖上
 function _makeBlurredSpineFromCover(file, targetW, targetH){
   return new Promise(resolve=>{
@@ -779,10 +771,6 @@ function _makeBlurredSpineFromCover(file, targetW, targetH){
     reader.onload = e=>{
       const img = new Image();
       img.onload = ()=>{
-        const canvas = document.createElement('canvas');
-        canvas.width  = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext('2d');
         // cover 模式：封面填滿書背尺寸
         const scaleX = targetW / img.width;
         const scaleY = targetH / img.height;
@@ -791,18 +779,30 @@ function _makeBlurredSpineFromCover(file, targetW, targetH){
         const drawH  = img.height * scale;
         const offsetX = (targetW - drawW) / 2;
         const offsetY = (targetH - drawH) / 2;
-        // 模糊效果：縮放6倍再縮回（倍數越大越模糊，顏色仍清楚）
-        const bigCanvas = document.createElement('canvas');
-        const blur = 6;
-        bigCanvas.width  = targetW  * blur;
-        bigCanvas.height = targetH  * blur;
-        bigCanvas.getContext('2d').drawImage(
+
+        // 多次縮放疊加模糊：先放大16倍，逐步縮小，每次縮小都加深模糊
+        // 最終效果：顏色可辨，圖像細節完全不可讀
+        const passes = [16, 8, 4, 2];  // 縮放序列
+        let current = document.createElement('canvas');
+        current.width  = targetW * passes[0];
+        current.height = targetH * passes[0];
+        current.getContext('2d').drawImage(
           img,
-          offsetX * blur, offsetY * blur,
-          drawW * blur, drawH * blur
+          offsetX * passes[0], offsetY * passes[0],
+          drawW * passes[0], drawH * passes[0]
         );
-        // 縮回目標尺寸（自然模糊，無暗色遮罩，保持原始亮度）
-        ctx.drawImage(bigCanvas, 0, 0, targetW, targetH);
+        for(let i = 1; i < passes.length; i++){
+          const next = document.createElement('canvas');
+          next.width  = targetW * passes[i];
+          next.height = targetH * passes[i];
+          next.getContext('2d').drawImage(current, 0, 0, next.width, next.height);
+          current = next;
+        }
+        // 最終縮回目標尺寸
+        const canvas = document.createElement('canvas');
+        canvas.width  = targetW;
+        canvas.height = targetH;
+        canvas.getContext('2d').drawImage(current, 0, 0, targetW, targetH);
         canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.82);
       };
       img.src = e.target.result;
