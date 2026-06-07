@@ -299,6 +299,8 @@
 
     document.body.appendChild(panel);
     _TTS.panel = panel;
+    // 確保下拉選單顯示正確的預設聲音
+    setTimeout(_initDefaultVoice, 0);
     return panel;
   }
   function _updatePanelState(){
@@ -374,7 +376,7 @@
   window._ttsSetRate  = (v)=>{
     _TTS.rate = parseFloat(v);
     const lbl = document.getElementById('tts-rate-lbl');
-    if(lbl) lbl.textContent = _TTS.rate.toFixed(1)+'×  語速';
+    if(lbl) lbl.textContent = _TTS.rate.toFixed(1)+'x';
     // 更新進度條背景色（仿 vp-seek 的 CSS variable）
     const slider = document.getElementById('tts-rate');
     if(slider){
@@ -387,7 +389,14 @@
       setTimeout(()=> _speakNext(), 80);
     }
   };
-  window._ttsSetVoice = (uri)=>{ _TTS.voiceURI = uri; };
+  window._ttsSetVoice = (uri)=>{
+    _TTS.voiceURI = uri;
+    // 切換聲音後立即重新播放當前段落，讓新聲音生效
+    if(_TTS.speaking && !_TTS.paused){
+      speechSynthesis.cancel();
+      setTimeout(()=> _speakNext(), 80);
+    }
+  };
 
   // 收合：隱藏完整控制列，顯示迷你球，朗讀繼續
   window._ttsCollapse = ()=>{
@@ -411,8 +420,25 @@
   window.addEventListener('beforeunload', ()=> speechSynthesis.cancel());
 
   // 聲音清單延遲載入（Chrome 需要等 onvoiceschanged）
-  if(speechSynthesis.onvoiceschanged !== undefined){
-    speechSynthesis.onvoiceschanged = ()=> {};  // 觸發載入
+  function _initDefaultVoice(){
+    const voices = _getVoices();
+    if(!voices.length) return;
+    // 優先選 zh-TW，其次 zh-TW 以外的中文
+    const preferred = voices.find(v => v.lang === 'zh-TW')
+                   || voices.find(v => v.lang.startsWith('zh'))
+                   || voices[0];
+    if(preferred && !_TTS.voiceURI){
+      _TTS.voiceURI = preferred.voiceURI;
+    }
+    // 更新已顯示的下拉選單
+    const sel = document.getElementById('tts-voice');
+    if(sel && _TTS.voiceURI) sel.value = _TTS.voiceURI;
   }
+
+  if(speechSynthesis.onvoiceschanged !== undefined){
+    speechSynthesis.onvoiceschanged = _initDefaultVoice;
+  }
+  // 有些瀏覽器聲音已同步載入
+  if(speechSynthesis.getVoices().length) _initDefaultVoice();
 
 })();
