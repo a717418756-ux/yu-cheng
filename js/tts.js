@@ -18,6 +18,7 @@
     voiceURI:   '',   // 選擇的聲音
     mode:       '',   // 'epub' | 'law'
     panel:      null, // 目前顯示的浮動控制列
+    collapsed:  false,// 是否收合為迷你球
   };
 
   // ── 取得可用中文聲音 ──────────────────────────────────────
@@ -231,14 +232,28 @@
     const panel = document.createElement('div');
     panel.id = 'tts-panel';
     panel.innerHTML = `
-      <div class="tts-sheet">
-        <!-- 拖把手 -->
-        <div class="tts-handle"></div>
+      <!-- 迷你浮動球（收合狀態）-->
+      <button id="tts-miniball" class="tts-miniball" onclick="_ttsExpand()" title="展開控制列">
+        <svg id="tts-ball-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="4" width="4" height="16" rx="1"/>
+          <rect x="14" y="4" width="4" height="16" rx="1"/>
+        </svg>
+      </button>
 
-        <!-- 標題列：模式 + 進度 -->
+      <!-- 完整控制列（展開狀態）-->
+      <div class="tts-sheet" id="tts-sheet">
+        <!-- 拖把手（點擊收合）-->
+        <div class="tts-handle" onclick="_ttsCollapse()" title="收合"></div>
+
+        <!-- 標題列：模式 + 進度 + 收合按鈕 -->
         <div class="tts-head">
           <span class="tts-mode-lbl">${mode === 'epub' ? '📖 朗讀本頁' : '⚖ 朗讀法條'}</span>
           <span id="tts-progress" class="tts-prog">—</span>
+          <button onclick="_ttsCollapse()" class="tts-collapse-btn" title="收合到背景">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
         </div>
 
         <!-- 聲音選擇（有多個聲音才顯示）-->
@@ -250,7 +265,7 @@
           </select>
         </div>` : ''}
 
-        <!-- 語速列（仿音頻進度條風格）-->
+        <!-- 語速列 -->
         <div class="tts-rate-row">
           <span class="tts-sub-lbl">語速</span>
           <div class="tts-track-wrap">
@@ -261,7 +276,7 @@
           <span id="tts-rate-lbl" class="tts-rate-num">${_TTS.rate}x</span>
         </div>
 
-        <!-- 控制按鈕列（仿音頻 vp-controls）-->
+        <!-- 控制按鈕列 -->
         <div class="tts-controls">
           <button class="tts-btn-side" onclick="_ttsStop()" title="停止">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -274,8 +289,11 @@
               <rect x="14" y="4" width="4" height="16" rx="1"/>
             </svg>
           </button>
-          <button class="tts-btn-side" onclick="ttsReadEpub && ttsReadEpub()" title="重新朗讀"
-            style="font-size:18px;color:rgba(255,255,255,0.5)">↺</button>
+          <button class="tts-btn-side" onclick="_ttsCollapse()" title="收合到背景">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
         </div>
       </div>`;
 
@@ -293,11 +311,13 @@
       btn.style.boxShadow = _TTS.paused
         ? 'none' : '0 0 0 1.5px rgba(255,255,255,0.25),0 4px 16px rgba(0,0,0,0.4)';
     }
-    if(icon){
-      icon.innerHTML = _TTS.paused
-        ? '<polygon points="5,3 19,12 5,21"/>'
-        : '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
-    }
+    const iconSvg = _TTS.paused
+      ? '<polygon points="5,3 19,12 5,21"/>'
+      : '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+    if(icon) icon.innerHTML = iconSvg;
+    // 同步迷你球 icon
+    const ballIcon = document.getElementById('tts-ball-icon');
+    if(ballIcon) ballIcon.innerHTML = iconSvg;
     if(prog){
       prog.textContent = _TTS.speaking
         ? `${_TTS.idx+1} / ${_TTS.utterances.length}`
@@ -368,6 +388,24 @@
     }
   };
   window._ttsSetVoice = (uri)=>{ _TTS.voiceURI = uri; };
+
+  // 收合：隱藏完整控制列，顯示迷你球，朗讀繼續
+  window._ttsCollapse = ()=>{
+    const sheet = document.getElementById('tts-sheet');
+    const ball  = document.getElementById('tts-miniball');
+    if(sheet) sheet.classList.add('tts-hidden');
+    if(ball)  ball.classList.add('tts-ball-visible');
+    _TTS.collapsed = true;
+  };
+
+  // 展開：顯示完整控制列，隱藏迷你球
+  window._ttsExpand = ()=>{
+    const sheet = document.getElementById('tts-sheet');
+    const ball  = document.getElementById('tts-miniball');
+    if(sheet) sheet.classList.remove('tts-hidden');
+    if(ball)  ball.classList.remove('tts-ball-visible');
+    _TTS.collapsed = false;
+  };
 
   // 頁面離開時停止
   window.addEventListener('beforeunload', ()=> speechSynthesis.cancel());
