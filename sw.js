@@ -3,7 +3,7 @@
    ★ 每次更新程式只需修改 APP_VERSION
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '2.2.5';
+const APP_VERSION = '2.2.6';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗會重試）────────────
@@ -25,6 +25,8 @@ const CORE_ASSETS = [
   './js/settings.js',
   './js/countdown.js',
   './js/app.js',
+  './js/layout.js',
+  './js/tts.js',
 ];
 
 // ── 可選資源（快取失敗不影響 SW 安裝）──────────────────────
