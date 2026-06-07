@@ -645,3 +645,27 @@ textarea{resize:vertical;line-height:1.7}
 
 /* 題目進度條（由 quiz.js 設定 --qpb-w）*/
 #qpb{ width:var(--qpb-w,0%); }
+
+/* ── TTS 朗讀控制列 ─────────────────────────────────────── */
+#tts-panel{
+  animation:tts-fadein .25s ease;
+}
+@keyframes tts-fadein{
+  from{opacity:0;transform:translateY(8px)}
+  to  {opacity:1;transform:translateY(0)}
+}
+#tts-panel input[type=range]{
+  -webkit-appearance:none;
+  appearance:none;
+  height:3px;
+  border-radius:2px;
+  background:rgba(255,255,255,0.15);
+  outline:none;
+}
+#tts-panel input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:14px;height:14px;
+  border-radius:50%;
+  background:var(--acc);
+  cursor:pointer;
+}
