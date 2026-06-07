@@ -105,8 +105,8 @@
   }
 
   // ── epub 閱讀模式 ────────────────────────────────────────────
-  // 由 books.js 的 openBookReader 呼叫 setReadingMode(true/false)
-  // 影響範圍：僅 [data-reading] 下的 CSS，不影響其他頁面
+  // books.js 直接操作 html.classList（reader-active/reader-ui-visible）
+  // setReadingMode 保留為輔助 API，可由外部呼叫同步狀態
 
   const READING_VARS = {
     '--reading-line-height': '2.1',
@@ -124,16 +124,12 @@
 
   function setReadingMode(on){
     const html = document.documentElement;
-    if(on){
-      html.setAttribute('data-reading', '');
-      for(const [k, v] of Object.entries(READING_VARS)){
-        html.style.setProperty(k, v);
-      }
-    } else {
-      html.removeAttribute('data-reading');
-      for(const [k, v] of Object.entries(NORMAL_VARS)){
-        html.style.setProperty(k, v);
-      }
+    // books.css 使用 .reader-active class 控制閱讀器樣式
+    html.classList.toggle('reader-active', on);
+    // CSS Variables 仍透過 data 屬性更新（供 layout-aware 元件使用）
+    const vars = on ? READING_VARS : NORMAL_VARS;
+    for(const [k, v] of Object.entries(vars)){
+      html.style.setProperty(k, v);
     }
   }
 

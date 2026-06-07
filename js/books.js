@@ -1287,10 +1287,11 @@ async function _initEpubReader(url, savedCfi){
     const viewerEl = document.getElementById('epub-viewer');
     const viewerH = window.innerHeight - 120;  // fixed overlay：視窗高扣頂/底列
     const rendition = book.renderTo('epub-viewer', {
-      width:  window.innerWidth,   // fixed overlay 寬度即視窗寬
+      width:  window.innerWidth,
       height: Math.max(400, viewerH),
       spread: 'none',
       flow:   'paginated',
+      allowScriptedContent: false,
     });
     window._epubRendition = rendition;
 
@@ -1302,9 +1303,10 @@ async function _initEpubReader(url, savedCfi){
         'font-family': "'Noto Serif TC', 'Noto Serif SC', Georgia, serif !important",
         'font-size': '17px !important',
         'line-height': '1.85 !important',
-        'padding': '0 8px !important',
+        'padding': '0 !important',    // paginated 模式不能設水平 padding（會被 overflow:hidden 裁切）
+        'margin': '0 !important',
       },
-      'p': { 'text-indent': '2em', 'margin': '0.4em 0' },
+      'p': { 'text-indent': '2em', 'margin': '0.5em 0' },
       'h1,h2,h3,h4': { 'color': '#fff !important', 'margin': '1em 0 0.5em' },
       'a': { 'color': '#6ea8fe !important' },
     });
@@ -1315,8 +1317,10 @@ async function _initEpubReader(url, savedCfi){
         'font-family': "'Noto Serif TC', Georgia, serif !important",
         'font-size': '17px !important',
         'line-height': '1.85 !important',
+        'padding': '0 !important',
+        'margin': '0 !important',
       },
-      'p': { 'text-indent': '2em', 'margin': '0.4em 0' },
+      'p': { 'text-indent': '2em', 'margin': '0.5em 0' },
     });
     rendition.themes.register('light', {
       'body': {
@@ -1325,8 +1329,10 @@ async function _initEpubReader(url, savedCfi){
         'font-family': "'Noto Serif TC', Georgia, serif !important",
         'font-size': '17px !important',
         'line-height': '1.85 !important',
+        'padding': '0 !important',
+        'margin': '0 !important',
       },
-      'p': { 'text-indent': '2em', 'margin': '0.4em 0' },
+      'p': { 'text-indent': '2em', 'margin': '0.5em 0' },
     });
     rendition.themes.select('dark');
 
@@ -1343,8 +1349,8 @@ async function _initEpubReader(url, savedCfi){
       if(loc) _updateEpubProgress(book, loc);
     }).catch(()=>{});
 
-    // epub 渲染完成後才啟動閱讀模式（確保 renderTo 用正確寬度）
-    if(typeof setReadingMode === 'function') setReadingMode(true);
+    // 閱讀模式：直接在 overlay 上設 class（不改 html[data-reading]，避免影響 epub.js 寬度計算）
+    document.documentElement.classList.add('reader-active');
 
     // 翻頁後更新進度
     rendition.on('relocated', loc=>{
@@ -1493,9 +1499,7 @@ async function closeBookReader(id){
   }
   if(ov._objectUrl) URL.revokeObjectURL(ov._objectUrl);
   ov.remove();
-  // 關閉閱讀模式，還原全域動畫設定
-  if(typeof setReadingMode === 'function') setReadingMode(false);
-  document.documentElement.classList.remove('reader-ui-visible');
+  document.documentElement.classList.remove('reader-active','reader-ui-visible');
 }
 
 // ════════════════════════════════════════════════════════════
