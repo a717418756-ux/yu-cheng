@@ -7,6 +7,23 @@
 /* ── 1. CSS 變數 ─────────────────────────────────────────────── */
 /* ══ 標準模式（預設深色）══════════════════════════════════════ */
 :root{
+  /* ── Layout Variables（由 layout.js 依裝置動態設定）── */
+  --layout-card-w:       130px;
+  --layout-card-audio-w: 96px;
+  --layout-card-audio-h: 96px;
+  --layout-card-video-w: 140px;
+  --layout-card-video-h: 90px;
+  --layout-shelf-h:      160px;
+  --layout-shelf-min-w:  18px;
+  --layout-reader-max-w: 100%;
+  --layout-page-max-w:   540px;
+  --layout-font-scale:   1;
+
+  /* ── Reading Mode Variables（epub 閱讀模式）── */
+  --reading-line-height: 1.85;
+  --reading-max-w:       100%;
+  --reading-padding:     0px;
+
   --bg0:#121212;
   --bg1:#1b1b1b;
   --bg2:#242424;
@@ -625,3 +642,6 @@ textarea{resize:vertical;line-height:1.7}
   background:rgba(76,175,80,0.14);color:var(--grn);
   letter-spacing:.04em;border:1px solid rgba(76,175,80,0.18);
 }
+
+/* 題目進度條（由 quiz.js 設定 --qpb-w）*/
+#qpb{ width:var(--qpb-w,0%); }

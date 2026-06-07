@@ -41,10 +41,10 @@
 /* 橫向卡片（影片 + 音頻共用外框）*/
 .media-hcard{
   flex-shrink:0;
-  width:130px;
+  width:var(--layout-card-w);
   display:flex;flex-direction:column;
   align-items:center;
-  justify-content:flex-end;  /* 圖片和文字靠下 */
+  justify-content:flex-end;
   gap:8px;
   cursor:pointer;
   padding-bottom:4px;

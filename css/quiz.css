@@ -183,15 +183,17 @@
 
 /* 橫向卡片唱盤光澤質感提升 */
 .media-hcard-thumb.audio{
-  width:96px; height:96px;        /* Spotify 風格正方形 */
-  border-radius:8px;              /* 小圓角正方形，非圓形 */
+  width:var(--layout-card-audio-w);
+  height:var(--layout-card-audio-h);
+  border-radius:8px;
   flex-shrink:0;
   box-shadow:
     0 4px 16px rgba(0,0,0,0.6),
     0 0 0 0.5px rgba(255,255,255,0.06);
 }
 .media-hcard-thumb.video{
-  width:140px; height:90px;       /* 16:9 橫向縮圖 */
+  width:var(--layout-card-video-w);
+  height:var(--layout-card-video-h);
   border-radius:10px;
   flex-shrink:0;
   box-shadow:
