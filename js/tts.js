@@ -28,15 +28,26 @@
   }
 
   // ── 主要朗讀函式 ──────────────────────────────────────────
-  function _speak(segments){
-    _stop();
+  function _speak(segments, mode){
+    // 先 cancel 停止舊播放（不呼叫 _updatePanelState，避免移除 panel）
+    speechSynthesis.cancel();
+    _TTS.speaking = false;
+    _TTS.paused   = false;
+    _TTS.idx      = 0;
+
     if(!segments?.length){ toast('沒有可朗讀的文字'); return; }
     _TTS.utterances = segments;
-    _TTS.idx = 0;
+    if(mode) _TTS.mode = mode;
+
+    // 建立 panel（此時 speaking 還是 false，不會被 _updatePanelState 移除）
+    _createPanel(_TTS.mode);
+
+    // 設為播放中再更新 UI
     _TTS.speaking = true;
-    _TTS.paused  = false;
     _updatePanelState();
-    _speakNext();
+
+    // 短暫延遲讓 Chrome 的 speechSynthesis.cancel() 完全生效
+    setTimeout(()=> _speakNext(), 80);
   }
 
   function _speakNext(){
@@ -258,8 +269,7 @@
     const segments = _getEpubPageText();
     if(!segments.length){ toast('無法取得頁面文字（可能是圖片頁或加密內容）'); return; }
     _TTS.mode = 'epub';
-    _createPanel('epub');
-    _speak(segments);
+    _speak(segments, 'epub');
   };
 
   // 法條朗讀（由法條頁面按鈕呼叫）
@@ -268,8 +278,7 @@
     const segments = _getLawText();
     if(!segments.length){ toast('沒有可朗讀的法條'); return; }
     _TTS.mode = 'law';
-    _createPanel('law');
-    _speak(segments);
+    _speak(segments, 'law');
   };
 
   // 控制列按鈕呼叫
