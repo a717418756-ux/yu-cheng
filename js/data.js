@@ -918,7 +918,7 @@ async function openLawGroup(lawName){  try{
     +chapterMgmtHtml
     +arts
     +'</div>';
-  window.currentLawName=lawName;window.currentLawContent=laws.map(l=>l.article+' '+l.content).join('\n');
+  window.currentLawName=lawName;window.currentLawContent=laws.map(l=>(l.article+(l.title?' '+l.title:'')+(l.content?' '+l.content:'')).trim()).filter(Boolean).join('\n');
   S.curLawName=lawName; // 供編輯按鈕使用
   document.getElementById('lv').style.display='flex';
   }catch(e){ logError('openLawGroup',e); }}

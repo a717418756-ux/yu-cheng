@@ -67,12 +67,14 @@
   let _keepaliveTimer = null;
   function _startKeepalive(){
     _stopKeepalive();
+    // Android bug：speechSynthesis 可能靜默停止但 _TTS.speaking 仍為 true
+    // 偵測到停止時，重新朗讀當前段落
     _keepaliveTimer = setInterval(()=>{
-      if(speechSynthesis.speaking && !speechSynthesis.paused){
-        speechSynthesis.pause();
-        speechSynthesis.resume();
+      if(_TTS.speaking && !_TTS.paused && !speechSynthesis.speaking){
+        // 偵測到異常停止，重新從當前段落繼續
+        _speakNext();
       }
-    }, 10000);
+    }, 3000);
   }
   function _stopKeepalive(){
     if(_keepaliveTimer){ clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
@@ -86,8 +88,16 @@
       _stop();
       return;
     }
-    const text = _TTS.utterances[_TTS.idx];
-    if(!text?.trim()){ _TTS.idx++; _speakNext(); return; }
+    const rawText = _TTS.utterances[_TTS.idx];
+    if(!rawText?.trim()){ _TTS.idx++; _speakNext(); return; }
+    // Android bug：單段超過 150 字容易靜默停止，自動截斷
+    const text = rawText.length > 150
+      ? rawText.slice(0, rawText.lastIndexOf('，', 150) + 1 || 150)
+      : rawText;
+    // 若截斷，把剩餘部分插回佇列
+    if(text.length < rawText.length){
+      _TTS.utterances.splice(_TTS.idx + 1, 0, rawText.slice(text.length));
+    }
 
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang  = 'zh-TW';
@@ -148,51 +158,59 @@
   // ── epub：取得當前頁面文字 ──────────────────────────────
   function _getEpubPageText(){
     try{
+      // 方法1：epub.js Section 取當前章節純文字（不含 HTML 標籤）
+      const rendition = window._epubRendition;
+      const book      = window._epubBook;
+      if(rendition && book){
+        const loc = rendition.currentLocation();
+        if(loc?.start?.cfi){
+          const sectionHref = rendition.location?.start?.href;
+          const section = sectionHref
+            ? book.spine.get(sectionHref)
+            : book.spine.get(loc.start.cfi);
+          if(section){
+            return section.load(book.load.bind(book)).then(contents=>{
+              const text = (contents?.documentElement || contents)
+                ?.textContent?.trim() || '';
+              return text.split(/\n+/).map(s=>s.trim()).filter(s=>s.length>1);
+            });
+          }
+        }
+      }
+      // 方法2：從 iframe DOM 取（fallback）
       const viewer = document.getElementById('epub-viewer');
       const iframe = viewer?.querySelector('iframe');
       const doc    = iframe?.contentDocument || iframe?.contentWindow?.document;
       if(!doc) return [];
       const body = doc.body;
       if(!body) return [];
-      // 取得可視區段落文字，分段以控制朗讀節奏
-      const paras = [...body.querySelectorAll('p,h1,h2,h3,h4,li,div')].filter(el=>{
-        const text = el.innerText?.trim();
-        return text && text.length > 1 && !el.querySelector('p,div');
-      }).map(el => el.innerText.trim()).filter(Boolean);
-      return paras.length ? paras : [body.innerText.trim()];
+      const paras = [...body.querySelectorAll('p,h1,h2,h3,h4,li')]
+        .map(el => el.innerText?.trim())
+        .filter(t => t && t.length > 1);
+      return paras.length ? paras : [body.innerText?.trim()].filter(Boolean);
     }catch(e){ return []; }
   }
 
   // ── 法條：取得當前顯示的法條文字 ──────────────────────
   function _getLawText(){
-    const lbody = document.getElementById('lbody');
-    if(!lbody) return [];
+    // 使用 openLawGroup 存入的純文字（window.currentLawContent）
+    // 格式：「第X條 內容」逐條換行，無 emoji 和按鈕文字
+    const lawName    = window.currentLawName    || document.getElementById('lv-name')?.textContent?.trim() || '';
+    const lawContent = window.currentLawContent || '';
 
-    const lawName = document.getElementById('lv-name')?.textContent?.trim() || '';
+    if(!lawContent && !lawName) return [];
+
     const segments = lawName ? [lawName] : [];
 
-    // 法條卡片用 inline style 無 class，改用 DOM 結構抓文字
-    // 每張卡片是 margin-bottom:12px 的 div，內有：
-    //   - 標題 div（font-weight:700）含條號和標題
-    //   - 內容 div（line-height:1.85）含法條文字
-    // 最可靠做法：遍歷 lbody 的直接子 div，取各自 innerText
-    const cards = lbody.querySelectorAll('div[style*="margin-bottom:12px"],div[style*="margin-bottom: 12px"]');
-    if(cards.length > 0){
-      cards.forEach(card=>{
-        const text = card.innerText?.trim();
-        if(text) segments.push(text);
-      });
-    } else {
-      // fallback：整個 lbody 分段（以空行分割）
-      const raw = lbody.innerText?.trim();
-      if(raw){
-        raw.split(/\n\n+/).forEach(s=>{
-          const t = s.trim();
-          if(t.length > 1) segments.push(t);
-        });
-      }
+    // 按條分段：每條「第X條」開頭為一段
+    if(lawContent){
+      lawContent.split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 1)
+        .forEach(s => segments.push(s));
     }
-    return segments.filter(Boolean);
+
+    return segments;
   }
 
   // ── 浮動控制列 ────────────────────────────────────────────
@@ -291,10 +309,16 @@
   // ── 公開 API ─────────────────────────────────────────────────
 
   // epub 頁面朗讀（由 epub 工具列按鈕呼叫）
-  window.ttsReadEpub = function(){
+  window.ttsReadEpub = async function(){
     if(_TTS.speaking){ _stop(); return; }
-    const segments = _getEpubPageText();
-    if(!segments.length){ toast('無法取得頁面文字（可能是圖片頁或加密內容）'); return; }
+    // _getEpubPageText 可能回傳 Promise（epub.js Section 非同步載入）
+    let segments = _getEpubPageText();
+    if(segments && typeof segments.then === 'function'){
+      segments = await segments.catch(()=>[]);
+    }
+    if(!segments || !segments.length){
+      toast('無法取得頁面文字（可能是圖片頁或加密內容）'); return;
+    }
     _TTS.mode = 'epub';
     _speak(segments, 'epub');
   };
