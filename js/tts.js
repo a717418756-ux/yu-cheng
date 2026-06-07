@@ -223,10 +223,15 @@
     if(existing) existing.remove();
 
     const voices    = _getVoices();
-    const hasVoice  = voices.length > 1;
+    const hasVoice  = voices.length > 0;
     const voiceOpts = hasVoice
       ? voices.map(v=>{
-          const name = v.name.replace(/Microsoft|Google|Apple/g,'').replace(/\(.+?\)/g,'').trim().slice(0,14);
+          // 保留三星/Google 前綴，幫助使用者分辨不同 TTS 引擎
+          let name = v.name;
+          // 移除括號內容（語系代碼）和多餘空白
+          name = name.replace(/\s*\([^)]*\)/g, '').trim();
+          // 縮短過長名稱
+          if(name.length > 16) name = name.slice(0, 16);
           const sel  = v.voiceURI === _TTS.voiceURI ? ' selected' : '';
           return `<option value="${v.voiceURI}"${sel}>${name}</option>`;
         }).join('')
