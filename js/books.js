@@ -1138,12 +1138,7 @@ async function openBookReader(id){
   ov.style.cssText = `position:fixed;inset:0;z-index:800;
     background:#111;display:flex;flex-direction:column`;
 
-  // 點擊頁面中央切換工具列顯示/隱藏（閱讀模式下預設收合）
-  ov.addEventListener('click', e=>{
-    // 點工具列按鈕不觸發
-    if(e.target.closest('.reader-topbar,.epub-bottom-bar,[id^="epub-"]')) return;
-    document.documentElement.classList.toggle('reader-ui-visible');
-  });
+
 
   // 頂部列
   ov.innerHTML = `
@@ -1499,7 +1494,7 @@ async function closeBookReader(id){
   }
   if(ov._objectUrl) URL.revokeObjectURL(ov._objectUrl);
   ov.remove();
-  document.documentElement.classList.remove('reader-active','reader-ui-visible');
+  document.documentElement.classList.remove('reader-active');
 }
 
 // ════════════════════════════════════════════════════════════

@@ -31,31 +31,31 @@
       '--layout-shelf-h':     '160px',
       '--layout-shelf-min-w': '18px',
       '--layout-reader-max-w':'100%',
-      '--layout-page-max-w':  '540px',
+      '--layout-page-max-w':  '520px',   // 手機：維持原始上限
       '--layout-font-scale':  '1',
     },
     tablet: {
-      '--layout-card-w':      '150px',
-      '--layout-card-audio-w':'110px',
-      '--layout-card-audio-h':'110px',
-      '--layout-card-video-w':'180px',
-      '--layout-card-video-h':'110px',
-      '--layout-shelf-h':     '180px',
-      '--layout-shelf-min-w': '20px',
-      '--layout-reader-max-w':'680px',
-      '--layout-page-max-w':  '680px',
-      '--layout-font-scale':  '1.05',
-    },
-    desktop: {
-      '--layout-card-w':      '170px',
+      '--layout-card-w':      '160px',
       '--layout-card-audio-w':'120px',
       '--layout-card-audio-h':'120px',
-      '--layout-card-video-w':'220px',
-      '--layout-card-video-h':'130px',
-      '--layout-shelf-h':     '200px',
+      '--layout-card-video-w':'200px',
+      '--layout-card-video-h':'125px',
+      '--layout-shelf-h':     '190px',
+      '--layout-shelf-min-w': '20px',
+      '--layout-reader-max-w':'720px',
+      '--layout-page-max-w':  '100%',    // 平板/BOOX：填滿全寬
+      '--layout-font-scale':  '1.08',
+    },
+    desktop: {
+      '--layout-card-w':      '180px',
+      '--layout-card-audio-w':'130px',
+      '--layout-card-audio-h':'130px',
+      '--layout-card-video-w':'240px',
+      '--layout-card-video-h':'140px',
+      '--layout-shelf-h':     '210px',
       '--layout-shelf-min-w': '22px',
       '--layout-reader-max-w':'780px',
-      '--layout-page-max-w':  '780px',
+      '--layout-page-max-w':  '900px',   // 桌面：900px 置中
       '--layout-font-scale':  '1.1',
     },
   };
@@ -105,7 +105,7 @@
   }
 
   // ── epub 閱讀模式 ────────────────────────────────────────────
-  // books.js 直接操作 html.classList（reader-active/reader-ui-visible）
+  // books.js 直接操作 html.classList（reader-active）
   // setReadingMode 保留為輔助 API，可由外部呼叫同步狀態
 
   const READING_VARS = {
