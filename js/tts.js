@@ -155,92 +155,43 @@
     const existing = document.getElementById('tts-panel');
     if(existing) existing.remove();
 
+    const voices    = _getVoices();
+    const hasVoice  = voices.length > 1;
+    const voiceOpts = hasVoice
+      ? voices.map(v=>{
+          const name = v.name.replace(/Microsoft|Google|Apple/g,'').trim().slice(0,10);
+          const sel  = v.voiceURI === _TTS.voiceURI ? ' selected' : '';
+          return `<option value="${v.voiceURI}"${sel}>${name}</option>`;
+        }).join('')
+      : '';
+
     const panel = document.createElement('div');
     panel.id = 'tts-panel';
-    panel.setAttribute('data-tts-panel', '');
-
-    // 定位：epub 在底部，法條在右下角
-    const isEpub = mode === 'epub';
-    panel.style.cssText = isEpub
-      ? `position:fixed;bottom:56px;left:0;right:0;z-index:820;
-         display:flex;align-items:center;justify-content:center;
-         pointer-events:none`
-      : `position:fixed;bottom:80px;right:14px;z-index:820;
-         pointer-events:none`;
 
     panel.innerHTML = `
-      <div style="
-        background:rgba(18,18,24,0.96);
-        border:1px solid rgba(255,255,255,0.1);
-        border-radius:${isEpub ? '14px' : '16px'};
-        padding:10px ${isEpub ? '16px' : '12px'};
-        display:flex;align-items:center;gap:${isEpub ? '14px' : '10px'};
-        backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-        box-shadow:0 8px 32px rgba(0,0,0,0.6),0 0 0 0.5px rgba(255,255,255,0.06);
-        pointer-events:auto;
-        ${isEpub ? 'min-width:280px' : ''}
-      ">
-        <!-- 段落進度 -->
-        <div id="tts-progress" style="
-          font-size:11px;color:rgba(255,255,255,0.4);
-          min-width:40px;text-align:center;font-variant-numeric:tabular-nums
-        ">0/0</div>
-
-        <!-- 語速 -->
-        <div style="display:flex;align-items:center;gap:4px">
-          <span style="font-size:10px;color:rgba(255,255,255,0.4)">速</span>
-          <input id="tts-rate" type="range" min="0.5" max="2" step="0.1"
-            value="${_TTS.rate}"
-            style="width:60px;height:2px;accent-color:var(--acc);cursor:pointer"
-            oninput="_ttsSetRate(this.value)">
-          <span id="tts-rate-lbl" style="font-size:10px;color:var(--acc);min-width:24px">
-            ${_TTS.rate}x
-          </span>
+      <div class="tts-inner">
+        <div class="tts-row tts-row-top">
+          <div id="tts-progress" class="tts-progress">—</div>
+          ${hasVoice ? `<select id="tts-voice" class="tts-voice" onchange="_ttsSetVoice(this.value)">${voiceOpts}</select>` : ''}
         </div>
-
-        <!-- 播放/暫停 -->
-        <button id="tts-playpause"
-          onclick="_ttsToggle()"
-          style="
-            width:40px;height:40px;border-radius:50%;
-            background:var(--acc);border:none;cursor:pointer;
-            display:flex;align-items:center;justify-content:center;
-            font-size:18px;flex-shrink:0;
-            box-shadow:0 4px 12px rgba(110,168,254,0.4)
-          ">⏸</button>
-
-        <!-- 停止 -->
-        <button onclick="_ttsStop()"
-          style="
-            width:36px;height:36px;border-radius:50%;
-            background:rgba(255,255,255,0.08);
-            border:1px solid rgba(255,255,255,0.1);
-            cursor:pointer;font-size:14px;color:rgba(255,255,255,0.7);
-            display:flex;align-items:center;justify-content:center;
-          ">■</button>
-
-        <!-- 聲音選擇（有多個聲音才顯示）-->
-        ${_getVoices().length > 1 ? `
-        <select id="tts-voice"
-          onchange="_ttsSetVoice(this.value)"
-          style="
-            background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);
-            color:var(--t1);border-radius:8px;padding:4px 6px;font-size:11px;
-            cursor:pointer;max-width:90px;
-          ">
-          ${_getVoices().map(v =>
-            `<option value="${v.voiceURI}" ${v.voiceURI===_TTS.voiceURI?'selected':''}>
-              ${v.name.replace(/Microsoft|Google|Apple/g,'').trim().slice(0,12)}
-            </option>`
-          ).join('')}
-        </select>` : ''}
+        <div class="tts-row tts-row-rate">
+          <span class="tts-label">慢</span>
+          <input id="tts-rate" class="tts-slider" type="range"
+            min="0.5" max="2" step="0.1" value="${_TTS.rate}"
+            oninput="_ttsSetRate(this.value)">
+          <span class="tts-label">快</span>
+          <span id="tts-rate-lbl" class="tts-rate-val">${_TTS.rate}x</span>
+        </div>
+        <div class="tts-row tts-row-ctrl">
+          <button id="tts-playpause" class="tts-btn tts-btn-main" onclick="_ttsToggle()">⏸</button>
+          <button class="tts-btn tts-btn-stop" onclick="_ttsStop()">■</button>
+        </div>
       </div>`;
 
     document.body.appendChild(panel);
     _TTS.panel = panel;
     return panel;
   }
-
   function _updatePanelState(){
     const btn  = document.getElementById('tts-playpause');
     const prog = document.getElementById('tts-progress');
