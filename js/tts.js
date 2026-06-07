@@ -23,9 +23,12 @@
 
   // ── 取得可用中文聲音 ──────────────────────────────────────
   function _getVoices(){
-    return speechSynthesis.getVoices().filter(v =>
-      v.lang.startsWith('zh') || v.lang.startsWith('cmn')
-    );
+    // 只保留 zh-TW（台灣中文），涵蓋 Google TTS 和三星 TTS
+    // zh-HK、zh-CN、zh-MY 等排除，避免選單出現音色相同的選項
+    const all = speechSynthesis.getVoices();
+    const twVoices = all.filter(v => v.lang === 'zh-TW');
+    // fallback：若裝置無 zh-TW，取所有中文
+    return twVoices.length ? twVoices : all.filter(v => v.lang.startsWith('zh'));
   }
 
   // ── 主要朗讀函式 ──────────────────────────────────────────
@@ -423,13 +426,8 @@
   function _initDefaultVoice(){
     const voices = _getVoices();
     if(!voices.length) return;
-    // 優先選 zh-TW，其次 zh-TW 以外的中文
-    const preferred = voices.find(v => v.lang === 'zh-TW')
-                   || voices.find(v => v.lang.startsWith('zh'))
-                   || voices[0];
-    if(preferred && !_TTS.voiceURI){
-      _TTS.voiceURI = preferred.voiceURI;
-    }
+    // 預設選第一個 zh-TW 聲音（_getVoices 已過濾）
+    if(!_TTS.voiceURI) _TTS.voiceURI = voices[0].voiceURI;
     // 更新已顯示的下拉選單
     const sel = document.getElementById('tts-voice');
     if(sel && _TTS.voiceURI) sel.value = _TTS.voiceURI;
