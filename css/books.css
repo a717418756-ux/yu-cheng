@@ -412,29 +412,29 @@
 .finput:focus{outline:none;border-color:var(--acc)}
 
 /* ════════════════════════════════════════════════════════════
-   epub 閱讀模式（html[data-reading] 觸發）
+   epub 閱讀模式（html.reader-active 觸發）
    僅影響閱讀器相關元件，不影響首頁/題庫/影音庫/統計
    ════════════════════════════════════════════════════════════ */
 
 /* 閱讀模式：關閉動畫（layout.js 設定 --tr:none，此處套用） */
-[data-reading] .book-reader-ov *{
+.reader-active .book-reader-ov *{
   transition:none !important;
   animation:none  !important;
 }
 
 /* 閱讀模式：關閉 blur 和 backdrop-filter */
-[data-reading] .book-reader-ov{
+.reader-active .book-reader-ov{
   backdrop-filter:none !important;
   -webkit-backdrop-filter:none !important;
 }
-[data-reading] .reader-topbar{
+.reader-active .reader-topbar{
   backdrop-filter:none !important;
   -webkit-backdrop-filter:none !important;
   box-shadow:none !important;
 }
 
 /* 閱讀模式：epub-viewer 最佳閱讀寬度 + 置中 */
-[data-reading] #epub-viewer{
+.reader-active #epub-viewer{
   max-width:var(--reading-max-w);
   margin:0 auto;
   padding:0 var(--reading-padding);
@@ -442,24 +442,24 @@
 }
 
 /* 閱讀模式：工具列預設收合（點擊頁面才展開） */
-[data-reading] .reader-topbar{
+.reader-active .reader-topbar{
   opacity:0;
   pointer-events:none;
   transform:translateY(-100%);
   transition:opacity .2s,transform .2s;
 }
-[data-reading].reader-ui-visible .reader-topbar{
+.reader-active.reader-ui-visible .reader-topbar{
   opacity:1;
   pointer-events:auto;
   transform:translateY(0);
 }
-[data-reading] .epub-bottom-bar{
+.reader-active .epub-bottom-bar{
   opacity:0;
   pointer-events:none;
   transform:translateY(100%);
   transition:opacity .2s,transform .2s;
 }
-[data-reading].reader-ui-visible .epub-bottom-bar{
+.reader-active.reader-ui-visible .epub-bottom-bar{
   opacity:1;
   pointer-events:auto;
   transform:translateY(0);
