@@ -41,13 +41,41 @@
 
     // 建立 panel（此時 speaking 還是 false，不會被 _updatePanelState 移除）
     _createPanel(_TTS.mode);
+    // 初始化滑桿進度色
+    setTimeout(()=>{
+      const s=document.getElementById('tts-rate');
+      if(s){const p=((_TTS.rate-0.5)/1.5*100).toFixed(1);s.style.setProperty('--seek-pct',p+'%');}
+    },20);
 
     // 設為播放中再更新 UI
     _TTS.speaking = true;
     _updatePanelState();
+    // 初始化語速滑桿的進度條顏色
+    const _s = document.getElementById('tts-rate');
+    if(_s){
+      const pct = ((_TTS.rate - 0.5) / 1.5 * 100).toFixed(1);
+      _s.style.setProperty('--seek-pct', pct + '%');
+    }
 
+    // 啟動 Android keepalive，防止 TTS 被系統中斷
+    _startKeepalive();
     // 短暫延遲讓 Chrome 的 speechSynthesis.cancel() 完全生效
     setTimeout(()=> _speakNext(), 80);
+  }
+
+  // Android Chrome keepalive：每 10s resume 防止 TTS 被系統中斷
+  let _keepaliveTimer = null;
+  function _startKeepalive(){
+    _stopKeepalive();
+    _keepaliveTimer = setInterval(()=>{
+      if(speechSynthesis.speaking && !speechSynthesis.paused){
+        speechSynthesis.pause();
+        speechSynthesis.resume();
+      }
+    }, 10000);
+  }
+  function _stopKeepalive(){
+    if(_keepaliveTimer){ clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
   }
 
   function _speakNext(){
@@ -75,7 +103,7 @@
       _speakNext();
     };
     utter.onerror = (e)=>{
-      if(e.error === 'interrupted') return;
+      if(e.error === 'interrupted' || e.error === 'canceled') return;
       _TTS.idx++;
       _speakNext();
     };
@@ -100,6 +128,7 @@
   }
 
   function _stop(){
+    _stopKeepalive();
     speechSynthesis.cancel();
     _TTS.speaking = false;
     _TTS.paused  = false;
@@ -159,7 +188,7 @@
     const hasVoice  = voices.length > 1;
     const voiceOpts = hasVoice
       ? voices.map(v=>{
-          const name = v.name.replace(/Microsoft|Google|Apple/g,'').trim().slice(0,10);
+          const name = v.name.replace(/Microsoft|Google|Apple/g,'').replace(/\(.+?\)/g,'').trim().slice(0,14);
           const sel  = v.voiceURI === _TTS.voiceURI ? ' selected' : '';
           return `<option value="${v.voiceURI}"${sel}>${name}</option>`;
         }).join('')
@@ -167,24 +196,52 @@
 
     const panel = document.createElement('div');
     panel.id = 'tts-panel';
-
     panel.innerHTML = `
-      <div class="tts-inner">
-        <div class="tts-row tts-row-top">
-          <div id="tts-progress" class="tts-progress">—</div>
-          ${hasVoice ? `<select id="tts-voice" class="tts-voice" onchange="_ttsSetVoice(this.value)">${voiceOpts}</select>` : ''}
+      <div class="tts-sheet">
+        <!-- 拖把手 -->
+        <div class="tts-handle"></div>
+
+        <!-- 標題列：模式 + 進度 -->
+        <div class="tts-head">
+          <span class="tts-mode-lbl">${mode === 'epub' ? '📖 朗讀本頁' : '⚖ 朗讀法條'}</span>
+          <span id="tts-progress" class="tts-prog">—</span>
         </div>
-        <div class="tts-row tts-row-rate">
-          <span class="tts-label">慢</span>
-          <input id="tts-rate" class="tts-slider" type="range"
-            min="0.5" max="2" step="0.1" value="${_TTS.rate}"
-            oninput="_ttsSetRate(this.value)">
-          <span class="tts-label">快</span>
-          <span id="tts-rate-lbl" class="tts-rate-val">${_TTS.rate}x</span>
+
+        <!-- 聲音選擇（有多個聲音才顯示）-->
+        ${hasVoice ? `
+        <div class="tts-voice-row">
+          <span class="tts-sub-lbl">聲音</span>
+          <select id="tts-voice" class="tts-voice-sel" onchange="_ttsSetVoice(this.value)">
+            ${voiceOpts}
+          </select>
+        </div>` : ''}
+
+        <!-- 語速列（仿音頻進度條風格）-->
+        <div class="tts-rate-row">
+          <span class="tts-sub-lbl">語速</span>
+          <div class="tts-track-wrap">
+            <input id="tts-rate" class="tts-track" type="range"
+              min="0.5" max="2" step="0.1" value="${_TTS.rate}"
+              oninput="_ttsSetRate(this.value)">
+          </div>
+          <span id="tts-rate-lbl" class="tts-rate-num">${_TTS.rate}x</span>
         </div>
-        <div class="tts-row tts-row-ctrl">
-          <button id="tts-playpause" class="tts-btn tts-btn-main" onclick="_ttsToggle()">⏸</button>
-          <button class="tts-btn tts-btn-stop" onclick="_ttsStop()">■</button>
+
+        <!-- 控制按鈕列（仿音頻 vp-controls）-->
+        <div class="tts-controls">
+          <button class="tts-btn-side" onclick="_ttsStop()" title="停止">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="4" y="4" width="16" height="16" rx="2"/>
+            </svg>
+          </button>
+          <button id="tts-playpause" class="tts-btn-main" onclick="_ttsToggle()">
+            <svg id="tts-pp-icon" width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16" rx="1"/>
+              <rect x="14" y="4" width="4" height="16" rx="1"/>
+            </svg>
+          </button>
+          <button class="tts-btn-side" onclick="ttsReadEpub && ttsReadEpub()" title="重新朗讀"
+            style="font-size:18px;color:rgba(255,255,255,0.5)">↺</button>
         </div>
       </div>`;
 
@@ -194,22 +251,25 @@
   }
   function _updatePanelState(){
     const btn  = document.getElementById('tts-playpause');
+    const icon = document.getElementById('tts-pp-icon');
     const prog = document.getElementById('tts-progress');
     if(btn){
-      btn.textContent = _TTS.paused ? '▶' : '⏸';
-      btn.style.background = _TTS.paused ? 'rgba(255,255,255,0.15)' : 'var(--acc)';
+      btn.style.background = _TTS.paused
+        ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.14)';
+      btn.style.boxShadow = _TTS.paused
+        ? 'none' : '0 0 0 1.5px rgba(255,255,255,0.25),0 4px 16px rgba(0,0,0,0.4)';
+    }
+    if(icon){
+      icon.innerHTML = _TTS.paused
+        ? '<polygon points="5,3 19,12 5,21"/>'
+        : '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
     }
     if(prog){
       prog.textContent = _TTS.speaking
-        ? `${_TTS.idx+1}/${_TTS.utterances.length}`
+        ? `${_TTS.idx+1} / ${_TTS.utterances.length}`
         : '—';
     }
-    if(!_TTS.speaking && _TTS.panel){
-      // 朗讀結束，淡出移除
-      _TTS.panel.style.transition = 'opacity .4s';
-      _TTS.panel.style.opacity = '0';
-      setTimeout(()=>{ _TTS.panel?.remove(); _TTS.panel=null; }, 400);
-    }
+    // panel 移除只由 _ttsStop() 明確觸發，不在這裡自動消失
   }
 
   // ── 公開 API ─────────────────────────────────────────────────
@@ -234,11 +294,33 @@
 
   // 控制列按鈕呼叫
   window._ttsToggle   = ()=> _TTS.paused ? _resume() : _pause();
-  window._ttsStop     = ()=>{ _stop(); _TTS.panel?.remove(); _TTS.panel=null; };
+  window._ttsSkip     = ()=>{
+    if(!_TTS.speaking) return;
+    speechSynthesis.cancel();
+    _TTS.idx = Math.min(_TTS.idx + 1, _TTS.utterances.length - 1);
+    setTimeout(()=> _speakNext(), 60);
+  };
+  window._ttsStop     = ()=>{
+    _stop();
+    if(_TTS.panel){
+      _TTS.panel.style.transition = 'opacity .3s,transform .3s';
+      _TTS.panel.style.opacity = '0';
+      _TTS.panel.style.transform = 'translateY(12px)';
+      const p = _TTS.panel;
+      setTimeout(()=>{ p.remove(); }, 320);
+      _TTS.panel = null;
+    }
+  };
   window._ttsSetRate  = (v)=>{
     _TTS.rate = parseFloat(v);
     const lbl = document.getElementById('tts-rate-lbl');
-    if(lbl) lbl.textContent = _TTS.rate.toFixed(1)+'x';
+    if(lbl) lbl.textContent = _TTS.rate.toFixed(1)+'×  語速';
+    // 更新進度條背景色（仿 vp-seek 的 CSS variable）
+    const slider = document.getElementById('tts-rate');
+    if(slider){
+      const pct = ((_TTS.rate - 0.5) / 1.5 * 100).toFixed(1);
+      slider.style.setProperty('--seek-pct', pct + '%');
+    }
     if(_TTS.speaking && !_TTS.paused){
       // 重新開始當前段落（Web Speech API 無法即時改速）
       speechSynthesis.cancel();
