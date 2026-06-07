@@ -1138,9 +1138,6 @@ async function openBookReader(id){
   ov.style.cssText = `position:fixed;inset:0;z-index:800;
     background:#111;display:flex;flex-direction:column`;
 
-  // 啟動閱讀模式（關閉動畫/blur，最佳閱讀寬度）
-  if(typeof setReadingMode === 'function') setReadingMode(true);
-
   // 點擊頁面中央切換工具列顯示/隱藏（閱讀模式下預設收合）
   ov.addEventListener('click', e=>{
     // 點工具列按鈕不觸發
@@ -1288,9 +1285,9 @@ async function _initEpubReader(url, savedCfi){
 
     // 取得容器實際高度（epub.js 需要明確像素高度）
     const viewerEl = document.getElementById('epub-viewer');
-    const viewerH = viewerEl ? viewerEl.parentElement.clientHeight - 40 : window.innerHeight - 120;
+    const viewerH = window.innerHeight - 120;  // fixed overlay：視窗高扣頂/底列
     const rendition = book.renderTo('epub-viewer', {
-      width:  viewerEl ? viewerEl.clientWidth || (window.innerWidth) : window.innerWidth,
+      width:  window.innerWidth,   // fixed overlay 寬度即視窗寬
       height: Math.max(400, viewerH),
       spread: 'none',
       flow:   'paginated',
@@ -1345,6 +1342,9 @@ async function _initEpubReader(url, savedCfi){
       const loc = rendition.currentLocation();
       if(loc) _updateEpubProgress(book, loc);
     }).catch(()=>{});
+
+    // epub 渲染完成後才啟動閱讀模式（確保 renderTo 用正確寬度）
+    if(typeof setReadingMode === 'function') setReadingMode(true);
 
     // 翻頁後更新進度
     rendition.on('relocated', loc=>{
