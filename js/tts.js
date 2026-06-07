@@ -78,6 +78,9 @@
     if(_keepaliveTimer){ clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
   }
 
+  // Android Chrome speechSynthesis bug：長文朗讀會在約15秒後靜默停止
+
+
   function _speakNext(){
     if(_TTS.idx >= _TTS.utterances.length){
       _stop();
@@ -108,6 +111,7 @@
       _speakNext();
     };
 
+    if(!_keepaliveTimer) _startKeepalive();
     speechSynthesis.speak(utter);
   }
 
@@ -163,18 +167,30 @@
   function _getLawText(){
     const lbody = document.getElementById('lbody');
     if(!lbody) return [];
-    const lawName = document.getElementById('lv-name')?.textContent || '';
-    const segments = [lawName];
-    lbody.querySelectorAll('.lw-art,.lw-card-art').forEach(art=>{
-      const title   = art.querySelector('.lw-art-title,.art-title')?.innerText?.trim();
-      const content = art.querySelector('.lw-art-content,.art-content')?.innerText?.trim();
-      if(title)   segments.push(title);
-      if(content) segments.push(content);
-    });
-    if(segments.length <= 1){
-      // fallback：直接取 lbody 文字
+
+    const lawName = document.getElementById('lv-name')?.textContent?.trim() || '';
+    const segments = lawName ? [lawName] : [];
+
+    // 法條卡片用 inline style 無 class，改用 DOM 結構抓文字
+    // 每張卡片是 margin-bottom:12px 的 div，內有：
+    //   - 標題 div（font-weight:700）含條號和標題
+    //   - 內容 div（line-height:1.85）含法條文字
+    // 最可靠做法：遍歷 lbody 的直接子 div，取各自 innerText
+    const cards = lbody.querySelectorAll('div[style*="margin-bottom:12px"],div[style*="margin-bottom: 12px"]');
+    if(cards.length > 0){
+      cards.forEach(card=>{
+        const text = card.innerText?.trim();
+        if(text) segments.push(text);
+      });
+    } else {
+      // fallback：整個 lbody 分段（以空行分割）
       const raw = lbody.innerText?.trim();
-      if(raw) segments.push(raw);
+      if(raw){
+        raw.split(/\n\n+/).forEach(s=>{
+          const t = s.trim();
+          if(t.length > 1) segments.push(t);
+        });
+      }
     }
     return segments.filter(Boolean);
   }

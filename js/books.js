@@ -1284,8 +1284,10 @@ async function _initEpubReader(url, savedCfi){
     // 取得容器實際高度（epub.js 需要明確像素高度）
     const viewerEl = document.getElementById('epub-viewer');
     const viewerH = window.innerHeight - 120;  // fixed overlay：視窗高扣頂/底列
+    // epub.js paginated 需精確寬度：window.innerWidth 有時多一像素造成截字
+    // 減去 2px 確保 column 完整顯示在容器內
     const rendition = book.renderTo('epub-viewer', {
-      width:  window.innerWidth,
+      width:  window.innerWidth - 2,
       height: Math.max(400, viewerH),
       spread: 'none',
       flow:   'paginated',
