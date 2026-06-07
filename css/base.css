@@ -101,7 +101,7 @@ input,textarea,select{font-family:inherit;background:var(--bg2);color:var(--t0);
 input:focus,textarea:focus,select:focus{border-color:var(--acc);outline:none;box-shadow:0 0 0 2px rgba(110,168,254,.12)}
 select option{background:var(--bg2)}
 textarea{resize:vertical;line-height:1.7}
-#app{display:flex;flex-direction:column;height:100%;max-width:520px;margin:0 auto}
+#app{display:flex;flex-direction:column;height:100%;max-width:var(--layout-page-max-w);margin:0 auto}
 .page{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:76px}
 .page::-webkit-scrollbar{width:3px}
 .page::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:2px}
