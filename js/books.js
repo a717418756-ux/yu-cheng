@@ -1145,6 +1145,9 @@ async function openBookReader(id){
     <div class="reader-topbar" id="reader-topbar">
       <button class="reader-btn" onclick="closeBookReader(${id})">←</button>
       <div class="reader-title">${esc(book.title||'閱讀中')}</div>
+      <button class="reader-btn" id="tts-epub-btn"
+        onclick="ttsReadEpub()"
+        title="朗讀本頁">🔊</button>
       <button class="reader-btn" onclick="_toggleReaderUI()">Aa</button>
     </div>
     <div id="reader-body" style="flex:1;overflow:hidden;position:relative;background:#111">
@@ -1495,6 +1498,8 @@ async function closeBookReader(id){
   if(ov._objectUrl) URL.revokeObjectURL(ov._objectUrl);
   ov.remove();
   document.documentElement.classList.remove('reader-active');
+  // 關閉閱讀器時停止朗讀
+  if(typeof _ttsStop === 'function') _ttsStop();
 }
 
 // ════════════════════════════════════════════════════════════
