@@ -1138,6 +1138,16 @@ async function openBookReader(id){
   ov.style.cssText = `position:fixed;inset:0;z-index:800;
     background:#111;display:flex;flex-direction:column`;
 
+  // 啟動閱讀模式（關閉動畫/blur，最佳閱讀寬度）
+  if(typeof setReadingMode === 'function') setReadingMode(true);
+
+  // 點擊頁面中央切換工具列顯示/隱藏（閱讀模式下預設收合）
+  ov.addEventListener('click', e=>{
+    // 點工具列按鈕不觸發
+    if(e.target.closest('.reader-topbar,.epub-bottom-bar,[id^="epub-"]')) return;
+    document.documentElement.classList.toggle('reader-ui-visible');
+  });
+
   // 頂部列
   ov.innerHTML = `
     <div class="reader-topbar" id="reader-topbar">
@@ -1173,10 +1183,9 @@ async function openBookReader(id){
                 style="height:100%;background:var(--acc);width:0%;transition:width .3s"></div>
             </div>
             <!-- 頁碼提示 -->
-            <div id="epub-page-info"
+            <div id="epub-page-info" class="hide"
               style="text-align:center;font-size:11px;color:rgba(255,255,255,0.3);
-              padding:4px 0 6px;flex-shrink:0;font-variant-numeric:tabular-nums;
-              display:none">
+              padding:4px 0 6px;flex-shrink:0;font-variant-numeric:tabular-nums">
             </div>
           </div>`
         : ext==='txt'
@@ -1196,7 +1205,7 @@ async function openBookReader(id){
           </div>`}
     </div>
     <!-- 閱讀設定面板 -->
-    <div id="reader-settings" style="display:none;position:absolute;top:52px;right:0;
+    <div id="reader-settings" class="hide" style="position:absolute;top:52px;right:0;
       background:rgba(20,20,28,0.97);border-radius:0 0 0 12px;
       padding:14px 16px;z-index:10;min-width:180px;
       border-left:1px solid rgba(255,255,255,0.08);
@@ -1371,7 +1380,7 @@ function _updateEpubProgress(book, loc){
     const info=document.getElementById('epub-page-info');
     if(info){
       info.textContent=`${Math.round(pct*100)}%`;
-      info.style.display='block';  // 有進度才顯示
+      info.classList.remove('hide');  // 有進度才顯示
     }
   }).catch(()=>{});
 }
@@ -1388,7 +1397,7 @@ let _readerUIVisible = true;
 
 function _toggleReaderUI(){
   const settings=document.getElementById('reader-settings');
-  if(settings) settings.style.display = settings.style.display==='none' ? 'block' : 'none';
+  if(settings) settings.classList.toggle('hide');
 }
 
 function _readerFontSize(delta){
@@ -1484,6 +1493,9 @@ async function closeBookReader(id){
   }
   if(ov._objectUrl) URL.revokeObjectURL(ov._objectUrl);
   ov.remove();
+  // 關閉閱讀模式，還原全域動畫設定
+  if(typeof setReadingMode === 'function') setReadingMode(false);
+  document.documentElement.classList.remove('reader-ui-visible');
 }
 
 // ════════════════════════════════════════════════════════════

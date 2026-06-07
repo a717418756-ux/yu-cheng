@@ -35,7 +35,7 @@ const _qfoot=document.getElementById('qfoot');
 if(_qfoot) _qfoot.style.display='';
 
   // 進度
-  document.getElementById('qpb').style.width=((idx/q.length)*100)+'%';
+  document.getElementById('qpb').style.setProperty('--qpb-w', ((idx/q.length)*100)+'%');
   document.getElementById('qct').textContent=(idx+1)+'/'+q.length;
 
   // 題型 badge + 危險等級

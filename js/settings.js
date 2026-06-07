@@ -254,7 +254,7 @@ async function delAll(){  try{
 function toggleGasHelp(){
   const el = document.getElementById('gas-help');
   if(!el) return;
-  el.style.display = el.style.display === 'none' ? '' : 'none';
+  el.classList.toggle('hide');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -272,11 +272,21 @@ async function localBackup(){
     const dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
     toast('備份中…請稍候');
 
-    const [ebooks, media] = await Promise.all([
-      da('ebooks'), da('leisuremedia')
+    const [ebooks, media, qs, ls] = await Promise.all([
+      da('ebooks'), da('leisuremedia'), da('questions'), da('laws')
     ]);
 
     let count = 0;
+
+    // ── 題庫 + 法條備份（JSON 單檔）──
+    const examHandle = await dirHandle.getFileHandle('exam_data.json', { create:true });
+    const examWriter = await examHandle.createWritable();
+    await examWriter.write(JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      questions: qs,
+      laws: ls
+    }));
+    await examWriter.close();
 
     // ── 書庫備份 ──
     const ebooksDir = await dirHandle.getDirectoryHandle('ebooks', { create:true });
@@ -349,12 +359,29 @@ async function localRestore(){
     toast('你的瀏覽器不支援資料夾存取，請用 Chrome 或 Edge');
     return;
   }
-  cfm('本地完整還原', '書庫和影音庫的現有資料將被覆蓋，確定繼續？', async()=>{
+  cfm('本地完整還原', '所有資料（題庫、法條、書庫、影音庫）將被覆蓋，確定繼續？', async()=>{
     try{
       const dirHandle = await window.showDirectoryPicker({ mode:'read' });
       toast('還原中…請稍候');
 
       let count = 0;
+
+      // ── 題庫 + 法條還原 ──
+      try{
+        const examHandle = await dirHandle.getFileHandle('exam_data.json');
+        const examFile   = await examHandle.getFile();
+        const examData   = JSON.parse(await examFile.text());
+        if(examData.questions?.length){
+          await dc('questions');
+          await bulkPut('questions', examData.questions);
+          count += examData.questions.length;
+        }
+        if(examData.laws?.length){
+          await dc('laws');
+          await bulkPut('laws', examData.laws);
+          count += examData.laws.length;
+        }
+      }catch(e){ /* exam_data.json 不存在就跳過 */ }
 
       // ── 書庫還原 ──
       try{
