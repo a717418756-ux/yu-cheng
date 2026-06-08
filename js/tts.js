@@ -100,6 +100,8 @@
     _TTS.idx        = 0;
     if(mode) _TTS.mode = mode;
     _createPanel(_TTS.mode);
+    // Android Autoplay Policy：在用戶手勢的同步鏈內解鎖 AudioContext
+    _unlockAudio();
     setTimeout(async()=>{
       const s = document.getElementById('tts-rate');
       if(s){
@@ -272,6 +274,15 @@
     else speechSynthesis.resume();
     _updatePanelState();
   }
+  // Android Autoplay Policy 解鎖（在用戶手勢的同步呼叫鏈內執行）
+  let _audioCtx = null;
+  function _unlockAudio(){
+    try{
+      if(!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if(_audioCtx.state === 'suspended') _audioCtx.resume();
+    }catch(e){}
+  }
+
   function _stopAll(){
     _stopKeepalive();
     speechSynthesis.cancel();
@@ -356,83 +367,95 @@
     ).join('');
 
     panel.innerHTML = `
-      <button id="tts-miniball" class="tts-miniball" onclick="_ttsExpand()" title="展開控制列">
+      <!-- 迷你浮動球（收合狀態）-->
+      <button id="tts-miniball" class="tts-miniball" onclick="_ttsExpand()" title="展開">
         <svg id="tts-ball-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
           <rect x="6" y="4" width="4" height="16" rx="1"/>
           <rect x="14" y="4" width="4" height="16" rx="1"/>
         </svg>
       </button>
 
+      <!-- 完整控制列 -->
       <div class="tts-sheet" id="tts-sheet">
-        <div class="tts-handle" onclick="_ttsCollapse()" title="收合"></div>
+        <!-- 拖把手（點擊收合）-->
+        <div class="tts-handle" onclick="_ttsCollapse()"></div>
 
-        <div class="tts-head">
-          <span class="tts-mode-lbl">${mode==='epub'?'📖 朗讀本頁':'⚖ 朗讀法條'}</span>
-          <span id="tts-progress" class="tts-prog">—</span>
-          <button onclick="_ttsCollapse()" class="tts-collapse-btn" title="收合">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <!-- 資訊列：模式標題 + 進度 + 收合 -->
+        <div class="vp-info" style="padding:0 14px 8px">
+          <div class="vp-info-text">
+            <div class="vp-title" style="font-size:15px">
+              ${mode === 'epub' ? '📖 朗讀本頁' : '⚖ 朗讀法條'}
+            </div>
+            <div class="vp-artist">
+              <span id="tts-progress">—</span>
+            </div>
+          </div>
+          <button onclick="_ttsCollapse()" class="vpc-btn vpc-sm" style="color:rgba(255,255,255,0.4)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6 9 12 15 18 9"/>
             </svg>
           </button>
         </div>
 
-        <!-- 引擎選擇 -->
-        <div class="tts-voice-row">
-          <span class="tts-sub-lbl">聲音</span>
+        <!-- 引擎選擇（聲音）-->
+        <div style="padding:0 16px 10px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:rgba(255,255,255,0.3);flex-shrink:0">聲音</span>
           <select id="tts-engine-sel" class="tts-voice-sel" onchange="_ttsSetEngine(this.value)">
             ${engineOpts}
           </select>
         </div>
 
-        <!-- 語速 -->
-        <div class="tts-rate-row">
-          <span class="tts-sub-lbl">語速</span>
-          <div class="tts-track-wrap">
-            <input id="tts-rate" class="tts-track" type="range"
-              min="0.5" max="2" step="0.1" value="${_TTS.rate}"
-              oninput="_ttsSetRate(this.value)">
+        <!-- 語速列（仿 vp-seek）-->
+        <div class="vp-progress-wrap">
+          <input id="tts-rate" class="vp-seek" type="range"
+            min="0.5" max="2" step="0.1" value="${_TTS.rate}"
+            style="--seek-pct:33%"
+            oninput="_ttsSetRate(this.value)">
+          <div class="vp-times">
+            <span style="font-size:11px;color:rgba(255,255,255,0.3)">慢</span>
+            <span id="tts-rate-lbl" style="font-size:11px;color:rgba(255,255,255,0.6)">${_TTS.rate}x</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.3)">快</span>
           </div>
-          <span id="tts-rate-lbl" class="tts-rate-num">${_TTS.rate}x</span>
         </div>
 
-        <!-- 控制按鈕 -->
-        <div class="tts-controls">
-          <button class="tts-btn-side" onclick="_ttsStop()" title="停止">
+        <!-- 控制按鈕列（完全對齊音頻播放器）-->
+        <div class="vp-controls">
+          <!-- 停止 -->
+          <button class="vpc-btn vpc-side" onclick="_ttsStop()" title="停止">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <rect x="4" y="4" width="16" height="16" rx="2"/>
             </svg>
           </button>
-          <button id="tts-playpause" class="tts-btn-main" onclick="_ttsToggle()">
-            <svg id="tts-pp-icon" width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+
+          <!-- 播放/暫停（大按鈕）-->
+          <button id="tts-playpause" class="vpc-btn vpc-main" onclick="_ttsToggle()">
+            <svg id="tts-pp-icon" width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
               <rect x="6" y="4" width="4" height="16" rx="1"/>
               <rect x="14" y="4" width="4" height="16" rx="1"/>
             </svg>
           </button>
-          <button class="tts-btn-side" onclick="_ttsCollapse()" title="收合到背景">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+
+          <!-- 收合到背景 -->
+          <button class="vpc-btn vpc-side" onclick="_ttsCollapse()" title="收合到背景">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6 9 12 15 18 9"/>
             </svg>
           </button>
         </div>
-      </div>`;
-
+      </div>`
     document.body.appendChild(panel);
     _TTS.panel = panel;
     return panel;
   }
 
   function _updatePanelState(){
-    const btn  = document.getElementById('tts-playpause');
     const icon = document.getElementById('tts-pp-icon');
     const prog = document.getElementById('tts-progress');
     const iconSvg = _TTS.paused
       ? '<polygon points="5,3 19,12 5,21"/>'
       : '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
-    if(btn){
-      btn.style.background = _TTS.paused ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.14)';
-      btn.style.boxShadow  = _TTS.paused ? 'none' : '0 0 0 1.5px rgba(255,255,255,0.25),0 4px 16px rgba(0,0,0,0.4)';
-    }
     if(icon) icon.innerHTML = iconSvg;
+    // 同步迷你球 icon
     const ballIcon = document.getElementById('tts-ball-icon');
     if(ballIcon) ballIcon.innerHTML = iconSvg;
     if(prog){
