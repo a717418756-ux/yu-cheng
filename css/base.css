@@ -646,12 +646,68 @@ textarea{resize:vertical;line-height:1.7}
 /* 題目進度條（由 quiz.js 設定 --qpb-w）*/
 #qpb{ width:var(--qpb-w,0%); }
 
-/* ── TTS 朗讀控制列（仿黑膠播放器，支援收合背景播放）──── */
+/* ── TTS 朗讀控制列（使用音頻播放器設計語言 vpc-* / vp-*）── */
 #tts-panel{
   position:fixed;
   bottom:0; left:0; right:0;
   z-index:820;
 }
+/* 迷你浮動球（收合狀態）*/
+.tts-miniball{
+  display:none;
+  position:fixed;
+  bottom:80px; right:16px;
+  z-index:821;
+  width:52px; height:52px;
+  border-radius:50%;
+  background:rgba(16,16,22,0.95);
+  border:1.5px solid rgba(255,255,255,0.2);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  box-shadow:0 8px 28px rgba(0,0,0,0.6);
+  color:#fff; cursor:pointer;
+  align-items:center; justify-content:center;
+  animation:tts-ball-in .2s cubic-bezier(.4,0,.2,1);
+}
+.tts-miniball.tts-ball-visible{ display:flex; }
+@keyframes tts-ball-in{
+  from{opacity:0;transform:scale(.7)}
+  to  {opacity:1;transform:scale(1)}
+}
+/* 收合時隱藏完整控制列 */
+.tts-sheet.tts-hidden{ display:none !important; }
+/* 完整控制列（bottom sheet 樣式）*/
+.tts-sheet{
+  background:#0e0e14;
+  border-top:0.5px solid rgba(255,255,255,0.1);
+  border-radius:20px 20px 0 0;
+  padding:0 0 max(16px,env(safe-area-inset-bottom));
+  box-shadow:0 -12px 48px rgba(0,0,0,0.7);
+  animation:tts-up .28s cubic-bezier(.4,0,.2,1);
+}
+@keyframes tts-up{
+  from{opacity:0;transform:translateY(20px)}
+  to  {opacity:1;transform:translateY(0)}
+}
+/* 拖把手 */
+.tts-handle{
+  width:36px; height:4px; border-radius:2px;
+  background:rgba(255,255,255,0.18);
+  margin:10px auto 8px; cursor:pointer;
+}
+.tts-handle:hover{ background:rgba(255,255,255,0.32); }
+/* 引擎選單 */
+.tts-voice-sel{
+  flex:1;
+  background:rgba(255,255,255,0.06);
+  border:0.5px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.8);
+  border-radius:10px;
+  padding:7px 12px; font-size:13px;
+  cursor:pointer; outline:none;
+  -webkit-appearance:none; appearance:none;
+}
+
 /* 迷你浮動球（收合狀態，預設隱藏）*/
 .tts-miniball{
   display:none;
