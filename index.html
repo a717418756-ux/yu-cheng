@@ -488,6 +488,39 @@
     </div>
   </div>
 
+  <!-- TTS 雲端聲音設定 -->
+  <div class="sec">朗讀聲音設定</div>
+  <div class="scard" style="padding:12px 14px">
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px;line-height:1.6">
+      填入 API Key 後，朗讀時可選擇高品質雲端聲音。未填則使用裝置內建聲音（離線可用）。
+    </div>
+    <div class="srow">
+      <div>
+        <div class="slb">Google Cloud TTS</div>
+        <div class="ssb">每月 100 萬字免費 · 需 Google Cloud API Key</div>
+      </div>
+    </div>
+    <input id="tts-google-key" type="password"
+      placeholder="Google Cloud API Key"
+      style="width:100%;margin:6px 0 12px;background:var(--bg2);border:1px solid var(--bd);
+      border-radius:var(--r);padding:9px 12px;color:var(--t1);font-size:13px"
+      oninput="saveTtsKey('google',this.value)">
+    <div class="srow">
+      <div>
+        <div class="slb">Microsoft Azure TTS</div>
+        <div class="ssb">每月 50 萬字免費 · 需 Azure Key + 上方 GAS 網址</div>
+      </div>
+    </div>
+    <input id="tts-azure-key" type="password"
+      placeholder="Azure Speech API Key"
+      style="width:100%;margin:6px 0 4px;background:var(--bg2);border:1px solid var(--bd);
+      border-radius:var(--r);padding:9px 12px;color:var(--t1);font-size:13px"
+      oninput="saveTtsKey('azure',this.value)">
+    <div style="font-size:10.5px;color:var(--t2);margin-top:4px">
+      Azure 區域：eastasia（東亞，延遲最低）
+    </div>
+  </div>
+
   <div class="sec" style="color:var(--red)">危險操作</div>
   <div class="srow"><div><div class="slb" style="color:var(--red)">清除作答記錄</div><div class="ssb">保留題目</div></div>
   <button class="btn br" style="padding:6px 10px;font-size:12px" onclick="cfm('清除作答記錄','確定清除？',clearAts)">清除</button></div>
