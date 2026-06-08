@@ -1,7 +1,9 @@
-// ══ tts.js — Web Speech API 朗讀模組 ═══════════════════════
-// 功能：epub 電子書 + 法條全文 TTS 朗讀
-// 依賴：utils.js（toast）
-// 不修改任何現有邏輯，純新增
+// ══ tts.js — 多引擎 TTS 朗讀模組 ══════════════════════════
+// 支援三種引擎（依優先順序自動選擇）：
+//   1. Google Cloud TTS  — 雲端，高品質，需 API key
+//   2. Azure TTS via GAS — 雲端，高品質，需 GAS URL + Azure key
+//   3. Web Speech API    — 本地，離線可用，無需設定
+// 依賴：db.js（getSetting）, utils.js（toast）
 // ════════════════════════════════════════════════════════════
 
 (function(){
@@ -11,71 +13,246 @@
   const _TTS = {
     speaking:   false,
     paused:     false,
-    utterances: [],   // 分段佇列
-    idx:        0,    // 目前段落
+    utterances: [],    // 分段文字佇列
+    idx:        0,     // 目前段落索引
     rate:       1.0,
-    pitch:      1.0,
-    voiceURI:   '',   // 選擇的聲音
-    mode:       '',   // 'epub' | 'law'
-    panel:      null, // 目前顯示的浮動控制列
-    collapsed:  false,// 是否收合為迷你球
+    voiceURI:   '',    // Web Speech 選擇的聲音
+    engine:     'web', // 'web' | 'google' | 'azure'
+    mode:       '',    // 'epub' | 'law'
+    panel:      null,
+    collapsed:  false,
+    audio:      null,  // 雲端引擎用的 Audio 物件
   };
 
-  // ── 取得可用中文聲音 ──────────────────────────────────────
-  function _getVoices(){
-    // 只保留 zh-TW（台灣中文），涵蓋 Google TTS 和三星 TTS
-    // zh-HK、zh-CN、zh-MY 等排除，避免選單出現音色相同的選項
-    const all = speechSynthesis.getVoices();
-    const twVoices = all.filter(v => v.lang === 'zh-TW');
-    // fallback：若裝置無 zh-TW，取所有中文
-    return twVoices.length ? twVoices : all.filter(v => v.lang.startsWith('zh'));
+  // ── 引擎清單（供選單顯示）───────────────────────────────────
+  // 動態偵測可用引擎，由 _buildEngineList() 組裝
+  let _engines = [];  // [{ id, label, available }]
+
+  async function _buildEngineList(){
+    const googleKey = await getSetting('tts_google_key', '');
+    const azureKey  = await getSetting('tts_azure_key', '');
+    const gasUrl    = await getSetting(GAS_URL_KEY, '');
+
+    // Web Speech：取 Google zh-TW，去重（只保留第一個）
+    const wsVoices  = _getWebSpeechVoices();
+    const webItems  = wsVoices.slice(0, 1).map(v => ({
+      id:        'web:' + v.voiceURI,
+      label:     '🔵 系統 TTS（離線）',
+      available: true,
+      voiceURI:  v.voiceURI,
+    }));
+
+    // Google Cloud TTS
+    const googleItems = googleKey ? [
+      { id:'google:zh-TW-Standard-A',  label:'🟢 Google 雲端 — 女聲A', available:true },
+      { id:'google:zh-TW-Standard-B',  label:'🟢 Google 雲端 — 男聲B', available:true },
+      { id:'google:zh-TW-Wavenet-A',   label:'🟢 Google WaveNet — 女聲', available:true },
+      { id:'google:zh-TW-Wavenet-B',   label:'🟢 Google WaveNet — 男聲', available:true },
+    ] : [{ id:'google:disabled', label:'🟢 Google 雲端（需設定 API Key）', available:false }];
+
+    // Azure TTS via GAS
+    const azureItems = (azureKey && gasUrl) ? [
+      { id:'azure:zh-TW-HsiaoChenNeural', label:'🟣 Azure — 曉臻（自然女聲）', available:true },
+      { id:'azure:zh-TW-YunJheNeural',    label:'🟣 Azure — 雲哲（自然男聲）', available:true },
+    ] : [{ id:'azure:disabled', label:'🟣 Azure TTS（需設定 API Key + GAS）', available:false }];
+
+    _engines = [...webItems, ...googleItems, ...azureItems];
+
+    // 設定預設引擎
+    if(!_TTS.engine || _TTS.engine === 'web'){
+      const saved = await getSetting('tts_engine_id', '');
+      const found = _engines.find(e => e.id === saved && e.available);
+      _TTS.engine = found ? found.id : (webItems[0]?.id || 'web:default');
+      if(webItems[0]) _TTS.voiceURI = webItems[0].voiceURI;
+    }
   }
 
-  // ── 主要朗讀函式 ──────────────────────────────────────────
+  // ── Web Speech 聲音清單（去重）───────────────────────────────
+  function _getWebSpeechVoices(){
+    const all = speechSynthesis.getVoices();
+    // 只取 zh-TW，優先 Google
+    const tw = all.filter(v => v.lang === 'zh-TW');
+    const google = tw.filter(v => v.name.toLowerCase().includes('google'));
+    const result = google.length ? google : tw;
+    // 去重：name 相似的只保留第一個
+    const seen = new Set();
+    return result.filter(v => {
+      const key = v.name.replace(/\s+/g,'').toLowerCase();
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  // ── 朗讀核心 ─────────────────────────────────────────────────
+
   function _speak(segments, mode){
-    // 先 cancel 停止舊播放（不呼叫 _updatePanelState，避免移除 panel）
+    _stopAll();
+    if(!segments?.length){ toast('沒有可朗讀的文字'); return; }
+    _TTS.utterances = segments;
+    _TTS.idx        = 0;
+    if(mode) _TTS.mode = mode;
+    _createPanel(_TTS.mode);
+    setTimeout(async()=>{
+      const s = document.getElementById('tts-rate');
+      if(s){
+        const pct = ((_TTS.rate - 0.5) / 1.5 * 100).toFixed(1);
+        s.style.setProperty('--seek-pct', pct + '%');
+      }
+      _TTS.speaking = true;
+      _updatePanelState();
+      await _speakNext();
+    }, 80);
+  }
+
+  async function _speakNext(){
+    if(!_TTS.speaking || _TTS.idx >= _TTS.utterances.length){
+      if(_TTS.speaking) _stopAll();
+      return;
+    }
+
+    const rawText = _TTS.utterances[_TTS.idx];
+    if(!rawText?.trim()){ _TTS.idx++; await _speakNext(); return; }
+
+    // 限 150 字，超過截斷插回佇列
+    const text = rawText.length > 150
+      ? rawText.slice(0, rawText.lastIndexOf('，', 150) + 1 || 150)
+      : rawText;
+    if(text.length < rawText.length){
+      _TTS.utterances.splice(_TTS.idx + 1, 0, rawText.slice(text.length));
+    }
+
+    const engineId = _TTS.engine || '';
+
+    if(engineId.startsWith('google:')){
+      await _speakGoogle(text, engineId.replace('google:',''));
+    } else if(engineId.startsWith('azure:')){
+      await _speakAzure(text, engineId.replace('azure:',''));
+    } else {
+      _speakWeb(text);
+    }
+  }
+
+  // ── Web Speech ───────────────────────────────────────────────
+  function _speakWeb(text){
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang  = 'zh-TW';
+    utter.rate  = _TTS.rate;
+    if(_TTS.voiceURI){
+      const v = speechSynthesis.getVoices().find(v => v.voiceURI === _TTS.voiceURI);
+      if(v) utter.voice = v;
+    }
+    utter.onend   = ()=>{ if(!_TTS.speaking) return; _TTS.idx++; _updatePanelState(); _speakNext(); };
+    utter.onerror = (e)=>{ if(e.error==='interrupted'||e.error==='canceled') return; _TTS.idx++; _speakNext(); };
+    if(!_keepaliveTimer) _startKeepalive();
+    speechSynthesis.speak(utter);
+  }
+
+  // ── Google Cloud TTS ─────────────────────────────────────────
+  async function _speakGoogle(text, voiceName){
+    try{
+      const key = await getSetting('tts_google_key','');
+      if(!key) throw new Error('無 Google API Key');
+      const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${key}`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          input:     { text },
+          voice:     { languageCode:'zh-TW', name:voiceName },
+          audioConfig:{ audioEncoding:'MP3', speakingRate:_TTS.rate },
+        }),
+      });
+      if(!res.ok) throw new Error(`Google TTS 錯誤 ${res.status}`);
+      const json = await res.json();
+      if(!json.audioContent) throw new Error('無音訊回傳');
+      await _playBase64(json.audioContent);
+    }catch(e){
+      toast('Google TTS 失敗，切換系統 TTS');
+      _speakWeb(text);
+    }
+  }
+
+  // ── Azure TTS via GAS ────────────────────────────────────────
+  async function _speakAzure(text, voiceName){
+    try{
+      const azureKey = await getSetting('tts_azure_key','');
+      const gasUrl   = await getSetting(GAS_URL_KEY,'');
+      if(!azureKey || !gasUrl) throw new Error('未設定');
+      const res = await fetch(gasUrl, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({
+          action:    'azure_tts',
+          text,
+          voiceName,
+          rate:      _TTS.rate,
+          azureKey,
+        }),
+      });
+      if(!res.ok) throw new Error(`GAS 錯誤 ${res.status}`);
+      const json = await res.json();
+      if(!json.ok || !json.audio) throw new Error(json.error||'無音訊');
+      await _playBase64(json.audio);
+    }catch(e){
+      toast('Azure TTS 失敗，切換系統 TTS');
+      _speakWeb(text);
+    }
+  }
+
+  // ── 播放 base64 音訊（Google / Azure 共用）──────────────────
+  function _playBase64(base64){
+    return new Promise((resolve)=>{
+      if(_TTS.audio){ _TTS.audio.pause(); _TTS.audio = null; }
+      const audio = new Audio('data:audio/mp3;base64,' + base64);
+      audio.playbackRate = 1.0;  // 速度由 API 控制
+      _TTS.audio = audio;
+      audio.onended = ()=>{
+        _TTS.audio = null;
+        if(!_TTS.speaking){ resolve(); return; }
+        _TTS.idx++;
+        _updatePanelState();
+        _speakNext();
+        resolve();
+      };
+      audio.onerror = ()=>{
+        _TTS.audio = null;
+        _TTS.idx++;
+        _speakNext();
+        resolve();
+      };
+      audio.play().catch(()=>{ _TTS.idx++; _speakNext(); resolve(); });
+    });
+  }
+
+  // ── 暫停 / 繼續 / 停止 ───────────────────────────────────────
+  function _pause(){
+    _TTS.paused = true;
+    if(_TTS.audio) _TTS.audio.pause();
+    else speechSynthesis.pause();
+    _updatePanelState();
+  }
+  function _resume(){
+    _TTS.paused = false;
+    if(_TTS.audio) _TTS.audio.play();
+    else speechSynthesis.resume();
+    _updatePanelState();
+  }
+  function _stopAll(){
+    _stopKeepalive();
     speechSynthesis.cancel();
+    if(_TTS.audio){ _TTS.audio.pause(); _TTS.audio = null; }
     _TTS.speaking = false;
     _TTS.paused   = false;
     _TTS.idx      = 0;
-
-    if(!segments?.length){ toast('沒有可朗讀的文字'); return; }
-    _TTS.utterances = segments;
-    if(mode) _TTS.mode = mode;
-
-    // 建立 panel（此時 speaking 還是 false，不會被 _updatePanelState 移除）
-    _createPanel(_TTS.mode);
-    // 初始化滑桿進度色
-    setTimeout(()=>{
-      const s=document.getElementById('tts-rate');
-      if(s){const p=((_TTS.rate-0.5)/1.5*100).toFixed(1);s.style.setProperty('--seek-pct',p+'%');}
-    },20);
-
-    // 設為播放中再更新 UI
-    _TTS.speaking = true;
     _updatePanelState();
-    // 初始化語速滑桿的進度條顏色
-    const _s = document.getElementById('tts-rate');
-    if(_s){
-      const pct = ((_TTS.rate - 0.5) / 1.5 * 100).toFixed(1);
-      _s.style.setProperty('--seek-pct', pct + '%');
-    }
-
-    // 啟動 Android keepalive，防止 TTS 被系統中斷
-    _startKeepalive();
-    // 短暫延遲讓 Chrome 的 speechSynthesis.cancel() 完全生效
-    setTimeout(()=> _speakNext(), 80);
   }
 
-  // Android Chrome keepalive：每 10s resume 防止 TTS 被系統中斷
+  // ── Keepalive（Web Speech Android bug 防護）─────────────────
   let _keepaliveTimer = null;
   function _startKeepalive(){
     _stopKeepalive();
-    // Android bug：speechSynthesis 可能靜默停止但 _TTS.speaking 仍為 true
-    // 偵測到停止時，重新朗讀當前段落
     _keepaliveTimer = setInterval(()=>{
-      if(_TTS.speaking && !_TTS.paused && !speechSynthesis.speaking){
-        // 偵測到異常停止，重新從當前段落繼續
+      if(_TTS.speaking && !_TTS.paused && !_TTS.audio && !speechSynthesis.speaking){
         _speakNext();
       }
     }, 3000);
@@ -84,85 +261,9 @@
     if(_keepaliveTimer){ clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
   }
 
-  // Android Chrome speechSynthesis bug：長文朗讀會在約15秒後靜默停止
-
-
-  function _speakNext(){
-    if(_TTS.idx >= _TTS.utterances.length){
-      _stop();
-      return;
-    }
-    const rawText = _TTS.utterances[_TTS.idx];
-    if(!rawText?.trim()){ _TTS.idx++; _speakNext(); return; }
-    // Android bug：單段超過 150 字容易靜默停止，自動截斷
-    const text = rawText.length > 150
-      ? rawText.slice(0, rawText.lastIndexOf('，', 150) + 1 || 150)
-      : rawText;
-    // 若截斷，把剩餘部分插回佇列
-    if(text.length < rawText.length){
-      _TTS.utterances.splice(_TTS.idx + 1, 0, rawText.slice(text.length));
-    }
-
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang  = 'zh-TW';
-    utter.rate  = _TTS.rate;
-    utter.pitch = _TTS.pitch;
-
-    if(_TTS.voiceURI){
-      const v = speechSynthesis.getVoices().find(v => v.voiceURI === _TTS.voiceURI);
-      if(v) utter.voice = v;
-    }
-
-    utter.onend = ()=>{
-      if(!_TTS.speaking) return;
-      _TTS.idx++;
-      _updatePanelState();
-      _speakNext();
-    };
-    utter.onerror = (e)=>{
-      if(e.error === 'interrupted' || e.error === 'canceled') return;
-      _TTS.idx++;
-      _speakNext();
-    };
-
-    if(!_keepaliveTimer) _startKeepalive();
-    speechSynthesis.speak(utter);
-  }
-
-  function _pause(){
-    if(speechSynthesis.speaking && !speechSynthesis.paused){
-      speechSynthesis.pause();
-      _TTS.paused = true;
-      _updatePanelState();
-    }
-  }
-
-  function _resume(){
-    if(speechSynthesis.paused){
-      speechSynthesis.resume();
-      _TTS.paused = false;
-      _updatePanelState();
-    }
-  }
-
-  function _stop(){
-    _stopKeepalive();
-    speechSynthesis.cancel();
-    _TTS.speaking = false;
-    _TTS.paused  = false;
-    _TTS.idx     = 0;
-    _updatePanelState();
-  }
-
-  function _togglePause(){
-    if(_TTS.paused) _resume();
-    else _pause();
-  }
-
-  // ── epub：取得當前頁面文字 ──────────────────────────────
+  // ── 取得 epub 當前頁文字 ────────────────────────────────────
   function _getEpubPageText(){
     try{
-      // 方法1：epub.js Section 取當前章節純文字（不含 HTML 標籤）
       const rendition = window._epubRendition;
       const book      = window._epubBook;
       if(rendition && book){
@@ -181,66 +282,45 @@
           }
         }
       }
-      // 方法2：從 iframe DOM 取（fallback）
+      // fallback：iframe DOM
       const viewer = document.getElementById('epub-viewer');
       const iframe = viewer?.querySelector('iframe');
       const doc    = iframe?.contentDocument || iframe?.contentWindow?.document;
       if(!doc) return [];
-      const body = doc.body;
-      if(!body) return [];
-      const paras = [...body.querySelectorAll('p,h1,h2,h3,h4,li')]
-        .map(el => el.innerText?.trim())
-        .filter(t => t && t.length > 1);
-      return paras.length ? paras : [body.innerText?.trim()].filter(Boolean);
+      const paras  = [...doc.body.querySelectorAll('p,h1,h2,h3,h4,li')]
+        .map(el => el.innerText?.trim()).filter(t => t && t.length > 1);
+      return paras.length ? paras : [doc.body.innerText?.trim()].filter(Boolean);
     }catch(e){ return []; }
   }
 
-  // ── 法條：取得當前顯示的法條文字 ──────────────────────
+  // ── 取得法條文字 ─────────────────────────────────────────────
   function _getLawText(){
-    // 使用 openLawGroup 存入的純文字（window.currentLawContent）
-    // 格式：「第X條 內容」逐條換行，無 emoji 和按鈕文字
     const lawName    = window.currentLawName    || document.getElementById('lv-name')?.textContent?.trim() || '';
     const lawContent = window.currentLawContent || '';
-
     if(!lawContent && !lawName) return [];
-
     const segments = lawName ? [lawName] : [];
-
-    // 按條分段：每條「第X條」開頭為一段
     if(lawContent){
-      lawContent.split('\n')
-        .map(s => s.trim())
-        .filter(s => s.length > 1)
-        .forEach(s => segments.push(s));
+      lawContent.split('\n').map(s=>s.trim()).filter(s=>s.length>1).forEach(s=>segments.push(s));
     }
-
     return segments;
   }
 
-  // ── 浮動控制列 ────────────────────────────────────────────
+  // ── 浮動控制列 ───────────────────────────────────────────────
   function _createPanel(mode){
     const existing = document.getElementById('tts-panel');
     if(existing) existing.remove();
 
-    const voices    = _getVoices();
-    const hasVoice  = voices.length > 0;
-    const voiceOpts = hasVoice
-      ? voices.map(v=>{
-          // 保留三星/Google 前綴，幫助使用者分辨不同 TTS 引擎
-          let name = v.name;
-          // 移除括號內容（語系代碼）和多餘空白
-          name = name.replace(/\s*\([^)]*\)/g, '').trim();
-          // 縮短過長名稱
-          if(name.length > 16) name = name.slice(0, 16);
-          const sel  = v.voiceURI === _TTS.voiceURI ? ' selected' : '';
-          return `<option value="${v.voiceURI}"${sel}>${name}</option>`;
-        }).join('')
-      : '';
-
     const panel = document.createElement('div');
     panel.id = 'tts-panel';
+
+    // 引擎選單 HTML
+    const engineOpts = _engines.map(e =>
+      `<option value="${e.id}" ${!e.available?'disabled':''} ${e.id===_TTS.engine?'selected':''}>
+        ${e.label}${!e.available?' ⚙':''}
+      </option>`
+    ).join('');
+
     panel.innerHTML = `
-      <!-- 迷你浮動球（收合狀態）-->
       <button id="tts-miniball" class="tts-miniball" onclick="_ttsExpand()" title="展開控制列">
         <svg id="tts-ball-icon" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
           <rect x="6" y="4" width="4" height="16" rx="1"/>
@@ -248,32 +328,28 @@
         </svg>
       </button>
 
-      <!-- 完整控制列（展開狀態）-->
       <div class="tts-sheet" id="tts-sheet">
-        <!-- 拖把手（點擊收合）-->
         <div class="tts-handle" onclick="_ttsCollapse()" title="收合"></div>
 
-        <!-- 標題列：模式 + 進度 + 收合按鈕 -->
         <div class="tts-head">
-          <span class="tts-mode-lbl">${mode === 'epub' ? '📖 朗讀本頁' : '⚖ 朗讀法條'}</span>
+          <span class="tts-mode-lbl">${mode==='epub'?'📖 朗讀本頁':'⚖ 朗讀法條'}</span>
           <span id="tts-progress" class="tts-prog">—</span>
-          <button onclick="_ttsCollapse()" class="tts-collapse-btn" title="收合到背景">
+          <button onclick="_ttsCollapse()" class="tts-collapse-btn" title="收合">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <polyline points="6 9 12 15 18 9"/>
             </svg>
           </button>
         </div>
 
-        <!-- 聲音選擇（有多個聲音才顯示）-->
-        ${hasVoice ? `
+        <!-- 引擎選擇 -->
         <div class="tts-voice-row">
           <span class="tts-sub-lbl">聲音</span>
-          <select id="tts-voice" class="tts-voice-sel" onchange="_ttsSetVoice(this.value)">
-            ${voiceOpts}
+          <select id="tts-engine-sel" class="tts-voice-sel" onchange="_ttsSetEngine(this.value)">
+            ${engineOpts}
           </select>
-        </div>` : ''}
+        </div>
 
-        <!-- 語速列 -->
+        <!-- 語速 -->
         <div class="tts-rate-row">
           <span class="tts-sub-lbl">語速</span>
           <div class="tts-track-wrap">
@@ -284,7 +360,7 @@
           <span id="tts-rate-lbl" class="tts-rate-num">${_TTS.rate}x</span>
         </div>
 
-        <!-- 控制按鈕列 -->
+        <!-- 控制按鈕 -->
         <div class="tts-controls">
           <button class="tts-btn-side" onclick="_ttsStop()" title="停止">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -307,106 +383,96 @@
 
     document.body.appendChild(panel);
     _TTS.panel = panel;
-    // 確保下拉選單顯示正確的預設聲音
-    setTimeout(_initDefaultVoice, 0);
     return panel;
   }
+
   function _updatePanelState(){
     const btn  = document.getElementById('tts-playpause');
     const icon = document.getElementById('tts-pp-icon');
     const prog = document.getElementById('tts-progress');
-    if(btn){
-      btn.style.background = _TTS.paused
-        ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.14)';
-      btn.style.boxShadow = _TTS.paused
-        ? 'none' : '0 0 0 1.5px rgba(255,255,255,0.25),0 4px 16px rgba(0,0,0,0.4)';
-    }
     const iconSvg = _TTS.paused
       ? '<polygon points="5,3 19,12 5,21"/>'
       : '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+    if(btn){
+      btn.style.background = _TTS.paused ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.14)';
+      btn.style.boxShadow  = _TTS.paused ? 'none' : '0 0 0 1.5px rgba(255,255,255,0.25),0 4px 16px rgba(0,0,0,0.4)';
+    }
     if(icon) icon.innerHTML = iconSvg;
-    // 同步迷你球 icon
     const ballIcon = document.getElementById('tts-ball-icon');
     if(ballIcon) ballIcon.innerHTML = iconSvg;
     if(prog){
       prog.textContent = _TTS.speaking
-        ? `${_TTS.idx+1} / ${_TTS.utterances.length}`
-        : '—';
+        ? `${_TTS.idx+1}/${_TTS.utterances.length}` : '—';
     }
-    // panel 移除只由 _ttsStop() 明確觸發，不在這裡自動消失
   }
 
   // ── 公開 API ─────────────────────────────────────────────────
-
-  // epub 頁面朗讀（由 epub 工具列按鈕呼叫）
   window.ttsReadEpub = async function(){
-    if(_TTS.speaking){ _stop(); return; }
-    // _getEpubPageText 可能回傳 Promise（epub.js Section 非同步載入）
+    if(_TTS.speaking){ _stopAll(); return; }
+    await _buildEngineList();
     let segments = _getEpubPageText();
-    if(segments && typeof segments.then === 'function'){
-      segments = await segments.catch(()=>[]);
-    }
-    if(!segments || !segments.length){
-      toast('無法取得頁面文字（可能是圖片頁或加密內容）'); return;
-    }
-    _TTS.mode = 'epub';
+    if(segments && typeof segments.then === 'function') segments = await segments.catch(()=>[]);
+    if(!segments?.length){ toast('無法取得頁面文字'); return; }
     _speak(segments, 'epub');
   };
 
-  // 法條朗讀（由法條頁面按鈕呼叫）
-  window.ttsReadLaw = function(){
-    if(_TTS.speaking){ _stop(); return; }
+  window.ttsReadLaw = async function(){
+    if(_TTS.speaking){ _stopAll(); return; }
+    await _buildEngineList();
     const segments = _getLawText();
     if(!segments.length){ toast('沒有可朗讀的法條'); return; }
-    _TTS.mode = 'law';
     _speak(segments, 'law');
   };
 
-  // 控制列按鈕呼叫
-  window._ttsToggle   = ()=> _TTS.paused ? _resume() : _pause();
-  window._ttsSkip     = ()=>{
-    if(!_TTS.speaking) return;
-    speechSynthesis.cancel();
-    _TTS.idx = Math.min(_TTS.idx + 1, _TTS.utterances.length - 1);
-    setTimeout(()=> _speakNext(), 60);
-  };
+  window._ttsToggle   = ()=>{ _TTS.paused ? _resume() : _pause(); };
+
   window._ttsStop     = ()=>{
-    _stop();
+    _stopAll();
     if(_TTS.panel){
       _TTS.panel.style.transition = 'opacity .3s,transform .3s';
-      _TTS.panel.style.opacity = '0';
-      _TTS.panel.style.transform = 'translateY(12px)';
+      _TTS.panel.style.opacity    = '0';
+      _TTS.panel.style.transform  = 'translateY(12px)';
       const p = _TTS.panel;
-      setTimeout(()=>{ p.remove(); }, 320);
+      setTimeout(()=> p.remove(), 320);
       _TTS.panel = null;
     }
   };
+
   window._ttsSetRate  = (v)=>{
     _TTS.rate = parseFloat(v);
     const lbl = document.getElementById('tts-rate-lbl');
     if(lbl) lbl.textContent = _TTS.rate.toFixed(1)+'x';
-    // 更新進度條背景色（仿 vp-seek 的 CSS variable）
     const slider = document.getElementById('tts-rate');
     if(slider){
       const pct = ((_TTS.rate - 0.5) / 1.5 * 100).toFixed(1);
       slider.style.setProperty('--seek-pct', pct + '%');
     }
     if(_TTS.speaking && !_TTS.paused){
-      // 重新開始當前段落（Web Speech API 無法即時改速）
-      speechSynthesis.cancel();
-      setTimeout(()=> _speakNext(), 80);
+      if(_TTS.audio){ _TTS.audio.playbackRate = _TTS.rate; }
+      else{ speechSynthesis.cancel(); setTimeout(()=> _speakNext(), 80); }
     }
   };
-  window._ttsSetVoice = (uri)=>{
-    _TTS.voiceURI = uri;
-    // 切換聲音後立即重新播放當前段落，讓新聲音生效
+
+  window._ttsSetEngine = async (id)=>{
+    const eng = _engines.find(e => e.id === id);
+    if(!eng || !eng.available){
+      toast('此聲音需先在設定頁填入 API Key');
+      // 還原選單
+      const sel = document.getElementById('tts-engine-sel');
+      if(sel) sel.value = _TTS.engine;
+      return;
+    }
+    _TTS.engine   = id;
+    _TTS.voiceURI = eng.voiceURI || '';
+    await setSetting('tts_engine_id', id);
+    // 切換後重新播放當前段落
     if(_TTS.speaking && !_TTS.paused){
+      if(_TTS.audio){ _TTS.audio.pause(); _TTS.audio = null; }
       speechSynthesis.cancel();
       setTimeout(()=> _speakNext(), 80);
     }
   };
 
-  // 收合：隱藏完整控制列，顯示迷你球，朗讀繼續
   window._ttsCollapse = ()=>{
     const sheet = document.getElementById('tts-sheet');
     const ball  = document.getElementById('tts-miniball');
@@ -415,7 +481,6 @@
     _TTS.collapsed = true;
   };
 
-  // 展開：顯示完整控制列，隱藏迷你球
   window._ttsExpand = ()=>{
     const sheet = document.getElementById('tts-sheet');
     const ball  = document.getElementById('tts-miniball');
@@ -424,24 +489,19 @@
     _TTS.collapsed = false;
   };
 
-  // 頁面離開時停止
-  window.addEventListener('beforeunload', ()=> speechSynthesis.cancel());
-
-  // 聲音清單延遲載入（Chrome 需要等 onvoiceschanged）
+  // 聲音清單非同步載入
   function _initDefaultVoice(){
-    const voices = _getVoices();
+    const voices = _getWebSpeechVoices();
     if(!voices.length) return;
-    // 預設選第一個 zh-TW 聲音（_getVoices 已過濾）
     if(!_TTS.voiceURI) _TTS.voiceURI = voices[0].voiceURI;
-    // 更新已顯示的下拉選單
-    const sel = document.getElementById('tts-voice');
-    if(sel && _TTS.voiceURI) sel.value = _TTS.voiceURI;
+    const sel = document.getElementById('tts-engine-sel');
+    if(sel) sel.value = _TTS.engine;
+  }
+  if(typeof speechSynthesis !== 'undefined'){
+    if(speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = _initDefaultVoice;
+    if(speechSynthesis.getVoices().length) _initDefaultVoice();
   }
 
-  if(speechSynthesis.onvoiceschanged !== undefined){
-    speechSynthesis.onvoiceschanged = _initDefaultVoice;
-  }
-  // 有些瀏覽器聲音已同步載入
-  if(speechSynthesis.getVoices().length) _initDefaultVoice();
+  window.addEventListener('beforeunload', ()=>{ _stopAll(); });
 
 })();

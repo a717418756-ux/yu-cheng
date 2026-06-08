@@ -109,7 +109,8 @@ async function gdriveRestore(){ try{
 }catch(e){ logError('gdriveRestore',e); toast('還原失敗：'+e.message); }}
 
 
-async function renderSet(){  try{
+async function renderSet(){
+  renderTtsKeys().catch(()=>{});  try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
   document.getElementById('exp-info').textContent=`${qs.length} 題 · ${ls.length} 條法條 · ${ats.length} 筆作答`;
   const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
@@ -468,4 +469,18 @@ function _base64ToBlob(b64, mimeType='image/jpeg'){
   const arr = new Uint8Array(bytes.length);
   for(let i=0; i<bytes.length; i++) arr[i] = bytes.charCodeAt(i);
   return Promise.resolve(new Blob([arr], { type:mimeType }));
+}
+
+// ── TTS API Key 設定 ─────────────────────────────────────────
+async function saveTtsKey(type, value){
+  await setSetting('tts_' + type + '_key', value.trim());
+}
+
+async function renderTtsKeys(){
+  const googleKey = await getSetting('tts_google_key','');
+  const azureKey  = await getSetting('tts_azure_key','');
+  const gEl = document.getElementById('tts-google-key');
+  const aEl = document.getElementById('tts-azure-key');
+  if(gEl && googleKey) gEl.value = googleKey;
+  if(aEl && azureKey)  aEl.value = azureKey;
 }
