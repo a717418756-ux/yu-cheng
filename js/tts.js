@@ -33,37 +33,44 @@
     const azureKey  = await getSetting('tts_azure_key', '');
     const gasUrl    = await getSetting(GAS_URL_KEY, '');
 
-    // Web Speech：取 Google zh-TW，去重（只保留第一個）
-    const wsVoices  = _getWebSpeechVoices();
-    const webItems  = wsVoices.slice(0, 1).map(v => ({
-      id:        'web:' + v.voiceURI,
+    // Web Speech：取 Google zh-TW，去重
+    // 系統 TTS：固定 id 為 'web'，不依賴 getVoices() 非同步載入
+    const webItems = [{
+      id:        'web',
       label:     '🔵 系統 TTS（離線）',
       available: true,
-      voiceURI:  v.voiceURI,
-    }));
+      voiceURI:  '',  // 由 _initDefaultVoice 設定
+    }];
 
-    // Google Cloud TTS
+    // Google Cloud TTS（有 Key 才加入選單）
     const googleItems = googleKey ? [
       { id:'google:zh-TW-Standard-A',  label:'🟢 Google 雲端 — 女聲A', available:true },
       { id:'google:zh-TW-Standard-B',  label:'🟢 Google 雲端 — 男聲B', available:true },
       { id:'google:zh-TW-Wavenet-A',   label:'🟢 Google WaveNet — 女聲', available:true },
       { id:'google:zh-TW-Wavenet-B',   label:'🟢 Google WaveNet — 男聲', available:true },
-    ] : [{ id:'google:disabled', label:'🟢 Google 雲端（需設定 API Key）', available:false }];
+    ] : [];  // 沒填 Key：完全不顯示
 
-    // Azure TTS via GAS
+    // Azure TTS via GAS（有 Key + GAS URL 才加入選單）
     const azureItems = (azureKey && gasUrl) ? [
       { id:'azure:zh-TW-HsiaoChenNeural', label:'🟣 Azure — 曉臻（自然女聲）', available:true },
       { id:'azure:zh-TW-YunJheNeural',    label:'🟣 Azure — 雲哲（自然男聲）', available:true },
-    ] : [{ id:'azure:disabled', label:'🟣 Azure TTS（需設定 API Key + GAS）', available:false }];
+    ] : [];  // 沒填 Key：完全不顯示
 
     _engines = [...webItems, ...googleItems, ...azureItems];
 
-    // 設定預設引擎
-    if(!_TTS.engine || _TTS.engine === 'web'){
-      const saved = await getSetting('tts_engine_id', '');
-      const found = _engines.find(e => e.id === saved && e.available);
-      _TTS.engine = found ? found.id : (webItems[0]?.id || 'web:default');
-      if(webItems[0]) _TTS.voiceURI = webItems[0].voiceURI;
+    // 設定預設引擎：優先讀上次儲存的選擇
+    const saved = await getSetting('tts_engine_id', '');
+    const found = _engines.find(e => e.id === saved && e.available);
+    if(found){
+      _TTS.engine = found.id;
+    } else {
+      // 沒有儲存或儲存的引擎不可用，預設系統 TTS
+      _TTS.engine = 'web';
+    }
+    // web 引擎：動態取聲音
+    if(_TTS.engine === 'web'){
+      const wsv = _getWebSpeechVoices();
+      _TTS.voiceURI = wsv[0]?.voiceURI || '';
     }
   }
 
@@ -152,23 +159,37 @@
   async function _speakGoogle(text, voiceName){
     try{
       const key = await getSetting('tts_google_key','');
-      if(!key) throw new Error('無 Google API Key');
-      const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${key}`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          input:     { text },
-          voice:     { languageCode:'zh-TW', name:voiceName },
-          audioConfig:{ audioEncoding:'MP3', speakingRate:_TTS.rate },
-        }),
-      });
-      if(!res.ok) throw new Error(`Google TTS 錯誤 ${res.status}`);
+      if(!key) throw new Error('請先在設定頁填入 Google API Key');
+      const res = await fetch(
+        `https://texttospeech.googleapis.com/v1/text:synthesize?key=${key}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            input:      { text },
+            voice:      { languageCode:'zh-TW', name:voiceName },
+            audioConfig:{ audioEncoding:'MP3', speakingRate:_TTS.rate },
+          }),
+        }
+      );
+      if(!res.ok){
+        const errJson = await res.json().catch(()=>({}));
+        const msg = errJson?.error?.message || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
       const json = await res.json();
-      if(!json.audioContent) throw new Error('無音訊回傳');
+      if(!json.audioContent) throw new Error('API 無回傳音訊');
       await _playBase64(json.audioContent);
     }catch(e){
-      toast('Google TTS 失敗，切換系統 TTS');
-      _speakWeb(text);
+      console.error('[Google TTS]', e.message);
+      const msg = e.message.includes('API_KEY') || e.message.includes('key')
+        ? 'API Key 錯誤，請重新確認'
+        : e.message.includes('quota') || e.message.includes('QUOTA')
+        ? 'Google TTS 免費額度已用完'
+        : e.message;
+      toast('Google TTS：' + msg);
+      // 仍繼續下一段（不 fallback 到 web，讓使用者知道問題）
+      _TTS.idx++;
+      _speakNext();
     }
   }
 
@@ -214,13 +235,27 @@
         _speakNext();
         resolve();
       };
-      audio.onerror = ()=>{
+      audio.onerror = (e)=>{
+        console.warn('TTS audio error:', e);
+        toast('雲端 TTS 播放失敗，切換系統 TTS');
         _TTS.audio = null;
+        // fallback 到 Web Speech 繼續這段
+        const curText = _TTS.utterances[_TTS.idx] || '';
         _TTS.idx++;
-        _speakNext();
+        if(curText) _speakWeb(curText);
+        else _speakNext();
         resolve();
       };
-      audio.play().catch(()=>{ _TTS.idx++; _speakNext(); resolve(); });
+      audio.play().catch((e)=>{
+        console.warn('TTS play() blocked:', e);
+        toast('雲端 TTS 無法播放，切換系統 TTS');
+        _TTS.audio = null;
+        const curText = _TTS.utterances[_TTS.idx] || '';
+        _TTS.idx++;
+        if(curText) _speakWeb(curText);
+        else _speakNext();
+        resolve();
+      });
     });
   }
 
@@ -462,8 +497,14 @@
       if(sel) sel.value = _TTS.engine;
       return;
     }
-    _TTS.engine   = id;
-    _TTS.voiceURI = eng.voiceURI || '';
+    _TTS.engine = id;
+    // web 引擎：動態取目前可用的第一個聲音
+    if(id === 'web'){
+      const wsv = _getWebSpeechVoices();
+      _TTS.voiceURI = wsv[0]?.voiceURI || '';
+    } else {
+      _TTS.voiceURI = eng.voiceURI || '';
+    }
     await setSetting('tts_engine_id', id);
     // 切換後重新播放當前段落
     if(_TTS.speaking && !_TTS.paused){
@@ -493,7 +534,10 @@
   function _initDefaultVoice(){
     const voices = _getWebSpeechVoices();
     if(!voices.length) return;
-    if(!_TTS.voiceURI) _TTS.voiceURI = voices[0].voiceURI;
+    // 如果目前是系統 TTS，更新 voiceURI
+    if(_TTS.engine === 'web' || !_TTS.voiceURI){
+      _TTS.voiceURI = voices[0].voiceURI;
+    }
     const sel = document.getElementById('tts-engine-sel');
     if(sel) sel.value = _TTS.engine;
   }
