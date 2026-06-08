@@ -274,12 +274,20 @@
     else speechSynthesis.resume();
     _updatePanelState();
   }
-  // Android Autoplay Policy 解鎖（在用戶手勢的同步呼叫鏈內執行）
-  let _audioCtx = null;
+  // Android Autoplay Policy 解鎖
+  // 必須在用戶手勢的同步鏈內用 HTMLAudioElement 播靜音，才能解鎖後續的 audio.play()
+  let _audioUnlocked = false;
   function _unlockAudio(){
+    if(_audioUnlocked) return;
     try{
-      if(!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if(_audioCtx.state === 'suspended') _audioCtx.resume();
+      // 1 秒靜音 mp3（最小合法 base64）
+      const sil = 'SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjM2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU2LjQxAAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//MUZAAAAAGkAAAAAAAAA0gAAAAATEFN//MUZAMAAAGkAAAAAAAAA0gAAAAARTMu//MUZAYAAAGkAAAAAAAAA0gAAAAAOTku//MUZAkAAAGkAAAAAAAAA0gAAAAANVVV';
+      const audio = new Audio('data:audio/mp3;base64,' + sil);
+      audio.volume = 0;
+      audio.play().then(()=>{
+        _audioUnlocked = true;
+        audio.pause();
+      }).catch(()=>{});
     }catch(e){}
   }
 
