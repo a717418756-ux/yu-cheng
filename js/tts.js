@@ -249,7 +249,6 @@
     }).join('');
 
     // Azure 聲音選項（有設 Key 才顯示）
-    console.log('[TTS] azureKey:', azureKey ? '有值('+azureKey.length+'字元)' : '空');
     if(azureKey){
       const azureVoices = [
         { id:'azure:zh-TW-HsiaoChenNeural', name:'🟣 Azure 曉臻（女）' },
@@ -261,7 +260,7 @@
       }).join('');
     }
 
-    const hasChoice = voices.length > 1 || (azureKey ? true : false);
+    const hasChoice = voices.length > 0 || !!azureKey;
 
     const panel = document.createElement('div');
     panel.id = 'tts-panel';
