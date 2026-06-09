@@ -227,11 +227,13 @@
   padding:0 12px;
 }
 .reader-btn{
-  background:rgba(255,255,255,0.08);border:none;
-  color:rgba(255,255,255,0.85);font-size:16px;
-  cursor:pointer;padding:6px 12px;border-radius:8px;
-  flex-shrink:0;
+  width:40px;height:40px;border-radius:50%;
+  background:none;border:none;
+  display:flex;align-items:center;justify-content:center;
+  color:rgba(255,255,255,0.75);font-size:16px;
+  cursor:pointer;flex-shrink:0;
 }
+.reader-btn:active{ opacity:.6; }
 .reader-btn:active{background:rgba(255,255,255,0.15)}
 
 /* ── 影音庫 section 質感加強 ──────────────────────────────── */
