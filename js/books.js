@@ -1147,7 +1147,7 @@ async function openBookReader(id){
       <div class="reader-title">${esc(book.title||'閱讀中')}</div>
       <button class="reader-btn" id="tts-epub-btn"
         onclick="ttsReadEpub()"
-        title="朗讀本頁">🔊</button>
+        title="朗讀本頁（點擊再次可停止）">🔊</button>
       <button class="reader-btn" onclick="_toggleReaderUI()">Aa</button>
     </div>
     <div id="reader-body" style="flex:1;overflow:hidden;position:relative;background:#111">

@@ -19,6 +19,7 @@
     mode:       '',
     panel:      null,
     collapsed:  false,
+    audio:      null,  // Azure 播放用的 HTMLAudioElement
   };
 
   // ── Azure TTS via GAS ───────────────────────────────────────
@@ -35,12 +36,31 @@
       if(!res.ok) throw new Error(`GAS HTTP ${res.status}`);
       const json = await res.json();
       if(!json.ok) throw new Error(json.error || '無回傳音訊');
-      // 播放 base64 mp3
+      // 播放 base64 mp3（存到 _TTS.audio 讓 _pause/_stop 可控制）
+      if(_TTS.audio){ _TTS.audio.pause(); _TTS.audio = null; }
       return new Promise(resolve=>{
         const audio = new Audio('data:audio/mp3;base64,' + json.audio);
-        audio.onended = ()=>{ _TTS.idx++; _updatePanelState(); _speakNext(); resolve(); };
-        audio.onerror = ()=>{ _TTS.idx++; _speakNext(); resolve(); };
-        audio.play().catch(()=>{ _TTS.idx++; _speakNext(); resolve(); });
+        _TTS.audio = audio;
+        audio.onended = ()=>{
+          _TTS.audio = null;
+          if(!_TTS.speaking){ resolve(); return; }
+          _TTS.idx++;
+          _updatePanelState();
+          _speakNext();
+          resolve();
+        };
+        audio.onerror = ()=>{
+          _TTS.audio = null;
+          _TTS.idx++;
+          _speakNext();
+          resolve();
+        };
+        audio.play().catch(()=>{
+          _TTS.audio = null;
+          _TTS.idx++;
+          _speakNext();
+          resolve();
+        });
       });
     }catch(e){
       console.error('[Azure TTS]', e.message);
@@ -130,14 +150,16 @@
   // ── 暫停 / 繼續 / 停止 ───────────────────────────────────────
   function _pause(){
     if(!_TTS.paused){
-      speechSynthesis.pause();
+      if(_TTS.audio) _TTS.audio.pause();
+      else speechSynthesis.pause();
       _TTS.paused = true;
       _updatePanelState();
     }
   }
   function _resume(){
     if(_TTS.paused){
-      speechSynthesis.resume();
+      if(_TTS.audio) _TTS.audio.play().catch(()=>{});
+      else speechSynthesis.resume();
       _TTS.paused = false;
       _updatePanelState();
     }
@@ -145,6 +167,7 @@
   function _stop(){
     _stopKeepalive();
     speechSynthesis.cancel();
+    if(_TTS.audio){ _TTS.audio.pause(); _TTS.audio = null; }
     _TTS.speaking = false;
     _TTS.paused   = false;
     _TTS.idx      = 0;
@@ -337,7 +360,16 @@
 
   // ── 公開 API ─────────────────────────────────────────────────
   window.ttsReadEpub = async function(){
-    if(_TTS.speaking){ _stop(); return; }
+    if(_TTS.speaking){
+      _stop();
+      // 停止時還原按鈕外觀
+      const btn = document.getElementById('tts-epub-btn');
+      if(btn){ btn.style.color=''; btn.style.opacity=''; }
+      return;
+    }
+    // 開始朗讀時標示按鈕
+    const btn = document.getElementById('tts-epub-btn');
+    if(btn){ btn.style.color='var(--acc)'; btn.style.opacity='1'; }
     let segments = _getEpubPageText();
     if(segments && typeof segments.then === 'function')
       segments = await segments.catch(()=>[]);
@@ -356,6 +388,9 @@
 
   window._ttsStop = ()=>{
     _stop();
+    // 還原喇叭按鈕外觀
+    const btn = document.getElementById('tts-epub-btn');
+    if(btn){ btn.style.color=''; btn.style.opacity=''; }
     if(_TTS.panel){
       _TTS.panel.style.transition = 'opacity .3s,transform .3s';
       _TTS.panel.style.opacity    = '0';
