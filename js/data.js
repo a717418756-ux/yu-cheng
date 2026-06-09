@@ -892,22 +892,42 @@ async function openLawGroup(lawName){  try{
     // 章節管理按鈕
   const chMgrBtn='<button onclick="openChapterMgr(window.currentLawName)" style="background:none;border:1px solid var(--bd);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;color:var(--t2);margin-left:4px">⚙ 管理章節</button>';
   const chMgrBtnNew='<div style="margin-bottom:6px"><button onclick="openChapterMgr(window.currentLawName)" style="background:none;border:1px solid var(--bd);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--t2)">⚙ 新增章節分類</button></div>';
-  const chTagsHtml=chapterList.map(ch=>{
-    const isP=parts.filter(Boolean).includes(ch);
-    const isS=sections.filter(Boolean).includes(ch);
-    const type=isP?'part':isS?'section':'chapter';
-    const s=LEVEL_STYLE[type];
-    const typeKey=isP?'part':isS?'sec':'ch';
-    return '<span class="tag" style="color:'+s.color+';background:'+s.bg+';border:1px solid '+s.border
-      +';cursor:pointer;margin:2px;font-size:11px" '
-      +'onclick="scrollToChapter(this,\''+encodeURIComponent(ch)+'\',\''+type+'\')" title="點擊跳轉">'
-      +'<span style="opacity:.65;font-size:9px;border:1px solid '+s.border
-        +';border-radius:3px;padding:0 3px;margin-right:3px">'+s.label+'</span>'
-      +esc(ch)+'</span>';
-  }).join('');
-  const chapterMgmtHtml=chapterList.length
-    ?'<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--t2);margin-bottom:4px">章節：'+chTagsHtml+chMgrBtn+'</div></div>'
-    :chMgrBtnNew;
+    // ── 章節導覽：依層級縱向列出，點擊跳轉（對齊法律人網站風格）──
+  const _buildChNav = () => {
+    if(!chapterList.length) return '';
+    const seen = new Set();
+    const items = [];
+    laws.forEach(l=>{
+      ['part','chapter','section'].forEach(type=>{
+        const val = l[type];
+        if(val && !seen.has(type+':'+val)){
+          seen.add(type+':'+val);
+          items.push({ type, val });
+        }
+      });
+    });
+    return items.map(({type,val})=>{
+      const s = LEVEL_STYLE[type];
+      const label = s.label||type;
+      const btnStyle = 'flex-shrink:0;background:'+s.bg+';border:1px solid '+s.border
+        +';color:'+s.color+';border-radius:20px;padding:3px 10px;font-size:11px;'
+        +'cursor:pointer;white-space:nowrap;font-weight:600';
+      const tagStyle = 'opacity:.65;margin-right:4px;font-size:9px;background:'+s.border
+        +';border-radius:3px;padding:0 3px;color:#0d1117';
+      return '<button onclick="scrollToChapter(this,\''+encodeURIComponent(val)+'\',\''+type+'\')"'
+        +' style="'+btnStyle+'">'
+        +'<span style="'+tagStyle+'">'+esc(label)+'</span>'
+        +esc(val)+'</button>';
+    }).join('');
+  };
+  const chNavHtml = _buildChNav();
+  const chapterMgmtHtml = chNavHtml
+    ? '<div style="overflow-x:auto;display:flex;align-items:center;gap:6px;'
+      +'padding:6px 12px 8px;border-bottom:1px solid var(--bd);scrollbar-width:none">'
+      +chNavHtml
+      +(chMgrBtn ? '<span style="flex-shrink:0;margin-left:6px">'+chMgrBtn+'</span>' : '')
+      +'</div>'
+    : chMgrBtnNew
 
   document.getElementById('lbody').innerHTML=
     '<div style="padding:4px 0 10px">'
@@ -1353,7 +1373,9 @@ function parseLawText(rawText, lawName, category, source){
   const partRe    = new RegExp('^第\\s*'+_numPart+'\\s*[篇編]\\s*(.+)?');
   const chapterRe = new RegExp('^第\\s*'+_numPart+'\\s*章\\s*(.+)?');
   const sectionRe = new RegExp('^第\\s*'+_numPart+'\\s*節\\s*(.+)?');
-  const articleRe = /^第\s*(\d+)\s*條\s*(?:[（(]([^）)]+)[）)])?(.*)$/;
+  // 條號：支援阿拉伯數字（第1條、第 1 條）和中文數字（第一條）
+  const _artNumPart = '(?:([一二三四五六七八九十百千\\d]+)|([\\d]+))';
+  const articleRe = /^第\s*((?:[一二三四五六七八九十百千]+|\d+))\s*條(?:之(\d+))?\s*(?:[（(]([^）)]+)[）)])?(.*)$/;
 
   // 中文數字→阿拉伯數字
   const zh2num = (s) => {
@@ -1382,7 +1404,13 @@ function parseLawText(rawText, lawName, category, source){
     if(curArtNum===null) return;
     const content = contentLines.join('\n').trim();
     if(!content && !curTitle) return;
-    const artNum = parseInt(curArtNum, 10);
+    // 支援中文數字條號
+    const _zh2n = (s)=>{
+      if(/^\d+$/.test(String(s))) return parseInt(s,10);
+      const map={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000};
+      let r=0,t=0; for(const c of String(s)){const v=map[c];if(!v)continue;if(v>=10){r+=(t||1)*v;t=0;}else t=v;} return r+t||parseInt(s,10)||0;
+    };
+    const artNum = _zh2n(curArtNum);
     items.push({
       lawName:       lawName||'',
       article:       '第 '+artNum+' 條',  // 顯示用
@@ -1419,9 +1447,10 @@ function parseLawText(rawText, lawName, category, source){
     const artM = line.match(articleRe);
     if(artM){
       saveArticle();
-      curArtNum = artM[1];
-      curTitle  = (artM[2]||'').trim();
-      const tail = (artM[3]||'').trim();
+      curArtNum = artM[1];    // 條號（中文或阿拉伯）
+      // artM[2] = 之X，artM[3] = 標題，artM[4] = 條文尾
+      curTitle  = (artM[3]||'').trim();
+      const tail = (artM[4]||'').trim();
       if(tail) contentLines.push(tail);
       continue;
     }

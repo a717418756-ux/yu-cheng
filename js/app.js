@@ -113,55 +113,86 @@ function openLawBrowseDetail(lawName){
   if(tools)     tools.style.display = 'flex';
   if(searchBar) searchBar.style.display = 'none';
 
-  // 存入 currentLawContent 供朗讀用
+  // 存入 currentLawContent 供朗讀用（純文字，無符號）
   window.currentLawName    = lawName;
   window.currentLawContent = laws.map(l=>(l.article+(l.title?' '+l.title:'')+(l.content?' '+l.content:'')).trim()).filter(Boolean).join('\n');
 
   const el = document.getElementById('lb-list');
   if(!el) return;
 
-  // 三層分組（編章節）
-  const parts    = [...new Set(laws.map(l=>l.part||''))];
+  // 三層分組狀態
+  const parts    = [...new Set(laws.map(l=>l.part   ||''))];
   const chapters = [...new Set(laws.map(l=>l.chapter||''))];
+  const sections = [...new Set(laws.map(l=>l.section||''))];
+  const hasPart    = parts.some(Boolean);
+  const hasChapter = chapters.some(Boolean);
+  const hasSection = sections.some(Boolean);
 
+  // 快速定位列：蒐集所有章節標題（依出現順序）
+  const anchors = [];
+  laws.forEach(l=>{
+    if(l.part    && !anchors.find(a=>a.text===l.part))    anchors.push({type:'part',    text:l.part});
+    if(l.chapter && !anchors.find(a=>a.text===l.chapter)) anchors.push({type:'chapter', text:l.chapter});
+    if(l.section && !anchors.find(a=>a.text===l.section)) anchors.push({type:'section', text:l.section});
+  });
+
+  // 條文卡片（唯讀，無編輯刪除按鈕）
   const renderArt = (l) => {
     const isImg = l.content && l.content.startsWith('data:image');
     const contentHtml = isImg
       ? `<img src="${l.content}" style="max-width:100%;border-radius:8px">`
       : `<div style="font-size:${_lbFontSz}px;line-height:1.85;color:var(--t1)">${esc(l.content||'').replace(/\n/g,'<br>')}</div>`;
-    return `<div class="card" style="margin:5px 12px">
+    const artId = 'lbart-'+encodeURIComponent(l.article||'');
+    return `<div id="${artId}" class="card" style="margin:5px 12px">
       <div style="font-size:${_lbFontSz+1}px;font-weight:700;color:var(--acc);margin-bottom:6px">
-        ${esc(l.article||'')}${l.title ? ' <span style="font-weight:400;color:var(--t2)">'+esc(l.title)+'</span>' : ''}
+        ${esc(l.article||'')}${l.title?' <span style="font-weight:400;color:var(--t2)">'+esc(l.title)+'</span>':''}
       </div>
       ${contentHtml}
     </div>`;
   };
 
-  const renderHeading = (text, size, color, padTop) =>
-    text ? `<div style="font-size:${size}px;font-weight:700;color:${color};padding:${padTop}px 14px 4px;margin-top:4px">${esc(text)}</div>` : '';
+  // 章節標頭（對齊資料庫 LEVEL_STYLE：編=深藍, 章=藍, 節=淺藍）
+  const LB_LEVEL = {
+    part:    { color:'#1f6feb', border:'#1f6feb', bg:'rgba(31,111,235,0.18)', bw:'4px', size:2 },
+    chapter: { color:'#58a6ff', border:'#58a6ff', bg:'rgba(88,166,255,0.13)', bw:'3px', size:1 },
+    section: { color:'#a5d6ff', border:'#a5d6ff', bg:'rgba(165,214,255,0.08)', bw:'2px', size:0 },
+  };
+  const renderHeading = (type, text) => {
+    if(!text) return '';
+    const s  = LB_LEVEL[type] || LB_LEVEL.chapter;
+    const id = 'lbch-'+encodeURIComponent(type+'-'+text);
+    const fs = _lbFontSz + s.size;
+    return `<div id="${id}" style="font-size:${fs}px;font-weight:700;color:${s.color};
+      background:${s.bg};border-left:${s.bw} solid ${s.border};
+      padding:8px 14px;margin:${type==='part'?'16':'8'}px 12px 0;
+      border-radius:0 6px 6px 0">${esc(text)}</div>`;
+  };
 
+  // 快速定位列
+  const jumpHtml = anchors.length > 1
+    ? `<div style="overflow-x:auto;display:flex;align-items:center;gap:6px;padding:6px 12px 8px;flex-shrink:0;border-bottom:1px solid var(--bd);scrollbar-width:none">` +
+      anchors.map(a => {
+        const s = LB_LEVEL[a.type] || LB_LEVEL.chapter;
+        const id = 'lbch-'+encodeURIComponent(a.type+'-'+a.text);
+        const label = {'part':'編','chapter':'章','section':'節'}[a.type]||'';
+        return `<button onclick="document.getElementById('${id}')?.scrollIntoView({behavior:'smooth',block:'start'})"
+          style="flex-shrink:0;font-size:11px;padding:3px 10px;border-radius:20px;cursor:pointer;
+            background:${s.bg};color:${s.color};border:1px solid ${s.border};white-space:nowrap;font-weight:600">
+          ${label?`<span style="opacity:.65;margin-right:4px;font-size:9px;background:${s.border};border-radius:3px;padding:0 3px;color:#0d1117">${label}</span>`:''}${esc(a.text)}</button>`;
+      }).join('') + `</div>` : '';
+
+  // 主體渲染（三層遍歷）
   let html = '';
-  if(parts.filter(Boolean).length > 1){
-    parts.forEach(part=>{
-      html += renderHeading(part, _lbFontSz+3, 'var(--org)', 14);
-      chapters.forEach(ch=>{
-        const arts = laws.filter(l=>(l.part||'')===(part) && (l.chapter||'')===(ch));
-        if(!arts.length) return;
-        html += renderHeading(ch, _lbFontSz+1, 'var(--pur)', 8);
-        arts.forEach(l=>{ html += renderArt(l); });
-      });
-      const noChArt = laws.filter(l=>(l.part||'')===(part) && !(l.chapter));
-      noChArt.forEach(l=>{ html += renderArt(l); });
-    });
-  } else {
-    chapters.forEach(ch=>{
-      if(ch) html += renderHeading(ch, _lbFontSz+2, 'var(--pur)', 10);
-      laws.filter(l=>(l.chapter||'')===(ch)).forEach(l=>{ html += renderArt(l); });
-    });
-    laws.filter(l=>!l.chapter).forEach(l=>{ html += renderArt(l); });
-  }
+  let lastPart = '__', lastChapter = '__', lastSection = '__';
+  laws.forEach(l=>{
+    const p = l.part||'', ch = l.chapter||'', sec = l.section||'';
+    if(hasPart && p !== lastPart){ html += renderHeading('part', p); lastPart = p; lastChapter = '__'; lastSection = '__'; }
+    if(hasChapter && ch !== lastChapter){ html += renderHeading('chapter', ch); lastChapter = ch; lastSection = '__'; }
+    if(hasSection && sec !== lastSection){ html += renderHeading('section', sec); lastSection = sec; }
+    html += renderArt(l);
+  });
 
-  el.innerHTML = html;
+  el.innerHTML = jumpHtml + '<div style="padding-bottom:24px">' + html + '</div>';
   el.scrollTop = 0;
 }
 

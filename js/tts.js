@@ -116,14 +116,18 @@
   // ── 取得系統 zh-TW 聲音，去重 ──────────────────────────────
   function _getVoices(){
     const all = speechSynthesis.getVoices();
-    // 只取 zh-TW，去重
     const seen = new Set();
-    return all.filter(v => v.lang === 'zh-TW').filter(v => {
+    const dedup = (list) => list.filter(v => {
       const key = v.name.replace(/\s+/g,'').toLowerCase();
       if(seen.has(key)) return false;
       seen.add(key);
       return true;
     });
+    // 優先 zh-TW；若無則取任何含「中文」或 zh 的聲音
+    const tw = all.filter(v => v.lang === 'zh-TW');
+    if(tw.length) return dedup(tw);
+    const zh = all.filter(v => v.lang.startsWith('zh') || v.name.includes('Chinese') || v.name.includes('中文'));
+    return dedup(zh);
   }
 
   // ── 朗讀核心 ─────────────────────────────────────────────────
@@ -171,7 +175,7 @@
     const utter    = new SpeechSynthesisUtterance(text);
     utter.lang     = 'zh-TW';
     utter.rate     = _TTS.rate;
-    if(_TTS.voiceURI){
+    if(_TTS.voiceURI && _TTS.voiceURI !== 'default'){
       const v = speechSynthesis.getVoices().find(v => v.voiceURI === _TTS.voiceURI);
       if(v) utter.voice = v;
     }
@@ -283,23 +287,29 @@
     if(existing) existing.remove();
 
     // 等待聲音清單載入（Chrome 非同步，最多等 500ms）
+    // 等待聲音清單載入，並加 10ms 緩衝確保 getVoices() 已填充
     if(!speechSynthesis.getVoices().length){
       await new Promise(resolve=>{
-        const t = setTimeout(resolve, 500);
+        const t = setTimeout(resolve, 600);
         const prev = speechSynthesis.onvoiceschanged;
         speechSynthesis.onvoiceschanged = ()=>{
+          speechSynthesis.onvoiceschanged = prev;
           clearTimeout(t);
-          speechSynthesis.onvoiceschanged = prev;  // 還原，不覆寫全域 handler
-          resolve();
+          setTimeout(resolve, 10); // 給瀏覽器 10ms 填充聲音清單
         };
       });
+    } else {
+      // 已有聲音但可能未含 zh-TW，等一個 microtask
+      await new Promise(r => setTimeout(r, 0));
     }
 
     const voices    = _getVoices();
     const azureKey  = await getSetting('tts_azure_key','').catch(()=>'');
 
-    // 系統聲音選項
-    let voiceOpts = voices.map(v => {
+    // 系統聲音選項（含保底「系統預設」選項）
+    const defSel = (!_TTS.voiceURI || _TTS.voiceURI === 'default') ? ' selected' : '';
+    let voiceOpts = `<option value="default"${defSel}>🔵 系統預設（離線）</option>`;
+    voiceOpts += voices.map(v => {
       const name = v.name.replace(/\s*\([^)]*\)/g,'').trim();
       const sel  = v.voiceURI === _TTS.voiceURI ? ' selected' : '';
       return `<option value="${v.voiceURI}"${sel}>${name}</option>`;
