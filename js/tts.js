@@ -53,11 +53,9 @@
   // ── 取得系統 zh-TW 聲音，去重 ──────────────────────────────
   function _getVoices(){
     const all = speechSynthesis.getVoices();
-    const tw  = all.filter(v => v.lang === 'zh-TW');
-    const res = tw.length ? tw : all.filter(v => v.lang.startsWith('zh'));
-    // 去重：name 相同只保留一個
+    // 只取 zh-TW，去重
     const seen = new Set();
-    return res.filter(v => {
+    return all.filter(v => v.lang === 'zh-TW').filter(v => {
       const key = v.name.replace(/\s+/g,'').toLowerCase();
       if(seen.has(key)) return false;
       seen.add(key);
@@ -228,6 +226,7 @@
     }).join('');
 
     // Azure 聲音選項（有設 Key 才顯示）
+    console.log('[TTS] azureKey:', azureKey ? '有值('+azureKey.length+'字元)' : '空');
     if(azureKey){
       const azureVoices = [
         { id:'azure:zh-TW-HsiaoChenNeural', name:'🟣 Azure 曉臻（女）' },
