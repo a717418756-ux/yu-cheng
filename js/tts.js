@@ -23,10 +23,19 @@
   };
 
   // ── Azure TTS via GAS ───────────────────────────────────────
+  // 快取 Azure 設定（避免每段都讀 IndexedDB）
+  let _azureCache = { key:'', url:'' };
+  async function _loadAzureConfig(){
+    if(!_azureCache.key){
+      _azureCache.key = await getSetting('tts_azure_key','').catch(()=>'');
+      _azureCache.url = await getSetting('gasWebAppUrl','').catch(()=>'');
+    }
+    return _azureCache;
+  }
+
   async function _speakAzure(text, voiceName){
     try{
-      const azureKey = await getSetting('tts_azure_key','');
-      const gasUrl   = await getSetting('gasWebAppUrl','');
+      const { key:azureKey, url:gasUrl } = await _loadAzureConfig();
       if(!azureKey || !gasUrl) throw new Error('請先設定 Azure Key 和 GAS 網址');
       const res = await fetch(gasUrl, {
         method: 'POST',
@@ -173,6 +182,7 @@
     _TTS.idx      = 0;
     _updatePanelState();
   }
+  function _resetAzureCache(){ _azureCache = { key:'', url:'' }; }
 
   // ── Keepalive（Android speechSynthesis 靜默停止防護）────────
   let _keepaliveTimer = null;
@@ -237,6 +247,13 @@
   async function _createPanel(mode){
     const existing = document.getElementById('tts-panel');
     if(existing) existing.remove();
+
+    // 等待聲音清單載入（Chrome 非同步，最多等 500ms）
+    await new Promise(resolve=>{
+      if(speechSynthesis.getVoices().length){ resolve(); return; }
+      const t = setTimeout(resolve, 500);
+      speechSynthesis.onvoiceschanged = ()=>{ clearTimeout(t); resolve(); };
+    });
 
     const voices    = _getVoices();
     const azureKey  = await getSetting('tts_azure_key','').catch(()=>'');
