@@ -33,23 +33,57 @@
     return _azureCache;
   }
 
+  // Prefetch：預先 fetch 下一段音訊，減少段落間停頓
+  let _prefetchCache = null;  // { idx, promise }
+  function _prefetchNext(idx, voiceName){
+    const nextIdx  = idx + 1;
+    const nextText = _TTS.utterances[nextIdx];
+    if(!nextText?.trim()) return;
+    if(_prefetchCache?.idx === nextIdx) return;  // 已在 prefetch
+    _prefetchCache = {
+      idx: nextIdx,
+      promise: _loadAzureConfig().then(({ key:azureKey, url:gasUrl })=>{
+        if(!azureKey || !gasUrl) return null;
+        return fetch(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            action:'azure_tts', text:nextText, voiceName,
+            rate:_TTS.rate, azureKey,
+          }),
+        }).then(r => r.ok ? r.json() : null).catch(()=>null);
+      }),
+    };
+  }
+
   async function _speakAzure(text, voiceName){
     try{
       const { key:azureKey, url:gasUrl } = await _loadAzureConfig();
       if(!azureKey || !gasUrl) throw new Error('請先設定 Azure Key 和 GAS 網址');
-      const res = await fetch(gasUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action:'azure_tts', text, voiceName, rate:_TTS.rate, azureKey }),
-      });
-      if(!res.ok) throw new Error(`GAS HTTP ${res.status}`);
-      const json = await res.json();
+
+      // 優先使用 prefetch 快取
+      let json = null;
+      if(_prefetchCache?.idx === _TTS.idx && _prefetchCache.promise){
+        json = await _prefetchCache.promise;
+        _prefetchCache = null;
+      }
+      if(!json){
+        const res = await fetch(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action:'azure_tts', text, voiceName, rate:_TTS.rate, azureKey }),
+        });
+        if(!res.ok) throw new Error(`GAS HTTP ${res.status}`);
+        json = await res.json();
+      }
       if(!json.ok) throw new Error(json.error || '無回傳音訊');
       // 播放 base64 mp3（存到 _TTS.audio 讓 _pause/_stop 可控制）
       if(_TTS.audio){ _TTS.audio.pause(); _TTS.audio = null; }
       return new Promise(resolve=>{
         const audio = new Audio('data:audio/mp3;base64,' + json.audio);
         _TTS.audio = audio;
+        // 開始播放時預先 fetch 下一段（減少段落間停頓）
+        _prefetchNext(_TTS.idx, voiceName);
         audio.onended = ()=>{
           _TTS.audio = null;
           if(!_TTS.speaking){ resolve(); return; }
@@ -177,12 +211,12 @@
     _stopKeepalive();
     speechSynthesis.cancel();
     if(_TTS.audio){ _TTS.audio.pause(); _TTS.audio = null; }
+    _prefetchCache = null;
     _TTS.speaking = false;
     _TTS.paused   = false;
     _TTS.idx      = 0;
     _updatePanelState();
   }
-  function _resetAzureCache(){ _azureCache = { key:'', url:'' }; }
 
   // ── Keepalive（Android speechSynthesis 靜默停止防護）────────
   let _keepaliveTimer = null;
@@ -249,11 +283,17 @@
     if(existing) existing.remove();
 
     // 等待聲音清單載入（Chrome 非同步，最多等 500ms）
-    await new Promise(resolve=>{
-      if(speechSynthesis.getVoices().length){ resolve(); return; }
-      const t = setTimeout(resolve, 500);
-      speechSynthesis.onvoiceschanged = ()=>{ clearTimeout(t); resolve(); };
-    });
+    if(!speechSynthesis.getVoices().length){
+      await new Promise(resolve=>{
+        const t = setTimeout(resolve, 500);
+        const prev = speechSynthesis.onvoiceschanged;
+        speechSynthesis.onvoiceschanged = ()=>{
+          clearTimeout(t);
+          speechSynthesis.onvoiceschanged = prev;  // 還原，不覆寫全域 handler
+          resolve();
+        };
+      });
+    }
 
     const voices    = _getVoices();
     const azureKey  = await getSetting('tts_azure_key','').catch(()=>'');

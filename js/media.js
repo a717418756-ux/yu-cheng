@@ -425,12 +425,7 @@ async function _executeBulk(){
   if(el) _renderExpandMode(el);
 }
 
-function _closeExpandMode(){
-  _M.expandMode = null;
-  _M.bulkMode = false;
-  _M.bulkSelected = new Set();
-  _renderMediaPage();
-}
+
 
 // 類別篩選（展開模式內）
 function _setExpandCat(btn, cat){

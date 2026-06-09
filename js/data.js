@@ -598,8 +598,6 @@ function pickLawSort(key){
 }
 // 保留舊 toggleLawSort 防外部殘留呼叫
 function toggleLawSort(){ openLawSortMenu(document.getElementById('law-sort-btn')); }
-// 保留舊 setLSort 防外部殘留呼叫
-function setLSort(el,sort){ pickLawSort(sort); }
 
 async function renderDB(){  try{
   const ls=await da('laws');
