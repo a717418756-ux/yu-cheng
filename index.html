@@ -575,8 +575,7 @@
   <div class="qhd">
     <button class="btn bg" style="padding:6px 10px;font-size:13px" onclick="exitLaw()">← 返回</button>
     <div style="flex:1;padding-left:8px;overflow:hidden"><div style="font-size:15px;font-weight:700;color:var(--t0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="lv-name"></div><div id="lv-info" style="font-size:10px;color:var(--t2);display:none;margin-top:1px"></div></div>
-    <button onclick="ttsReadLaw()" class="vpc-btn vpc-sm"
-      style="font-size:18px;color:var(--t2)" title="朗讀法條">🔊</button>
+
     <button onclick="editLawGroupInfo()" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--t2);padding:4px 6px" title="編輯法規資訊（機關/日期）">⚙</button>
     <button id="lv-star" style="width:40px;height:40px;border-radius:50%;background:var(--bg2);font-size:18px;border:1px solid var(--bd);color:var(--t2);cursor:pointer;flex-shrink:0">☆</button>
   </div>
@@ -750,6 +749,13 @@
       <button class="chip" onclick="setLBCat(this,'supplement')">補充資料</button>
       <button class="chip" onclick="setLBCat(this,'interpretation')">函釋</button>
     </div>
+  </div>
+  <!-- 章節快速定位列（sticky，詳細頁才顯示）-->
+  <div id="lb-jump-bar" style="display:none;flex-shrink:0;overflow-x:auto;
+    align-items:center;gap:6px;padding:10px 14px;
+    background:var(--bg1);border-bottom:1.5px solid var(--bd);
+    scrollbar-width:none;position:sticky;top:0;z-index:10;
+    min-height:48px">
   </div>
   <div style="flex:1;overflow-y:auto;padding-bottom:20px" id="lb-list"></div>
 </div>
