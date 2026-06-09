@@ -720,12 +720,28 @@
 </div>
 
 <!-- 資料閱覽 overlay -->
-<div id="law-browse-ov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:500;flex-direction:column;max-width:520px;margin:0 auto">
-  <div class="qhd">
-    <button class="btn bg" style="padding:6px 10px;font-size:13px" onclick="closeLawBrowse()">✕ 關閉</button>
-    <div style="flex:1;font-size:15px;font-weight:700;padding-left:8px">資料閱覽</div>
+<div id="law-browse-ov" style="display:none;position:fixed;inset:0;background:var(--bg0);z-index:500;flex-direction:column;max-width:var(--layout-page-max-w);margin:0 auto">
+  <!-- 標題列：動態切換（列表/詳細）-->
+  <div class="qhd" style="flex-shrink:0">
+    <!-- 返回按鈕（詳細頁時顯示）-->
+    <button id="lb-back-btn" class="vpc-btn vpc-sm"
+      onclick="backToLawBrowseList()"
+      style="display:none;font-size:18px;color:rgba(255,255,255,0.75)">←</button>
+    <!-- 關閉按鈕（列表時顯示）-->
+    <button id="lb-close-btn" class="btn bg" style="padding:6px 10px;font-size:13px" onclick="closeLawBrowse()">✕ 關閉</button>
+    <div id="lb-browse-title" style="flex:1;font-size:15px;font-weight:700;padding-left:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">資料閱覽</div>
+    <!-- 詳細頁工具列 -->
+    <div id="lb-detail-tools" style="display:none;align-items:center;gap:4px">
+      <button class="vpc-btn vpc-sm" onclick="lbFontChange(-1)"
+        style="font-size:14px;color:rgba(255,255,255,0.6)">A-</button>
+      <button class="vpc-btn vpc-sm" onclick="lbFontChange(1)"
+        style="font-size:16px;font-weight:700;color:rgba(255,255,255,0.8)">A+</button>
+      <button class="vpc-btn vpc-sm" onclick="ttsReadLaw()"
+        style="font-size:18px;color:rgba(255,255,255,0.6)" title="朗讀">🔊</button>
+    </div>
   </div>
-  <div style="padding:8px 12px;background:var(--bg1);border-bottom:1px solid var(--bd)">
+  <!-- 搜尋列（列表時顯示）-->
+  <div id="lb-search-bar" style="padding:8px 12px;background:var(--bg1);border-bottom:1px solid var(--bd);flex-shrink:0">
     <div class="sb" style="margin:0 0 6px"><span class="ic">🔍</span><input id="lb-search" type="search" placeholder="搜尋法規名稱、條號、關鍵概念..." oninput="_debouncedLawBrowseSearch()"></div>
     <div class="chips" id="lb-cat-chips" style="padding:0">
       <button class="chip on" onclick="setLBCat(this,'all')">全部</button>
