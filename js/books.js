@@ -1299,12 +1299,26 @@ async function _initEpubReader(url, savedCfi){
     window._epubRendition = rendition;
 
     // 設定主題（深色預設）
+    // 依裝置 DPR 和螢幕尺寸自動調整基礎字體
+    const _dpr    = window.devicePixelRatio || 1;
+    const _sw     = window.screen.width;
+    const _sh     = window.screen.height;
+    // 物理解析度（實際像素）
+    const _physW  = _sw * _dpr;
+    const _physH  = _sh * _dpr;
+    // 判斷：FHD+(>1080px 物理寬) → 較大字體
+    const _isHighRes = _physW >= 1080 || _physH >= 1920;
+    const _baseFontSize = (_dpr >= 2.5 && _isHighRes) ? 19  // S24+(2340×1080,DPR≈2.8)
+                        : _dpr >= 2.5                 ? 18  // 高 DPR 但較小螢幕
+                        : _dpr >= 1.5                 ? 17  // BOOX / 一般平板
+                        :                               15; // 低 DPI
+
     rendition.themes.register('dark', {
       'body': {
         'background': '#111 !important',
         'color': '#e8e8e8 !important',
         'font-family': "'Noto Serif TC', 'Noto Serif SC', Georgia, serif !important",
-        'font-size': '17px !important',
+        'font-size': _baseFontSize+'px !important',
         'line-height': '1.85 !important',
         'padding': '0 !important',    // paginated 模式不能設水平 padding（會被 overflow:hidden 裁切）
         'margin': '0 !important',

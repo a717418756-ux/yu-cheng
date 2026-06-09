@@ -1154,7 +1154,7 @@ function openVpPlaylist(){
       width:56px;height:56px;border-radius:50%;
       background:radial-gradient(circle at 50%,#2a2a36 0%,#111 25%,#1c1c24 45%,#111 65%,#0e0e12 100%);
       overflow:hidden;flex-shrink:0;
-      box-shadow:${isActive?'0 0 0 2px #a855f7':'0 2px 8px rgba(0,0,0,0.5)'};
+      box-shadow:${isActive?'0 0 0 2.5px #ffffff,0 0 0 4px rgba(255,255,255,0.15)':'0 2px 8px rgba(0,0,0,0.5)'};
       position:relative;display:flex;align-items:center;justify-content:center;`;
     if(m.thumbnail){
       const img = document.createElement('img');
@@ -1168,7 +1168,7 @@ function openVpPlaylist(){
       dot.style.cssText = `
         position:absolute;bottom:3px;right:3px;
         width:10px;height:10px;border-radius:50%;
-        background:#a855f7;border:1.5px solid #0a0a0a;`;
+        background:rgba(255,255,255,0.9);border:1.5px solid #0a0a0a;`;
       thumb.appendChild(dot);
     }
 
@@ -1176,7 +1176,7 @@ function openVpPlaylist(){
     const name = document.createElement('div');
     name.style.cssText = `
       font-size:10px;font-weight:${isActive?'700':'500'};
-      color:${isActive?'#a855f7':'rgba(255,255,255,0.65)'};
+      color:${isActive?'#ffffff':'rgba(255,255,255,0.65)'};
       text-align:center;line-height:1.3;
       width:100%;overflow:hidden;
       display:-webkit-box;-webkit-line-clamp:2;
