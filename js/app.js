@@ -9,13 +9,15 @@ function toggleBrowseSub(){
 }
 
 // ── 資料閱覽 overlay ─────────────────────────────────────────
-let _lbCat = 'all';
+let _lbCat     = 'all';
 let _lbAllLaws = [];
+let _lbView    = 'list';  // 'list'=法規列表 'detail'=條文詳細
+let _lbFontSz  = 15;
 
 async function openLawBrowse(){  try{
   _lbAllLaws = await da('laws');
   _lbCat = 'all';
-  // reset chips
+  _lbView = 'list';  // 'list'=法規列表, 'detail'=條文詳細
   document.querySelectorAll('#lb-cat-chips .chip').forEach(c=>c.classList.remove('on'));
   const first = document.querySelector('#lb-cat-chips .chip');
   if(first) first.classList.add('on');
@@ -29,6 +31,7 @@ async function openLawBrowse(){  try{
 function closeLawBrowse(){
   const ov = document.getElementById('law-browse-ov');
   if(ov) ov.style.display = 'none';
+  _lbView = 'list';
 }
 
 function setLBCat(el, cat){
@@ -38,54 +41,157 @@ function setLBCat(el, cat){
   renderLawBrowse();
 }
 
+let _lbSearchTimer = null;
+function _debouncedLawBrowseSearch(){
+  clearTimeout(_lbSearchTimer);
+  _lbSearchTimer = setTimeout(renderLawBrowse, 200);
+}
+
 function renderLawBrowse(){
-  const kw = (document.getElementById('lb-search')?.value||'').toLowerCase().trim();
-  let fl = _lbAllLaws.filter(l=>{
-    if(_lbCat!=='all' && l.category!==_lbCat) return false;
-    if(kw){
-      const h = ((l.lawName||'')+(l.article||'')+(l.content||'')+(l.keywords||[]).join(' ')+(l.title||'')).toLowerCase();
-      return h.includes(kw);
-    }
-    return true;
-  }).sort((a,b)=>{
-    if((a.lawName||'') < (b.lawName||'')) return -1;
-    if((a.lawName||'') > (b.lawName||'')) return 1;
-    return (a.articleNumber||0)-(b.articleNumber||0);
-  });
-  const el = document.getElementById('lb-list');
+  const kw    = (document.getElementById('lb-search')?.value||'').toLowerCase().trim();
+  const el    = document.getElementById('lb-list');
   if(!el) return;
+
+  if(_lbView === 'detail') return;  // 詳細頁時不覆蓋
+
+  // 過濾
+  let fl = _lbAllLaws.filter(l=>{
+    if(_lbCat !== 'all' && l.category !== _lbCat) return false;
+    if(!kw) return true;
+    const h = ((l.lawName||'')+(l.article||'')+(l.title||'')+(l.content||'')+(l.keywords||[]).join(' ')).toLowerCase();
+    return h.includes(kw);
+  });
+
   if(!fl.length){
-    el.innerHTML='<div class="empty"><span class="ic">📂</span><span>查無資料</span></div>';
+    el.innerHTML = '<div class="empty"><span class="ic">📂</span><span>查無資料</span></div>';
     return;
   }
-  el.innerHTML = fl.map(l=>{
-    const isImg = l.content && l.content.startsWith('data:image');
-    const preview = isImg ? '🖼 圖片內容' : _hl((l.content||'').slice(0,80),kw);
-    const kwTags=(l.keywords||[]).length
-      ?'<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">'
-        +(l.keywords||[]).map(k=>'<span class="tag" style="color:var(--pur);font-size:10px">'+_hl(k,kw)+'</span>').join('')
-        +'</div>':'';
-    return `<div class="card" style="margin:5px 12px;cursor:pointer" onclick="openLawGroup('${esc(l.lawName||'')}')">
-      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;flex-wrap:wrap">
-        <span class="tag" style="color:var(--pur)">${_hl(l.lawName||'未命名',kw)}</span>
-        ${l.article?`<span class="tag">${_hl(l.article,kw)}</span>`:''}
-        ${l.title?`<span class="tag">${_hl(l.title,kw)}</span>`:''}
-        <span class="tag">${l.category==='statute'?'法規':l.category==='sop'?'SOP':l.category==='supplement'?'補充':l.category==='interpretation'?'函釋':'其他'}</span>
+
+  // 依法規名稱分組
+  const byName = {};
+  fl.forEach(l=>{
+    const n = l.lawName||'未分類';
+    if(!byName[n]) byName[n] = { laws:[], category: l.category||'statute' };
+    byName[n].laws.push(l);
+  });
+
+  const catLabel = { statute:'法規條文', sop:'SOP', supplement:'補充資料', interpretation:'函釋' };
+  const catIcon  = { statute:'⚖', sop:'📋', supplement:'📄', interpretation:'📜' };
+
+  el.innerHTML = Object.entries(byName).sort((a,b)=>a[0].localeCompare(b[0],'zh-TW')).map(([name,{laws,category}])=>{
+    const icon  = catIcon[category]||'⚖';
+    const label = catLabel[category]||category;
+    const kw_hl = kw ? name.replace(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),m=>`<mark style="background:#d4a438;color:#121212;border-radius:2px;padding:0 2px">${m}</mark>`) : esc(name);
+    return `<div class="card" style="margin:5px 12px;cursor:pointer" onclick="openLawBrowseDetail('${esc(name)}')">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:20px">${icon}</span>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700;color:var(--t0)">${kw_hl}</div>
+          <div style="font-size:11px;color:var(--t2);margin-top:2px">${label} · ${laws.length} 條</div>
+        </div>
+        <span style="color:var(--t2);font-size:18px">›</span>
       </div>
-      <div style="font-size:12px;color:var(--t2);line-height:1.6">${preview}${!isImg&&(l.content||'').length>80?'…':''}</div>
-      ${kwTags}
     </div>`;
   }).join('');
 }
-const _debouncedLawBrowseSearch = debounce(renderLawBrowse, 200);
 
-// ── 首頁兩大區塊展開/收合 ────────────────────────────────────
-window._activeZone = null;  // 'exam' | 'study' | null
-let _zoneQuizOpen = false;
+// ── 閱覽詳細頁（唯讀，不可編輯）────────────────────────────
+function openLawBrowseDetail(lawName){
+  _lbView = 'detail';
+  const laws = _lbAllLaws.filter(l => l.lawName === lawName);
+  if(!laws.length) return;
 
-// ── 首頁 widget 顯示控制 ────────────────────────────────────
-// show=true：顯示數據橫條+熱力圖（無區域展開狀態）
-// show=false：隱藏熱力圖，考試區顯示數據橫條，其他區隱藏
+  // 更新標題列
+  const titleEl   = document.getElementById('lb-browse-title');
+  const backBtn   = document.getElementById('lb-back-btn');
+  const closeBtn  = document.getElementById('lb-close-btn');
+  const tools     = document.getElementById('lb-detail-tools');
+  const searchBar = document.getElementById('lb-search-bar');
+  if(titleEl)   titleEl.textContent = lawName;
+  if(backBtn)   backBtn.style.display = 'flex';
+  if(closeBtn)  closeBtn.style.display = 'none';
+  if(tools)     tools.style.display = 'flex';
+  if(searchBar) searchBar.style.display = 'none';
+
+  // 存入 currentLawContent 供朗讀用
+  window.currentLawName    = lawName;
+  window.currentLawContent = laws.map(l=>(l.article+(l.title?' '+l.title:'')+(l.content?' '+l.content:'')).trim()).filter(Boolean).join('\n');
+
+  const el = document.getElementById('lb-list');
+  if(!el) return;
+
+  // 三層分組（編章節）
+  const parts    = [...new Set(laws.map(l=>l.part||''))];
+  const chapters = [...new Set(laws.map(l=>l.chapter||''))];
+
+  const renderArt = (l) => {
+    const isImg = l.content && l.content.startsWith('data:image');
+    const contentHtml = isImg
+      ? `<img src="${l.content}" style="max-width:100%;border-radius:8px">`
+      : `<div style="font-size:${_lbFontSz}px;line-height:1.85;color:var(--t1)">${esc(l.content||'').replace(/\n/g,'<br>')}</div>`;
+    return `<div class="card" style="margin:5px 12px">
+      <div style="font-size:${_lbFontSz+1}px;font-weight:700;color:var(--acc);margin-bottom:6px">
+        ${esc(l.article||'')}${l.title ? ' <span style="font-weight:400;color:var(--t2)">'+esc(l.title)+'</span>' : ''}
+      </div>
+      ${contentHtml}
+    </div>`;
+  };
+
+  const renderHeading = (text, size, color, padTop) =>
+    text ? `<div style="font-size:${size}px;font-weight:700;color:${color};padding:${padTop}px 14px 4px;margin-top:4px">${esc(text)}</div>` : '';
+
+  let html = '';
+  if(parts.filter(Boolean).length > 1){
+    parts.forEach(part=>{
+      html += renderHeading(part, _lbFontSz+3, 'var(--org)', 14);
+      chapters.forEach(ch=>{
+        const arts = laws.filter(l=>(l.part||'')===(part) && (l.chapter||'')===(ch));
+        if(!arts.length) return;
+        html += renderHeading(ch, _lbFontSz+1, 'var(--pur)', 8);
+        arts.forEach(l=>{ html += renderArt(l); });
+      });
+      const noChArt = laws.filter(l=>(l.part||'')===(part) && !(l.chapter));
+      noChArt.forEach(l=>{ html += renderArt(l); });
+    });
+  } else {
+    chapters.forEach(ch=>{
+      if(ch) html += renderHeading(ch, _lbFontSz+2, 'var(--pur)', 10);
+      laws.filter(l=>(l.chapter||'')===(ch)).forEach(l=>{ html += renderArt(l); });
+    });
+    laws.filter(l=>!l.chapter).forEach(l=>{ html += renderArt(l); });
+  }
+
+  el.innerHTML = html;
+  el.scrollTop = 0;
+}
+
+function backToLawBrowseList(){
+  _lbView = 'list';
+  window.currentLawName    = '';
+  window.currentLawContent = '';
+  const titleEl   = document.getElementById('lb-browse-title');
+  const backBtn   = document.getElementById('lb-back-btn');
+  const closeBtn  = document.getElementById('lb-close-btn');
+  const tools     = document.getElementById('lb-detail-tools');
+  const searchBar = document.getElementById('lb-search-bar');
+  if(titleEl)   titleEl.textContent = '資料閱覽';
+  if(backBtn)   backBtn.style.display = 'none';
+  if(closeBtn)  closeBtn.style.display = '';
+  if(tools)     tools.style.display = 'none';
+  if(searchBar) searchBar.style.display = '';
+  renderLawBrowse();
+}
+
+function lbFontChange(delta){
+  _lbFontSz = Math.max(12, Math.min(24, _lbFontSz + delta));
+  if(_lbView === 'detail'){
+    // 重新渲染當前詳細頁
+    const name = window.currentLawName;
+    if(name) openLawBrowseDetail(name);
+  }
+}
+
+
 function _setHomeWidgets(show, zone){
   const dataBar = document.getElementById('h-data-bar');
   const heatmap = document.getElementById('heatmap-wrap');
