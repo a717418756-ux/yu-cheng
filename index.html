@@ -566,19 +566,34 @@
 <!-- LAW READER -->
 <div id="lv">
   <div class="qhd">
-    <button class="btn bg" style="padding:6px 10px;font-size:13px" onclick="exitLaw()">← 返回</button>
-    <div style="flex:1;padding-left:8px;overflow:hidden;display:flex;align-items:center;gap:8px;min-width:0">
+    <!-- 迴轉返回按鈕 -->
+    <button class="vpc-btn vpc-sm" onclick="exitLaw()" title="返回" style="color:var(--t1)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
+    <div style="flex:1;padding-left:6px;overflow:hidden;display:flex;align-items:center;gap:6px;min-width:0">
       <div style="min-width:0;flex:1">
         <div style="font-size:15px;font-weight:700;color:var(--t0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="lv-name"></div>
         <div id="lv-info" style="font-size:10px;color:var(--t2);display:none;margin-top:1px"></div>
       </div>
       <div id="lv-count" style="font-size:11px;color:var(--t2);flex-shrink:0;white-space:nowrap"></div>
     </div>
-
-    <button onclick="ttsReadLaw()" class="vpc-btn vpc-sm"
-      style="font-size:18px;color:var(--t2)" title="朗讀法條">🔊</button>
-    <button onclick="editLawGroupInfo()" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--t2);padding:4px 6px" title="編輯法規資訊（機關/日期）">⚙</button>
-    <button id="lv-star" style="width:40px;height:40px;border-radius:50%;background:var(--bg2);font-size:18px;border:1px solid var(--bd);color:var(--t2);cursor:pointer;flex-shrink:0">☆</button>
+    <!-- 閱讀/編輯模式切換 -->
+    <button id="lv-mode-btn" class="vpc-btn vpc-sm" onclick="toggleLvMode()"
+      title="切換模式" style="font-size:12px;font-weight:700;color:var(--t2)">編輯</button>
+    <!-- 更多選單按鈕 -->
+    <div style="position:relative">
+      <button class="vpc-btn vpc-sm" onclick="toggleLvMenu(this)" style="font-size:18px;color:var(--t2)">⋮</button>
+      <div id="lv-menu" style="display:none;position:absolute;right:0;top:calc(100%+4px);
+        background:var(--bg1);border:1px solid var(--bd);border-radius:12px;
+        padding:4px 0;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:200">
+        <button class="lv-menu-item" onclick="ttsReadLaw();closeLvMenu()">🔊 朗讀法條</button>
+        <button class="lv-menu-item" id="lv-star-item" onclick="toggleLawFav(window.currentLawId);closeLvMenu()">☆ 收藏</button>
+        <button class="lv-menu-item" onclick="editLawGroupInfo();closeLvMenu()">⚙ 編輯法規資訊</button>
+        <button class="lv-menu-item" onclick="openChapterMgr();closeLvMenu()">📑 編輯編章節</button>
+        <div style="border-top:1px solid var(--bd);margin:4px 0"></div>
+        <button class="lv-menu-item" style="color:var(--red)" onclick="openBulkDelLawInGroup();closeLvMenu()">🗑 大量刪除</button>
+      </div>
+    </div>
   </div>
   <!-- 章節快速定位列（sticky，openLawGroup 渲染後填入）-->
   <div id="lv-chapter-bar" style="display:none;flex-shrink:0;overflow-x:auto;
@@ -587,8 +602,8 @@
     scrollbar-width:none;position:sticky;top:0;z-index:10;min-height:48px">
   </div>
   <div class="lb" id="lbody"></div>
-  <div style="padding:10px 12px;border-top:1px solid var(--bd);background:var(--bg1);display:flex;gap:7px">
-    <button class="btn bg" style="flex:1;padding:12px;font-size:13px" onclick="addLawInGroup()">＋ 新增條文</button>
+  <div id="lv-bottom-bar" style="padding:10px 12px;border-top:1px solid var(--bd);background:var(--bg1);display:flex;gap:7px">
+    <button id="lv-add-btn" class="btn bg" style="flex:1;padding:12px;font-size:13px" onclick="addLawInGroup()">＋ 新增條文</button>
     <button class="btn bp" style="flex:1;padding:12px;font-size:13px" onclick="quizFromLaw()">🎯 練習相關題</button>
   </div>
 </div>
