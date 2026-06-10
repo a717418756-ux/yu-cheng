@@ -564,7 +564,7 @@
   </div>
 </div>
 <!-- LAW READER -->
-<div id="lv">
+<div id="lv" style="display:none;position:fixed;inset:0;z-index:400;background:var(--bg0);flex-direction:column;max-width:var(--layout-page-max-w);margin:0 auto">
   <div class="qhd">
     <!-- 迴轉返回按鈕 -->
     <button class="vpc-btn vpc-sm" onclick="exitLaw()" title="返回" style="color:var(--t1)">
@@ -587,7 +587,7 @@
         background:var(--bg1);border:1px solid var(--bd);border-radius:12px;
         padding:4px 0;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:200">
         <button class="lv-menu-item" onclick="ttsReadLaw();closeLvMenu()">🔊 朗讀法條</button>
-        <button class="lv-menu-item" id="lv-star-item" onclick="toggleLawFav(window.currentLawId);closeLvMenu()">☆ 收藏</button>
+        <button class="lv-menu-item" id="lv-star-item" onclick="toggleLvFav();closeLvMenu()">☆ 收藏</button>
         <button class="lv-menu-item" onclick="editLawGroupInfo();closeLvMenu()">⚙ 編輯法規資訊</button>
         <button class="lv-menu-item" onclick="openChapterMgr();closeLvMenu()">📑 編輯編章節</button>
         <div style="border-top:1px solid var(--bd);margin:4px 0"></div>
@@ -601,7 +601,7 @@
     background:var(--bg1);border-bottom:1.5px solid var(--bd);
     scrollbar-width:none;position:sticky;top:0;z-index:10;min-height:48px">
   </div>
-  <div class="lb" id="lbody"></div>
+  <div class="lb" id="lbody" style="flex:1;overflow-y:auto;padding-bottom:12px"></div>
   <div id="lv-bottom-bar" style="padding:10px 12px;border-top:1px solid var(--bd);background:var(--bg1);display:flex;gap:7px">
     <button id="lv-add-btn" class="btn bg" style="flex:1;padding:12px;font-size:13px" onclick="addLawInGroup()">＋ 新增條文</button>
     <button class="btn bp" style="flex:1;padding:12px;font-size:13px" onclick="quizFromLaw()">🎯 練習相關題</button>
