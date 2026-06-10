@@ -958,6 +958,19 @@ function exitLaw(){
 }
 
 // ── lv 更多選單 ────────────────────────────────────────────
+async function toggleLvFav(){
+  const name = S.curLawName || window.currentLawName;
+  if(!name) return;
+  const all = await da('laws');
+  const laws = all.filter(l => l.lawName === name);
+  if(!laws.length) return;
+  const nf = laws.some(l => l.favorite);
+  for(const l of laws){ l.favorite = !nf; await dp('laws', l); }
+  toast(nf ? '已取消收藏' : '已收藏');
+  // 更新收藏按鈕文字
+  const btn = document.getElementById('lv-star-item');
+  if(btn) btn.textContent = nf ? '☆ 收藏' : '★ 已收藏';
+}
 function toggleLvMenu(btn){
   const menu = document.getElementById('lv-menu');
   if(!menu) return;
