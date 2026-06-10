@@ -306,14 +306,9 @@
     const voices    = _getVoices();
     const azureKey  = await getSetting('tts_azure_key','').catch(()=>'');
 
-    // 系統聲音選項（含保底「系統預設」選項）
+    // 聲音選項：固定三個（系統預設 + Azure 曉臻 + Azure 雲哲）
     const defSel = (!_TTS.voiceURI || _TTS.voiceURI === 'default') ? ' selected' : '';
     let voiceOpts = `<option value="default"${defSel}>🔵 系統預設（離線）</option>`;
-    voiceOpts += voices.map(v => {
-      const name = v.name.replace(/\s*\([^)]*\)/g,'').trim();
-      const sel  = v.voiceURI === _TTS.voiceURI ? ' selected' : '';
-      return `<option value="${v.voiceURI}"${sel}>${name}</option>`;
-    }).join('');
 
     // Azure 聲音選項（有設 Key 才顯示）
     if(azureKey){
@@ -327,7 +322,7 @@
       }).join('');
     }
 
-    const hasChoice = voices.length > 0 || !!azureKey;
+    const hasChoice = !!azureKey;  // 只有設定 Azure Key 時才顯示選單
 
     const panel = document.createElement('div');
     panel.id = 'tts-panel';
