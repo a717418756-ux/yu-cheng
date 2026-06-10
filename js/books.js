@@ -1289,10 +1289,12 @@ async function _initEpubReader(url, savedCfi){
     const viewerH = window.innerHeight - 120;  // fixed overlay：視窗高扣頂/底列
     // epub.js paginated 需精確寬度：window.innerWidth 有時多一像素造成截字
     // 減去 2px 確保 column 完整顯示在容器內
+    // 自動偵測裝置（layout.js 已設定 _epubDeviceSpread）
+    const _spread = window._epubDeviceSpread || 'none';
     const rendition = book.renderTo('epub-viewer', {
       width:  window.innerWidth - 2,
       height: Math.max(400, viewerH),
-      spread: 'none',
+      spread: _spread,
       flow:   'paginated',
       allowScriptedContent: false,
     });

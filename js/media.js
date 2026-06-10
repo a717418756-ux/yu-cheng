@@ -1161,6 +1161,12 @@ function openVpPlaylist(){
       img.src = m.thumbnail;
       img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
       thumb.appendChild(img);
+    } else {
+      // 無封面：顯示黑膠紋路圖案
+      const inner = document.createElement('div');
+      inner.style.cssText = 'width:100%;height:100%;border-radius:50%;'
+        +'background:radial-gradient(circle at 50% 50%,#333 0%,#111 30%,#222 55%,#1a1a1a 70%,#111 100%)';
+      thumb.appendChild(inner);
     }
     // 正在播放指示
     if(isActive){

@@ -929,11 +929,20 @@ async function openLawGroup(lawName){  try{
       +'</div>'
     : chMgrBtnNew
 
+  // 法條數量寫入 header
+  const countEl = document.getElementById('lv-count');
+  if(countEl) countEl.textContent = laws.length + ' 條';
+  // 章節 chip 寫入 sticky 列
+  const chBarEl = document.getElementById('lv-chapter-bar');
+  if(chBarEl){
+    const chHtml = _buildChNav();
+    chBarEl.innerHTML = chHtml;
+    chBarEl.style.display = chHtml ? 'flex' : 'none';
+  }
+  // lbody：只有法條卡片（章節標題已由 renderHeading 內嵌在 arts 裡）
   document.getElementById('lbody').innerHTML=
     '<div style="padding:4px 0 10px">'
     +(others.length?'<div class="sec" style="padding:0 0 4px;font-size:11px">快速跳轉</div><div style="overflow-x:auto;display:flex;gap:6px;padding:6px 0">'+jumpHtml+'</div>':'')
-    +'<div class="sec" style="padding:8px 0 6px;font-size:11px">'+esc(lawName)+' · '+laws.length+' 條</div>'
-    +chapterMgmtHtml
     +arts
     +'</div>';
   window.currentLawName=lawName;window.currentLawContent=laws.map(l=>(l.article+(l.title?' '+l.title:'')+(l.content?' '+l.content:'')).trim()).filter(Boolean).join('\n');
@@ -941,7 +950,13 @@ async function openLawGroup(lawName){  try{
   document.getElementById('lv').style.display='flex';
   }catch(e){ logError('openLawGroup',e); }}
 
-function exitLaw(){ document.getElementById('lv').style.display='none'; }
+function exitLaw(){
+  document.getElementById('lv').style.display='none';
+  const cb = document.getElementById('lv-chapter-bar');
+  if(cb){ cb.innerHTML=''; cb.style.display='none'; }
+  const ct = document.getElementById('lv-count');
+  if(ct) ct.textContent='';
+}
 async function addLawInGroup(){
   try{
     const lawName=S.curLawName||window.currentLawName;

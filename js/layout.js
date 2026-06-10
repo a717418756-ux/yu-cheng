@@ -69,12 +69,18 @@
     return 'mobile';
   }
 
+  // epub 裝置模式：供 books.js 讀取（'none'=單頁/手機, 'auto'=雙頁/平板）
+  function _setEpubDeviceMode(lyt){
+    window._epubDeviceSpread = (lyt === 'tablet' || lyt === 'desktop') ? 'auto' : 'none';
+  }
+
   function _applyLayout(layout){
     if(layout === _currentLayout) return;
     _currentLayout = layout;
 
     const html = document.documentElement;
     html.setAttribute('data-layout', layout);
+    _setEpubDeviceMode(layout);
 
     const vars = LAYOUT_VARS[layout];
     for(const [k, v] of Object.entries(vars)){
