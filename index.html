@@ -282,7 +282,11 @@
     <div><div class="hdt">資料庫</div></div>
     <div style="display:flex;gap:6px">
       <button class="hd-btn bg" id="law-sort-btn" onclick="openLawSortMenu(this)">排序</button>
-      <button class="hd-btn red" onclick="openBulkDelLaw()">🗑 大量刪除</button>
+      <button class="hd-btn bg" id="db-sel-btn" onclick="toggleDbSelectMode()" title="選擇刪除">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </button>
       <div style="position:relative" id="add-law-wrap">
         <button class="hd-btn blue plus" id="add-law-btn" onclick="toggleAddLawMenu()">＋</button>
         <div id="add-law-menu" style="display:none;position:absolute;top:calc(100% + 7px);right:0;background:var(--bg1);border:1px solid var(--bd);border-radius:10px;padding:5px 0;min-width:148px;box-shadow:0 6px 24px rgba(0,0,0,.5);z-index:260">
@@ -301,6 +305,20 @@
     <button class="chip" onclick="setLC(this,'interpretation')">函釋</button>
   </div>
   <div style="font-size:11px;color:var(--t2);padding:4px 12px" id="db-lc"></div>
+  <!-- 選擇刪除模式的確認列（平時隱藏）-->
+  <div id="db-sel-bar" style="display:none;padding:10px 12px;background:var(--bg1);
+    border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;flex-shrink:0">
+    <span id="db-sel-count" style="font-size:13px;color:var(--t2);flex:1">已選 0 筆</span>
+    <button class="btn bg" style="padding:6px 14px;font-size:13px" onclick="toggleDbSelectMode()">取消</button>
+    <button class="btn" style="padding:6px 14px;font-size:13px;background:var(--red);color:#fff"
+      onclick="confirmDbSelDel()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
+      刪除選取
+    </button>
+  </div>
   <div id="llist"></div>
 </div>
 <!-- BULK（overlay，與逐一新增相同樣式）-->
