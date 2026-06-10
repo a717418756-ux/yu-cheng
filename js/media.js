@@ -262,7 +262,7 @@ function _renderExpandMode(el){
     backBtn.id='expand-back-btn';
     backBtn.className='hd-btn';
     backBtn.style.cssText='font-size:13px;color:var(--acc)';
-    backBtn.textContent='‹ 返回';
+    backBtn.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
     backBtn.onclick=()=>_closeExpandMode();
     hdLeft.appendChild(backBtn);
     // 中間：標題改為主旨
@@ -273,7 +273,7 @@ function _renderExpandMode(el){
       bulkBtn.id='expand-bulk-btn';
       bulkBtn.className='hd-btn';
       bulkBtn.style.cssText=`font-size:12px;color:${isFavMode?'var(--acc)':'var(--red)'}`;
-      bulkBtn.textContent=isFavMode?'批量移除':'批量刪除';
+      bulkBtn.innerHTML=isFavMode?'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>':'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
       bulkBtn.onclick=()=>_toggleBulkMode();
       // 插在新增按鈕前面
       const addBtn = hdRight.querySelector('.hd-btn.blue');
@@ -1249,7 +1249,7 @@ async function playVideo(id){
 
   ov.innerHTML=`
     <div class="vvp-topbar">
-      <button class="vvp-back" onclick="closeVideoPlayer(${id})">←</button>
+      <button class="vvp-back" onclick="closeVideoPlayer(${id})"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
       <div class="vvp-title">${esc(full.title||'影片')}</div>
       <button class="vvp-more" onclick="_openVideoMenu(${id},this)">⋮</button>
     </div>
@@ -1584,8 +1584,11 @@ async function openMediaDetail(id){
       </div>
       <div style="height:1px;background:rgba(255,255,255,0.06);margin:0 0 8px"></div>
       <button onclick="document.getElementById('media-detail-ov').remove()"
-        style="width:100%;padding:13px 20px;text-align:center;background:none;border:none;
-        color:var(--t2);font-size:14px;cursor:pointer">關閉</button>
+        style="display:flex;align-items:center;justify-content:center;gap:8px;
+        width:100%;padding:12px 20px;background:none;border:none;
+        color:var(--t2);font-size:14px;cursor:pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 關閉
+      </button>
     </div>`;
   ov.onclick=e=>{if(e.target===ov)ov.remove();};
   document.body.appendChild(ov);

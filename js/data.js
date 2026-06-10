@@ -200,9 +200,12 @@ async function renderList(){  try{
     if(sf!=='all'&&q.subject!==sf)return false;
     if(kw){const h=(q.searchBlob||(q.stem||'')+(q.subject||'')+(q.keywords||[]).join(' ')).toLowerCase();if(!h.includes(kw))return false;}
     return true;
-  }).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  }).sort((a,b)=>(b.year||'').localeCompare(a.year||'') || (a.subject||'').localeCompare(b.subject||''));
+
   const lcEl=document.getElementById('lc');
   if(lcEl) lcEl.textContent='共 '+fl.length+' 題';
+
+  // 更新科目 chip
   const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))].sort();
   const schips=document.getElementById('schips');
   if(schips){
@@ -215,11 +218,162 @@ async function renderList(){  try{
       schips.appendChild(b);
     });
   }
-  const PAGE=50; let page=0;
+
   const el=document.getElementById('qlist');
   if(!el) return;
-  el.style.cssText=''; el.innerHTML='';
   if(window._vlScroll){ window.removeEventListener('scroll',window._vlScroll); window._vlScroll=null; }
+  el.innerHTML='';
+
+  if(!fl.length){
+    el.innerHTML='<div class="empty"><span class="ic">📭</span><span>尚無題目</span></div>';
+    return;
+  }
+
+  // 有搜尋關鍵字時：直接顯示題目列表（不分組）
+  if(kw){
+    const PAGE=50; let page=0;
+    const _mkQCard=(q)=>{
+      const danger=getDangerLevel(q,ats);
+      const div=document.createElement('div');
+      div.className='qc'+(ws.has(q.id)?' wrong':'')+(q.starred?' star':'');
+      div.innerHTML=
+        '<div class="qch">'+
+          '<span class="badge '+(q.type==='mc'?'bmc':'bes')+'">'+(q.type==='mc'?'選擇':'申論')+'</span>'+
+          (q.year?'<span class="tag">'+esc(q.year)+'</span>':'')+
+          (q.exam?'<span class="tag">'+esc(q.exam)+'</span>':'')+
+          '<span class="tag">'+esc(q.subject||'未分類')+'</span>'+
+          '<span style="font-size:13px;margin-left:auto">'+danger+'</span>'+
+          '<span style="font-size:15px;margin-left:4px">'+(q.starred?'★':'☆')+'</span>'+
+        '</div>'+
+        '<div class="qst">'+esc((q.stem||'').slice(0,100))+'</div>'+
+        '<div class="qa">'+
+          '<button class="qabn" onclick="editQ('+q.id+')">✏ 編輯</button>'+
+          '<button class="qabn" data-qid="'+q.id+'" onclick="startSingleQ(this)">▶ 練習</button>'+
+          '<button class="qabn" onclick="toggleStar('+q.id+')">'+(q.starred?'★':'☆')+'</button>'+
+          '<button class="qabn" style="color:var(--red);margin-left:auto" onclick="delQ('+q.id+')">🗑</button>'+
+        '</div>';
+      return div;
+    };
+    const loadMore=()=>{
+      const batch=fl.slice(page*PAGE,(page+1)*PAGE);
+      if(!batch.length) return;
+      batch.forEach(q=>el.appendChild(_mkQCard(q)));
+      page++;
+    };
+    loadMore();
+    if(fl.length>PAGE){
+      window._vlScroll=()=>{ if(window.scrollY+window.innerHeight>=document.body.offsetHeight-200) loadMore(); };
+      window.addEventListener('scroll',window._vlScroll);
+    }
+    return;
+  }
+
+  // 無搜尋：依年度分組（第一層），點進去才顯示科目
+  const byYear={};
+  fl.forEach(q=>{
+    const yr = q.year||'未知年度';
+    if(!byYear[yr]) byYear[yr]=[];
+    byYear[yr].push(q);
+  });
+
+  Object.entries(byYear).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([yr, qs])=>{
+    const wrong = qs.filter(q=>ws.has(q.id)).length;
+    // 計算科目數
+    const subjects = [...new Set(qs.map(q=>q.subject||'未分類'))];
+    const div=document.createElement('div');
+    div.className='qc';
+    div.style.cursor='pointer';
+    div.innerHTML=
+      '<div class="qch">'+
+        '<span class="tag" style="font-size:13px;font-weight:700">'+esc(yr)+'</span>'+
+        '<span style="font-size:11px;color:var(--t2);margin-left:6px">'+subjects.length+' 科</span>'+
+        '<span style="margin-left:auto;font-size:12px;color:var(--t2)">'+qs.length+' 題'+(wrong?' · <span style="color:var(--red)">'+wrong+' 錯</span>':'')+'</span>'+
+        '<span style="color:var(--t2);margin-left:6px">›</span>'+
+      '</div>'+
+      '<div style="font-size:11px;color:var(--t2);margin-top:4px">'+subjects.slice(0,4).map(s=>esc(s)).join('・')+(subjects.length>4?'…':'')+'</div>';
+    div.onclick=()=>openYearGroup(yr);
+    el.appendChild(div);
+  });
+}catch(e){ logError('renderList',e); }}
+
+// ── 年度選擇頁（第二層）─────────────────────────────────────────
+async function openYearGroup(year){  try{
+  const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
+  const ws=getWrong(qs,ats);
+  const fl=qs.filter(q=>(q.year||'未知年度')===year);
+  const el=document.getElementById('qlist');
+  if(!el) return;
+  if(window._vlScroll){ window.removeEventListener('scroll',window._vlScroll); window._vlScroll=null; }
+  el.innerHTML='';
+
+  // 返回按鈕
+  const backDiv=document.createElement('div');
+  backDiv.style.cssText='padding:4px 0 8px;';
+  const backBtn=document.createElement('button');
+  backBtn.className='btn bg';
+  backBtn.style.cssText='font-size:13px;padding:6px 14px;display:inline-flex;align-items:center;gap:6px';
+  backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回列表';
+  backBtn.onclick=()=>openYearGroup(_qGroupYear);
+  backDiv.appendChild(backBtn);
+  el.appendChild(backDiv);
+
+  // 科目分組
+  const bySubject={};
+  fl.forEach(q=>{
+    const sub=q.subject||'未分類';
+    if(!bySubject[sub]) bySubject[sub]=[];
+    bySubject[sub].push(q);
+  });
+  const lcEl=document.getElementById('lc');
+  if(lcEl) lcEl.textContent=year+' · '+Object.keys(bySubject).length+' 科 · '+fl.length+' 題';
+
+  Object.entries(bySubject).sort((a,b)=>a[0].localeCompare(b[0],'zh-TW')).forEach(([sub,sqs])=>{
+    const wrong=sqs.filter(q=>ws.has(q.id)).length;
+    const div=document.createElement('div');
+    div.className='qc';
+    div.style.cursor='pointer';
+    div.innerHTML=
+      '<div class="qch">'+
+        '<span class="tag">'+esc(sub)+'</span>'+
+        '<span style="margin-left:auto;font-size:12px;color:var(--t2)">'+sqs.length+' 題'+(wrong?' · <span style="color:var(--red)">'+wrong+' 錯</span>':'')+'</span>'+
+        '<span style="color:var(--t2);margin-left:6px">›</span>'+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--t2);margin-top:4px">'+
+        esc((sqs[0]?.stem||'').slice(0,50))+(sqs.length>1?'…':'')+'</div>';
+    div.onclick=()=>openQGroup(year, sub);
+    el.appendChild(div);
+  });
+}catch(e){ logError('openYearGroup',e); }}
+
+// ── 題目群組詳細頁 ────────────────────────────────────────────
+let _qGroupYear='', _qGroupSubject='';
+async function openQGroup(year, subject){  try{
+  _qGroupYear=year; _qGroupSubject=subject;
+  const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
+  const ws=getWrong(qs,ats);
+  const fl=qs.filter(q=>(q.year||'未知年度')===year&&(q.subject||'未分類')===subject)
+    .sort((a,b)=>(a.id||0)-(b.id||0));
+
+  const el=document.getElementById('qlist');
+  if(!el) return;
+  if(window._vlScroll){ window.removeEventListener('scroll',window._vlScroll); window._vlScroll=null; }
+
+  // header：返回按鈕
+  const lcEl=document.getElementById('lc');
+  if(lcEl) lcEl.textContent=year+' · '+subject+' · '+fl.length+' 題';
+
+  el.innerHTML='';
+  // 返回按鈕區
+  const backDiv=document.createElement('div');
+  backDiv.style.cssText='padding:4px 0 8px;';
+  const backBtn=document.createElement('button');
+  backBtn.className='btn bg';
+  backBtn.style.cssText='font-size:13px;padding:6px 14px;display:inline-flex;align-items:center;gap:6px';
+  backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回列表';
+  backBtn.onclick=()=>renderList();
+  backDiv.appendChild(backBtn);
+  el.appendChild(backDiv);
+
   const _mkQCard=(q)=>{
     const danger=getDangerLevel(q,ats);
     const div=document.createElement('div');
@@ -242,112 +396,10 @@ async function renderList(){  try{
       '</div>';
     return div;
   };
-  const loadMore=()=>{
-    const batch=fl.slice(page*PAGE,(page+1)*PAGE);
-    if(!batch.length) return;
-    batch.forEach(q=>el.appendChild(_mkQCard(q)));
-    page++;
-    if(lcEl){
-      const shown=Math.min(page*PAGE,fl.length);
-      lcEl.textContent=shown<fl.length?'共 '+fl.length+' 題（已顯示 '+shown+'，繼續滑動）':'共 '+fl.length+' 題';
-    }
-  };
-  loadMore();
-  const pgEl=document.getElementById('pg-list');
-  const onScroll=()=>{ if(pgEl&&pgEl.scrollHeight-pgEl.scrollTop-pgEl.clientHeight<200) loadMore(); };
-  window._vlScroll=onScroll;
-  if(pgEl) pgEl.addEventListener('scroll',onScroll,{passive:true});
-  }catch(e){ logError('renderList',e); }}
 
-function setF(el,f){
-  document.querySelectorAll('#fchips .chip').forEach(c=>c.classList.remove('on'));
-  el.classList.add('on');S.filter=f;renderList();
-}
+  fl.forEach(q=>el.appendChild(_mkQCard(q)));
+}catch(e){ logError('openQGroup',e); }}
 
-
-function showAdd(q){
-  const data=q&&q.id?q:null;
-  S.editId=data?.id||null;
-  document.getElementById('add-title').textContent=data?'編輯題目':'新增題目';
-  setQT(data?.type||'mc');
-  document.getElementById('f-sub').value=data?.subject||'';
-  document.getElementById('f-yr').value=data?.year||'';
-  document.getElementById('f-ex').value=data?.exam||'';
-  document.getElementById('f-num').value=data?.num||'';
-  document.getElementById('f-stem').value=data?.stem||'';
-  // 題組欄位
-  const isGroupEl=document.getElementById('f-is-group');
-  const groupWrap=document.getElementById('f-group-wrap');
-  const hasGroup=!!(data?.groupId);
-  if(isGroupEl) isGroupEl.checked=hasGroup;
-  if(groupWrap) groupWrap.classList.toggle('hide',!hasGroup);
-  const gsEl=document.getElementById('f-group-stem');
-  if(gsEl) gsEl.value=data?.groupStem||'';
-  const giEl=document.getElementById('f-group-id');
-  if(giEl) giEl.value=data?.groupId||'';
-  const goEl=document.getElementById('f-group-order');
-  if(goEl) goEl.value=data?.groupOrder||''  ;
-  document.getElementById('f-kw').value=(data?.keywords||[]).join(',');
-  document.getElementById('f-note').value=data?.note||'';
-  const isNumEl=document.getElementById('f-is-number');
-  if(isNumEl) isNumEl.checked=data?.isNumberQ||false;
-  document.getElementById('f-laws').value=(data?.relatedLaws||[]).map(l=>l.ref||l.lawName||'').filter(Boolean).join(',');
-  // 申論題關鍵字
-  const mustEl=document.getElementById('f-must-kw');
-  if(mustEl)mustEl.value=(data?.mustKeywords||[]).join(',');
-  buildOpts(data||{});
-  document.getElementById('add-ov').classList.add('on');
-  setTimeout(()=>document.getElementById('f-stem').focus(),300);
-}
-function closeAdd(){document.getElementById('add-ov').classList.remove('on');S.editId=null;}
-
-function toggleGroupStem(){
-  const cb=document.getElementById('f-is-group');
-  const wrap=document.getElementById('f-group-wrap');
-  if(wrap) wrap.classList.toggle('hide',!cb?.checked);
-}
-
-function setQT(t){
-  S.qType=t;
-  document.getElementById('tmc').className='btn '+(t==='mc'?'bp':'bg');
-  document.getElementById('tes').className='btn '+(t==='es'?'bp':'bg');
-  document.getElementById('mc-opts').classList.toggle('hide',t!=='mc');
-  document.getElementById('es-area').classList.toggle('hide',t!=='es');
-  // (10) 申論必寫關鍵字只在申論題顯示
-  const mustWrap=document.getElementById('must-kw-wrap');
-  if(mustWrap) mustWrap.classList.toggle('hide',t!=='es');
-}
-
-function buildOpts(q){
-  const opts=q.options||{A:'',B:'',C:'',D:''};
-  const ans=(q.answer||'').replace(/[, ]/g,'');
-  // 初始化多選集合
-  S.correctSet=new Set(ans.split('').filter(c=>/[A-E]/.test(c)));
-  S.correct=ans;
-  document.getElementById('opts-c').innerHTML=
-    ['A','B','C','D','E'].map(k=>`
-      <div class="oi">
-        <button class="cb ${ans===k?'sel':''}" id="cb-${k}" onclick="setCorr('${k}')">${k}</button>
-        <input id="opt-${k}" placeholder="選項 ${k}" value="${esc(opts[k]||'')}">
-      </div>`).join('');
-  document.getElementById('f-es').value=q.answerEs||'';
-}
-
-function setCorr(k){
-  // 支援多選：再次點擊已選的取消，多個選項可同時選
-  if(!S.correctSet) S.correctSet=new Set();
-  if(S.correctSet.has(k)) S.correctSet.delete(k);
-  else S.correctSet.add(k);
-  // 排序後合併成答案字串
-  S.correct=[...S.correctSet].sort().join('');
-  ['A','B','C','D','E'].forEach(c=>{
-    const el=document.getElementById('cb-'+c);
-    if(el)el.className='cb'+(S.correctSet.has(c)?' sel':'');
-  });
-}
-
-const _debouncedRenderList=debounce(renderList,200);
-const _debouncedRenderDB=debounce(renderDB,220);
 
 async function saveQ(){
   try{
@@ -677,14 +729,36 @@ async function renderDB(){  try{
       return nameMatch && artMatch;
     }
     // searchBlob 優先（純文字），沒有才 fallback 到欄位拼接（排除 content 避免 base64 拖慢）
-    const h = (l.searchBlob || ((l.lawName||'')+(l.article||'')+(l.title||'')+(l.keywords||[]).join(' '))).toLowerCase();
+    const _c = (l.content||'').startsWith('data:') ? '' : (l.content||'');
+    const h = (l.searchBlob || ((l.lawName||'')+(l.article||'')+(l.title||'')+(l.keywords||[]).join(' ')+_c)).toLowerCase();
     return h.includes(kwText);
   });
 
-  const byName={};
-  fl.forEach(l=>{const n=l.lawName||'未分類';if(!byName[n])byName[n]=[];byName[n].push(l);});
   const el=document.getElementById('llist');
   if(!fl.length){el.innerHTML='<div class="empty"><span class="ic">🗄</span><span>尚無資料</span></div>';return;}
+
+  // 有關鍵字：直接顯示匹配的條文（不分組）
+  if(kw){
+    el.innerHTML='';
+    fl.forEach(l=>{
+      const isImg = (l.content||'').startsWith('data:');
+      const preview = isImg ? '🖼 圖片內容' : esc((l.content||'').slice(0,80));
+      const div=document.createElement('div');
+      div.className='card';
+      div.style.cssText='margin:5px 12px;cursor:pointer';
+      div.innerHTML=
+        '<div style="font-size:11px;color:var(--t2);margin-bottom:4px">'+esc(l.lawName||'')+'</div>'+
+        '<div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:4px">'+esc(l.article||'')+(l.title?' <span style="font-weight:400;color:var(--t2)">'+esc(l.title)+'</span>':'')+' </div>'+
+        '<div style="font-size:13px;color:var(--t1);line-height:1.7">'+preview+'</div>';
+      div.onclick=()=>openLawGroup(l.lawName);
+      el.appendChild(div);
+    });
+    return;
+  }
+
+  // 無關鍵字：依法規名稱分組顯示
+  const byName={};
+  fl.forEach(l=>{const n=l.lawName||'未分類';if(!byName[n])byName[n]=[];byName[n].push(l);});
 
   const sortedEntries=Object.entries(byName).sort((a,b)=>{
     const sortBy=S.lawSort||'name';
@@ -1425,9 +1499,10 @@ async function saveLaw(){
   }
   try{
     // 建立純文字搜尋索引（排除 base64 圖片 content，加速搜尋）
+    const _cnt = (data.content||'').startsWith('data:') ? '' : (data.content||'');
     data.searchBlob = [
       data.lawName, data.article, String(data.articleNumber||''),
-      data.title, (data.keywords||[]).join(' ')
+      data.title, (data.keywords||[]).join(' '), _cnt
     ].filter(Boolean).join(' ').toLowerCase();
     await dp('laws',data);
     // 更新制定機關 datalist
@@ -1650,7 +1725,7 @@ async function importBulkLaw(){  try{
     l.searchBlob = [
       l.lawName, l.article, String(l.articleNumber||''),
       l.title, (l.keywords||[]).join(' ')
-    ].filter(Boolean).join(' ').toLowerCase();
+    , (l.content||'').startsWith('data:') ? '' : (l.content||'')].filter(Boolean).join(' ').toLowerCase();
   });
   await bulkPut('laws',items);
   toast('已匯入 '+items.length+' 條法條 ✓');
