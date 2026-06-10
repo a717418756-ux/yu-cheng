@@ -775,15 +775,10 @@ async function openLawGroup(lawName){  try{
     lvInfo.textContent=(s.org?'🏛 '+s.org:'')+(s.org&&s.amendDate?' · ':'')+(s.amendDate?'📅 '+s.amendDate:'');
     lvInfo.style.display=(s.org||s.amendDate)?'block':'none';
   }
-  const sb=document.getElementById('lv-star');
+  // 收藏狀態同步到 ⋮ 選單的收藏按鈕
   const favN=laws.filter(l=>l.favorite).length;
-  sb.textContent=favN?'★':'☆';
-  sb.style.color=favN?'var(--org)':'var(--t2)';
-  sb.onclick=async()=>{
-    const nf=laws.filter(l=>l.favorite).length>0;
-    for(const l of laws){l.favorite=!nf;await dp('laws',l);}
-    openLawGroup(lawName);
-  };
+  const starItem=document.getElementById('lv-star-item');
+  if(starItem) starItem.textContent=favN?'★ 已收藏':'☆ 收藏';
   const jumpHtml=others.map(n=>'<button class="chip" style="flex-shrink:0;font-size:11px" onclick="openLawGroup(\''+esc(n)+'\')">'+esc(n)+'</button>').join('');
 
   // ── 三層分組（編 > 章 > 節）────────────────────────────────
@@ -944,8 +939,7 @@ async function openLawGroup(lawName){  try{
   window.currentLawName=lawName;window.currentLawContent=laws.map(l=>(l.article+(l.title?' '+l.title:'')+(l.content?' '+l.content:'')).trim()).filter(Boolean).join('\n');
   S.curLawName=lawName; // 供編輯按鈕使用
   document.getElementById('lv').style.display='flex';
-  console.log('[lv] opened:', lawName);
-  }catch(e){ console.error('[lv] error:', e); logError('openLawGroup',e); }}
+  }catch(e){ logError('openLawGroup',e); }}
 
 function exitLaw(){
   document.getElementById('lv').style.display='none';
