@@ -747,6 +747,7 @@ const LEVEL_STYLE = {
 };
 
 async function openLawGroup(lawName){  try{
+  if(!document.getElementById('lv')){ return; }  // 防衛：lv 元素不存在時不執行
   const allLaws=await da('laws');
   const _kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
   // §N 精確搜尋
@@ -767,7 +768,7 @@ async function openLawGroup(lawName){  try{
   const others=[...new Set(allLaws.map(l=>l.lawName).filter(Boolean))].filter(n=>n!==lawName).slice(0,8);
   const cat=laws[0].category||'statute';
   const icon=cat==='sop'?'📋':cat==='supplement'?'📄':'⚖';
-  document.getElementById('lv-name').textContent=icon+' '+lawName;
+  const lvName=document.getElementById('lv-name'); if(lvName) lvName.textContent=icon+' '+lawName;
   // 顯示法規機關/日期資訊
   const lvInfo=document.getElementById('lv-info');
   if(lvInfo){
