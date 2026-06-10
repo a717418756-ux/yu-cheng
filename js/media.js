@@ -1150,6 +1150,7 @@ function openVpPlaylist(){
 
     // 唱盤縮圖（小圓形）
     const thumb = document.createElement('div');
+    thumb.dataset.pthumb = '1';  // 供非同步 thumbnail 填充識別
     thumb.style.cssText = `
       width:56px;height:56px;border-radius:50%;
       background:radial-gradient(circle at 50%,#2a2a36 0%,#111 25%,#1c1c24 45%,#111 65%,#0e0e12 100%);
@@ -1205,7 +1206,7 @@ function openVpPlaylist(){
       if(!raw) return;
       const card = row.children[i];
       if(!card) return;
-      const thumbDiv = card.querySelector('div[style*="border-radius:50%"]');
+      const thumbDiv = card.querySelector('[data-pthumb]');
       if(!thumbDiv) return;
       const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
       const img = document.createElement('img');

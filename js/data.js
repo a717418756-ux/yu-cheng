@@ -739,6 +739,7 @@ async function renderDB(){  try{
       +'</div>';
     div.addEventListener('click',function(e){
       if(e.target.classList.contains('lw-del'))return;
+      if(_dbSelMode){ e.stopPropagation(); _toggleDbCard(this.dataset.lawname); return; }
       openLawGroup(this.dataset.lawname);
     });
     div.querySelector('.lw-del').addEventListener('click',function(e){
