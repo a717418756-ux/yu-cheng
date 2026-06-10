@@ -646,6 +646,15 @@ textarea{resize:vertical;line-height:1.7}
 /* 題目進度條（由 quiz.js 設定 --qpb-w）*/
 #qpb{ width:var(--qpb-w,0%); }
 
+/* ── lv 更多選單（法規內選單）──────────────────────────────── */
+.lv-menu-item{
+  width:100%;padding:11px 16px;text-align:left;
+  background:none;border:none;
+  color:var(--t0);font-size:13px;font-weight:500;
+  cursor:pointer;display:flex;align-items:center;gap:9px;
+}
+.lv-menu-item:active{ background:var(--bg3); }
+
 /* ── TTS 朗讀控制列（使用音頻播放器設計語言 vpc-* / vp-*）── */
 #tts-panel{
   position:fixed;
