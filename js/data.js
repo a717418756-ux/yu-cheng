@@ -596,6 +596,13 @@ function pickLawSort(key){
 // 保留舊 toggleLawSort 防外部殘留呼叫
 function toggleLawSort(){ openLawSortMenu(document.getElementById('law-sort-btn')); }
 
+function setLC(el, cat){
+  document.querySelectorAll('#lchips .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  S.lawCat = cat;
+  renderDB();
+}
+
 async function renderDB(){  try{
   const ls=await da('laws');
   const kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
@@ -807,8 +814,8 @@ async function openLawGroup(lawName){  try{
       +'<div style="font-size:14px;font-weight:700;color:var(--acc);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">'
         +'<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'
         +'<div style="display:flex;gap:6px">'
-          +'<button onclick="editLawInView('+l.id+')" style="background:none;border:none;color:var(--t2);font-size:12px;cursor:pointer">✏</button>'
-          +'<button onclick="delLaw('+l.id+')" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">🗑</button>'
+          +'<button onclick="editLawInView('+l.id+')" class="law-edit-btn" style="background:none;border:none;color:var(--t2);font-size:12px;cursor:pointer">✏</button>'
+          +'<button onclick="delLaw('+l.id+')" class="law-del-btn" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">🗑</button>'
         +'</div>'
       +'</div>'
       +'<div style="font-size:14px;line-height:1.85;color:var(--t1)">'+contentHtml+'</div>'
@@ -945,6 +952,53 @@ function exitLaw(){
   if(cb){ cb.innerHTML=''; cb.style.display='none'; }
   const ct = document.getElementById('lv-count');
   if(ct) ct.textContent='';
+  // 重置為編輯模式
+  _lvReadMode = false;
+  _applyLvMode();
+}
+
+// ── lv 更多選單 ────────────────────────────────────────────
+function toggleLvMenu(btn){
+  const menu = document.getElementById('lv-menu');
+  if(!menu) return;
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen){
+    // 點外部關閉
+    setTimeout(()=> document.addEventListener('click', closeLvMenu, { once:true }), 0);
+  }
+}
+function closeLvMenu(){
+  const menu = document.getElementById('lv-menu');
+  if(menu) menu.style.display = 'none';
+}
+
+// ── lv 閱讀/編輯模式切換 ────────────────────────────────────
+let _lvReadMode = false;
+function toggleLvMode(){
+  _lvReadMode = !_lvReadMode;
+  _applyLvMode();
+}
+function _applyLvMode(){
+  const modeBtn  = document.getElementById('lv-mode-btn');
+  const addBtn   = document.getElementById('lv-add-btn');
+  const lbody    = document.getElementById('lbody');
+
+  if(modeBtn) modeBtn.textContent = _lvReadMode ? '編輯' : '閱讀';
+  modeBtn?.setAttribute('title', _lvReadMode ? '切換為編輯模式' : '切換為閱讀模式');
+
+  // 閱讀模式：隱藏新增條文按鈕、隱藏每條的編輯/刪除按鈕
+  if(addBtn) addBtn.style.display = _lvReadMode ? 'none' : '';
+  if(lbody){
+    lbody.querySelectorAll('.law-edit-btn,.law-del-btn').forEach(el=>{
+      el.style.display = _lvReadMode ? 'none' : '';
+    });
+  }
+}
+
+// 大量刪除（從法規內）
+function openBulkDelLawInGroup(){
+  openBulkDelLaw();
 }
 async function addLawInGroup(){
   try{
