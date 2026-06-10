@@ -1199,6 +1199,24 @@ function openVpPlaylist(){
   wrap.appendChild(panel);
   wrap.style.maxHeight = '200px';
 
+  // 非同步填充播放清單的 thumbnail（_M.playlist 沒有 thumbnail 欄位，需按需讀取）
+  _M.playlist.forEach((m, i)=>{
+    _getMediaThumb(m.id).then(raw=>{
+      if(!raw) return;
+      const card = row.children[i];
+      if(!card) return;
+      const thumbDiv = card.querySelector('div[style*="border-radius:50%"]');
+      if(!thumbDiv) return;
+      const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
+      const img = document.createElement('img');
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+      if(raw instanceof Blob){ img.onload = ()=> URL.revokeObjectURL(src); }
+      img.src = src;
+      thumbDiv.innerHTML = '';
+      thumbDiv.appendChild(img);
+    }).catch(()=>{});
+  });
+
   // 捲動到當前播放項目
   setTimeout(()=>{
     const cards = row.children;

@@ -596,6 +596,59 @@ function pickLawSort(key){
 // 保留舊 toggleLawSort 防外部殘留呼叫
 function toggleLawSort(){ openLawSortMenu(document.getElementById('law-sort-btn')); }
 
+// ── 資料庫選擇刪除模式 ──────────────────────────────────────
+let _dbSelMode = false;
+const _dbSelected = new Set(); // 儲存選取的 lawName
+
+function toggleDbSelectMode(){
+  _dbSelMode = !_dbSelMode;
+  _dbSelected.clear();
+  const btn    = document.getElementById('db-sel-btn');
+  const bar    = document.getElementById('db-sel-bar');
+  const addBtn = document.getElementById('add-law-btn');
+  const sortBtn= document.getElementById('law-sort-btn');
+  if(btn){
+    btn.style.background = _dbSelMode ? 'var(--red2)' : '';
+    btn.style.borderColor= _dbSelMode ? 'var(--red)' : '';
+  }
+  if(bar)  bar.style.display = _dbSelMode ? 'flex' : 'none';
+  if(addBtn) addBtn.closest('div[id="add-law-wrap"]').style.display = _dbSelMode ? 'none' : '';
+  if(sortBtn) sortBtn.style.display = _dbSelMode ? 'none' : '';
+  _updateDbSelCount();
+  renderDB();
+}
+
+function _updateDbSelCount(){
+  const el = document.getElementById('db-sel-count');
+  if(el) el.textContent = `已選 ${_dbSelected.size} 筆法規`;
+}
+
+function _toggleDbCard(lawName){
+  if(_dbSelected.has(lawName)) _dbSelected.delete(lawName);
+  else _dbSelected.add(lawName);
+  _updateDbSelCount();
+  // 更新卡片的選取外觀
+  document.querySelectorAll('.lw-card[data-lawname]').forEach(c=>{
+    if(c.dataset.lawname === lawName){
+      c.style.outline = _dbSelected.has(lawName) ? '2px solid var(--acc)' : '';
+      c.style.background = _dbSelected.has(lawName) ? 'rgba(88,166,255,0.08)' : '';
+      const chk = c.querySelector('.db-sel-chk');
+      if(chk) chk.textContent = _dbSelected.has(lawName) ? '☑' : '☐';
+    }
+  });
+}
+
+async function confirmDbSelDel(){
+  if(!_dbSelected.size){ toast('請先選取法規'); return; }
+  if(!confirm(`確定刪除選取的 ${_dbSelected.size} 筆法規（含所有條文）？`)) return;
+  const all = await da('laws');
+  const toDelete = all.filter(l => _dbSelected.has(l.lawName));
+  for(const l of toDelete){ await dd('laws', l.id); }
+  toast(`已刪除 ${_dbSelected.size} 筆法規`);
+  toggleDbSelectMode();
+  renderDB();
+}
+
 function setLC(el, cat){
   document.querySelectorAll('#lchips .chip').forEach(c=>c.classList.remove('on'));
   el.classList.add('on');
@@ -674,6 +727,7 @@ async function renderDB(){  try{
     div.style.marginBottom='6px';
     div.innerHTML=
       '<div style="display:flex;align-items:center;gap:8px">'
+        +(_dbSelMode?'<span class="db-sel-chk" style="font-size:18px;color:var(--acc)">'+(_dbSelected.has(name)?'\u2611':'\u2610')+'</span>':'')
         +'<span style="font-size:20px">'+icon+'</span>'
         +'<div style="flex:1">'
           +'<div style="font-size:15px;font-weight:700;color:var(--t0)">'+esc(name)+'</div>'
