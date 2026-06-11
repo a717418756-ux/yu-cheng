@@ -1513,8 +1513,7 @@ function loadSOPImg(e){
   reader.readAsDataURL(file);
 }
 
-async function saveLaw(){
-  try{
+async function saveLaw(){  try{
   const cat_=document.getElementById('l-cat').value;
   let content='';
   // sop / supplement / interpretation 都可選擇圖片或文字
@@ -1573,12 +1572,17 @@ async function saveLaw(){
     }
     closeLawSh();
     toast(S.editLawId?'法條已更新 ✓':'法條已儲存 ✓');
+    // 儲存後刷新畫面
+    if(document.getElementById('lv')?.style.display==='flex' && S.curLawName){
+      openLawGroup(S.curLawName);
+    } else {
+      renderDB();
+    }
   }catch(e){
     logError('saveLaw',e);
     toast('儲存失敗，請重試');
   }
-  renderDB();
-  }catch(e){logError('saveLaw',e);toast('saveLaw 發生錯誤');}
+}catch(e){ logError('saveLaw',e); }
 }
 
 function openBulkQ(){

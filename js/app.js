@@ -21,6 +21,7 @@ function _setHomeWidgets(show, zone){
 // ── 區域計時：記錄每個區域的使用時間 ──────────────────────
 let _zoneTimer = null;
 let _zoneTick  = 0;
+let _zoneQuizOpen = false;
 
 function _startZoneTimer(zone){
   _stopZoneTimer();

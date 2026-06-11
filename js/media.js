@@ -271,12 +271,16 @@ function _renderExpandMode(el){
     if(!isSearchMode){
       const bulkBtn = document.createElement('button');
       bulkBtn.id='expand-bulk-btn';
-      bulkBtn.className=isFavMode?'hd-btn bg':'hd-btn red';
+      bulkBtn.className='hd-btn red';
       bulkBtn.style.cssText='';
-      bulkBtn.innerHTML=isFavMode?'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>':'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+      // fav 模式：移除收藏圖示（愛心劃叉）；一般模式：垃圾桶
+      bulkBtn.innerHTML=isFavMode
+        ?'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/><line x1="4" y1="4" x2="20" y2="20"/></svg>'
+        :'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
       bulkBtn.onclick=()=>_toggleBulkMode();
       // 插在新增按鈕前面
       const addBtn = hdRight.querySelector('.hd-btn.blue');
+      if(isFavMode && addBtn) addBtn.style.display = 'none';  // fav 模式不需要新增
       if(addBtn) hdRight.insertBefore(bulkBtn, addBtn);
       else hdRight.appendChild(bulkBtn);
     }
@@ -359,10 +363,11 @@ function _renderExpandMode(el){
 }
 
 function _closeExpandMode(){
-  // 還原頁面 hd
-  // 清除展開模式的按鈕，還原標題
   document.getElementById('expand-back-btn')?.remove();
   document.getElementById('expand-bulk-btn')?.remove();
+  // 還原新增按鈕（fav 模式可能被隱藏）
+  const addBtn = document.querySelector('#media-hd-right .hd-btn.blue');
+  if(addBtn) addBtn.style.display = '';
   const hdTitle = document.getElementById('media-hd-title');
   if(hdTitle) hdTitle.textContent = '影音庫';
   _M.expandMode = null;
