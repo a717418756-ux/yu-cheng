@@ -825,9 +825,9 @@ async function renderDB(){  try{
         if(rocM)return String(parseInt(rocM[1])+1911)+'-'+rocM[2].padStart(2,'0')+'-'+rocM[3].padStart(2,'0');
         return s;
       };
-      const da=toDate(a[1][0]?.amendDate)||'0000';
-      const db=toDate(b[1][0]?.amendDate)||'0000';
-      return dir * db.localeCompare(da);
+      const _da=toDate(a[1][0]?.amendDate)||'0000';
+      const _db=toDate(b[1][0]?.amendDate)||'0000';
+      return dir * _db.localeCompare(_da);
     }
     if(sortBy==='count') return dir * (b[1].length-a[1].length);
     return dir * a[0].localeCompare(b[0],'zh-TW');
