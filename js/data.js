@@ -764,7 +764,9 @@ function setLC(el, cat){
 }
 
 async function renderDB(){  try{
+  console.log('[renderDB] called, page=', S.page);
   const ls=await da('laws');
+  console.log('[renderDB] ls.length=', ls.length, 'lawCat=', S.lawCat);
   const kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
   let kwLaw='', kwArt='', kwText=kw;
   const secM = kw.match(/^(.*)§\s*(\d+)\s*$/);
@@ -907,7 +909,7 @@ async function renderDB(){  try{
     scroller.addEventListener('scroll', onScroll, {passive:true});
   }
 
-  }catch(e){ logError('renderDB',e); }}
+  }catch(e){ console.error('[renderDB] ERROR:', e); logError('renderDB',e); }}
 
 
 
