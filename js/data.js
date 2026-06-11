@@ -710,7 +710,8 @@ function toggleDbSelectMode(){
     btn.style.borderColor= _dbSelMode ? 'var(--red)' : '';
   }
   if(bar)  bar.style.display = _dbSelMode ? 'flex' : 'none';
-  if(addBtn) addBtn.closest('div[id="add-law-wrap"]').style.display = _dbSelMode ? 'none' : '';
+  const addWrap = document.getElementById('add-law-wrap');
+  if(addWrap) addWrap.style.display = _dbSelMode ? 'none' : '';
   if(sortBtn) sortBtn.style.display = _dbSelMode ? 'none' : '';
   _updateDbSelCount();
   renderDB();
