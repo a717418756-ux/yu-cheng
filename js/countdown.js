@@ -119,11 +119,6 @@ async function _saveCountdownFromModal(){
   toast('已新增「'+name+'」');
 }
 
-async function delCountdown(id){
-  const list=(await getCountdowns()).filter(i=>String(i.id)!==String(id));
-  await saveCountdowns(list);
-  renderCountdown();
-}
 
 // ── 勉勵語編輯 ──────────────────────────────────────────────
 async function editMotto(){
