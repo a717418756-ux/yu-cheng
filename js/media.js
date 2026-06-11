@@ -260,8 +260,8 @@ function _renderExpandMode(el){
     // 左側：返回按鈕
     const backBtn = document.createElement('button');
     backBtn.id='expand-back-btn';
-    backBtn.className='hd-btn';
-    backBtn.style.cssText='font-size:13px;color:var(--acc)';
+    backBtn.className='hd-btn bg';
+    backBtn.style.cssText='';
     backBtn.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
     backBtn.onclick=()=>_closeExpandMode();
     hdLeft.appendChild(backBtn);
@@ -271,8 +271,8 @@ function _renderExpandMode(el){
     if(!isSearchMode){
       const bulkBtn = document.createElement('button');
       bulkBtn.id='expand-bulk-btn';
-      bulkBtn.className='hd-btn';
-      bulkBtn.style.cssText=`font-size:12px;color:${isFavMode?'var(--acc)':'var(--red)'}`;
+      bulkBtn.className=isFavMode?'hd-btn bg':'hd-btn red';
+      bulkBtn.style.cssText='';
       bulkBtn.innerHTML=isFavMode?'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>':'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
       bulkBtn.onclick=()=>_toggleBulkMode();
       // 插在新增按鈕前面

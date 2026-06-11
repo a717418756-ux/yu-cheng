@@ -313,7 +313,7 @@ async function openYearGroup(year){  try{
   backBtn.className='btn bg';
   backBtn.style.cssText='font-size:13px;padding:6px 14px;display:inline-flex;align-items:center;gap:6px';
   backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回列表';
-  backBtn.onclick=()=>openYearGroup(_qGroupYear);
+  backBtn.onclick=()=>renderList();
   backDiv.appendChild(backBtn);
   el.appendChild(backDiv);
 
@@ -478,6 +478,52 @@ async function toggleStar(id){  try{
   q.starred=!q.starred;await dp('questions',q);
   toast(q.starred?'已收藏 ⭐':'取消收藏');renderList();
   }catch(e){ logError('toggleStar',e); }}
+
+async // ── 題目選擇刪除模式 ──────────────────────────────────────────
+let _listSelMode = false;
+const _listSelected = new Set();
+
+function toggleListSelectMode(){
+  _listSelMode = !_listSelMode;
+  _listSelected.clear();
+  const btn = document.getElementById('list-sel-btn');
+  const bar = document.getElementById('list-sel-bar');
+  if(btn){
+    btn.style.background = _listSelMode ? 'rgba(207,71,71,0.18)' : '';
+    btn.style.borderColor = _listSelMode ? 'rgba(207,71,71,0.3)' : '';
+    btn.style.color = _listSelMode ? '#e05c5c' : '';
+  }
+  if(bar) bar.style.display = _listSelMode ? 'flex' : 'none';
+  _updateListSelCount();
+  renderList();
+}
+
+function _updateListSelCount(){
+  const el = document.getElementById('list-sel-count');
+  if(el) el.textContent = `已選 ${_listSelected.size} 題`;
+}
+
+function _toggleListCard(id){
+  if(_listSelected.has(id)) _listSelected.delete(id);
+  else _listSelected.add(id);
+  _updateListSelCount();
+  document.querySelectorAll('.qc[data-qid]').forEach(c=>{
+    if(+c.dataset.qid === id){
+      c.style.outline = _listSelected.has(id) ? '2px solid var(--acc)' : '';
+      c.style.background = _listSelected.has(id) ? 'rgba(88,166,255,0.08)' : '';
+      const chk = c.querySelector('.list-sel-chk');
+      if(chk) chk.textContent = _listSelected.has(id) ? '\u2611' : '\u2610';
+    }
+  });
+}
+
+async function confirmListSelDel(){
+  if(!_listSelected.size){ toast('請先選取題目'); return; }
+  if(!confirm(`確定刪除選取的 ${_listSelected.size} 題？`)) return;
+  for(const id of _listSelected){ await dd('questions', id); }
+  toast(`已刪除 ${_listSelected.size} 題`);
+  toggleListSelectMode();
+}
 
 async function openBulkDelQ(){  try{
   const qs=await da('questions');
