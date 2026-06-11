@@ -259,7 +259,6 @@ function _applyTheme(theme){
 async function init(){  try{
   await initDB();
   await initTheme();
-  buildOpts({});
   goPage('home',document.querySelector('.nb'));
   }catch(e){
     logError('init',e);
