@@ -278,13 +278,6 @@ async function renderList(){  try{
           +
         '</div>';
       div.dataset.qid = q.id;
-      if(_listSelMode){
-        div.style.cursor='pointer';
-        div.addEventListener('click', function(e){
-          if(e.target.closest('.qabn')) return;
-          _toggleListCard(q.id);
-        });
-      }
       return div;
     };
     const loadMore=()=>{
@@ -324,7 +317,7 @@ async function renderList(){  try{
         '<span style="color:var(--t2);margin-left:6px">›</span>'+
       '</div>'+
       '<div style="font-size:11px;color:var(--t2);margin-top:4px">'+subjects.slice(0,4).map(s=>esc(s)).join('・')+(subjects.length>4?'…':'')+'</div>';
-    div.onclick=()=>openYearGroup(yr);
+    div.onclick=()=>{ if(_listSelMode) return; openYearGroup(yr); };
     el.appendChild(div);
   });
 }catch(e){ logError('renderList',e); }}
@@ -432,17 +425,8 @@ async function openQGroup(year, subject){  try{
     return div;
   };
 
-  fl.forEach(q=>{
-    const card = _mkQCard(q);
-    if(_listSelMode){
-      card.style.cursor='pointer';
-      card.addEventListener('click', e=>{
-        if(e.target.closest('.qabn')) return;
-        _toggleListCard(q.id);
-      });
-    }
-    el.appendChild(card);
-  });
+  fl.forEach(q=>el.appendChild(_mkQCard(q)));
+  if(_listSelMode) _applyListSelUI();
 }catch(e){ logError('openQGroup',e); }}
 
 
@@ -616,16 +600,51 @@ async // ── 題目選擇刪除模式 ─────────────
 function toggleListSelectMode(){
   _listSelMode = !_listSelMode;
   _listSelected.clear();
+
+  // 按鈕外觀
   const btn = document.getElementById('list-sel-btn');
   const bar = document.getElementById('list-sel-bar');
   if(btn){
-    btn.style.background = _listSelMode ? 'rgba(207,71,71,0.18)' : '';
-    btn.style.borderColor = _listSelMode ? 'rgba(207,71,71,0.3)' : '';
-    btn.style.color = _listSelMode ? '#e05c5c' : '';
+    btn.style.background   = _listSelMode ? 'rgba(207,71,71,0.18)' : '';
+    btn.style.borderColor  = _listSelMode ? 'rgba(207,71,71,0.3)'  : '';
+    btn.style.color        = _listSelMode ? '#e05c5c' : '';
   }
   if(bar) bar.style.display = _listSelMode ? 'flex' : 'none';
   _updateListSelCount();
-  renderList();
+
+  // 不重渲染：對當前畫面的題目卡片直接加/移除勾選框
+  _applyListSelUI();
+}
+
+function _applyListSelUI(){
+  document.querySelectorAll('.qc[data-qid]').forEach(c=>{
+    const id = +c.dataset.qid;
+    if(_listSelMode){
+      // 加勾選框（若尚未加過）
+      if(!c.querySelector('.list-sel-chk')){
+        const chk = document.createElement('span');
+        chk.className = 'list-sel-chk';
+        chk.style.cssText = 'font-size:18px;color:var(--acc);margin-right:6px;flex-shrink:0';
+        chk.textContent = '☐';
+        c.querySelector('.qch')?.prepend(chk);
+      }
+      c.style.cursor = 'pointer';
+      // 覆蓋 onclick：讓整張卡片點擊等同勾選
+      c._origClick = c.onclick;
+      c.onclick = e => {
+        if(e.target.closest('.qabn')) return;
+        _toggleListCard(id);
+      };
+    } else {
+      // 移除勾選框，還原樣式和 onclick
+      c.querySelector('.list-sel-chk')?.remove();
+      c.style.outline    = '';
+      c.style.background = '';
+      c.style.cursor     = '';
+      c.onclick = c._origClick || null;
+      delete c._origClick;
+    }
+  });
 }
 
 function _updateListSelCount(){
@@ -637,22 +656,31 @@ function _toggleListCard(id){
   if(_listSelected.has(id)) _listSelected.delete(id);
   else _listSelected.add(id);
   _updateListSelCount();
+  // 更新卡片外觀
   document.querySelectorAll('.qc[data-qid]').forEach(c=>{
-    if(+c.dataset.qid === id){
-      c.style.outline = _listSelected.has(id) ? '2px solid var(--acc)' : '';
-      c.style.background = _listSelected.has(id) ? 'rgba(88,166,255,0.08)' : '';
-      const chk = c.querySelector('.list-sel-chk');
-      if(chk) chk.textContent = _listSelected.has(id) ? '\u2611' : '\u2610';
-    }
+    if(+c.dataset.qid !== id) return;
+    const sel = _listSelected.has(id);
+    c.style.outline    = sel ? '2px solid var(--acc)' : '';
+    c.style.background = sel ? 'rgba(88,166,255,0.08)' : '';
+    const chk = c.querySelector('.list-sel-chk');
+    if(chk) chk.textContent = sel ? '\u2611' : '\u2610';
   });
 }
 
 async function confirmListSelDel(){
   if(!_listSelected.size){ toast('請先選取題目'); return; }
   if(!confirm(`確定刪除選取的 ${_listSelected.size} 題？`)) return;
-  for(const id of _listSelected){ await dd('questions', id); }
-  toast(`已刪除 ${_listSelected.size} 題`);
-  toggleListSelectMode();
+  const ids = [..._listSelected];
+  for(const id of ids){ await dd('questions', id); }
+  toast(`已刪除 ${ids.length} 題`);
+  // 關閉選擇模式後重新渲染當前層
+  _listSelMode = false;
+  _listSelected.clear();
+  const btn = document.getElementById('list-sel-btn');
+  const bar = document.getElementById('list-sel-bar');
+  if(btn){ btn.style.background=''; btn.style.borderColor=''; btn.style.color=''; }
+  if(bar) bar.style.display = 'none';
+  renderList();
 }
 
 async function openBulkDelQ(){  try{
