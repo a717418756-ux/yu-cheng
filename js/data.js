@@ -425,6 +425,93 @@ async function openQGroup(year, subject){  try{
 }catch(e){ logError('openQGroup',e); }}
 
 
+
+// ── 題目新增/編輯表單控制 ───────────────────────────────────
+function closeAdd(){
+  document.getElementById('add-ov').classList.remove('on');
+  S.editId = null;
+  S.qType = 'mc';
+}
+
+function showAdd(q){
+  S.editId = q?.id || null;
+  S.qType = q?.type || 'mc';
+  S.correct = q?.answer || 'A';
+  const title = document.getElementById('add-title');
+  if(title) title.textContent = q?.id ? '編輯題目' : '新增題目';
+  // 填入欄位
+  const set = (id, v) => { const el=document.getElementById(id); if(el) el.value = v||''; };
+  set('f-sub',  q?.subject||'');
+  set('f-yr',   q?.year||'');
+  set('f-num',  q?.num||'');
+  set('f-stem', q?.stem||'');
+  set('f-es',   q?.answerEs||'');
+  set('f-kw',   (q?.keywords||[]).join('，'));
+  set('f-must-kw', (q?.mustKeywords||[]).join('，'));
+  set('f-note', q?.note||'');
+  set('f-laws', (q?.relatedLaws||[]).map(l=>l.ref).join('，'));
+  const exEl = document.getElementById('f-ex');
+  if(exEl) exEl.value = q?.exam||'';
+  const isNum = document.getElementById('f-is-number');
+  if(isNum) isNum.checked = q?.isNumberQ||false;
+  // 題組
+  const isGroup = document.getElementById('f-is-group');
+  const groupWrap = document.getElementById('f-group-wrap');
+  if(isGroup) isGroup.checked = !!(q?.groupStem);
+  if(groupWrap) groupWrap.classList.toggle('hide', !q?.groupStem);
+  set('f-group-stem', q?.groupStem||'');
+  set('f-group-id',   q?.groupId||'');
+  set('f-group-order', q?.groupOrder||'');
+  setQT(S.qType, q?.options);
+  // 更新科目 datalist
+  da('questions').then(qs=>{
+    const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
+    const dl=document.getElementById('f-subs');
+    if(dl){ dl.innerHTML=subs.map(s=>`<option value="${esc(s)}">`).join(''); }
+  }).catch(()=>{});
+  document.getElementById('add-ov').classList.add('on');
+}
+
+function setQT(type, opts){
+  S.qType = type;
+  S.correct = S.correct || 'A';
+  const mc = document.getElementById('tmc');
+  const es = document.getElementById('tes');
+  const mcArea = document.getElementById('mc-opts');
+  const esArea = document.getElementById('es-area');
+  if(mc) mc.className = type==='mc' ? 'btn bp' : 'btn bg';
+  if(es) es.className = type==='es' ? 'btn bp' : 'btn bg';
+  if(mcArea) mcArea.style.display = type==='mc' ? '' : 'none';
+  if(esArea) esArea.className = type==='es' ? 'fg' : 'fg hide';
+  // 建立選項輸入框
+  if(type==='mc'){
+    const c = document.getElementById('opts-c');
+    if(c){
+      c.innerHTML = ['A','B','C','D','E'].map(k=>`
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <button class="btn ${S.correct===k?'bp':'bg'}" style="width:32px;flex-shrink:0;padding:6px"
+            onclick="setAns('${k}')">${k}</button>
+          <input id="opt-${k}" class="inp" style="flex:1" placeholder="選項 ${k}"
+            value="${esc(opts?.[k]||'')}">
+        </div>`).join('');
+    }
+  }
+}
+
+function setAns(k){
+  S.correct = k;
+  ['A','B','C','D','E'].forEach(l=>{
+    const btn = document.getElementById('opt-'+l)?.previousElementSibling;
+    if(btn) btn.className = 'btn '+(l===k?'bp':'bg');
+  });
+}
+
+function toggleGroupStem(){
+  const checked = document.getElementById('f-is-group')?.checked;
+  const wrap = document.getElementById('f-group-wrap');
+  if(wrap) wrap.classList.toggle('hide', !checked);
+}
+
 async function saveQ(){
   try{
   const stem=cleanSpaces(document.getElementById('f-stem').value.trim());
