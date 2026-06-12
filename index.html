@@ -602,9 +602,26 @@
       </div>
       <div id="lv-count" style="font-size:11px;color:var(--t2);flex-shrink:0;white-space:nowrap"></div>
     </div>
-    <!-- 閱讀/編輯模式切換 -->
-    <button id="lv-mode-btn" class="vpc-btn vpc-sm" onclick="toggleLvMode()"
-      title="切換模式" style="font-size:12px;font-weight:700;color:var(--t2)">編輯</button>
+    <!-- 閱讀/編輯模式切換（toggle switch）-->
+    <button id="lv-mode-btn" onclick="toggleLvMode()" title="切換閱讀/編輯模式"
+      style="background:none;border:none;cursor:pointer;padding:4px 6px;
+             display:inline-flex;align-items:center;gap:5px;color:var(--t2)">
+      <!-- 左圖示（編輯=筆，閱讀=眼）-->
+      <span id="lv-mode-icon-l" style="opacity:.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+      <!-- Switch 本體 -->
+      <span id="lv-mode-track" style="
+        display:inline-flex;align-items:center;
+        width:38px;height:22px;border-radius:11px;
+        background:var(--bg3);border:1.5px solid var(--bd);
+        position:relative;transition:background .2s">
+        <span id="lv-mode-thumb" style="
+          position:absolute;left:3px;
+          width:14px;height:14px;border-radius:50%;
+          background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)">
+        </span>
+      </span>
+      <span id="lv-mode-icon-r" style="opacity:1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
+    </button>
     <!-- 更多選單按鈕 -->
     <div style="position:relative">
       <button class="vpc-btn vpc-sm" onclick="toggleLvMenu(this)" style="font-size:18px;color:var(--t2)">⋮</button>
