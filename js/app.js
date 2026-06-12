@@ -291,8 +291,16 @@ init().then(()=>{
 /* ── Service Worker 更新偵測 ── */
 if('serviceWorker' in navigator){
   navigator.serviceWorker.ready.then(reg => {
+    // 頁面載入時若已有新版在等待（上次點了「稍後」或關閉期間部署過）
+    if(reg.waiting && navigator.serviceWorker.controller){
+      _showUpdateBanner(reg);
+    }
     // 定期檢查更新（每 30 分鐘）
     setInterval(()=> reg.update(), 30 * 60 * 1000);
+    // App 回到前景時也檢查（手機 PWA 最常見的更新時機）
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState === 'visible') reg.update().catch(()=>{});
+    });
     // 偵測到新 SW 進入 waiting
     reg.addEventListener('updatefound', ()=>{
       const newWorker = reg.installing;

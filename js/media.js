@@ -294,7 +294,7 @@ function _renderExpandMode(el){
       catRow.className='media-expand-cats';
       catRow.innerHTML=`
         <button class="mec-chip on" onclick="_setExpandCat(this,'')">全部</button>
-        ${cats.map(c=>`<button class="mec-chip" onclick="_setExpandCat(this,'${esc(c)}')">${esc(c)}</button>`).join('')}`;
+        ${cats.map(c=>`<button class="mec-chip" onclick="_setExpandCat(this,'${escJs(c)}')">${esc(c)}</button>`).join('')}`;
       el.appendChild(catRow);
     }
   }

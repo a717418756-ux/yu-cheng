@@ -122,7 +122,7 @@ async function renderHeatmap(){
     `<div class="hm-cell${c.isToday?' hm-today':''}"
       style="background:var(--hm${c.level})"
       title="${c.label}"
-      onclick="openHeatmapOv('${c.dateStr}','${c.label}')"></div>`
+      onclick="openHeatmapOv('${c.dateStr}','${escJs(c.label)}')"></div>`
   ).join('');
 }
 

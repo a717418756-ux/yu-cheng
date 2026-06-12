@@ -114,7 +114,7 @@ function showQLawLinks(qu){
   if(!laws.length){lawEl.style.display='none';return;}
   listEl.innerHTML=laws.map(l=>
     `<span class="tag" style="color:var(--pur);cursor:pointer"
-      onclick="showLawPop('${esc(l.ref||l.lawName||'')}')">⚖ ${esc(l.ref||l.lawName||'')}</span>`
+      onclick="showLawPop('${escJs(l.ref||l.lawName||'')}')">⚖ ${esc(l.ref||l.lawName||'')}</span>`
   ).join('');
   lawEl.style.display='block';
 }
