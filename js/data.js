@@ -10,6 +10,10 @@ let _dbSelMode = false;
 const _dbSelected = new Set();
 let _lvReadMode = false;
 const _lawSortState = { key:'name', dir:1 };
+// debounced 搜尋（需在頂部，HTML oninput 直接呼叫）
+const _debouncedRenderList = debounce(()=>renderList(), 220);
+const _debouncedRenderDB   = debounce(()=>renderDB(),   220);
+
 const LEVEL_STYLE = {
   part: { color:'#1f6feb', border:'#1f6feb', bg:'rgba(31,111,235,0.18)', size:'14px', fw:'800', pt:'10px', pb:'4px', mt:'16px', ml:'0', br:'0 8px 8px 0', bw:'4px', label:'編' },
   chapter: { color:'#58a6ff', border:'#58a6ff', bg:'rgba(88,166,255,0.13)', size:'13px', fw:'700', pt:'7px', pb:'3px', mt:'10px', ml:'0', br:'0 6px 6px 0', bw:'3px', label:'章' },
@@ -206,7 +210,6 @@ function setF(el, f){
   renderList();
 }
 
-const _debouncedRenderList = debounce(()=>renderList(), 220);
 
 async function renderList(){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
@@ -272,7 +275,7 @@ async function renderList(){  try{
           '<button class="qabn" onclick="editQ('+q.id+')">✏ 編輯</button>'+
           '<button class="qabn" data-qid="'+q.id+'" onclick="startSingleQ(this)">▶ 練習</button>'+
           '<button class="qabn" onclick="toggleStar('+q.id+')">'+(q.starred?'★':'☆')+'</button>'+
-          +(_listSelMode?'':'<button class="qabn" style="color:var(--red);margin-left:auto;display:inline-flex;align-items:center;gap:4px" onclick="delQ('+q.id+')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>')+
+          +
         '</div>';
       div.dataset.qid = q.id;
       if(_listSelMode){
@@ -370,7 +373,10 @@ async function openYearGroup(year){  try{
       '</div>'+
       '<div style="font-size:12px;color:var(--t2);margin-top:4px">'+
         esc((sqs[0]?.stem||'').slice(0,50))+(sqs.length>1?'…':'')+'</div>';
-    div.onclick=()=>openQGroup(year, sub);
+    div.onclick=()=>{
+      if(_listSelMode){ return; }  // 選擇模式下第二層不可點進
+      openQGroup(year, sub);
+    };
     el.appendChild(div);
   });
 }catch(e){ logError('openYearGroup',e); }}
@@ -422,12 +428,21 @@ async function openQGroup(year, subject){  try{
         '<button class="qabn" onclick="editQ('+q.id+')">✏ 編輯</button>'+
         '<button class="qabn" data-qid="'+q.id+'" onclick="startSingleQ(this)">▶ 練習</button>'+
         '<button class="qabn" onclick="toggleStar('+q.id+')">'+(q.starred?'★':'☆')+'</button>'+
-        '<button class="qabn" style="color:var(--red);margin-left:auto" onclick="delQ('+q.id+')" style="display:inline-flex;align-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'+
       '</div>';
     return div;
   };
 
-  fl.forEach(q=>el.appendChild(_mkQCard(q)));
+  fl.forEach(q=>{
+    const card = _mkQCard(q);
+    if(_listSelMode){
+      card.style.cursor='pointer';
+      card.addEventListener('click', e=>{
+        if(e.target.closest('.qabn')) return;
+        _toggleListCard(q.id);
+      });
+    }
+    el.appendChild(card);
+  });
 }catch(e){ logError('openQGroup',e); }}
 
 
@@ -868,7 +883,6 @@ function setLC(el, cat){
   renderDB();
 }
 
-const _debouncedRenderDB = debounce(()=>renderDB(), 220);
 
 async function renderDB(){  try{
   const ls=await da('laws');
@@ -1262,12 +1276,18 @@ function toggleLvMode(){
   _applyLvMode();
 }
 function _applyLvMode(){
-  const modeBtn  = document.getElementById('lv-mode-btn');
-  const addBtn   = document.getElementById('lv-add-btn');
-  const lbody    = document.getElementById('lbody');
+  const addBtn = document.getElementById('lv-add-btn');
+  const lbody  = document.getElementById('lbody');
 
-  if(modeBtn) modeBtn.textContent = _lvReadMode ? '編輯' : '閱讀';
-  modeBtn?.setAttribute('title', _lvReadMode ? '切換為編輯模式' : '切換為閱讀模式');
+  // Toggle switch 外觀
+  const track   = document.getElementById('lv-mode-track');
+  const thumb   = document.getElementById('lv-mode-thumb');
+  const iconL   = document.getElementById('lv-mode-icon-l');  // 筆（編輯）
+  const iconR   = document.getElementById('lv-mode-icon-r');  // 眼（閱讀）
+  if(track) track.style.background = _lvReadMode ? 'rgba(88,166,255,0.3)' : 'var(--bg3)';
+  if(thumb) thumb.style.left = _lvReadMode ? '21px' : '3px';
+  if(iconL) iconL.style.opacity = _lvReadMode ? '0.35' : '1';
+  if(iconR) iconR.style.opacity = _lvReadMode ? '1' : '0.35';
 
   // 閱讀模式：隱藏新增條文按鈕、隱藏每條的編輯/刪除按鈕
   if(addBtn) addBtn.style.display = _lvReadMode ? 'none' : '';
