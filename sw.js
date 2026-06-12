@@ -1,13 +1,18 @@
 /* ══════════════════════════════════════════════════════════════
    sw.js — Y.C. 多功能專用平台
    ★ 每次更新程式只需修改 APP_VERSION
+   ★ v2.8.0 更新策略：
+     - 新 SW 安裝後進入 waiting，不再強制 skipWaiting
+     - 由 app.js 顯示「發現新版本」橫幅，使用者點擊後才接管+reload
+     - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '2.7.8';
+const APP_VERSION = '2.8.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
-// ── 核心本地資源（必須快取成功，任一失敗會重試）────────────
+// ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
 const CORE_ASSETS = [
+  './index.html',
   './manifest.json',
   './css/base.css',
   './css/books.css',
@@ -38,29 +43,28 @@ const OPTIONAL_ASSETS = [
   './icons/icon-512.png',
   './splash-logo-icon.png',
   'https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js',
+  'https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;700&family=Dancing+Script:wght@600;700&family=Cormorant+Garamond:ital,wght@1,400;1,500&display=swap',
   './js/jszip.min.js',
   './js/epub.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
 ];
 
-/* ── 安裝：核心資源快取成功後立即 skipWaiting ── */
+/* ── 安裝：預快取核心資源後進入 waiting（等待使用者確認更新）── */
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      // 核心資源：全部成功才繼續
       const corePromise = cache.addAll(CORE_ASSETS);
-      // 可選資源：逐一嘗試，失敗不影響安裝
       const optionalPromise = Promise.allSettled(
-        OPTIONAL_ASSETS.map(url =>
-          cache.add(url).catch(() => {/* 靜默失敗 */})
-        )
+        OPTIONAL_ASSETS.map(url => cache.add(url).catch(() => {}))
       );
       return Promise.all([corePromise, optionalPromise]);
-    }).then(() => self.skipWaiting())  // 安裝完直接接管
+    })
+    // 注意：不呼叫 skipWaiting()。
+    // 由 app.js 的更新橫幅送出 SKIP_WAITING 訊息後才接管。
   );
 });
 
-/* ── 啟動：清舊快取，立即接管所有頁面 ── */
+/* ── 啟動：清舊快取，接管所有頁面 ── */
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -79,11 +83,17 @@ self.addEventListener('fetch', e => {
   const url = e.request.url;
   if (!url.startsWith('http')) return;
 
-  // index.html → 永遠優先走網路，失敗才用快取
-  if (url.endsWith('/') || url.endsWith('/index.html') || url.endsWith('.io/') || url.endsWith('.io')) {
+  // 頁面導覽（index.html）→ Network First，並更新快取副本
+  if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request)
-        .then(res => res)
+        .then(res => {
+          if (res && res.status === 200) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then(c => c.put('./index.html', clone));
+          }
+          return res;
+        })
         .catch(() => caches.match('./index.html'))
     );
     return;
@@ -107,7 +117,7 @@ self.addEventListener('fetch', e => {
   );
 });
 
-/* ── 接收主頁面訊息（立即更新指令）── */
+/* ── 接收主頁面訊息（使用者確認更新）── */
 self.addEventListener('message', e => {
   if (e.data && e.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
