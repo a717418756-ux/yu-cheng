@@ -433,6 +433,17 @@
   <input type="file" id="imp" accept=".json" style="display:none" onchange="impJSON(event)">
   <div class="srow"><div><div class="slb">匯出錯題 HTML</div><div class="ssb">可列印錯題卷</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expWrong()">匯出</button></div>
   <div class="srow"><div><div class="slb">匯出全部題目 HTML</div><div class="ssb">適合列印複習</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expAll()">匯出</button></div>
+  <div class="sec">偵錯</div>
+  <div class="row" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-size:14px;font-weight:600;color:var(--t0)">錯誤紀錄</div>
+      <div style="font-size:12px;color:var(--t2);margin-top:2px">查看 console 錯誤，協助回報問題</div>
+    </div>
+    <button class="hd-btn bg" onclick="openDebugPanel()" style="position:relative;font-size:13px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span id="debug-dot" style="display:none;position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:#ef4444"></span>
+    </button>
+  </div>
   <div class="sec">資料庫資訊</div>
   <div id="db-info" style="padding:0 12px 12px;font-size:13px;color:var(--t2);line-height:2"></div>
   <div class="sec">考試倒數</div>
