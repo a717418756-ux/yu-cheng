@@ -278,6 +278,7 @@ async function renderList(){  try{
           +
         '</div>';
       div.dataset.qid = q.id;
+      div.dataset.selkey = 'qid:'+q.id;
       return div;
     };
     const loadMore=()=>{
@@ -317,6 +318,7 @@ async function renderList(){  try{
         '<span style="color:var(--t2);margin-left:6px">›</span>'+
       '</div>'+
       '<div style="font-size:11px;color:var(--t2);margin-top:4px">'+subjects.slice(0,4).map(s=>esc(s)).join('・')+(subjects.length>4?'…':'')+'</div>';
+    div.dataset.selkey = 'yr:'+yr;
     div.onclick=()=>{ if(_listSelMode) return; openYearGroup(yr); };
     el.appendChild(div);
   });
@@ -366,12 +368,14 @@ async function openYearGroup(year){  try{
       '</div>'+
       '<div style="font-size:12px;color:var(--t2);margin-top:4px">'+
         esc((sqs[0]?.stem||'').slice(0,50))+(sqs.length>1?'…':'')+'</div>';
+    div.dataset.selkey = 'sub:'+year+':'+sub;
     div.onclick=()=>{
-      if(_listSelMode){ return; }  // 選擇模式下第二層不可點進
+      if(_listSelMode){ return; }
       openQGroup(year, sub);
     };
     el.appendChild(div);
   });
+  if(_listSelMode) _applyListSelUI();
 }catch(e){ logError('openYearGroup',e); }}
 
 // ── 題目群組詳細頁 ────────────────────────────────────────────
@@ -600,51 +604,72 @@ async // ── 題目選擇刪除模式 ─────────────
 function toggleListSelectMode(){
   _listSelMode = !_listSelMode;
   _listSelected.clear();
-
-  // 按鈕外觀
   const btn = document.getElementById('list-sel-btn');
   const bar = document.getElementById('list-sel-bar');
   if(btn){
-    btn.style.background   = _listSelMode ? 'rgba(207,71,71,0.18)' : '';
-    btn.style.borderColor  = _listSelMode ? 'rgba(207,71,71,0.3)'  : '';
-    btn.style.color        = _listSelMode ? '#e05c5c' : '';
+    btn.style.background  = _listSelMode ? 'rgba(207,71,71,0.18)' : '';
+    btn.style.borderColor = _listSelMode ? 'rgba(207,71,71,0.3)'  : '';
+    btn.style.color       = _listSelMode ? '#e05c5c' : '';
   }
   if(bar) bar.style.display = _listSelMode ? 'flex' : 'none';
   _updateListSelCount();
-
-  // 不重渲染：對當前畫面的題目卡片直接加/移除勾選框
+  // 對當前畫面所有可勾選卡片套用/移除選擇模式 UI
   _applyListSelUI();
 }
 
+// 對畫面上所有 .qc[data-selkey] 卡片套用勾選 UI
 function _applyListSelUI(){
-  document.querySelectorAll('.qc[data-qid]').forEach(c=>{
-    const id = +c.dataset.qid;
+  document.querySelectorAll('.qc[data-selkey]').forEach(card=>{
+    const key = card.dataset.selkey; // 格式："yr:2024" 或 "sub:2024:刑法" 或 "qid:123"
     if(_listSelMode){
-      // 加勾選框（若尚未加過）
-      if(!c.querySelector('.list-sel-chk')){
+      if(!card.querySelector('.list-sel-chk')){
         const chk = document.createElement('span');
-        chk.className = 'list-sel-chk';
-        chk.style.cssText = 'font-size:18px;color:var(--acc);margin-right:6px;flex-shrink:0';
-        chk.textContent = '☐';
-        c.querySelector('.qch')?.prepend(chk);
+        chk.className='list-sel-chk';
+        chk.style.cssText='font-size:18px;color:var(--acc);margin-right:6px;flex-shrink:0';
+        chk.textContent='☐';
+        card.querySelector('.qch')?.prepend(chk);
       }
-      c.style.cursor = 'pointer';
-      // 覆蓋 onclick：讓整張卡片點擊等同勾選
-      c._origClick = c.onclick;
-      c.onclick = e => {
+      card.style.cursor='pointer';
+      card._origOnclick = card.onclick;
+      card.onclick = e=>{
         if(e.target.closest('.qabn')) return;
-        _toggleListCard(id);
+        _toggleSelCard(key, card);
       };
     } else {
-      // 移除勾選框，還原樣式和 onclick
-      c.querySelector('.list-sel-chk')?.remove();
-      c.style.outline    = '';
-      c.style.background = '';
-      c.style.cursor     = '';
-      c.onclick = c._origClick || null;
-      delete c._origClick;
+      card.querySelector('.list-sel-chk')?.remove();
+      card.style.outline=''; card.style.background=''; card.style.cursor='';
+      card.onclick = card._origOnclick||null;
+      delete card._origOnclick;
     }
   });
+}
+
+// 切換一張卡片的勾選狀態（支援年度/科目/題目三種 key）
+async function _toggleSelCard(key, card){
+  // 解析 key 取得對應的題目 id 集合
+  const getIds = async ()=>{
+    const qs = await da('questions');
+    if(key.startsWith('yr:')){
+      const yr = key.slice(3);
+      return qs.filter(q=>(q.year||'未知年度')===yr).map(q=>q.id);
+    } else if(key.startsWith('sub:')){
+      const [,yr,sub] = key.split(':');
+      return qs.filter(q=>(q.year||'未知年度')===yr&&(q.subject||'未分類')===sub).map(q=>q.id);
+    } else {
+      return [+key.slice(4)]; // qid:123
+    }
+  };
+  const ids = await getIds();
+  const allSel = ids.every(id=>_listSelected.has(id));
+  if(allSel){ ids.forEach(id=>_listSelected.delete(id)); }
+  else       { ids.forEach(id=>_listSelected.add(id)); }
+  // 更新這張卡片的外觀
+  const nowSel = ids.every(id=>_listSelected.has(id));
+  card.style.outline    = nowSel ? '2px solid var(--acc)' : '';
+  card.style.background = nowSel ? 'rgba(88,166,255,0.08)' : '';
+  const chk = card.querySelector('.list-sel-chk');
+  if(chk) chk.textContent = nowSel ? '\u2611' : '\u2610';
+  _updateListSelCount();
 }
 
 function _updateListSelCount(){
@@ -652,34 +677,17 @@ function _updateListSelCount(){
   if(el) el.textContent = `已選 ${_listSelected.size} 題`;
 }
 
-function _toggleListCard(id){
-  if(_listSelected.has(id)) _listSelected.delete(id);
-  else _listSelected.add(id);
-  _updateListSelCount();
-  // 更新卡片外觀
-  document.querySelectorAll('.qc[data-qid]').forEach(c=>{
-    if(+c.dataset.qid !== id) return;
-    const sel = _listSelected.has(id);
-    c.style.outline    = sel ? '2px solid var(--acc)' : '';
-    c.style.background = sel ? 'rgba(88,166,255,0.08)' : '';
-    const chk = c.querySelector('.list-sel-chk');
-    if(chk) chk.textContent = sel ? '\u2611' : '\u2610';
-  });
-}
-
 async function confirmListSelDel(){
   if(!_listSelected.size){ toast('請先選取題目'); return; }
   if(!confirm(`確定刪除選取的 ${_listSelected.size} 題？`)) return;
-  const ids = [..._listSelected];
-  for(const id of ids){ await dd('questions', id); }
+  const ids=[..._listSelected];
+  for(const id of ids) await dd('questions',id);
   toast(`已刪除 ${ids.length} 題`);
-  // 關閉選擇模式後重新渲染當前層
-  _listSelMode = false;
-  _listSelected.clear();
-  const btn = document.getElementById('list-sel-btn');
-  const bar = document.getElementById('list-sel-bar');
-  if(btn){ btn.style.background=''; btn.style.borderColor=''; btn.style.color=''; }
-  if(bar) bar.style.display = 'none';
+  _listSelMode=false; _listSelected.clear();
+  const btn=document.getElementById('list-sel-btn');
+  const bar=document.getElementById('list-sel-bar');
+  if(btn){btn.style.background='';btn.style.borderColor='';btn.style.color='';}
+  if(bar) bar.style.display='none';
   renderList();
 }
 
