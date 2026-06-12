@@ -1,3 +1,11 @@
+// ── blob URL 釋放（事件代理，避免 inline onload 問題）
+document.addEventListener('load', e => {
+  if(e.target.tagName === 'IMG' && e.target.dataset.revoke && e.target.src.startsWith('blob:')){
+    URL.revokeObjectURL(e.target.src);
+  }
+}, true);
+
+// ── 書庫初始化
 // ══ books.js — 書庫（高質感書架版）══════════════════════════
 // 依賴：db.js（_db, dp, dd, dg, logError, updateEbookProgress）
 // 頁面：pg-books
@@ -568,7 +576,7 @@ async function openBookCover(id){
         style="width:${dispW}px;height:${dispH}px;object-fit:cover;
         border-radius:4px 8px 8px 4px;
         box-shadow:-4px 0 0 rgba(0,0,0,0.6),6px 12px 40px rgba(0,0,0,0.8)"
-        onload="if(this.src.startsWith('blob:'))URL.revokeObjectURL(this.src)">`
+        data-revoke="1">`
     : `<div style="width:${dispW}px;height:${dispH}px;border-radius:4px 8px 8px 4px;
         background:linear-gradient(160deg,${t.bg},${t.dark});
         display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -1401,15 +1409,19 @@ let _epubTouchStart = null;
 
 function _updateEpubProgress(book, loc){
   if(!loc) return;
-  book.locations.percentageFromCfi(loc.start.cfi).then(pct=>{
-    const fill=document.getElementById('epub-progress-fill');
-    if(fill) fill.style.width=(pct*100).toFixed(1)+'%';
-    const info=document.getElementById('epub-page-info');
-    if(info){
-      info.textContent=`${Math.round(pct*100)}%`;
-      info.classList.remove('hide');  // 有進度才顯示
-    }
-  }).catch(()=>{});
+  try{
+    const result = book.locations.percentageFromCfi(loc.start.cfi);
+    const applyPct = pct => {
+      if(typeof pct !== 'number' || isNaN(pct)) return;
+      const fill=document.getElementById('epub-progress-fill');
+      if(fill) fill.style.width=(pct*100).toFixed(1)+'%';
+      const info=document.getElementById('epub-page-info');
+      if(info){ info.textContent=`${Math.round(pct*100)}%`; info.classList.remove('hide'); }
+    };
+    // 兼容同步和非同步兩種返回
+    if(result && typeof result.then === 'function') result.then(applyPct).catch(()=>{});
+    else applyPct(result);
+  }catch(e){}
 }
 
 function _epubNext(){

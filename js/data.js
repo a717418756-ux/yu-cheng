@@ -9,6 +9,12 @@ const _listSelected = new Set();
 let _dbSelMode = false;
 const _dbSelected = new Set();
 let _lvReadMode = false;
+const _lawSortState = { key:'name', dir:1 };
+const LEVEL_STYLE = {
+  part: { color:'#1f6feb', border:'#1f6feb', bg:'rgba(31,111,235,0.18)', size:'14px', fw:'800', pt:'10px', pb:'4px', mt:'16px', ml:'0', br:'0 8px 8px 0', bw:'4px', label:'編' },
+  chapter: { color:'#58a6ff', border:'#58a6ff', bg:'rgba(88,166,255,0.13)', size:'13px', fw:'700', pt:'7px', pb:'3px', mt:'10px', ml:'0', br:'0 6px 6px 0', bw:'3px', label:'章' },
+  section: { color:'#a5d6ff', border:'#a5d6ff', bg:'rgba(165,214,255,0.08)', size:'12px', fw:'600', pt:'4px', pb:'2px', mt:'5px', ml:'18px', br:'0 4px 4px 0', bw:'2px', label:'節' },
+};
 
 // ══ questions.js — 題目管理 ════════════════════════════════
 // 依賴：db.js, utils.js
@@ -757,7 +763,7 @@ async function startSingleQ(el){  try{
 // 依賴：db.js, utils.js, parser.js
 
 // 法規排序狀態（key → 'name'|'amend'|'count'，dir → 1 升/-1 降）
-const _lawSortState = { key:'name', dir:1 };
+
 
 function openLawSortMenu(btn){
   const menu = document.getElementById('law-sort-menu');
@@ -1012,24 +1018,7 @@ async function renderDB(){  try{
 
 
 
-const LEVEL_STYLE = {
-  // ── 由外而內：深藍(編) > 藍(章) > 淺藍(節) ───────────────
-  part: {
-    color:'#1f6feb', border:'#1f6feb', bg:'rgba(31,111,235,0.18)',
-    size:'14px', fw:'800', pt:'10px', pb:'4px', mt:'16px', ml:'0',
-    br:'0 8px 8px 0', bw:'4px', label:'編',
-  },
-  chapter: {
-    color:'#58a6ff', border:'#58a6ff', bg:'rgba(88,166,255,0.13)',
-    size:'13px', fw:'700', pt:'7px', pb:'3px', mt:'10px', ml:'0',
-    br:'0 6px 6px 0', bw:'3px', label:'章',
-  },
-  section: {
-    color:'#a5d6ff', border:'#a5d6ff', bg:'rgba(165,214,255,0.08)',
-    size:'12px', fw:'600', pt:'4px', pb:'2px', mt:'5px', ml:'18px',
-    br:'0 4px 4px 0', bw:'2px', label:'節',
-  },
-};
+// LEVEL_STYLE 移至頂部宣告
 
 async function openLawGroup(lawName){  try{
   if(!document.getElementById('lv')){ return; }  // 防衛：lv 元素不存在時不執行
