@@ -192,6 +192,13 @@ function closeHeatmapOv(){
   if(ov) ov.classList.remove('on');
 }
 
+function setF(el, f){
+  document.querySelectorAll('#fchips .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  S.filter = f;
+  renderList();
+}
+
 async function renderList(){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const kw=(document.getElementById('si')?.value||'').toLowerCase().trim();

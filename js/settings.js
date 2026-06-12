@@ -513,6 +513,25 @@ const _MAX_LOGS = 200;
   });
 })();
 
+function _debugCopyAll(){
+  const txt = _debugLogs.map(l=>'['+l.t+']['+l.level+'] '+l.msg).join('\n');
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(txt).then(()=>toast('已複製')).catch(()=>{
+      _debugFallbackCopy(txt);
+    });
+  } else {
+    _debugFallbackCopy(txt);
+  }
+}
+function _debugFallbackCopy(txt){
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); toast('已複製'); }
+  catch(e){ toast('複製失敗，請手動長按選取'); }
+  document.body.removeChild(ta);
+}
+
 function openDebugPanel(){
   document.getElementById('debug-panel-ov')?.remove();
   const ov = document.createElement('div');
@@ -525,10 +544,7 @@ function openDebugPanel(){
   header.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:#0d0d0d;border-bottom:1px solid #333;flex-shrink:0';
   header.innerHTML = `
     <span style="font-size:13px;font-weight:700;color:#fff;flex:1">偵錯紀錄（最新在上）</span>
-    <button id="dbg-copy-btn" title="全部複製" onclick="(()=>{
-      const txt = _debugLogs.map(l=>'['+l.t+']['+l.level+'] '+l.msg).join('\n');
-      navigator.clipboard.writeText(txt).then(()=>toast('已複製'));
-    })()" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
+    <button id="dbg-copy-btn" title="全部複製" onclick="_debugCopyAll()" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
     </button>
     <button title="清除紀錄" onclick="_debugLogs.length=0;openDebugPanel();" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
