@@ -8,6 +8,7 @@ let _listSelMode = false;
 const _listSelected = new Set();
 let _dbSelMode = false;
 const _dbSelected = new Set();
+let _lvReadMode = false;
 
 // ══ questions.js — 題目管理 ════════════════════════════════
 // 依賴：db.js, utils.js
@@ -198,6 +199,8 @@ function setF(el, f){
   S.filter = f;
   renderList();
 }
+
+const _debouncedRenderList = debounce(()=>renderList(), 220);
 
 async function renderList(){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
@@ -772,6 +775,8 @@ function setLC(el, cat){
   renderDB();
 }
 
+const _debouncedRenderDB = debounce(()=>renderDB(), 220);
+
 async function renderDB(){  try{
   const ls=await da('laws');
   const kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
@@ -1176,7 +1181,6 @@ function closeLvMenu(){
 }
 
 // ── lv 閱讀/編輯模式切換 ────────────────────────────────────
-let _lvReadMode = false;
 function toggleLvMode(){
   _lvReadMode = !_lvReadMode;
   _applyLvMode();
