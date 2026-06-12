@@ -481,3 +481,79 @@ async function renderAzureKey(){
   const el  = document.getElementById('tts-azure-key');
   if(el && key) el.value = key;
 }
+
+// ══ 偵錯面板 ══════════════════════════════════════════════════
+const _debugLogs = [];
+const _MAX_LOGS = 200;
+
+// 攔截 console.error / console.warn
+(function(){
+  const _origError = console.error.bind(console);
+  const _origWarn  = console.warn.bind(console);
+  const _push = (level, args) => {
+    const msg = args.map(a => {
+      if(a instanceof Error) return a.stack || a.message;
+      if(typeof a === 'object'){ try{ return JSON.stringify(a); }catch(e){ return String(a); } }
+      return String(a);
+    }).join(' ');
+    _debugLogs.unshift({ t: new Date().toLocaleTimeString('zh-TW'), level, msg });
+    if(_debugLogs.length > _MAX_LOGS) _debugLogs.pop();
+    // 紅點提示
+    const dot = document.getElementById('debug-dot');
+    if(dot && level==='error') dot.style.display = 'inline-block';
+  };
+  console.error = (...a) => { _push('error', a); _origError(...a); };
+  console.warn  = (...a) => { _push('warn',  a); _origWarn(...a); };
+  // 攔截未捕獲的錯誤
+  window.addEventListener('error', e => {
+    _push('error', [e.message + ' (' + (e.filename||'').split('/').pop() + ':' + e.lineno + ')']);
+  });
+  window.addEventListener('unhandledrejection', e => {
+    _push('error', ['Promise rejected: ' + (e.reason?.message || e.reason || e)]);
+  });
+})();
+
+function openDebugPanel(){
+  document.getElementById('debug-panel-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'debug-panel-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;flex-direction:column';
+  const dot = document.getElementById('debug-dot');
+  if(dot) dot.style.display = 'none';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:#0d0d0d;border-bottom:1px solid #333;flex-shrink:0';
+  header.innerHTML = `
+    <span style="font-size:13px;font-weight:700;color:#fff;flex:1">偵錯紀錄（最新在上）</span>
+    <button id="dbg-copy-btn" title="全部複製" onclick="(()=>{
+      const txt = _debugLogs.map(l=>'['+l.t+']['+l.level+'] '+l.msg).join('\n');
+      navigator.clipboard.writeText(txt).then(()=>toast('已複製'));
+    })()" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    </button>
+    <button title="清除紀錄" onclick="_debugLogs.length=0;openDebugPanel();" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+    </button>
+    <button onclick="document.getElementById('debug-panel-ov').remove()" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>`;
+  ov.appendChild(header);
+
+  const list = document.createElement('div');
+  list.style.cssText = 'flex:1;overflow-y:auto;padding:8px 0;font-family:monospace;font-size:12px';
+  if(!_debugLogs.length){
+    list.innerHTML = '<div style="color:#555;padding:20px 16px">目前無錯誤紀錄</div>';
+  } else {
+    _debugLogs.forEach(l => {
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:6px 14px;border-bottom:1px solid #1a1a1a;'
+        + (l.level==='error' ? 'background:rgba(200,50,50,0.12);color:#f87171;' : 'color:#fbbf24;');
+      div.innerHTML = '<span style="opacity:.5;margin-right:8px">' + l.t + '</span>'
+        + '<span style="opacity:.6;margin-right:8px;font-size:10px;text-transform:uppercase">[' + l.level + ']</span>'
+        + esc(l.msg).replace(/\n/g,'<br>');
+      list.appendChild(div);
+    });
+  }
+  ov.appendChild(list);
+  document.body.appendChild(ov);
+}

@@ -3,6 +3,12 @@
 // 依賴：db.js, utils.js
 // ══════════════════════════════════════════════════════════════
 
+// ── 選擇刪除模式狀態（需在所有函式前宣告）──────────────────
+let _listSelMode = false;
+const _listSelected = new Set();
+let _dbSelMode = false;
+const _dbSelected = new Set();
+
 // ══ questions.js — 題目管理 ════════════════════════════════
 // 依賴：db.js, utils.js
 
@@ -488,8 +494,6 @@ async function toggleStar(id){  try{
   }catch(e){ logError('toggleStar',e); }}
 
 async // ── 題目選擇刪除模式 ──────────────────────────────────────────
-let _listSelMode = false;
-const _listSelected = new Set();
 
 function toggleListSelectMode(){
   _listSelMode = !_listSelMode;
@@ -703,8 +707,6 @@ function pickLawSort(key){
 function toggleLawSort(){ openLawSortMenu(document.getElementById('law-sort-btn')); }
 
 // ── 資料庫選擇刪除模式 ──────────────────────────────────────
-let _dbSelMode = false;
-const _dbSelected = new Set(); // 儲存選取的 lawName
 
 function toggleDbSelectMode(){
   _dbSelMode = !_dbSelMode;
@@ -764,9 +766,7 @@ function setLC(el, cat){
 }
 
 async function renderDB(){  try{
-  console.log('[renderDB] called, page=', S.page);
   const ls=await da('laws');
-  console.log('[renderDB] ls.length=', ls.length, 'lawCat=', S.lawCat);
   const kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
   let kwLaw='', kwArt='', kwText=kw;
   const secM = kw.match(/^(.*)§\s*(\d+)\s*$/);
@@ -909,7 +909,7 @@ async function renderDB(){  try{
     scroller.addEventListener('scroll', onScroll, {passive:true});
   }
 
-  }catch(e){ console.error('[renderDB] ERROR:', e); logError('renderDB',e); }}
+  }catch(e){ logError('renderDB',e); }}
 
 
 
