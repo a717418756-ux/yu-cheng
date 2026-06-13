@@ -417,6 +417,7 @@ async function openQGroup(year, subject){  try{
     const danger=getDangerLevel(q,ats);
     const div=document.createElement('div');
     div.className='qc'+(ws.has(q.id)?' wrong':'')+(q.starred?' star':'');
+    div.dataset.selkey='qid:'+q.id;  // 勾選模式可選取（修正最底層無法勾選刪除）
     div.innerHTML=
       '<div class="qch">'+
         '<span class="badge '+(q.type==='mc'?'bmc':'bes')+'">'+(q.type==='mc'?'選擇':'申論')+'</span>'+

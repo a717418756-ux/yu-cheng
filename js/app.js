@@ -226,6 +226,7 @@ function goPage(pg, btn){
     set:renderSet,
     books:renderBooks,
     media:renderMedia,
+    english:renderEnglish,
   })[pg]?.();
 }
 

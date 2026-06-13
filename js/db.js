@@ -55,6 +55,24 @@ _db.version(3).stores({
   usageLogs:   '++id, [date+zone], date, zone'
 });
 
+// version(4)：英語學習庫
+_db.version(4).stores({
+  questions:   '++id, subject, createdAt, nextReview, reviewLevel, difficultyScore, type, starred',
+  laws:        '++id, lawName, category, articleNumber',
+  attempts:    '++id, qid, date, responseTime',
+  settings:    'key',
+  countdowns:  '++id',
+  refbooks:    '++id, title, category, fileType, lastRead, createdAt',
+  learnmedia:  '++id, title, mediaType, subject, lastPlay, createdAt',
+  ebooks:      '++id, title, author, category, fileType, lastRead, createdAt, favorite',
+  leisuremedia:'++id, title, type, category, lastPlay, createdAt, favorite',
+  usageLogs:   '++id, [date+zone], date, zone',
+  // 英語材料：標題、來源類型(text/pdf/ocr)、句子陣列(JSON)、建立時間
+  englishMaterials: '++id, title, sourceType, createdAt, lastRead, favorite',
+  // 單字本：單字、所屬材料、遺忘曲線欄位（第二階段用，先建表）
+  englishVocab:     '++id, word, materialId, reviewLevel, nextReview, createdAt'
+});
+
 // ── 遺忘曲線間隔 ─────────────────────────────────────────────
 const REVIEW_INTERVALS = [1, 3, 7, 14, 30, 60, 180];
 
@@ -288,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.9.4';       // 合併題目刪除入口：大量刪除整合進勾選模式為「依條件選取」
+const APP_VERSION  = '2.10.0';      // 新增英語學習庫第一階段：上傳(文字/PDF/OCR)+閱讀+TTS逐句高亮
 const DATA_VERSION = '1150531-3';   // 題庫版本（題庫/法條資料更新時遞增）
