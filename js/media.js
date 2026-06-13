@@ -471,7 +471,7 @@ function _mkVideoCard(m){
     <div class="mvc-meta-row">
       <div class="mvc-title-txt" onclick="playVideo(${m.id})">${esc(m.title||'未命名')}</div>
       <button class="mv-fav-btn${m.favorite?' on':''}"
-        onclick="toggleMediaFav(${m.id},this)">${m.favorite?'⭐':'☆'}</button>
+        onclick="toggleMediaFav(${m.id},this)">${m.favorite?'★':'☆'}</button>
     </div>
     ${m.category?`<div class="mvc-cat">${esc(m.category)}</div>`:''}`;
   return div;
@@ -502,7 +502,7 @@ function _mkAudioRow(m,i){
     <div class="mar-actions">
       ${dur?`<span class="mar-dur">${dur}</span>`:''}
       <button class="mv-fav-btn${m.favorite?' on':''}"
-        onclick="toggleMediaFav(${m.id},this)">${m.favorite?'⭐':'☆'}</button>
+        onclick="toggleMediaFav(${m.id},this)">${m.favorite?'★':'☆'}</button>
       <button class="mar-more" onclick="openMediaDetail(${m.id})">⋯</button>
     </div>`;
   return div;
@@ -1617,7 +1617,7 @@ async function toggleMediaFav(id,btn){
     const m=await dg('leisuremedia',id);if(!m)return;
     m.favorite=!m.favorite;await dp('leisuremedia',m);
     btn.className=`mv-fav-btn${m.favorite?' on':''}`;
-    btn.textContent=m.favorite?'⭐':'☆';
+    btn.textContent=m.favorite?'★':'☆';
     const idx=_M.allMedia.findIndex(x=>x.id===id);
     if(idx>=0) _M.allMedia[idx].favorite=m.favorite;
   }catch(e){logError('toggleMediaFav',e);}
