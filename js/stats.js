@@ -1,5 +1,12 @@
 // ══ stats.js — 統計分析 + AI弱點診斷 ══════════════════════
-// 依賴：db.js, utils.js
+// 依賴：db.js, utils.js, data.js(getDangerLevel)
+//
+// v2.8.1 重構：IIFE 模組化；邏輯與 v2.8.0 完全相同
+// 公開 API：Stats.* 與相容別名 renderStats / clearWrongAts / buildAI / copyAI / dlAI
+
+(function(){
+'use strict';
+
 
 let _dchart=null;
 
@@ -239,3 +246,9 @@ function dlAI(type){
   dl(text,fn,type==='md'?'text/markdown':'application/json');
 }
 
+// ════════ 公開 API ════════
+const Stats = { renderStats, clearWrongAts, buildAI, copyAI, dlAI };
+window.Stats = Stats;
+Object.assign(window, Stats);
+
+})();
