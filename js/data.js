@@ -1086,6 +1086,16 @@ async function openLawGroup(lawName){  try{
   let _kwLaw2='',_kwArt2='',_kwText2=_kw;
   const _sm=_kw.match(/^(.*)§\s*(\d+)\s*$/);
   if(_sm){_kwLaw2=_sm[1].trim().toLowerCase();_kwArt2=_sm[2];_kwText2='';}
+  // ── 群組首次出現順序：依原始輸入順序（id）記錄每個編|章|節群組的位置 ──
+  // 這是「編章節不跑掉」的關鍵：群組排序依此表，而非條號
+  const _groupFirstId=new Map();
+  allLaws.forEach(l=>{
+    if(l.lawName!==lawName) return;
+    const g=(l.part||'')+'|'+(l.chapter||'')+'|'+(l.section||'');
+    const id=l.id||0;
+    if(!_groupFirstId.has(g) || id<_groupFirstId.get(g)) _groupFirstId.set(g,id);
+  });
+
   const laws=allLaws.filter(l=>{
     if(l.lawName!==lawName) return false;
     if(!_kw) return true;
@@ -1096,11 +1106,22 @@ async function openLawGroup(lawName){  try{
     const h=((l.article||'')+(l.title||'')+(l.content||'')).toLowerCase();
     return h.includes(_kwText2);
   }).sort((a,b)=>{
-    // 優先用 articleNumber；缺值或為 0 時即時由條號字串計算（相容舊資料）
+    // ── 法律結構排序：章節決定大順序，條號決定章節內順序 ──
+    // 群組鍵 = 編|章|節；群組之間依「該群組首次出現的最小 id」排序，
+    // 維持輸入時的法規結構順序（標準法規條號連續→正確；SOP無條號→不被打散）。
+    // 同一群組內，再依條號（articleNumber）排序。
+    const ga=(a.part||'')+'|'+(a.chapter||'')+'|'+(a.section||'');
+    const gb=(b.part||'')+'|'+(b.chapter||'')+'|'+(b.section||'');
+    if(ga!==gb){
+      // 不同群組：比首次出現順序（_groupFirstId 在迴圈外預先建好）
+      const fa=_groupFirstId.get(ga) ?? Infinity;
+      const fb=_groupFirstId.get(gb) ?? Infinity;
+      if(fa!==fb) return fa-fb;
+    }
+    // 同群組（或群組首次順序相同）：依條號
     const na=(a.articleNumber||art2n(a.article||''))||0;
     const nb=(b.articleNumber||art2n(b.article||''))||0;
     if(na!==nb) return na-nb;
-    // 數值相同時用 id 當穩定排序鍵，避免更新後位置跳動
     return (a.id||0)-(b.id||0);
   });
   if(!laws.length)return;
@@ -2053,6 +2074,9 @@ function scrollToChapter(tagEl, encodedCh, typeHint){
 }
 
 async function openChapterMgr(lawName){  try{
+  // 無參數呼叫（選單按鈕）時回退用目前開啟的法規
+  lawName = lawName || S.curLawName || window.currentLawName || '';
+  if(!lawName){ toast('請先開啟一個法規'); return; }
   const allLaws=await da('laws');
   const targets=allLaws.filter(l=>l.lawName===lawName)
     .sort((a,b)=>(a.articleNumber||0)-(b.articleNumber||0));
