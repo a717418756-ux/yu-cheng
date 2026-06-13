@@ -25,6 +25,7 @@
   <link rel="stylesheet" href="css/quiz.css">
   <link rel="stylesheet" href="css/eink.css">
 <link rel="stylesheet" href="css/splash.css">
+<link rel="stylesheet" href="css/english.css">
 <script>
 /* 早期主題套用：避免畫面閃白（IDB 非同步，先暫存到 localStorage） */
 (function(){
@@ -247,11 +248,13 @@
   <!-- 學習區展開面板 -->
   <div class="zone-panel" id="panel-study">
     <div class="zone-panel-inner">
-      <div class="zpanel-wip">
-        <div class="zpanel-wip-icon">🚧</div>
-        <div class="zpanel-wip-t">學習區即將推出</div>
-        <div class="zpanel-wip-s">課程・音訊碎片・複習功能<br>持續開發中，敬請期待</div>
-      </div>
+      <button class="zone-act-btn" onclick="goPage('english')">
+        <span style="font-size:22px">🇬🇧</span>
+        <span style="display:flex;flex-direction:column;align-items:flex-start;gap:1px">
+          <b style="font-size:14px">英語學習庫</b>
+          <small style="font-size:11px;color:var(--t2)">上傳英文・聽讀・朗讀跟讀</small>
+        </span>
+      </button>
     </div>
   </div>
 
@@ -425,6 +428,37 @@
   <!-- 影音庫篩選改用各 section 的「更多」按鈕，chips 移除 -->
   <div style="font-size:11px;color:var(--t2);padding:2px 14px 6px" id="media-count"></div>
   <div id="media-list"></div>
+</div>
+
+<!-- ENGLISH 英語學習庫 -->
+<div id="pg-english" class="page hide">
+  <div class="hd">
+    <div class="hdt">英語學習庫</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="hd-btn blue plus" onclick="openEngUpload()" title="上傳材料">＋</button>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--t2);padding:8px 14px 4px">點材料開始閱讀，朗讀時逐句高亮</div>
+  <div id="eng-list" style="padding:8px 12px"></div>
+</div>
+
+<!-- 英語閱讀器（覆蓋層）-->
+<div id="eng-reader" style="display:none">
+  <div class="eng-reader-top">
+    <button class="eng-reader-back" onclick="closeMaterial()" title="返回">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
+    <div class="eng-reader-titletext" id="eng-reader-title"></div>
+  </div>
+  <div class="eng-reader-body" id="eng-reader-body"></div>
+  <div class="eng-reader-ctrl">
+    <button class="eng-tts-btn" id="eng-tts-btn" onclick="toggleEngTTS()">▶ 朗讀</button>
+    <div class="eng-rate-box">
+      <button onclick="engRateStep(-0.1)" title="慢">−</button>
+      <span class="eng-rate-lbl" id="eng-rate-lbl">0.9×</span>
+      <button onclick="engRateStep(0.1)" title="快">+</button>
+    </div>
+  </div>
 </div>
 
 <div id="pg-set" class="page hide">
@@ -833,6 +867,7 @@
 <script src="js/utils.js"></script>
 <script src="js/quiz.js"></script>
 <script src="js/data.js"></script>
+<script src="js/english.js"></script>
 <script src="js/stats.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/countdown.js"></script>
