@@ -607,7 +607,7 @@ async function toggleStar(id){  try{
   toast(q.starred?'已收藏 ⭐':'取消收藏');renderList();
   }catch(e){ logError('toggleStar',e); }}
 
-async // ── 題目選擇刪除模式 ──────────────────────────────────────────
+// ── 題目選擇刪除模式 ──────────────────────────────────────────
 
 function toggleListSelectMode(){
   _listSelMode = !_listSelMode;
@@ -1415,6 +1415,35 @@ async function editCurLaw(){  try{
   });
   }catch(e){ logError('editCurLaw',e); }}
 async function editLawInView(id){  try{ const l=await dg('laws',id);if(l)showAddLaw(l);   }catch(e){ logError('editLawInView',e); }}
+
+// ── 重建條號索引：用最新 art2n 重算所有法條 articleNumber ──────
+// 修正：①舊資料 articleNumber 缺值/存錯 ②「第N條之M」子條號排序
+async function rebuildLawIndex(){  try{
+  const laws=await da('laws');
+  if(!laws.length){ toast('沒有法條資料'); return; }
+  let changed=0;
+  const updated=[];
+  for(const l of laws){
+    const newNum=art2n(l.article||'')||0;
+    if(l.articleNumber!==newNum){
+      l.articleNumber=newNum;
+      changed++;
+    }
+    // 順便重建搜尋索引（排除 base64 圖片）
+    const _cnt=(l.content||'').startsWith('data:')?'':(l.content||'');
+    l.searchBlob=[l.lawName,l.article,String(l.articleNumber||''),l.title,(l.keywords||[]).join(' '),_cnt]
+      .filter(Boolean).join(' ').toLowerCase();
+    updated.push(l);
+  }
+  await bulkPut('laws', updated);
+  toast(`重建完成：${laws.length} 條，修正 ${changed} 條排序 ✓`);
+  // 若正在檢視某法規，刷新；否則刷新清單
+  if(document.getElementById('lv')?.style.display==='flex' && S.curLawName){
+    openLawGroup(S.curLawName);
+  } else {
+    renderDB();
+  }
+  }catch(e){ logError('rebuildLawIndex',e); toast('重建失敗：'+e.message); }}
 async function toggleLawFav(id){  try{ const l=await dg('laws',id);if(!l)return;l.favorite=!l.favorite;await dp('laws',l);renderDB();toast(l.favorite?'已收藏':'已取消收藏');   }catch(e){ logError('toggleLawFav',e); }}
 
 async function startLawCloze(){
@@ -2348,7 +2377,8 @@ const DataMod = {
   setAns,
   startSingleQ,
   toggleStar,
-  toggleLawSort
+  toggleLawSort,
+  rebuildLawIndex
 };
 window.DataMod = DataMod;
 Object.assign(window, DataMod);
