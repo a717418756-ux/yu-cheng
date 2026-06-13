@@ -5,10 +5,11 @@
 // - IIFE 包裝：頂層變數不再污染全域；邏輯與 v2.8.2 逐字相同
 // - 刻意「不」加 'use strict'：圖片檢視器等處有沿用既有的隱式全域
 //   （dragging/scale/tx/ty…），strict 會直接拋錯，留待第二階段逐一宣告
-// - 公開 API 白名單見檔尾（61 個）：含其他模組/index.html 引用 +
+// - 公開 API 白名單見檔尾：含其他模組/index.html 引用 +
 //   本檔動態 HTML onclick 依賴 + _debouncedRenderList/_debouncedRenderDB
-// - 已知死代碼（無任何呼叫點，暫保留待確認）：
-//   openBulkDelQ, delQ, toggleLawFav, editCurLaw, startLawCloze, startClozeLaw
+// - v2.9.3 清理死碼：移除 delQ(被多選刪除取代)、toggleLawFav(被整部收藏取代)、
+//   editCurLaw(被 addLawInGroup 取代)、startLawCloze/startClozeLaw(依賴已失效)
+//   並接回 openBulkDelQ 的 UI 入口（題目大量刪除）
 
 (function(){
 
@@ -529,6 +530,19 @@ function toggleGroupStem(){
   if(wrap) wrap.classList.toggle('hide', !checked);
 }
 
+// 年度輸入正規化（onblur）：全形數字→半形、移除「年/民國」字樣與空白
+// 例：「１１３年」→「113」、「民國113」→「113」
+function formatYearInput(el){
+  if(!el) return;
+  let v=(el.value||'').trim();
+  if(!v) return;
+  // 全形數字轉半形
+  v=v.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+  // 移除「民國」「年」與所有空白
+  v=v.replace(/民國|年/g,'').replace(/\s+/g,'');
+  el.value=v;
+}
+
 async function saveQ(){
   try{
   const stem=cleanSpaces(document.getElementById('f-stem').value.trim());
@@ -780,11 +794,6 @@ function _filterBulkDelLaw(laws){
     return true;
   });
 }
-
-async function delQ(id){  try{
-  if(!confirm('確定刪除此題目？'))return;
-  await dd('questions',id);toast('已刪除');renderList();
-  }catch(e){ logError('delQ',e); }}
 
 async function checkDuplicate(data){  try{
   const qs=await da('questions');
@@ -1423,22 +1432,6 @@ function parseMinguoDate(s){
   return s;
 }
 
-async function editCurLaw(){  try{
-  // 功能：快速新增條文到目前法規（預填法規名稱）
-  const lawName=(S.curLawName||window.currentLawName||'').trim();
-  if(!lawName){toast('請先開啟一個法規');return;}
-  // 取得目前法規的類別，預填到新增 sheet
-  const allLaws=await da('laws');
-  const sample=allLaws.find(l=>l.lawName===lawName);
-  showAddLaw({
-    lawName:lawName,
-    article:'',
-    category:sample?.category||'statute',
-    content:'',keywords:[],relatedLaws:[],
-    org:sample?.org||'',
-    amendDate:sample?.amendDate||''
-  });
-  }catch(e){ logError('editCurLaw',e); }}
 async function editLawInView(id){  try{ const l=await dg('laws',id);if(l)showAddLaw(l);   }catch(e){ logError('editLawInView',e); }}
 
 // ── 重建條號索引：用最新 art2n 重算所有法條 articleNumber ──────
@@ -1496,13 +1489,7 @@ async function rebuildLawIndex(){  try{
     renderDB();
   }
   }catch(e){ logError('rebuildLawIndex',e); toast('重建失敗：'+e.message); }}
-async function toggleLawFav(id){  try{ const l=await dg('laws',id);if(!l)return;l.favorite=!l.favorite;await dp('laws',l);renderDB();toast(l.favorite?'已收藏':'已取消收藏');   }catch(e){ logError('toggleLawFav',e); }}
 
-async function startLawCloze(){
-  try{
-  startClozeLaw(window.currentLawContent, window.currentLawName);
-  }catch(e){logError('startLawCloze',e);toast('startLawCloze 發生錯誤');}
-}
 async function quizFromLaw(){  try{
   const lawName=(S.curLawName||window.currentLawName||'').trim();
   if(!lawName){toast('請先開啟一個法規');return;}
@@ -2243,31 +2230,6 @@ async function startNumberMode(){  try{
   startQWithPool(pool,'number');
   }catch(e){ logError('startNumberMode',e); }}
 
-// ── Cloze 挖空模式 ─────────────────────────────────────────
-function startClozeLaw(content, lawName){
-  var cloze=generateCloze(content||'', 0.35);
-  var el=document.getElementById('lbody');
-  if(!el) return;
-  var parts=cloze.split('【　　　】');
-  var html='<div style="padding:12px">'
-    +'<div style="font-size:12px;color:var(--org);margin-bottom:8px">📝 挖空練習 — 試著填入空白</div>'
-    +'<div style="font-size:15px;line-height:2.2;color:var(--t1)">';
-  for(var i=0;i<parts.length;i++){
-    html+=esc(parts[i]);
-    if(i<parts.length-1)
-      html+='<span style="display:inline-block;min-width:60px;border-bottom:2px solid var(--pur);margin:0 4px">&nbsp;</span>';
-  }
-  html+='</div>';
-  el.innerHTML=html;
-  var btn=document.createElement('button');
-  btn.className='btn bg bw';
-  btn.style.cssText='margin-top:12px;padding:12px';
-  btn.textContent='📖 顯示原文';
-  btn.onclick=function(){ openLawGroup(lawName||''); };
-  el.appendChild(btn);
-}
-
-
 // ══ bulk.js — 大量貼題 ════════════════════════════════
 // 依賴：db.js, utils.js, parser.js
 
@@ -2444,12 +2406,14 @@ const DataMod = {
   openImgViewer,
   previewBulkDelLaw,
   previewBulkDelQ,
+  openBulkDelQ,
   scrollToChapter,
   setAns,
   startSingleQ,
   toggleStar,
   toggleLawSort,
-  rebuildLawIndex
+  rebuildLawIndex,
+  formatYearInput
 };
 window.DataMod = DataMod;
 Object.assign(window, DataMod);
