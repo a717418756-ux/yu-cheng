@@ -230,33 +230,33 @@ function preprocessQuestionText(text){
   //   一旦該符號在 2 行以上的行首重複出現，才視為選項（避免誤判單行括號補充）
   {
     const _bulletChars = '•·‧‒–—*◦▪▸→・．';
-    const lines2 = t.split('\n');
-    // 統計行首「孤立左括號」與 bullet 出現次數
-    let parenStart = 0, bulletStart = 0;
-    lines2.forEach(ln=>{
-      const tr = ln.trim();
-      if(!tr) return;
-      // 孤立括號：行首是（或( ，且後面「不是」緊接字母選項（避免吃掉 (A) 殘留）
-      if(/^[（(]\s*[^A-Ea-e）)]/.test(tr)) parenStart++;
-      if(_bulletChars.includes(tr[0])) bulletStart++;
-    });
-    // 孤立括號開頭 ≥2 行 → 視為選項分隔
-    if(parenStart >= 2){
+    // 全文孤立括號數（( 後非字母選項、非右括號）
+    const _parenAll = t.match(/[（(]\s*(?![A-Ea-e]\s*[）)])[^（()）]/g);
+    const parenTotal = _parenAll ? _parenAll.length : 0;
+    // bullet 總數（含同行）
+    const _bulletAll = t.match(new RegExp('['+_bulletChars.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+']','g'));
+    const bulletTotal = _bulletAll ? _bulletAll.length : 0;
+    // 孤立括號總數 ≥2 → 視為選項分隔（含同行多個的情況）
+    if(parenTotal >= 2){
+      const _parenRe = /[（(]\s*(?![A-Ea-e]\s*[）)])/g;
       t = t.split('\n').map(ln=>{
         const tr = ln.trim();
-        if(/^[（(]\s*[^A-Ea-e）)]/.test(tr)){
-          return '\n§OPT§ ' + tr.replace(/^[（(]\s*/, '');
+        // 行內含孤立括號就切（行首孤立括號，或同列多個孤立括號）
+        if(/^[（(]\s*[^A-Ea-e）)]/.test(tr) || (tr.match(_parenRe)||[]).length>=2){
+          return tr.replace(_parenRe, '\n§OPT§ ');
         }
         return ln;
       }).join('\n');
     }
-    // bullet 開頭 ≥2 行 → 視為選項分隔
-    if(bulletStart >= 2){
-      const _bRe = new RegExp('^['+_bulletChars.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+']\\s*');
+    // bullet 總數 ≥2 → 視為選項分隔
+    if(bulletTotal >= 2){
+      const _escClass = _bulletChars.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      // 同行內每個 bullet 都切（含同列多選項）
+      const _bReAll = new RegExp('['+_escClass+']\\s*','g');
       t = t.split('\n').map(ln=>{
         const tr = ln.trim();
         if(_bulletChars.includes(tr[0])){
-          return '\n§OPT§ ' + tr.replace(_bRe, '');
+          return tr.replace(_bReAll, '\n§OPT§ ');
         }
         return ln;
       }).join('\n');
