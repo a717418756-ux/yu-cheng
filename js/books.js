@@ -1239,15 +1239,18 @@ async function openBookReader(id){
         <button onclick="_readerTheme('light')"
           style="flex:1;padding:6px;border-radius:8px;border:1px solid rgba(0,0,0,0.1);
           background:#f5f5f0;color:#222;font-size:11px;cursor:pointer">白色</button>
+        <button onclick="_readerTheme('eink')"
+          style="flex:1;padding:6px;border-radius:8px;border:1.5px solid #000;
+          background:#fff;color:#000;font-size:11px;font-weight:700;cursor:pointer">電子紙</button>
       </div>
     </div>`;
 
   document.body.appendChild(ov);
   ov._objectUrl = url;
 
-  // eink 模式：自動套用白色主題（最適合電子紙閱讀）
+  // eink 模式：自動套用電子紙專屬主題（純黑粗體大字，最適合反射光閱讀）
   if(document.documentElement.dataset.theme==='eink'){
-    setTimeout(()=>{ _readerTheme('light'); }, 80);
+    setTimeout(()=>{ _readerTheme('eink'); }, 80);
   }
 
   // 載入文字內容（txt / epub 純文字模式）
@@ -1363,7 +1366,33 @@ async function _initEpubReader(url, savedCfi){
       },
       'p': { 'text-indent': '2em', 'margin': '0.5em 0' },
     });
-    rendition.themes.select('dark');
+    // ── eink 專用主題：電子紙最佳化 ──────────────────────────────
+    // 電子紙是反射光、無背光，且灰階層次少，所以：
+    //   ① 純白底 + 純黑字（最大對比，字最清晰）
+    //   ② 字重加粗到 500（電子紙細字會發灰，加粗才實）
+    //   ③ 字號比一般大 2px（Boox 多為高解析，字要夠大才舒適）
+    //   ④ 行高加大，字間呼吸感
+    const _einkFontSize = Math.max(_baseFontSize + 2, 19);
+    rendition.themes.register('eink', {
+      'body': {
+        'background': '#ffffff !important',
+        'color': '#000000 !important',
+        'font-family': "'Noto Serif TC', 'Noto Serif SC', '標楷體', 'DFKai-SB', Georgia, serif !important",
+        'font-size': _einkFontSize+'px !important',
+        'font-weight': '500 !important',
+        'line-height': '1.95 !important',
+        'padding': '0 !important',
+        'margin': '0 !important',
+        '-webkit-font-smoothing': 'none !important',
+      },
+      'p': { 'text-indent': '2em', 'margin': '0.6em 0', 'color': '#000 !important' },
+      'h1,h2,h3,h4': { 'color': '#000 !important', 'font-weight': '700 !important', 'margin': '1em 0 0.5em' },
+      'a': { 'color': '#000 !important', 'text-decoration': 'underline !important' },
+      'span,div,li': { 'color': '#000 !important' },
+    });
+    // 依目前主題自動選用：eink 模式 → eink 主題，否則 dark
+    const _isEink = document.documentElement.getAttribute('data-theme') === 'eink';
+    rendition.themes.select(_isEink ? 'eink' : 'dark');
 
     // 顯示（從上次位置或開頭）
     if(savedCfi && typeof savedCfi === 'string' && savedCfi.startsWith('epubcfi')){
@@ -1455,6 +1484,7 @@ function _readerTheme(theme){
     dark:  {bg:'#111',fg:'#e8e8e8'},
     sepia: {bg:'#2d2416',fg:'#d4b896'},
     light: {bg:'#f5f5f0',fg:'#222'},
+    eink:  {bg:'#ffffff',fg:'#000000'},
   };
   const t=themes[theme]||themes.dark;
   const ov=document.getElementById('book-reader-ov');
@@ -1464,7 +1494,7 @@ function _readerTheme(theme){
   if(txt){txt.style.background=t.bg;txt.style.color=t.fg;}
   // epub.js 主題切換
   if(window._epubRendition){
-    const epubTheme = (theme==='light')?'light':(theme==='sepia')?'sepia':'dark';
+    const epubTheme = (theme==='eink')?'eink':(theme==='light')?'light':(theme==='sepia')?'sepia':'dark';
     window._epubRendition.themes.select(epubTheme);
     // epub-viewer 容器背景
     const viewer = document.getElementById('epub-viewer');
