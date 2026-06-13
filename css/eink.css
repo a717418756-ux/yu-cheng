@@ -292,3 +292,45 @@
 [data-theme="eink"] .epub-progress-fill{
   background:#000 !important;
 }
+
+/* ══ eink 主題：FAB 選單不用深色遮罩（保護電子紙，避免整屏重繪殘影）══
+   電子紙最忌諱大面積變暗→變亮的全屏刷新。eink 下 FAB 展開時：
+   - 背景遮罩完全透明（不變暗），僅保留點擊關閉功能
+   - FAB 選單項目用實心淺底卡片，確保在原背景上仍清晰可辨
+   ═══════════════════════════════════════════════════════════════ */
+[data-theme="eink"] #fab-overlay.open{
+  background:transparent !important;
+}
+/* FAB 選單項目：實心高對比卡片（因為背景不再變暗，項目自己要夠醒目）*/
+[data-theme="eink"] .fab-item .fab-label{
+  background:#F6F4EE;
+  color:#000;
+  border:1.5px solid #000;
+  font-weight:700;
+  box-shadow:none;
+}
+[data-theme="eink"] .fab-btn{
+  background:#F6F4EE !important;
+  color:#000 !important;
+  border:2px solid #000 !important;
+  box-shadow:none !important;
+}
+[data-theme="eink"] .fab-main{
+  background:#000 !important;
+  color:#F6F4EE !important;
+  border:none !important;
+  box-shadow:none !important;
+}
+
+/* ══ eink 主題：閱讀器容器全白（電子紙避免深色重繪）══════════════ */
+/* reader-body / PDF iframe / epub wrap 在 eink 下強制白底 */
+[data-theme="eink"] #reader-body,
+[data-theme="eink"] #reader-iframe,
+[data-theme="eink"] #reader-epub-wrap,
+[data-theme="eink"] #epub-viewer{
+  background:#ffffff !important;
+}
+/* 閱讀器頂列 Aa 等按鈕文字：eink 下改深色（原本半透明白）*/
+[data-theme="eink"] .reader-topbar button{
+  color:#000 !important;
+}
