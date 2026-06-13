@@ -53,7 +53,19 @@ function autoKeywords(text){ return KW_POOL.filter(kw=>(text||'').includes(kw));
 // 條號轉數字
 const ZHN = {'零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000};
 function zh2n(s){ let n=0,c=0;for(const ch of s){const v=ZHN[ch];if(v===undefined)continue;if(v>=10){if(c===0)c=1;n+=c*v;c=0;}else c=v;}return n+c; }
-function art2n(art){ const m=art.match(/第([一二三四五六七八九十百千\d]+)條/);if(!m)return 0;const s=m[1];return /^\d+$/.test(s)?parseInt(s):zh2n(s); }
+function art2n(art){
+  if(!art) return 0;
+  const m=art.match(/第([一二三四五六七八九十百千\d]+)條/);
+  if(!m) return 0;
+  const s=m[1];
+  const main=/^\d+$/.test(s)?parseInt(s):zh2n(s);
+  // 子條號：「第10條之2」「第10-1條」「第十條之一」都要納入排序
+  // 主號 ×1000 + 子號，確保 10、10-1、10-2、11 正確排列
+  let sub=0;
+  const mSub=art.match(/條之([一二三四五六七八九十百千\d]+)/) || art.match(/第[一二三四五六七八九十百千\d]+[-－]([一二三四五六七八九十百千\d]+)條/);
+  if(mSub){ const ss=mSub[1]; sub=/^\d+$/.test(ss)?parseInt(ss):zh2n(ss); }
+  return main*1000 + Math.min(sub,999);
+}
 
 // 錯題演算法
 function getWrong(qs,ats){
@@ -210,6 +222,47 @@ function preprocessQuestionText(text){
 
   // 全形括號選項：（A）(A) → §A§
   t=t.replace(/[（(]\s*([A-Ea-e])\s*[）)]/g,(_,k)=>'§'+k.toUpperCase()+'§');
+
+  // ★ 問題(1)修正：行首「孤立括號」或「bullet 類符號」→ §OPT§
+  // 涵蓋 PDF 複製常見亂象：
+  //   1. 孤立全形/半形括號開頭「（ 內容」「( 內容」（括號內沒有字母編號）
+  //   2. bullet 點號開頭「• · ‧ ‒ – — * ◦ ▪ ▸ → ・ ．」
+  //   一旦該符號在 2 行以上的行首重複出現，才視為選項（避免誤判單行括號補充）
+  {
+    const _bulletChars = '•·‧‒–—*◦▪▸→・．';
+    const lines2 = t.split('\n');
+    // 統計行首「孤立左括號」與 bullet 出現次數
+    let parenStart = 0, bulletStart = 0;
+    lines2.forEach(ln=>{
+      const tr = ln.trim();
+      if(!tr) return;
+      // 孤立括號：行首是（或( ，且後面「不是」緊接字母選項（避免吃掉 (A) 殘留）
+      if(/^[（(]\s*[^A-Ea-e）)]/.test(tr)) parenStart++;
+      if(_bulletChars.includes(tr[0])) bulletStart++;
+    });
+    // 孤立括號開頭 ≥2 行 → 視為選項分隔
+    if(parenStart >= 2){
+      t = t.split('\n').map(ln=>{
+        const tr = ln.trim();
+        if(/^[（(]\s*[^A-Ea-e）)]/.test(tr)){
+          return '\n§OPT§ ' + tr.replace(/^[（(]\s*/, '');
+        }
+        return ln;
+      }).join('\n');
+    }
+    // bullet 開頭 ≥2 行 → 視為選項分隔
+    if(bulletStart >= 2){
+      const _bRe = new RegExp('^['+_bulletChars.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+']\\s*');
+      t = t.split('\n').map(ln=>{
+        const tr = ln.trim();
+        if(_bulletChars.includes(tr[0])){
+          return '\n§OPT§ ' + tr.replace(_bRe, '');
+        }
+        return ln;
+      }).join('\n');
+    }
+  }
+
   // 數字括號選項：(1)(2)(3)(4) → §A§§B§§C§§D§
   // 只在沒有字母選項(A)(B)(C)(D)的情況下才啟用（有字母選項時 (1) 是題號）
   if(!/[（(][A-Ea-e][）)]/.test(t) && !/[§][A-E][§]/.test(t)){

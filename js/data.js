@@ -1,9 +1,17 @@
-// ══════════════════════════════════════════════════════════════
-// data.js — 題目管理 + 資料庫（法條）+ 大量貼題
-// 依賴：db.js, utils.js
-// ══════════════════════════════════════════════════════════════
+// ══ data.js — 題目管理 + 法條資料庫 ═══════════════════════
+// 依賴：db.js, utils.js, quiz.js(startQWithPool), stats.js, countdown.js
+//
+// v2.8.3 重構（保守第一階段）：
+// - IIFE 包裝：頂層變數不再污染全域；邏輯與 v2.8.2 逐字相同
+// - 刻意「不」加 'use strict'：圖片檢視器等處有沿用既有的隱式全域
+//   （dragging/scale/tx/ty…），strict 會直接拋錯，留待第二階段逐一宣告
+// - 公開 API 白名單見檔尾（61 個）：含其他模組/index.html 引用 +
+//   本檔動態 HTML onclick 依賴 + _debouncedRenderList/_debouncedRenderDB
+// - 已知死代碼（無任何呼叫點，暫保留待確認）：
+//   openBulkDelQ, delQ, toggleLawFav, editCurLaw, startLawCloze, startClozeLaw
 
-// ── 選擇刪除模式狀態（需在所有函式前宣告）──────────────────
+(function(){
+
 let _listSelMode = false;
 const _listSelected = new Set();
 let _dbSelMode = false;
@@ -1087,7 +1095,14 @@ async function openLawGroup(lawName){  try{
     }
     const h=((l.article||'')+(l.title||'')+(l.content||'')).toLowerCase();
     return h.includes(_kwText2);
-  }).sort((a,b)=>(a.articleNumber||0)-(b.articleNumber||0));
+  }).sort((a,b)=>{
+    // 優先用 articleNumber；缺值或為 0 時即時由條號字串計算（相容舊資料）
+    const na=(a.articleNumber||art2n(a.article||''))||0;
+    const nb=(b.articleNumber||art2n(b.article||''))||0;
+    if(na!==nb) return na-nb;
+    // 數值相同時用 id 當穩定排序鍵，避免更新後位置跳動
+    return (a.id||0)-(b.id||0);
+  });
   if(!laws.length)return;
   const others=[...new Set(allLaws.map(l=>l.lawName).filter(Boolean))].filter(n=>n!==lawName).slice(0,8);
   const cat=laws[0].category||'statute';
@@ -2270,4 +2285,75 @@ function clearBulk(){
   S.bulkParsed=[];
 }
 
+// ════════ 公開 API ════════
+// 新程式碼請使用 DataMod.xxx；window 別名供 index.html 與動態 onclick 相容
+const DataMod = {
+  renderHome,
+  closeHeatmapOv,
+  setF,
+  renderList,
+  closeAdd,
+  showAdd,
+  setQT,
+  toggleGroupStem,
+  saveQ,
+  toggleListSelectMode,
+  confirmListSelDel,
+  dupAction,
+  openLawSortMenu,
+  closeLawSortMenu,
+  pickLawSort,
+  toggleDbSelectMode,
+  confirmDbSelDel,
+  setLC,
+  renderDB,
+  openLawGroup,
+  exitLaw,
+  toggleLvFav,
+  toggleLvMenu,
+  closeLvMenu,
+  toggleLvMode,
+  openBulkDelLawInGroup,
+  addLawInGroup,
+  editLawGroupInfo,
+  quizFromLaw,
+  showAddLaw,
+  closeLawSh,
+  switchLawMode,
+  toggleSOPMode,
+  onLawImgSelect,
+  saveLaw,
+  openBulkQ,
+  closeBulkQ,
+  showBulkLaw,
+  closeBulkLaw,
+  prevBulkLaw,
+  importBulkLaw,
+  showLawPop,
+  closeLawPop,
+  openChapterMgr,
+  startNumberMode,
+  parseBulk,
+  importBulk,
+  clearBulk,
+  confirmBulkDelLaw,
+  confirmBulkDelQ,
+  delLaw,
+  editLawInView,
+  openHeatmapOv,
+  openImgViewer,
+  previewBulkDelLaw,
+  previewBulkDelQ,
+  scrollToChapter,
+  setAns,
+  startSingleQ,
+  toggleStar,
+  toggleLawSort
+};
+window.DataMod = DataMod;
+Object.assign(window, DataMod);
+// index.html 的搜尋框 oninput 直接引用：
+window._debouncedRenderList = _debouncedRenderList;
+window._debouncedRenderDB   = _debouncedRenderDB;
 
+})();
