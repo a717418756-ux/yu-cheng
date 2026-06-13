@@ -7,9 +7,6 @@
 //   （dragging/scale/tx/ty…），strict 會直接拋錯，留待第二階段逐一宣告
 // - 公開 API 白名單見檔尾：含其他模組/index.html 引用 +
 //   本檔動態 HTML onclick 依賴 + _debouncedRenderList/_debouncedRenderDB
-// - v2.9.3 清理死碼：移除 delQ(被多選刪除取代)、toggleLawFav(被整部收藏取代)、
-//   editCurLaw(被 addLawInGroup 取代)、startLawCloze/startClozeLaw(依賴已失效)
-//   並接回 openBulkDelQ 的 UI 入口（題目大量刪除）
 
 (function(){
 
@@ -722,25 +719,28 @@ async function openBulkDelQ(){  try{
   const modal=document.createElement('div');
   modal.id='bulk-del-q-modal';
   modal.style.cssText='position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end';
-  modal.innerHTML=`<div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto"><div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 16px"></div><div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:14px">🗑 題目大量刪除</div><div style="font-size:12px;color:var(--t2);margin-bottom:12px">依條件篩選刪除，或指定題號。<b style="color:var(--red)">刪除後無法復原。</b></div><div style="display:flex;flex-direction:column;gap:10px"><div><label class="fl">年度</label><input id="bdq-year" list="bdq-yl" placeholder="例：113（留空不限）"><datalist id="bdq-yl">${years.map(y=>`<option value="${y}">`).join('')}</datalist></div><div><label class="fl">考試別</label><input id="bdq-exam" list="bdq-el" placeholder="例：升官等（留空不限）"><datalist id="bdq-el">${exams.map(e=>`<option value="${e}">`).join('')}</datalist></div><div><label class="fl">科目</label><input id="bdq-sub" list="bdq-sl" placeholder="例：警察法規（留空不限）"><datalist id="bdq-sl">${subs.map(s=>`<option value="${s}">`).join('')}</datalist></div><div><label class="fl">指定題號（逗號分隔，留空刪除所有符合條件）</label><input id="bdq-nums" placeholder="例：1,2,5,10"></div></div><div id="bdq-preview" style="margin-top:12px;font-size:12px;color:var(--t2)"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn bg" style="flex:1;padding:12px" onclick="document.getElementById('bulk-del-q-modal').remove()">取消</button><button class="btn bg" style="flex:1;padding:12px;color:var(--t2)" onclick="previewBulkDelQ()">預覽</button><button class="btn" style="flex:1;padding:12px;background:var(--red);color:#fff" onclick="confirmBulkDelQ()">確認刪除</button></div></div>`;
+  modal.innerHTML=`<div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto"><div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 16px"></div><div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:14px">☑ 依條件選取題目</div><div style="font-size:12px;color:var(--t2);margin-bottom:12px">依條件自動勾選，套用後可在列表再調整，最後按「刪除選取」。</div><div style="display:flex;flex-direction:column;gap:10px"><div><label class="fl">年度</label><input id="bdq-year" list="bdq-yl" placeholder="例：113（留空不限）"><datalist id="bdq-yl">${years.map(y=>`<option value="${y}">`).join('')}</datalist></div><div><label class="fl">考試別</label><input id="bdq-exam" list="bdq-el" placeholder="例：升官等（留空不限）"><datalist id="bdq-el">${exams.map(e=>`<option value="${e}">`).join('')}</datalist></div><div><label class="fl">科目</label><input id="bdq-sub" list="bdq-sl" placeholder="例：警察法規（留空不限）"><datalist id="bdq-sl">${subs.map(s=>`<option value="${s}">`).join('')}</datalist></div><div><label class="fl">指定題號（逗號分隔，留空選取所有符合條件）</label><input id="bdq-nums" placeholder="例：1,2,5,10"></div></div><div id="bdq-preview" style="margin-top:12px;font-size:12px;color:var(--t2)"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn bg" style="flex:1;padding:12px" onclick="document.getElementById('bulk-del-q-modal').remove()">取消</button><button class="btn bg" style="flex:1;padding:12px;color:var(--t2)" onclick="previewBulkDelQ()">預覽</button><button class="btn bp" style="flex:1;padding:12px" onclick="applyBulkSelectQ()">套用選取</button></div></div>`;
   document.body.appendChild(modal);
   }catch(e){ logError('openBulkDelQ',e); }}
 
 async function previewBulkDelQ(){  try{
   const targets=_filterBulkDelQ(await da('questions'));
   const el=document.getElementById('bdq-preview');
-  if(el) el.innerHTML='<span style="color:var(--org)">符合條件：<b>'+targets.length+'</b> 題將被刪除</span>';
+  if(el) el.innerHTML='<span style="color:var(--acc)">符合條件：<b>'+targets.length+'</b> 題將被勾選</span>';
   }catch(e){ logError('previewBulkDelQ',e); }}
 
-async function confirmBulkDelQ(){  try{
+// 依條件自動勾選：把符合的題目加入選取集合，進入勾選模式供檢視後刪除
+async function applyBulkSelectQ(){  try{
   const targets=_filterBulkDelQ(await da('questions'));
   if(!targets.length){toast('無符合條件的題目');return;}
-  if(!confirm('確定刪除 '+targets.length+' 題？\n此操作無法復原！'))return;
-  for(const q of targets) await dd('questions',q.id);
+  // 確保處於勾選模式
+  if(!_listSelMode) toggleListSelectMode();
+  targets.forEach(q=>_listSelected.add(q.id));
   const m=document.getElementById('bulk-del-q-modal');if(m)m.remove();
-  toast('已刪除 '+targets.length+' 題 ✓');
-  renderHome();renderList();
-  }catch(e){ logError('confirmBulkDelQ',e); }}
+  _updateListSelCount();
+  _applyListSelUI();
+  toast('已勾選 '+targets.length+' 題，確認後按「刪除選取」');
+  }catch(e){ logError('applyBulkSelectQ',e); }}
 
 function _filterBulkDelQ(qs){
   const yr =(document.getElementById('bdq-year')||{}).value?.trim()||'';
@@ -2399,7 +2399,7 @@ const DataMod = {
   importBulk,
   clearBulk,
   confirmBulkDelLaw,
-  confirmBulkDelQ,
+  applyBulkSelectQ,
   delLaw,
   editLawInView,
   openHeatmapOv,
