@@ -1554,8 +1554,12 @@ async function showAddLaw(l){
   document.getElementById('law-sh-t').textContent=l?'編輯資料':'新增資料';
   document.getElementById('l-name').value=l?.lawName||'';
   document.getElementById('l-art').value=l?.article||'';
+  const partEl=document.getElementById('l-part');
+  if(partEl)partEl.value=l?.part||'';
   const chEl=document.getElementById('l-chapter');
   if(chEl)chEl.value=l?.chapter||'';
+  const secEl=document.getElementById('l-section');
+  if(secEl)secEl.value=l?.section||'';
   if(document.getElementById('l-note'))document.getElementById('l-note').value=l?.note||'';
   const tiEl=document.getElementById('l-title');
   if(tiEl)tiEl.value=l?.title||'';
@@ -1570,11 +1574,21 @@ async function showAddLaw(l){
   const prev=document.getElementById('l-img-prev');
   if(prev)prev.innerHTML=window._sopImgData?'<img src="'+window._sopImgData+'" style="max-width:100%;border-radius:8px">':'';
   toggleSOPMode();
-  // 更新制定機關 datalist
+  // 載入制定機關 + 同法規既有的編/章/節（下拉選擇用）
   da('laws').then(all=>{
-    const orgs=[...new Set(all.map(l=>l.org).filter(Boolean))];
+    const orgs=[...new Set(all.map(x=>x.org).filter(Boolean))];
     const dl=document.getElementById('l-org-list');
     if(dl)dl.innerHTML=orgs.map(o=>'<option value="'+esc(o)+'">').join('');
+    // 同法規範圍內的編/章/節選項
+    const curName=l?.lawName||document.getElementById('l-name').value.trim();
+    const sameLaw=curName?all.filter(x=>x.lawName===curName):all;
+    const fillDL=(id,vals)=>{
+      const el=document.getElementById(id);
+      if(el)el.innerHTML=[...new Set(vals.filter(Boolean))].map(v=>'<option value="'+esc(v)+'">').join('');
+    };
+    fillDL('l-part-list',    sameLaw.map(x=>x.part));
+    fillDL('l-chapter-list', sameLaw.map(x=>x.chapter));
+    fillDL('l-section-list', sameLaw.map(x=>x.section));
   });
   document.getElementById('law-ov').classList.add('on');
   }catch(e){logError('showAddLaw',e);}
@@ -1767,13 +1781,15 @@ async function saveLaw(){  try{
     if(!content){toast('請填寫內容，或上傳圖片');return;}
   }
   const article=document.getElementById('l-art').value.trim();
+  const part=document.getElementById('l-part')?.value.trim()||'';
   const chapter=document.getElementById('l-chapter')?.value.trim()||'';
+  const section=document.getElementById('l-section')?.value.trim()||'';
   const relStr=(document.getElementById('l-related')?.value||'').trim();
   const relatedLaws=relStr?relStr.split(/[,，]/).map(s=>({ref:s.trim()})).filter(r=>r.ref):[];
   const articleNumber=art2n(article)||0;
   const data={
     lawName:document.getElementById('l-name').value.trim(),
-    article,chapter,articleNumber,
+    article,part,chapter,section,articleNumber,
     category:cat_,
     title:document.getElementById('l-title')?.value.trim()||'',
     content,
