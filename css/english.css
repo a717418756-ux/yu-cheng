@@ -1,0 +1,147 @@
+/* ══ english.css — 英語學習庫 ════════════════════════════════ */
+
+/* ── 列表卡片 ── */
+.eng-card{
+  display:flex; align-items:center; gap:12px;
+  padding:14px; margin-bottom:10px;
+  background:var(--bg1); border:1px solid var(--bd);
+  border-radius:12px; cursor:pointer;
+  transition:border-color var(--t-base,.22s), box-shadow var(--t-base,.22s), transform var(--t-fast,.14s);
+}
+.eng-card:hover{ border-color:rgba(110,168,254,.28); box-shadow:var(--sh-1); }
+.eng-card:active{ transform:scale(.99); }
+.eng-card-icon{ font-size:26px; flex-shrink:0; width:42px; text-align:center; }
+.eng-card-body{ flex:1; min-width:0; }
+.eng-card-title{ font-size:15px; font-weight:700; color:var(--t0); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.eng-card-meta{ font-size:12px; color:var(--t2); margin-top:3px; }
+.eng-card-del{
+  background:none; border:none; color:var(--t2); font-size:22px;
+  cursor:pointer; padding:4px 8px; flex-shrink:0; line-height:1;
+  border-radius:6px; transition:background var(--t-fast,.14s), color var(--t-fast,.14s);
+}
+.eng-card-del:hover{ background:rgba(224,92,87,.14); color:var(--red); }
+
+/* ── 上傳 bottom sheet ── */
+.eng-sheet{
+  width:100%; max-width:520px; background:var(--bg1);
+  border-radius:20px 20px 0 0; padding:18px 16px 32px;
+  animation:polish-fade-up .24s both;
+}
+.eng-sheet-bar{ width:36px; height:4px; background:var(--bd); border-radius:2px; margin:0 auto 16px; }
+.eng-sheet-title{ font-size:15px; font-weight:700; color:var(--t0); margin-bottom:16px; }
+.eng-up-opts{ display:flex; flex-direction:column; gap:10px; }
+.eng-up-opt{
+  display:flex; align-items:center; gap:14px;
+  padding:14px; background:var(--bg2); border:1px solid var(--bd);
+  border-radius:12px; cursor:pointer; text-align:left;
+  transition:border-color var(--t-fast,.14s), background var(--t-fast,.14s);
+}
+.eng-up-opt:hover{ border-color:var(--acc); background:var(--bg3); }
+.eng-up-opt .eu-ic{ font-size:26px; flex-shrink:0; }
+.eng-up-opt .eu-tx{ display:flex; flex-direction:column; gap:2px; }
+.eng-up-opt .eu-tx b{ font-size:14px; color:var(--t0); }
+.eng-up-opt .eu-tx small{ font-size:11px; color:var(--t2); }
+.eng-sheet-cancel{
+  width:100%; margin-top:14px; padding:13px;
+  background:var(--bg2); border:1px solid var(--bd); border-radius:10px;
+  color:var(--t2); font-size:13px; cursor:pointer;
+}
+
+/* 貼上文字輸入 */
+.eng-input{
+  width:100%; padding:11px 12px; margin-bottom:10px;
+  background:var(--bg2); border:1px solid var(--bd); border-radius:8px;
+  color:var(--t0); font-size:14px;
+}
+.eng-textarea{
+  width:100%; min-height:180px; padding:11px 12px; resize:vertical;
+  background:var(--bg2); border:1px solid var(--bd); border-radius:8px;
+  color:var(--t0); font-size:14px; line-height:1.6;
+  font-family:'Noto Serif TC', Georgia, serif;
+}
+.eng-sheet-btns{ display:flex; gap:8px; margin-top:14px; }
+
+/* ── 閱讀器 ── */
+#eng-reader{
+  position:fixed; inset:0; z-index:380;
+  background:var(--bg0);
+  flex-direction:column;
+  max-width:var(--layout-page-max-w, 100%); margin:0 auto;
+}
+.eng-reader-top{
+  display:flex; align-items:center; gap:8px;
+  padding:12px 14px; border-bottom:1px solid var(--bd);
+  flex-shrink:0; background:var(--bg1);
+}
+.eng-reader-back{
+  background:none; border:none; cursor:pointer; color:var(--t1);
+  padding:4px; display:flex; align-items:center;
+}
+.eng-reader-titletext{
+  flex:1; font-size:15px; font-weight:700; color:var(--t0);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.eng-reader-body{
+  flex:1; overflow-y:auto; padding:18px 18px 100px;
+  max-width:680px; width:100%; margin:0 auto;
+}
+.eng-sent{
+  font-family:'Noto Serif TC', Georgia, serif;
+  font-size:17px; line-height:1.95; color:var(--t1);
+  margin:0 0 4px; padding:4px 8px; border-radius:6px;
+  cursor:pointer; transition:background var(--t-fast,.14s);
+}
+.eng-sent:hover{ background:var(--bg2); }
+.eng-sent.reading{
+  background:rgba(110,168,254,.16);
+  color:var(--t0);
+  box-shadow:inset 3px 0 0 var(--acc);
+}
+
+/* ── 閱讀器底部控制列 ── */
+.eng-reader-ctrl{
+  position:absolute; bottom:0; left:0; right:0;
+  display:flex; align-items:center; gap:10px;
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom,0));
+  background:var(--bg1); border-top:1px solid var(--bd);
+}
+.eng-tts-btn{
+  flex:1; padding:12px; border-radius:10px; border:none;
+  background:var(--acc); color:#fff; font-size:15px; font-weight:700;
+  cursor:pointer;
+}
+.eng-rate-box{ display:flex; align-items:center; gap:6px; }
+.eng-rate-box button{
+  width:34px; height:34px; border-radius:8px;
+  background:var(--bg2); border:1px solid var(--bd); color:var(--t1);
+  font-size:16px; cursor:pointer;
+}
+.eng-rate-lbl{ font-size:13px; color:var(--t2); min-width:34px; text-align:center; }
+
+/* ══ eink 模式：英語庫高對比 + 朗讀高亮改邊框（電子紙避免大色塊）══ */
+[data-theme="eink"] .eng-sent{
+  font-family:'Noto Serif TC','標楷體','DFKai-SB',Georgia,serif;
+  color:#000; font-weight:500;
+}
+[data-theme="eink"] .eng-sent.reading{
+  background:transparent;
+  box-shadow:inset 4px 0 0 #000;
+  border-bottom:2px solid #000;
+  color:#000; font-weight:700;
+}
+[data-theme="eink"] .eng-card,
+[data-theme="eink"] #eng-reader{ box-shadow:none; }
+[data-theme="eink"] .eng-tts-btn{
+  background:#000; color:#fff;
+}
+
+/* ── 學習區入口按鈕 ── */
+.zone-act-btn{
+  display:flex; align-items:center; gap:12px; width:100%;
+  padding:14px 16px; background:var(--bg1); border:1px solid var(--bd);
+  border-radius:12px; cursor:pointer; text-align:left;
+  transition:border-color var(--t-fast,.14s), background var(--t-fast,.14s);
+}
+.zone-act-btn:hover{ border-color:var(--acc); background:var(--bg2); }
+.zone-act-btn:active{ transform:scale(.99); }
+[data-theme="eink"] .zone-act-btn{ box-shadow:none; border-color:#000; }
