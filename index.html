@@ -537,6 +537,10 @@
       oninput="saveAzureKey(this.value)">
   </div>
 
+  <div class="sec">資料維護</div>
+  <div class="srow"><div><div class="slb">重建條號索引</div><div class="ssb" id="reindex-info">修正法條排序（之N、舊資料）</div></div>
+  <button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="rebuildLawIndex()">重建</button></div>
+
   <div class="sec" style="color:var(--red)">危險操作</div>
   <div class="srow"><div><div class="slb" style="color:var(--red)">清除作答記錄</div><div class="ssb">保留題目</div></div>
   <button class="btn br" style="padding:6px 10px;font-size:12px" onclick="cfm('清除作答記錄','確定清除？',clearAts)">清除</button></div>
