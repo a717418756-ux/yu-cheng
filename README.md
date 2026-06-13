@@ -1,6 +1,6 @@
 # Y.C. 多功能專用平台
 
-> 版本 2.8.1 ｜ PWA 離線應用 ｜ 部署於 GitHub Pages
+> 版本 2.8.2 ｜ PWA 離線應用 ｜ 部署於 GitHub Pages
 
 ---
 
