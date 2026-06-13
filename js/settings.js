@@ -1,6 +1,15 @@
 // ══ settings.js — 設定與匯出 ══════════════════════════
-// 依賴：db.js, utils.js
+// 依賴：db.js, utils.js, data.js(getWrong), countdown.js(renderSetCountdown)
+//
+// v2.8.2 重構：
+// - IIFE 模組化，內部函式私有化（_gasGetConfig、buildHTML、_blobToBase64 等）
+// - 偵錯面板按鈕改 addEventListener（不再依賴全域 _debugLogs/_debugCopyAll）
+// - 匯出 HTML / 設定頁 innerHTML 補上 esc()（防止題目含 < > 字元時版面壞掉）
+// - 雲端備援補 HTTP 狀態檢查（錯誤訊息更明確）
+// - 功能與 v2.8.1 完全相同
 
+(function(){
+'use strict';
 
 // ══════════════════════════════════════════════════════════════
 // ══ 雲端備份（Google Apps Script）══════════════════════════════
@@ -53,6 +62,7 @@ async function gdriveBackup(){ try{
     headers:{'Content-Type':'text/plain'},
     body: JSON.stringify(payload)
   });
+  if(!res.ok){ toast('備份失敗：HTTP '+res.status); return; }
   const json = await res.json();
   if(json.ok){
     const t = new Date().toLocaleString('zh-TW');
@@ -76,6 +86,7 @@ async function gdriveRestore(){ try{
         headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({ password:pwd, action:'restore', filename:GAS_BACKUP_FILE })
       });
+      if(!res.ok){ toast('還原失敗：HTTP '+res.status); return; }
       const json = await res.json();
       if(!json.ok){ toast('還原失敗：'+(json.error||'未知錯誤')); return; }
 
@@ -109,11 +120,11 @@ async function gdriveRestore(){ try{
 }catch(e){ logError('gdriveRestore',e); toast('還原失敗：'+e.message); }}
 
 
-async function renderSet(){  renderAzureKey().catch(()=>{}); try{
+async function renderSet(){  _renderAzureKey().catch(()=>{}); try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
   document.getElementById('exp-info').textContent=`${qs.length} 題 · ${ls.length} 條法條 · ${ats.length} 筆作答`;
   const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
-  document.getElementById('db-info').innerHTML=`總題數：${qs.length}<br>法條數：${ls.length}<br>作答記錄：${ats.length}<br>科目：${subs.join('、')||'無'}<br>題型：選擇 ${qs.filter(q=>q.type==='mc').length} / 申論 ${qs.filter(q=>q.type==='es').length}`;
+  document.getElementById('db-info').innerHTML=`總題數：${qs.length}<br>法條數：${ls.length}<br>作答記錄：${ats.length}<br>科目：${esc(subs.join('、'))||'無'}<br>題型：選擇 ${qs.filter(q=>q.type==='mc').length} / 申論 ${qs.filter(q=>q.type==='es').length}`;
   renderSetCountdown();
   _gasLoadSavedConfig();
   // 版本號與備份時間
@@ -127,8 +138,8 @@ async function renderSet(){  renderAzureKey().catch(()=>{}); try{
     const dv = typeof DATA_VERSION !== 'undefined' ? DATA_VERSION : '';
     verInfoEl.innerHTML =
       `程式版本：<b>v${av}</b>　題庫版本：<b>${dv}</b><br>` +
-      `最後備份：<span style="color:var(--t2)">${lastBk}</span>　` +
-      `最後還原：<span style="color:var(--t2)">${lastRs}</span>`;
+      `最後備份：<span style="color:var(--t2)">${esc(lastBk)}</span>　` +
+      `最後還原：<span style="color:var(--t2)">${esc(lastRs)}</span>`;
 
     // 診斷資訊：錯誤日誌
     const diagEl = document.getElementById('set-diag-info');
@@ -139,13 +150,14 @@ async function renderSet(){  renderAzureKey().catch(()=>{}); try{
       } else {
         const errHtml = errs.slice(-5).reverse().map(e=>
           `<div style="color:var(--red2,#c00);font-size:11px;border-left:2px solid var(--red);padding-left:6px;margin-bottom:4px">` +
-          `<b>${e.ctx}</b>：${e.msg}<br><span style="color:var(--t2)">${e.t.replace('T',' ').slice(0,19)}</span></div>`
+          `<b>${esc(e.ctx)}</b>：${esc(e.msg)}<br><span style="color:var(--t2)">${esc(e.t.replace('T',' ').slice(0,19))}</span></div>`
         ).join('');
         diagEl.innerHTML = `<div style="color:var(--t2);font-size:11px;margin-bottom:4px">最近 ${errs.length} 筆錯誤（顯示最後5筆）：</div>${errHtml}`;
       }
     }
   }
   }catch(e){ logError('renderSet',e); }}
+
 async function expJSON(){  try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
   dl(JSON.stringify({version:2,exportedAt:new Date().toISOString(),questions:qs,laws:ls,attempts:ats},null,2),'警察考題庫_'+today()+'.json','application/json');
@@ -209,27 +221,27 @@ async function expWrong(){  try{
   const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const wids=getWrong(qs,ats);const wqs=qs.filter(q=>wids.has(q.id));
   if(!wqs.length){toast('目前沒有錯題');return;}
-  dl(buildHTML(wqs,'錯題整理'),'警察考題_錯題_'+today()+'.html','text/html');toast(`匯出 ${wqs.length} 題`);
+  dl(_buildHTML(wqs,'錯題整理'),'警察考題_錯題_'+today()+'.html','text/html');toast(`匯出 ${wqs.length} 題`);
   }catch(e){ logError('expWrong',e); }}
 
 async function expAll(){  try{
   const qs=await da('questions');if(!qs.length){toast('題庫是空的');return;}
-  dl(buildHTML(qs,'警察考題庫'),'警察考題庫_'+today()+'.html','text/html');toast(`匯出 ${qs.length} 題`);
+  dl(_buildHTML(qs,'警察考題庫'),'警察考題庫_'+today()+'.html','text/html');toast(`匯出 ${qs.length} 題`);
   }catch(e){ logError('expAll',e); }}
 
-function buildHTML(qs,title){
+function _buildHTML(qs,title){
   const grp={};qs.forEach(q=>{const s=q.subject||'未分類';if(!grp[s])grp[s]=[];grp[s].push(q);});
   const d=new Date().toLocaleDateString('zh-TW');
-  let out='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>'+title+'</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px;line-height:1.8;color:#111}h1{font-size:22px;border-bottom:2px solid #333;padding-bottom:7px}h2{font-size:17px;color:#1f6feb;margin-top:28px}.q{margin:14px 0;padding:14px;border:1px solid #ddd;border-radius:8px}.qn{font-size:11px;color:#666}.qs{font-size:14px;font-weight:600;margin-bottom:8px}.opt{font-size:13px;margin:3px 0}.ans{margin-top:8px;font-size:12px;color:#1f6feb;font-weight:600}.note{font-size:11px;color:#666}</style></head><body><h1>'+title+' — '+d+'</h1>';
+  let out='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>'+esc(title)+'</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px;line-height:1.8;color:#111}h1{font-size:22px;border-bottom:2px solid #333;padding-bottom:7px}h2{font-size:17px;color:#1f6feb;margin-top:28px}.q{margin:14px 0;padding:14px;border:1px solid #ddd;border-radius:8px}.qn{font-size:11px;color:#666}.qs{font-size:14px;font-weight:600;margin-bottom:8px}.opt{font-size:13px;margin:3px 0}.ans{margin-top:8px;font-size:12px;color:#1f6feb;font-weight:600}.note{font-size:11px;color:#666}</style></head><body><h1>'+esc(title)+' — '+d+'</h1>';
   Object.entries(grp).forEach(([sub,sqs])=>{
-    out+='<h2>'+sub+'</h2>';
+    out+='<h2>'+esc(sub)+'</h2>';
     sqs.forEach((q,i)=>{
       const meta=[q.year,q.exam,q.num?'第'+q.num+'題':''].filter(Boolean).join(' · ');
-      out+='<div class="q"><div class="qn">'+meta+' · '+(q.type==='mc'?'選擇題':'申論題')+'</div><div class="qs">'+(i+1)+'. '+(q.stem||'')+'</div>';
-      if(q.type==='mc')Object.entries(q.options||{}).forEach(([k,v])=>{out+='<div class="opt">('+k+') '+v+'</div>';});
-      if(q.answer)out+='<div class="ans">答案：'+q.answer+'</div>';
-      if(q.answerEs)out+='<div class="note">解析：'+q.answerEs+'</div>';
-      if(q.note)out+='<div class="note">備註：'+q.note+'</div>';
+      out+='<div class="q"><div class="qn">'+esc(meta)+' · '+(q.type==='mc'?'選擇題':'申論題')+'</div><div class="qs">'+(i+1)+'. '+esc(q.stem||'')+'</div>';
+      if(q.type==='mc')Object.entries(q.options||{}).forEach(([k,v])=>{out+='<div class="opt">('+esc(k)+') '+esc(v)+'</div>';});
+      if(q.answer)out+='<div class="ans">答案：'+esc(q.answer)+'</div>';
+      if(q.answerEs)out+='<div class="note">解析：'+esc(q.answerEs)+'</div>';
+      if(q.note)out+='<div class="note">備註：'+esc(q.note)+'</div>';
       out+='</div>';
     });
   });
@@ -476,7 +488,7 @@ async function saveAzureKey(value){
   await setSetting('tts_azure_key', v);
   if(v.length > 10) toast('Azure Key 已儲存（'+v.length+'字元）✓');
 }
-async function renderAzureKey(){
+async function _renderAzureKey(){
   const key = await getSetting('tts_azure_key','');
   const el  = document.getElementById('tts-azure-key');
   if(el && key) el.value = key;
@@ -486,7 +498,7 @@ async function renderAzureKey(){
 const _debugLogs = [];
 const _MAX_LOGS = 200;
 
-// 攔截 console.error / console.warn
+// 攔截 console.error / console.warn 與未捕獲錯誤
 (function(){
   const _origError = console.error.bind(console);
   const _origWarn  = console.warn.bind(console);
@@ -544,15 +556,23 @@ function openDebugPanel(){
   header.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:#0d0d0d;border-bottom:1px solid #333;flex-shrink:0';
   header.innerHTML = `
     <span style="font-size:13px;font-weight:700;color:#fff;flex:1">偵錯紀錄（最新在上）</span>
-    <button id="dbg-copy-btn" title="全部複製" onclick="_debugCopyAll()" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
+    <button data-dbg="copy" title="全部複製" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
     </button>
-    <button title="清除紀錄" onclick="_debugLogs.length=0;openDebugPanel();" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
+    <button data-dbg="clear" title="清除紀錄" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
     </button>
-    <button onclick="document.getElementById('debug-panel-ov').remove()" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
+    <button data-dbg="close" title="關閉" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>`;
+  // 事件委派：偵錯面板按鈕（不再依賴全域函式）
+  header.addEventListener('click', e=>{
+    const btn = e.target.closest('[data-dbg]');
+    if(!btn) return;
+    if(btn.dataset.dbg === 'copy') _debugCopyAll();
+    else if(btn.dataset.dbg === 'clear'){ _debugLogs.length = 0; openDebugPanel(); }
+    else if(btn.dataset.dbg === 'close') ov.remove();
+  });
   ov.appendChild(header);
 
   const list = document.createElement('div');
@@ -573,3 +593,15 @@ function openDebugPanel(){
   ov.appendChild(list);
   document.body.appendChild(ov);
 }
+
+// ════════ 公開 API ════════
+const Settings = {
+  saveGasConfig, gdriveBackup, gdriveRestore,
+  renderSet, expJSON, impJSON, expWrong, expAll,
+  clearAts, delAll, toggleGasHelp,
+  localBackup, localRestore, saveAzureKey, openDebugPanel
+};
+window.Settings = Settings;
+Object.assign(window, Settings);
+
+})();
