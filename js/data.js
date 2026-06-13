@@ -1188,54 +1188,54 @@ async function openLawGroup(lawName){  try{
   const hasChapter = chapters.some(c=>c);
   const hasSection = sections.some(s=>s);
 
-  // ── 階層分組渲染：以「章」為主幹建樹，徹底杜絕標題重複 ──
-  // 結構：章 → 節 → 條文。同名章必為同一組（不受 part 標記不一致影響），
-  // 因此每個章/節標題只渲染一次。各層級內部依條號排序。
+  // ── 完整三層樹狀分組渲染：編 → 章 → 節 → 條文 ──
+  // 以「編」為最外層分組（同名編的所有章聚在一起），「章」為中層，
+  // 「節」為內層。每層標題只渲染一次，且同層級依各自最小條號排序。
+  // 徹底免疫於 part/章標記不一致：不論條文順序如何，同名編/章絕不分裂。
   const _artNum=l=>(l.articleNumber||art2n(l.article||''))||0;
+  const _minOf=arr=>arr.reduce((m,l)=>Math.min(m,_artNum(l)),Infinity);
 
-  // 以章分組（無章者歸入 key ''），保留各章首見的 part 供顯示
-  const chapMap=new Map(); // chapter -> { part, items:[] }
+  // 第一層：以編(part)分組
+  const partMap=new Map(); // part -> items[]
   laws.forEach(l=>{
-    const ch=l.chapter||'';
-    if(!chapMap.has(ch)) chapMap.set(ch, { part:l.part||'', items:[] });
-    chapMap.get(ch).items.push(l);
+    const p=l.part||'';
+    if(!partMap.has(p)) partMap.set(p,[]);
+    partMap.get(p).push(l);
   });
-  // 章排序：依該章最小條號
-  const chapEntries=[...chapMap.entries()].sort((a,b)=>{
-    const ma=Math.min(...a[1].items.map(_artNum));
-    const mb=Math.min(...b[1].items.map(_artNum));
-    return ma-mb;
-  });
+  const partEntries=[...partMap.entries()].sort((a,b)=>_minOf(a[1])-_minOf(b[1]));
 
   const renderGroup=()=>{
-    let lastPart='__none__';
-    chapEntries.forEach(([ch, grp])=>{
-      // 編標題：僅在 part 變動時顯示（同名章共用第一個 part）
-      if(hasPart && grp.part && grp.part!==lastPart){
-        arts+=renderHeading('part', grp.part);
-        lastPart=grp.part;
-      }
-      // 章標題（每章唯一）
-      if(hasChapter && ch) arts+=renderHeading('chapter', ch);
-      // 章內依「節」再分組
-      if(hasSection){
-        const sectMap=new Map();
-        grp.items.forEach(l=>{
-          const sec=l.section||'';
-          if(!sectMap.has(sec)) sectMap.set(sec,[]);
-          sectMap.get(sec).push(l);
-        });
-        const sectEntries=[...sectMap.entries()].sort((a,b)=>
-          Math.min(...a[1].map(_artNum))-Math.min(...b[1].map(_artNum)));
-        sectEntries.forEach(([sec,items])=>{
-          if(sec) arts+=renderHeading('section', sec);
-          items.sort((a,b)=>_artNum(a)-_artNum(b)||((a.id||0)-(b.id||0)));
-          items.forEach(l=>{ arts+=renderArtCard(l); });
-        });
-      } else {
-        grp.items.sort((a,b)=>_artNum(a)-_artNum(b)||((a.id||0)-(b.id||0)));
-        grp.items.forEach(l=>{ arts+=renderArtCard(l); });
-      }
+    partEntries.forEach(([part, partItems])=>{
+      if(hasPart && part) arts+=renderHeading('part', part);
+      // 第二層：該編內以章分組
+      const chapMap=new Map();
+      partItems.forEach(l=>{
+        const ch=l.chapter||'';
+        if(!chapMap.has(ch)) chapMap.set(ch,[]);
+        chapMap.get(ch).push(l);
+      });
+      const chapEntries=[...chapMap.entries()].sort((a,b)=>_minOf(a[1])-_minOf(b[1]));
+      chapEntries.forEach(([ch, chapItems])=>{
+        if(hasChapter && ch) arts+=renderHeading('chapter', ch);
+        // 第三層：該章內以節分組
+        if(hasSection){
+          const sectMap=new Map();
+          chapItems.forEach(l=>{
+            const sec=l.section||'';
+            if(!sectMap.has(sec)) sectMap.set(sec,[]);
+            sectMap.get(sec).push(l);
+          });
+          const sectEntries=[...sectMap.entries()].sort((a,b)=>_minOf(a[1])-_minOf(b[1]));
+          sectEntries.forEach(([sec,items])=>{
+            if(sec) arts+=renderHeading('section', sec);
+            items.sort((a,b)=>_artNum(a)-_artNum(b)||((a.id||0)-(b.id||0)));
+            items.forEach(l=>{ arts+=renderArtCard(l); });
+          });
+        } else {
+          chapItems.sort((a,b)=>_artNum(a)-_artNum(b)||((a.id||0)-(b.id||0)));
+          chapItems.forEach(l=>{ arts+=renderArtCard(l); });
+        }
+      });
     });
   };
   renderGroup();
@@ -1443,19 +1443,52 @@ async function editLawInView(id){  try{ const l=await dg('laws',id);if(l)showAdd
 
 // ── 重建條號索引：用最新 art2n 重算所有法條 articleNumber ──────
 // 修正：①舊資料 articleNumber 缺值/存錯 ②「第N條之M」子條號排序
+//      ③編章節標記不一致（多數決統一，清除孤立錯標）
 async function rebuildLawIndex(){  try{
   const laws=await da('laws');
   if(!laws.length){ toast('沒有法條資料'); return; }
-  let changed=0;
+  let changed=0, fixed=0;
+
+  // 步驟1：重算條號
   for(const l of laws){
     const newNum=art2n(l.article||'')||0;
     if(l.articleNumber!==newNum){ l.articleNumber=newNum; changed++; }
+  }
+
+  // 步驟2：編章節一致性修復（多數決）
+  // 同一法規同一「章」的所有條文，其 part(編) 應該一致。
+  // 統計每章各 part 的出現次數，取最多者統一；清除孤立錯標。
+  // 同理，同一「節」應隸屬同一章。
+  const byLawChap=new Map(); // 'lawName|chapter' -> [items]
+  laws.forEach(l=>{
+    const k=(l.lawName||'')+'|'+(l.chapter||'');
+    if(!byLawChap.has(k)) byLawChap.set(k,[]);
+    byLawChap.get(k).push(l);
+  });
+  byLawChap.forEach((items, k)=>{
+    if(!k.split('|')[1]) return; // 無章者跳過
+    // 統計此章各 part 的票數
+    const votes=new Map();
+    items.forEach(l=>{ const p=l.part||''; votes.set(p,(votes.get(p)||0)+1); });
+    // 取票數最高的 part（平手時取非空者優先）
+    let bestPart='', bestN=-1;
+    votes.forEach((n,p)=>{
+      if(n>bestN || (n===bestN && p && !bestPart)){ bestPart=p; bestN=n; }
+    });
+    // 統一：與多數不同者修正
+    items.forEach(l=>{
+      if((l.part||'')!==bestPart){ l.part=bestPart; fixed++; }
+    });
+  });
+
+  // 步驟3：重建搜尋索引並寫回
+  for(const l of laws){
     const _cnt=(l.content||'').startsWith('data:')?'':(l.content||'');
     l.searchBlob=[l.lawName,l.article,String(l.articleNumber||''),l.title,(l.keywords||[]).join(' '),_cnt]
       .filter(Boolean).join(' ').toLowerCase();
   }
   await bulkPut('laws', laws);
-  toast(`重建完成：${laws.length} 條，修正 ${changed} 條排序 ✓`);
+  toast(`重建完成：${laws.length} 條，修正排序 ${changed}、統一編章節 ${fixed} ✓`);
   // 若正在檢視某法規，刷新；否則刷新清單
   if(document.getElementById('lv')?.style.display==='flex' && S.curLawName){
     openLawGroup(S.curLawName);
