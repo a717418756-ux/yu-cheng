@@ -22,7 +22,7 @@
 
 /* 速率按鈕 span 確保顯示 */
 .vpt-speed-btn > span{
-  color:rgba(255,255,255,0.6);
+  color:var(--t1);
   font-size:13px !important;
   font-weight:700;
 }
@@ -127,8 +127,8 @@
   font-size:22px;
   font-weight:800;
   letter-spacing:-.02em;
-  color:#fff;
-  -webkit-text-fill-color:#fff;
+  color:#111;
+  -webkit-text-fill-color:#111;
   flex-shrink:0;
 }
 
@@ -257,4 +257,38 @@
 #media-hd-title{
   flex:1;
   text-align:left;
+}
+
+/* ══ eink 主題：電子書閱讀器內文強化（Boox 閱讀最佳化）══════════
+   只在 eink 模式生效，提升長時間閱讀舒適度。
+   ═══════════════════════════════════════════════════════════════ */
+/* epub 內文：襯線字體更適合長文閱讀，段落間距加大 */
+[data-theme="eink"].reader-active #epub-viewer,
+[data-theme="eink"] #epub-viewer{
+  font-family:'Noto Serif TC','標楷體','DFKai-SB',Georgia,serif;
+  line-height:1.9;
+  color:#000;
+}
+/* epub 內文段落：適度段距，不擠 */
+[data-theme="eink"] #epub-viewer p{
+  margin:0 0 1.1em;
+  text-align:justify;
+}
+/* 閱讀器頂列：純淨高對比 */
+[data-theme="eink"] .reader-active .reader-topbar,
+[data-theme="eink"] .epub-bottom-bar{
+  background:#F6F4EE;
+  border-color:#888;
+}
+/* 法條檢視內文：eink 下襯線 + 加大行距，與書籍一致的閱讀質感 */
+[data-theme="eink"] #lv{
+  background:#F6F4EE;
+}
+[data-theme="eink"] #lv-arts{
+  font-family:'Noto Serif TC','標楷體','DFKai-SB',Georgia,serif;
+}
+/* eink 閱讀進度條：純黑高對比 */
+[data-theme="eink"] #epub-progress-fill,
+[data-theme="eink"] .epub-progress-fill{
+  background:#000 !important;
 }
