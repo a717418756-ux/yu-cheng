@@ -342,7 +342,17 @@ async function renderList(){  try{
 async function openYearGroup(year){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const ws=getWrong(qs,ats);
-  const fl=qs.filter(q=>(q.year||'未知年度')===year);
+  const f=S.filter||'all';
+  const sf=S.subF||'all';
+  const fl=qs.filter(q=>{
+    if((q.year||'未知年度')!==year) return false;
+    if(f==='mc'&&q.type!=='mc') return false;
+    if(f==='es'&&q.type!=='es') return false;
+    if(f==='wrong'&&!ws.has(q.id)) return false;
+    if(f==='star'&&!q.starred) return false;
+    if(sf!=='all'&&q.subject!==sf) return false;
+    return true;
+  });
   const el=document.getElementById('qlist');
   if(!el) return;
   if(window._vlScroll){ window.removeEventListener('scroll',window._vlScroll); window._vlScroll=null; }
@@ -355,7 +365,7 @@ async function openYearGroup(year){  try{
   backBtn.className='btn bg';
   backBtn.style.cssText='font-size:13px;padding:6px 14px;display:inline-flex;align-items:center;gap:6px';
   backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回列表';
-  backBtn.onclick=()=>renderList();
+  backBtn.onclick=()=>{ _qGroupYear=''; _qGroupSubject=''; renderList(); };
   backDiv.appendChild(backBtn);
   el.appendChild(backDiv);
 
@@ -398,8 +408,16 @@ async function openQGroup(year, subject){  try{
   _qGroupYear=year; _qGroupSubject=subject;
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const ws=getWrong(qs,ats);
-  const fl=qs.filter(q=>(q.year||'未知年度')===year&&(q.subject||'未分類')===subject)
-    .sort((a,b)=>(a.id||0)-(b.id||0));
+  const f=S.filter||'all';
+  const fl=qs.filter(q=>{
+    if((q.year||'未知年度')!==year) return false;
+    if((q.subject||'未分類')!==subject) return false;
+    if(f==='mc'&&q.type!=='mc') return false;
+    if(f==='es'&&q.type!=='es') return false;
+    if(f==='wrong'&&!ws.has(q.id)) return false;
+    if(f==='star'&&!q.starred) return false;
+    return true;
+  }).sort((a,b)=>(a.id||0)-(b.id||0));
 
   const el=document.getElementById('qlist');
   if(!el) return;
@@ -416,8 +434,8 @@ async function openQGroup(year, subject){  try{
   const backBtn=document.createElement('button');
   backBtn.className='btn bg';
   backBtn.style.cssText='font-size:13px;padding:6px 14px;display:inline-flex;align-items:center;gap:6px';
-  backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回列表';
-  backBtn.onclick=()=>renderList();
+  backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回年度';
+  backBtn.onclick=()=>openYearGroup(year);
   backDiv.appendChild(backBtn);
   el.appendChild(backDiv);
 
@@ -617,7 +635,11 @@ async function saveQ(){
     logError('saveQ',e);
     toast('儲存失敗，請重試');
   }
-  if(S.page==='list')renderList();else renderHome();
+  if(S.page==='list'){
+    // 編輯後回到編輯前所在的層（第三層 → 回科目群組；否則回第一層）
+    if(_qGroupYear && _qGroupSubject) openQGroup(_qGroupYear, _qGroupSubject);
+    else renderList();
+  } else renderHome();
   }catch(e){logError('saveQ',e);}}
 
 async function editQ(id){  try{const q=await dg('questions',id);if(q)showAdd(q);  }catch(e){ logError('editQ',e); }}
