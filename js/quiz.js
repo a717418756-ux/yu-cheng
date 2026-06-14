@@ -102,9 +102,9 @@ function renderQCard(){
     optsEl.innerHTML = Object.entries(qu.options||{}).map(([k,v])=>
       '<div class="qopt" data-key="'+esc(k)+'"><div class="qok">'+esc(k)+'</div><div class="qov">'+esc(v)+'</div></div>'
     ).join('');
-    // 顯示 qfoot 裡的確認按鈕
+    // 多選才顯示確認按鈕，單選自動提交不需要
     const cfmBtn = document.getElementById('qmulti-confirm');
-    if(cfmBtn) cfmBtn.classList.remove('hide');
+    if(cfmBtn){ if(isMulti) cfmBtn.classList.remove('hide'); else cfmBtn.classList.add('hide'); }
     // 相關法條先隱藏，確認後顯示
     const lawEl = document.getElementById('qlaw');
     if(lawEl) lawEl.style.display = 'none';
@@ -348,11 +348,12 @@ function selectOpt(el, key){
       el.classList.add('selected');
     }
   } else {
-    // 單選：只能選一個
+    // 單選：只能選一個，選後立即自動提交
     document.querySelectorAll('.qopt').forEach(o=>o.classList.remove('selected'));
     S.quiz._selected.clear();
     S.quiz._selected.add(key);
     el.classList.add('selected');
+    ansQ(key);
   }
 }
 
