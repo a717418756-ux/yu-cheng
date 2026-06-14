@@ -229,7 +229,12 @@ async function renderList(){  try{
     if(f==='wrong'&&!ws.has(q.id))return false;
     if(f==='star'&&!q.starred)return false;
     if(sf!=='all'&&q.subject!==sf)return false;
-    if(kw){const h=(q.searchBlob||(q.stem||'')+(q.subject||'')+(q.keywords||[]).join(' ')).toLowerCase();if(!h.includes(kw))return false;}
+    if(kw){
+      const h=(q.searchBlob||(q.stem||'')+(q.subject||'')+(q.keywords||[]).join(' ')).toLowerCase();
+      // 多關鍵字 AND：空格分隔的每個詞都要出現（可跨欄位，順序不限）
+      const terms=kw.split(/\s+/).filter(Boolean);
+      if(!terms.every(t=>h.includes(t))) return false;
+    }
     return true;
   }).sort((a,b)=>(b.year||'').localeCompare(a.year||'') || (a.subject||'').localeCompare(b.subject||''));
 
@@ -2321,7 +2326,9 @@ async function importBulk(){
     subject: sub||q.subject||'',
     year:    yr||q.year||'',
     exam:    ex||q.exam||'',
-    searchBlob: ((q.stem||'')+' '+(sub||q.subject||'')+' '+(q.keywords||[]).join(' ')).toLowerCase(),
+    searchBlob: ((q.stem||'')+' '+(q.groupStem||'')+' '+(sub||q.subject||'')+' '+
+      (yr||q.year||'')+' '+(ex||q.exam||'')+' '+(q.num||'')+' '+
+      (q.keywords||[]).join(' ')).toLowerCase(),
   }));
   try{
     // ── 防重複：以年度+考試別+科目+題號 判斷 ──────────────────

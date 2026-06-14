@@ -278,6 +278,15 @@ function preprocessQuestionText(text){
   t=t.replace(/§([A-E])§\s*/g,'\n§$1§ ');
   t=t.replace(/§OPT§\s*/g,'\n§OPT§ ');
 
+  // ★ 題號從選項內容中拆出：當選項符號後面黏著「數字+空白+中文長句」
+  //   （下一題題號被前一題答案選項吸進來的情況），在題號前斷行。
+  //   例：「§C§ 6 依警察教育…」→「§C§」「6 依警察教育…」
+  t=t.replace(/(§(?:OPT|[A-E])§[^\n]*?)\s(\d{1,3})\s+([\u4e00-\u9fff])/g, (m, head, num, zh)=>{
+    // 量詞起頭不切（避免「§A§ 3 公里」被誤拆）
+    if('年月日時分秒週天個件名條款項元萬千百公里度次'.includes(zh)) return m;
+    return head + '\n' + num + ' ' + zh;
+  });
+
   // 中文字間多餘空格（保留數字前後）
   let prev='';
   let _wLim1=0;
