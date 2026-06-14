@@ -198,14 +198,10 @@
       _TTS.utterances.splice(_TTS.idx + 1, 0, rawText.slice(text.length));
     }
 
-    // 若選了 Azure 聲音，先確認 key/url 有設定再走 Azure 引擎
+    // 若選了 Azure 聲音，直接走 Azure 引擎（內部會自行檢查 key/url 並 fallback）
     if(_TTS.voiceURI && _TTS.voiceURI.startsWith('azure:')){
-      const { key:_k, url:_u } = await _loadAzureConfig();
-      if(_k && _u){
-        await _speakAzure(text, _TTS.voiceURI.replace('azure:',''));
-        return;
-      }
-      // key 或 url 未設定 → 靜默降回系統 TTS（不顯示 toast 避免干擾朗讀）
+      await _speakAzure(text, _TTS.voiceURI.replace('azure:',''));
+      return;
     }
 
     const utter    = new SpeechSynthesisUtterance(text);
