@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.10.2';      // 修復 editQ 未暴露全域 + 補寫 parseBulkText/parseAnswerStr
+const APP_VERSION  = '2.10.3';      // 整合：音檔功能+題目searchBlob(year/exam/num)+重建索引同步題目+editQ修正
 const DATA_VERSION = '1150531-3';   // 題庫版本（題庫/法條資料更新時遞增）

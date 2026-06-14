@@ -59,11 +59,13 @@ async function renderEnglish(){
     const cnt = (m.sentences||[]).length;
     const icon = m.sourceType==='pdf' ? '📄' : m.sourceType==='ocr' ? '📷' : '📝';
     const date = m.createdAt ? new Date(m.createdAt).toLocaleDateString('zh-TW') : '';
+    const hasAudio = (m.audioRead instanceof Blob) || (m.audioDetail instanceof Blob);
+    const audioTag = hasAudio ? ' · 🎵' : '';
     return `<div class="eng-card" data-id="${m.id}">
       <div class="eng-card-icon">${icon}</div>
       <div class="eng-card-body">
         <div class="eng-card-title">${esc(m.title||'未命名')}</div>
-        <div class="eng-card-meta">${cnt} 句 · ${esc(date)}</div>
+        <div class="eng-card-meta">${cnt} 句 · ${esc(date)}${audioTag}</div>
       </div>
       <button class="eng-card-del" data-del="${m.id}" title="刪除">×</button>
     </div>`;
@@ -248,11 +250,13 @@ async function openMaterial(id){
     ).join('');
     ov.style.display = 'flex';
     _stopTTS();
+    _setupAudio(m);  // 載入該材料的朗讀/詳解音檔
   }catch(e){ logError('openMaterial',e); }
 }
 
 function closeMaterial(){
   _stopTTS();
+  _teardownAudio();  // 釋放音檔 objectURL，避免記憶體洩漏
   const ov = document.getElementById('eng-reader');
   if(ov) ov.style.display = 'none';
   _curMaterial = null;
@@ -342,6 +346,152 @@ function engRateStep(delta){
   setEngRate(r);
 }
 
+// ════════ 音檔播放（朗讀 mp3 / 詳解 mp3）════════
+// 音檔以 Blob 存在材料物件的 audioRead / audioDetail 欄位（IndexedDB 原生支援 Blob，離線可播）
+const _engAudio = { read:null, detail:null };  // Audio 物件
+let _engAudioUrls = { read:null, detail:null }; // objectURL（用後釋放）
+
+// 開啟閱讀器時，載入該材料的音檔
+function _setupAudio(material){
+  _teardownAudio();
+  const bar = document.getElementById('eng-audio-bar');
+  let any = false;
+  ['read','detail'].forEach(kind=>{
+    const blob = kind==='read' ? material.audioRead : material.audioDetail;
+    const row = document.getElementById('eng-audio-'+kind);
+    if(blob instanceof Blob){
+      const url = URL.createObjectURL(blob);
+      _engAudioUrls[kind] = url;
+      const audio = new Audio(url);
+      audio.preload = 'metadata';
+      audio.ontimeupdate = ()=>_updateAudioUI(kind);
+      audio.onended = ()=>{ _updateAudioPlayBtn(kind,false); };
+      audio.onloadedmetadata = ()=>_updateAudioUI(kind);
+      _engAudio[kind] = audio;
+      if(row) row.style.display = 'flex';
+      any = true;
+    } else {
+      if(row) row.style.display = 'none';
+    }
+  });
+  if(bar) bar.style.display = any ? 'block' : 'none';
+}
+
+function _teardownAudio(){
+  ['read','detail'].forEach(kind=>{
+    if(_engAudio[kind]){ try{ _engAudio[kind].pause(); }catch(e){} _engAudio[kind]=null; }
+    if(_engAudioUrls[kind]){ URL.revokeObjectURL(_engAudioUrls[kind]); _engAudioUrls[kind]=null; }
+  });
+}
+
+function toggleEngAudio(kind){
+  const audio = _engAudio[kind];
+  if(!audio) return;
+  // 播一個時暫停另一個 + 暫停 TTS
+  if(audio.paused){
+    _pauseTTS();
+    const other = kind==='read' ? 'detail' : 'read';
+    if(_engAudio[other] && !_engAudio[other].paused){ _engAudio[other].pause(); _updateAudioPlayBtn(other,false); }
+    audio.play().catch(e=>toast('播放失敗：'+e.message));
+    _updateAudioPlayBtn(kind,true);
+  } else {
+    audio.pause();
+    _updateAudioPlayBtn(kind,false);
+  }
+}
+
+function engAudioSeek(kind, val){
+  const audio = _engAudio[kind];
+  if(!audio || !audio.duration) return;
+  audio.currentTime = (val/100)*audio.duration;
+}
+
+function _updateAudioUI(kind){
+  const audio = _engAudio[kind];
+  if(!audio) return;
+  const seek = document.getElementById('eng-au-seek-'+kind);
+  const time = document.getElementById('eng-au-time-'+kind);
+  if(audio.duration){
+    if(seek) seek.value = (audio.currentTime/audio.duration)*100;
+    if(time) time.textContent = _fmtTime(audio.currentTime)+' / '+_fmtTime(audio.duration);
+  }
+}
+
+function _updateAudioPlayBtn(kind, playing){
+  const btn = document.querySelector('.eng-au-play[data-au="'+kind+'"]');
+  if(btn) btn.textContent = playing ? '⏸' : '▶';
+}
+
+function _fmtTime(sec){
+  if(!isFinite(sec)) return '0:00';
+  const m = Math.floor(sec/60), s = Math.floor(sec%60);
+  return m+':'+String(s).padStart(2,'0');
+}
+
+// ── 音檔管理面板（上傳/移除）──
+function openEngAudioMgr(){
+  if(!_curMaterial){ toast('請先開啟材料'); return; }
+  const m = _curMaterial;
+  const ov = document.createElement('div');
+  ov.id = 'eng-audio-mgr';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:420;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center';
+  const row = (kind,label,icon)=>{
+    const has = (kind==='read'?m.audioRead:m.audioDetail) instanceof Blob;
+    return `<div class="eng-aum-row">
+      <span class="eng-aum-label">${icon} ${label}</span>
+      ${has
+        ? `<span class="eng-aum-has">已附加</span><button class="eng-aum-btn del" data-del="${kind}">移除</button>`
+        : `<button class="eng-aum-btn" data-add="${kind}">上傳 MP3</button>`}
+    </div>`;
+  };
+  ov.innerHTML = `<div class="eng-sheet">
+    <div class="eng-sheet-bar"></div>
+    <div class="eng-sheet-title">管理音檔</div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:14px">每篇可附「朗讀」與「詳解」兩個音檔，離線儲存可播放。</div>
+    ${row('read','朗讀音檔','📖')}
+    ${row('detail','詳解音檔','💡')}
+    <button class="eng-sheet-cancel" data-cancel>關閉</button>
+  </div>`;
+  ov.addEventListener('click', e=>{
+    if(e.target===ov || e.target.closest('[data-cancel]')){ ov.remove(); return; }
+    const add = e.target.closest('[data-add]');
+    if(add){ _pickAudio(add.dataset.add, ov); return; }
+    const del = e.target.closest('[data-del]');
+    if(del){ _removeAudio(del.dataset.del, ov); return; }
+  });
+  document.body.appendChild(ov);
+}
+
+function _pickAudio(kind, ov){
+  const inp = document.createElement('input');
+  inp.type='file'; inp.accept='audio/*,.mp3';
+  inp.onchange = async ()=>{
+    const file = inp.files[0]; if(!file) return;
+    try{
+      const m = await dg('englishMaterials', _curMaterial.id);
+      if(kind==='read') m.audioRead = file; else m.audioDetail = file;
+      await dp('englishMaterials', m);
+      _curMaterial = m;
+      toast('音檔已附加 ✓');
+      if(ov) ov.remove();
+      _setupAudio(m);  // 重新載入音檔列
+    }catch(e){ logError('_pickAudio',e); toast('附加失敗：'+e.message); }
+  };
+  inp.click();
+}
+
+async function _removeAudio(kind, ov){
+  try{
+    const m = await dg('englishMaterials', _curMaterial.id);
+    if(kind==='read') delete m.audioRead; else delete m.audioDetail;
+    await dp('englishMaterials', m);
+    _curMaterial = m;
+    toast('已移除音檔');
+    if(ov) ov.remove();
+    _setupAudio(m);
+  }catch(e){ logError('_removeAudio',e); }
+}
+
 // 點句子 → 從該句開始朗讀
 function _initReaderDelegation(){
   const body = document.getElementById('eng-reader-body');
@@ -395,7 +545,8 @@ else _initEnglish();
 // ════════ 公開 API ════════
 const English = {
   renderEnglish, openEngUpload, openMaterial, closeMaterial,
-  toggleEngTTS, setEngRate, engRateStep
+  toggleEngTTS, setEngRate, engRateStep,
+  openEngAudioMgr, toggleEngAudio, engAudioSeek
 };
 window.English = English;
 Object.assign(window, English);
