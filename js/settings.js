@@ -299,6 +299,7 @@ async function localBackup(){
       laws: ls
     }));
     await examWriter.close();
+    count++;  // exam_data.json 計入項目數
 
     // ── 書庫備份 ──
     const ebooksDir = await dirHandle.getDirectoryHandle('ebooks', { create:true });

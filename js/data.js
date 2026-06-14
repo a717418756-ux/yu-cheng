@@ -213,6 +213,7 @@ function setF(el, f){
   document.querySelectorAll('#fchips .chip').forEach(c=>c.classList.remove('on'));
   el.classList.add('on');
   S.filter = f;
+  S.subF = 'all';  // 切換類型篩選時重置科目篩選
   renderList();
 }
 
@@ -242,7 +243,9 @@ async function renderList(){  try{
   if(lcEl) lcEl.textContent='共 '+fl.length+' 題';
 
   // 更新科目 chip
-  const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))].sort();
+  // 科目 chip 只顯示目前篩選結果內的科目（不含關鍵字搜尋，以保留切換科目的意義）
+  const subsBase=f==='all'&&!kw ? qs : fl;
+  const subs=[...new Set(subsBase.map(q=>q.subject).filter(Boolean))].sort();
   const schips=document.getElementById('schips');
   if(schips){
     schips.innerHTML='';
