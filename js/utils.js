@@ -95,6 +95,7 @@ function cfm(t,s,cb){
   document.getElementById('cfm-t').textContent=t;
   document.getElementById('cfm-s').textContent=s;
   document.getElementById('cfm-ok').onclick=()=>{closeCfm();_cfmCb?.();};
+  document.getElementById('cfm-cn').onclick=()=>closeCfm();
   document.getElementById('cfm-ov').classList.add('on');
 }
 function closeCfm(){ document.getElementById('cfm-ov').classList.remove('on'); }
