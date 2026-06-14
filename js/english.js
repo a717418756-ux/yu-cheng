@@ -244,9 +244,15 @@ async function openMaterial(id){
     if(!ov || !bodyEl) return;
     if(titleEl) titleEl.textContent = m.title||'';
 
-    // 逐句渲染：每句一個可點擊段落（之後跟讀/查詞用）
-    bodyEl.innerHTML = (m.sentences||[]).map((s,i)=>
-      `<p class="eng-sent" data-si="${i}">${esc(s)}</p>`
+    // 逐句渲染：每句一個可點擊段落 + 跟讀按鈕（有語音辨識才顯示）
+    const hasSR = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    bodyEl.innerHTML = (m.sentences||[]).map((s,i)=>`
+      <div class="eng-sent-wrap">
+        <p class="eng-sent" data-si="${i}">${esc(s)}</p>
+        ${hasSR ? `<div class="eng-repeat-row" data-ri="${i}">
+          <button class="eng-repeat-btn" onclick="startRepeat(this,${i})" title="跟讀此句">🎙</button>
+        </div>` : ''}
+      </div>`
     ).join('');
     ov.style.display = 'flex';
     _stopTTS();
@@ -256,6 +262,7 @@ async function openMaterial(id){
 
 function closeMaterial(){
   _stopTTS();
+  _stopRecording();
   _teardownAudio();  // 釋放音檔 objectURL，避免記憶體洩漏
   const ov = document.getElementById('eng-reader');
   if(ov) ov.style.display = 'none';
@@ -508,7 +515,232 @@ function _initReaderDelegation(){
   });
 }
 
-// ════════ 動態載入第三方庫 ════════
+// ════════ 跟讀糾正（Azure Pronunciation Assessment）════════
+// 流程：取得 Azure Token → MediaRecorder 錄音（webm/mp4）
+//       → POST 到 Azure Speech REST API（含 Pronunciation Assessment 參數）
+//       → 解析 NBest[0].Words[] 逐字顯示發音分數
+// 依賴：getSetting('tts_azure_key') 已在 settings.js 存入 IndexedDB
+
+const _AZ_REGION  = 'eastasia';
+const _AZ_LANG    = 'en-US';
+let   _azPAToken  = null;   // { token, expiry }
+let   _mediaRec   = null;   // 目前的 MediaRecorder
+let   _recChunks  = [];
+
+// ── 取得 Azure 授權 Token（10 分鐘有效，自動快取）──────────
+async function _getAzToken(){
+  const now = Date.now();
+  if(_azPAToken && _azPAToken.expiry > now + 30000) return _azPAToken.token;
+  const key = await getSetting('tts_azure_key','').catch(()=>'');
+  if(!key) throw new Error('請先在「設定」填入 Azure Key');
+  const res = await fetch(
+    `https://${_AZ_REGION}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
+    { method:'POST', headers:{ 'Ocp-Apim-Subscription-Key': key } }
+  );
+  if(!res.ok) throw new Error(`Token 取得失敗（HTTP ${res.status}）`);
+  const token = await res.text();
+  _azPAToken = { token, expiry: now + 9 * 60 * 1000 };
+  return token;
+}
+
+// ── 停止目前錄音（若有）──────────────────────────────────────
+function _stopRecording(){
+  if(_mediaRec && _mediaRec.state !== 'inactive') _mediaRec.stop();
+  _mediaRec = null;
+}
+
+// ── 主入口：點 🎙 按鈕 ────────────────────────────────────────
+async function startRepeat(btn, idx){
+  // 若正在錄音 → 停止
+  if(_mediaRec && _mediaRec.state === 'recording'){
+    _stopRecording();
+    return;
+  }
+
+  const sents = _curMaterial?.sentences || [];
+  const original = sents[idx];
+  if(!original) return;
+
+  // 暫停 TTS 避免干擾麥克風
+  if(_ttsPlaying){ _pauseTTS(); }
+
+  // 先確認有 Azure Key（避免錄完才報錯）
+  const key = await getSetting('tts_azure_key','').catch(()=>'');
+  if(!key){
+    toast('請先在「設定」填入 Azure Key 才能使用跟讀糾正');
+    return;
+  }
+
+  // 取得麥克風權限
+  let stream;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+  }catch(e){
+    toast('無法開啟麥克風：' + (e.message||e));
+    return;
+  }
+
+  // 按鈕：錄音中狀態
+  const origTxt = btn.textContent;
+  btn.textContent = '⏹';
+  btn.classList.add('eng-repeat-btn-rec');
+  btn.title = '點擊停止錄音';
+
+  _recChunks = [];
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+    : 'audio/mp4';
+  const rec = new MediaRecorder(stream, { mimeType });
+  _mediaRec = rec;
+
+  rec.ondataavailable = e=>{ if(e.data.size>0) _recChunks.push(e.data); };
+  rec.onstop = async ()=>{
+    stream.getTracks().forEach(t=>t.stop());
+    // 還原按鈕
+    btn.textContent = origTxt;
+    btn.classList.remove('eng-repeat-btn-rec');
+    btn.title = '跟讀此句';
+    _mediaRec = null;
+
+    if(!_recChunks.length){ toast('未收到錄音資料'); return; }
+    const blob = new Blob(_recChunks, { type: mimeType });
+    _recChunks = [];
+    await _assessPronunciation(idx, original, blob, mimeType);
+  };
+
+  rec.start();
+  // 最長 15 秒自動停止
+  setTimeout(()=>{ if(rec.state==='recording') rec.stop(); }, 15000);
+}
+
+// ── 送 Azure Pronunciation Assessment REST ────────────────────
+async function _assessPronunciation(idx, original, audioBlob, mimeType){
+  _showRepeatLoading(idx);
+
+  let token;
+  try{ token = await _getAzToken(); }
+  catch(e){ toast(e.message); _clearRepeatResult(idx); return; }
+
+  // Pronunciation Assessment 參數（JSON → base64）
+  const paConfig = JSON.stringify({
+    ReferenceText:  original,
+    GradingSystem:  'HundredMark',
+    Dimension:      'Comprehensive',
+    EnableMiscue:   true,
+  });
+  const paHeader = btoa(unescape(encodeURIComponent(paConfig)));
+
+  const url = `https://${_AZ_REGION}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`
+    + `?language=${_AZ_LANG}&format=detailed`;
+
+  let result;
+  try{
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization':           `Bearer ${token}`,
+        'Content-Type':            mimeType,
+        'Pronunciation-Assessment': paHeader,
+        'Accept':                  'application/json',
+      },
+      body: audioBlob,
+    });
+    if(!res.ok){
+      const txt = await res.text().catch(()=>'');
+      throw new Error(`Azure HTTP ${res.status}：${txt.slice(0,120)}`);
+    }
+    result = await res.json();
+  }catch(e){
+    _clearRepeatResult(idx);
+    toast('評估失敗：' + e.message);
+    console.error('[AzurePA]', e);
+    return;
+  }
+
+  _clearRepeatResult(idx);
+  _showPAResult(idx, original, result);
+}
+
+function _showRepeatLoading(idx){
+  _clearRepeatResult(idx);
+  const body = document.getElementById('eng-reader-body');
+  if(!body) return;
+  const div = document.createElement('div');
+  div.className = 'eng-repeat-res';
+  div.dataset.ri = idx;
+  div.innerHTML = '<span style="color:var(--t2)">⏳ Azure 評估中…</span>';
+  _insertAfterSent(body, idx, div);
+}
+function _clearRepeatResult(idx){
+  document.getElementById('eng-reader-body')
+    ?.querySelectorAll(`.eng-repeat-res[data-ri="${idx}"]`)
+    .forEach(el=>el.remove());
+}
+function _insertAfterSent(body, idx, el){
+  const anchor = body.querySelector(`.eng-repeat-row[data-ri="${idx}"]`)
+               || body.querySelector(`.eng-sent[data-si="${idx}"]`);
+  if(anchor?.nextSibling) anchor.parentNode.insertBefore(el, anchor.nextSibling);
+  else if(anchor) anchor.after(el);
+}
+
+// ── 解析並顯示結果 ────────────────────────────────────────────
+function _showPAResult(idx, original, result){
+  const body = document.getElementById('eng-reader-body');
+  if(!body) return;
+
+  const nb    = result?.NBest?.[0];
+  const pa    = nb?.PronunciationAssessment;
+  const words = nb?.Words || [];
+
+  const accScore   = Math.round(pa?.AccuracyScore    ?? 0);
+  const fluScore   = Math.round(pa?.FluencyScore     ?? 0);
+  const compScore  = Math.round(pa?.CompletenessScore ?? 0);
+  const totalScore = Math.round((accScore + fluScore + compScore) / 3);
+
+  const scoreColor = s => s>=90 ? 'var(--grn,#4caf7d)' : s>=70 ? 'var(--org,#f5a623)' : 'var(--red,#e05c57)';
+
+  const wordsHtml = words.map(w=>{
+    const ws  = Math.round(w.PronunciationAssessment?.AccuracyScore ?? 0);
+    const err = w.PronunciationAssessment?.ErrorType ?? 'None';
+    const badge = err==='Omission'  ? '<sup class="eng-pa-err">漏</sup>'
+                : err==='Insertion' ? '<sup class="eng-pa-err">多</sup>' : '';
+    return `<span class="eng-pa-word" style="color:${scoreColor(ws)}" title="準確度 ${ws}%">`
+         + `${esc(w.Word)}${badge}</span>`;
+  }).join(' ');
+
+  const div = document.createElement('div');
+  div.className = 'eng-repeat-res';
+  div.dataset.ri = idx;
+  div.innerHTML = `
+    <div class="eng-pa-scores">
+      <div class="eng-pa-score-item">
+        <span class="eng-pa-score-val" style="color:${scoreColor(accScore)}">${accScore}</span>
+        <span class="eng-pa-score-lbl">準確度</span>
+      </div>
+      <div class="eng-pa-score-item">
+        <span class="eng-pa-score-val" style="color:${scoreColor(fluScore)}">${fluScore}</span>
+        <span class="eng-pa-score-lbl">流暢度</span>
+      </div>
+      <div class="eng-pa-score-item">
+        <span class="eng-pa-score-val" style="color:${scoreColor(compScore)}">${compScore}</span>
+        <span class="eng-pa-score-lbl">完整度</span>
+      </div>
+      <div class="eng-pa-score-item eng-pa-score-total">
+        <span class="eng-pa-score-val" style="color:${scoreColor(totalScore)}">${totalScore}</span>
+        <span class="eng-pa-score-lbl">綜合</span>
+      </div>
+    </div>
+    <div class="eng-pa-words">${wordsHtml || '<span style="color:var(--t2)">（未偵測到語音）</span>'}</div>
+    <div style="font-size:10px;color:var(--t2);margin-top:6px">
+      辨識：${esc(nb?.Display || nb?.Lexical || '—')}
+    </div>`;
+
+  _insertAfterSent(body, idx, div);
+  div.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+
 let _pdfLib = null;
 async function _ensurePdfLib(){
   if(_pdfLib) return _pdfLib;
@@ -546,7 +778,8 @@ else _initEnglish();
 const English = {
   renderEnglish, openEngUpload, openMaterial, closeMaterial,
   toggleEngTTS, setEngRate, engRateStep,
-  openEngAudioMgr, toggleEngAudio, engAudioSeek
+  openEngAudioMgr, toggleEngAudio, engAudioSeek,
+  startRepeat,
 };
 window.English = English;
 Object.assign(window, English);
