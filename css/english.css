@@ -145,3 +145,49 @@
 .zone-act-btn:hover{ border-color:var(--acc); background:var(--bg2); }
 .zone-act-btn:active{ transform:scale(.99); }
 [data-theme="eink"] .zone-act-btn{ box-shadow:none; border-color:#000; }
+
+/* ── 音檔播放列 ── */
+.eng-audio-bar{
+  border-top:1px solid var(--bd);
+  background:var(--bg1);
+  padding:8px 14px;
+}
+.eng-audio-row{
+  display:flex; align-items:center; gap:10px;
+  padding:5px 0;
+}
+.eng-au-play{
+  width:34px; height:34px; border-radius:50%; flex-shrink:0;
+  background:var(--acc); color:#fff; border:none;
+  font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+.eng-au-label{ font-size:12px; color:var(--t1); flex-shrink:0; min-width:48px; }
+.eng-au-seek{
+  flex:1; height:4px; -webkit-appearance:none; appearance:none;
+  background:var(--bg3); border-radius:2px; cursor:pointer;
+}
+.eng-au-seek::-webkit-slider-thumb{
+  -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+  background:var(--acc); cursor:pointer;
+}
+.eng-au-time{ font-size:10px; color:var(--t2); flex-shrink:0; min-width:64px; text-align:right; }
+
+/* ── 音檔管理面板 ── */
+.eng-aum-row{
+  display:flex; align-items:center; gap:10px;
+  padding:12px; margin-bottom:8px;
+  background:var(--bg2); border:1px solid var(--bd); border-radius:10px;
+}
+.eng-aum-label{ font-size:14px; color:var(--t0); flex:1; }
+.eng-aum-has{ font-size:11px; color:var(--grn,#4caf7d); }
+.eng-aum-btn{
+  padding:7px 14px; border-radius:8px; border:1px solid var(--acc);
+  background:var(--acc); color:#fff; font-size:12px; cursor:pointer;
+}
+.eng-aum-btn.del{ background:transparent; border-color:var(--red); color:var(--red); }
+
+/* eink：音檔列高對比 */
+[data-theme="eink"] .eng-au-play{ background:#000; color:#fff; }
+[data-theme="eink"] .eng-au-seek::-webkit-slider-thumb{ background:#000; }
+[data-theme="eink"] .eng-aum-btn{ background:#000; border-color:#000; }
+[data-theme="eink"] .eng-aum-btn.del{ background:transparent; border-color:#000; color:#000; }
