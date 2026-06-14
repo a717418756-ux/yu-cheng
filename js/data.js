@@ -765,36 +765,35 @@ async function openBulkDelLaw(){  try{
   const modal=document.createElement('div');
   modal.id='bulk-del-law-modal';
   modal.style.cssText='position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end';
-  modal.innerHTML=`<div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto"><div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 16px"></div><div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:14px">🗑 法條大量刪除</div><div style="font-size:12px;color:var(--t2);margin-bottom:12px">依法律名稱刪除，或指定條號。<b style="color:var(--red)">刪除後無法復原。</b></div><div style="display:flex;flex-direction:column;gap:10px"><div><label class="fl">法律名稱</label><input id="bdl-name" list="bdl-nl" placeholder="例：警察職權行使法（留空不限）"><datalist id="bdl-nl">${names.map(n=>`<option value="${n}">`).join('')}</datalist></div><div><label class="fl">指定條號（逗號分隔，留空刪除該法全部條文）</label><input id="bdl-arts" placeholder="例：1,2,10"></div></div><div id="bdl-preview" style="margin-top:12px;font-size:12px;color:var(--t2)"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn bg" style="flex:1;padding:12px" onclick="document.getElementById('bulk-del-law-modal').remove()">取消</button><button class="btn bg" style="flex:1;padding:12px;color:var(--t2)" onclick="previewBulkDelLaw()">預覽</button><button class="btn" style="flex:1;padding:12px;background:var(--red);color:#fff" onclick="confirmBulkDelLaw()">確認刪除</button></div></div>`;
+  modal.innerHTML=`<div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:85vh;overflow-y:auto"><div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 16px"></div><div style="font-size:15px;font-weight:700;color:var(--t0);margin-bottom:14px">☑ 依條件選取法規</div><div style="font-size:12px;color:var(--t2);margin-bottom:12px">選擇法律名稱自動勾選整部法規，套用後可再調整，最後按「刪除選取」。</div><div style="display:flex;flex-direction:column;gap:10px"><div><label class="fl">法律名稱</label><input id="bdl-name" list="bdl-nl" placeholder="例：警察職權行使法"><datalist id="bdl-nl">${names.map(n=>`<option value="${n}">`).join('')}</datalist></div></div><div id="bdl-preview" style="margin-top:12px;font-size:12px;color:var(--t2)"></div><div style="display:flex;gap:8px;margin-top:16px"><button class="btn bg" style="flex:1;padding:12px" onclick="document.getElementById('bulk-del-law-modal').remove()">取消</button><button class="btn bg" style="flex:1;padding:12px;color:var(--t2)" onclick="previewBulkDelLaw()">預覽</button><button class="btn bp" style="flex:1;padding:12px" onclick="applyBulkSelectLaw()">套用選取</button></div></div>`;
   document.body.appendChild(modal);
   }catch(e){ logError('openBulkDelLaw',e); }}
 
 async function previewBulkDelLaw(){  try{
-  const targets=_filterBulkDelLaw(await da('laws'));
+  const name=(document.getElementById('bdl-name')||{}).value?.trim()||'';
+  const laws=await da('laws');
+  const matched=name?laws.filter(l=>(l.lawName||'')===name):laws;
+  const lawNames=[...new Set(matched.map(l=>l.lawName||'').filter(Boolean))];
   const el=document.getElementById('bdl-preview');
-  if(el) el.innerHTML='<span style="color:var(--org)">符合條件：<b>'+targets.length+'</b> 條將被刪除</span>';
+  if(el) el.innerHTML='<span style="color:var(--acc)">符合：<b>'+lawNames.length+'</b> 部法規（共 '+matched.length+' 條）將被勾選</span>';
   }catch(e){ logError('previewBulkDelLaw',e); }}
 
-async function confirmBulkDelLaw(){  try{
-  const targets=_filterBulkDelLaw(await da('laws'));
-  if(!targets.length){toast('無符合條件的法條');return;}
-  if(!confirm('確定刪除 '+targets.length+' 條法條？\n此操作無法復原！'))return;
-  for(const l of targets) await dd('laws',l.id);
-  const m=document.getElementById('bulk-del-law-modal');if(m)m.remove();
-  toast('已刪除 '+targets.length+' 條 ✓');
-  renderDB();
-  }catch(e){ logError('confirmBulkDelLaw',e); }}
-
-function _filterBulkDelLaw(laws){
+// 依法律名稱自動勾選整部法規，進入勾選模式供檢視後刪除
+async function applyBulkSelectLaw(){  try{
   const name=(document.getElementById('bdl-name')||{}).value?.trim()||'';
-  const arts=(document.getElementById('bdl-arts')||{}).value?.trim()||'';
-  const artSet=arts?new Set(arts.split(/[,，、\s]+/).map(n=>n.trim()).filter(Boolean)):null;
-  return laws.filter(l=>{
-    if(name&&(l.lawName||'')!==name) return false;
-    if(artSet&&!artSet.has(String(l.articleNumber||''))) return false;
-    return true;
-  });
-}
+  const laws=await da('laws');
+  const lawNames=name
+    ? [...new Set(laws.filter(l=>(l.lawName||'')===name).map(l=>l.lawName))]
+    : [...new Set(laws.map(l=>l.lawName||'').filter(Boolean))];
+  if(!lawNames.length){toast('無符合條件的法規');return;}
+  // 確保處於勾選模式
+  if(!_dbSelMode) toggleDbSelectMode();
+  lawNames.forEach(n=>_dbSelected.add(n));
+  const m=document.getElementById('bulk-del-law-modal');if(m)m.remove();
+  _updateDbSelCount();
+  renderDB();  // 重繪卡片以顯示勾選狀態
+  toast('已勾選 '+lawNames.length+' 部法規，確認後按「刪除選取」');
+  }catch(e){ logError('applyBulkSelectLaw',e); }}
 
 async function checkDuplicate(data){  try{
   const qs=await da('questions');
@@ -1384,10 +1383,6 @@ function _applyLvMode(){
   }
 }
 
-// 大量刪除（從法規內）
-function openBulkDelLawInGroup(){
-  openBulkDelLaw();
-}
 async function addLawInGroup(){
   try{
     const lawName=S.curLawName||window.currentLawName;
@@ -1520,12 +1515,16 @@ async function quizFromLaw(){  try{
   }catch(e){ logError('quizFromLaw',e); }}
 
 async function delLawGroup(lawName){  try{
+  lawName = lawName || S.curLawName || window.currentLawName || '';
+  if(!lawName){toast('請先開啟一個法規');return;}
   const all=await da('laws');
   const targets=all.filter(l=>l.lawName===lawName);
   if(!targets.length){toast('找不到對應法條');return;}
   if(!confirm('確定刪除「'+lawName+'」全部 '+targets.length+' 條？無法復原。'))return;
   for(const l of targets) await dd('laws',l.id);
   toast('已刪除「'+lawName+'」共 '+targets.length+' 條');
+  // 若正在檢視這部法規，關閉檢視
+  if((S.curLawName||window.currentLawName)===lawName){ exitLaw&&exitLaw(); }
   renderDB();
   }catch(e){ logError('delLawGroup',e); }}
 
@@ -2376,7 +2375,6 @@ const DataMod = {
   toggleLvMenu,
   closeLvMenu,
   toggleLvMode,
-  openBulkDelLawInGroup,
   addLawInGroup,
   editLawGroupInfo,
   quizFromLaw,
@@ -2399,8 +2397,10 @@ const DataMod = {
   parseBulk,
   importBulk,
   clearBulk,
-  confirmBulkDelLaw,
+  applyBulkSelectLaw,
+  openBulkDelLaw,
   applyBulkSelectQ,
+  delLawGroup,
   delLaw,
   editLawInView,
   openHeatmapOv,
