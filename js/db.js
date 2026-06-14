@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.11.4';      // 英語學習庫跟讀糾正改用 Azure Pronunciation Assessment
+const APP_VERSION  = '2.11.6';      // 跟讀按鈕顯示條件改用 MediaRecorder 偵測（修正死碼）
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

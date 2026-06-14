@@ -24,13 +24,17 @@
 
   // ── Azure TTS via GAS ───────────────────────────────────────
   // 快取 Azure 設定（避免每段都讀 IndexedDB）
-  let _azureCache = { key:'', url:'' };
+  let _azureCache = null;  // { key, url, ts } — 僅快取已設定的值
   async function _loadAzureConfig(){
-    if(!_azureCache.key){
-      _azureCache.key = await getSetting('tts_azure_key','').catch(()=>'');
-      _azureCache.url = await getSetting('gasWebAppUrl','').catch(()=>'');
+    const now = Date.now();
+    // 快取 30 秒，且只在 key/url 都有值時才快取（避免快取空值）
+    if(_azureCache && _azureCache.key && _azureCache.url && now - _azureCache.ts < 30000){
+      return _azureCache;
     }
-    return _azureCache;
+    const key = await getSetting('tts_azure_key','').catch(()=>'');
+    const url = await getSetting('gasWebAppUrl','').catch(()=>'');
+    if(key && url) _azureCache = { key, url, ts: now };
+    return { key, url };
   }
 
   // Prefetch：預先 fetch 下一段音訊，減少段落間停頓
@@ -107,10 +111,26 @@
       });
     }catch(e){
       console.error('[Azure TTS]', e.message);
-      toast('Azure TTS：' + e.message);
-      _TTS.idx++;
-      _speakNext();
+      // Azure 失敗時 fallback 到系統 TTS（讓使用者至少聽得到聲音）
+      toast('Azure TTS 失敗，改用系統語音');
+      _speakWithSystem(text);
     }
+  }
+
+  // 系統 TTS fallback（中文）
+  function _speakWithSystem(text){
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang  = 'zh-TW';
+    utter.rate  = _TTS.rate;
+    utter.onend = ()=>{
+      if(!_TTS.speaking) return;
+      _TTS.idx++;
+      _updatePanelState();
+      _speakNext();
+    };
+    utter.onerror = ()=>{ _TTS.idx++; _speakNext(); };
+    if(!_keepaliveTimer) _startKeepalive();
+    speechSynthesis.speak(utter);
   }
 
   // ── 取得系統 zh-TW 聲音，去重 ──────────────────────────────
@@ -166,10 +186,14 @@
       _TTS.utterances.splice(_TTS.idx + 1, 0, rawText.slice(text.length));
     }
 
-    // 若選了 Azure 聲音，改走 Azure 引擎
+    // 若選了 Azure 聲音，先確認 key/url 有設定再走 Azure 引擎
     if(_TTS.voiceURI && _TTS.voiceURI.startsWith('azure:')){
-      await _speakAzure(text, _TTS.voiceURI.replace('azure:',''));
-      return;
+      const { key:_k, url:_u } = await _loadAzureConfig();
+      if(_k && _u){
+        await _speakAzure(text, _TTS.voiceURI.replace('azure:',''));
+        return;
+      }
+      // key 或 url 未設定 → 靜默降回系統 TTS（不顯示 toast 避免干擾朗讀）
     }
 
     const utter    = new SpeechSynthesisUtterance(text);
@@ -237,35 +261,52 @@
   }
 
   // ── 取得 epub 當前章節文字 ──────────────────────────────────
+  // 策略：優先從 iframe DOM 抓（最穩定）；若抓不到再用 epub.js API
   function _getEpubPageText(){
+    // 策略 1：直接從 epub-viewer 內的 iframe 取文字（最可靠）
+    try{
+      const viewer = document.getElementById('epub-viewer');
+      const iframes = viewer ? [...viewer.querySelectorAll('iframe')] : [];
+      for(const iframe of iframes){
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if(!doc || !doc.body) continue;
+        const paras = [...doc.body.querySelectorAll('p,h1,h2,h3,h4,li,div')]
+          .map(el => el.innerText?.trim()).filter(t => t && t.length > 1);
+        if(paras.length) return paras;
+        // fallback：整個 body 文字
+        const raw = doc.body.innerText?.trim();
+        if(raw && raw.length > 1){
+          return raw.split(/\n+/).map(s=>s.trim()).filter(s=>s.length>1);
+        }
+      }
+    }catch(e){}
+
+    // 策略 2：用 epub.js rendition location 取章節文字（非同步）
     try{
       const rendition = window._epubRendition;
       const book      = window._epubBook;
       if(rendition && book){
         const loc = rendition.currentLocation();
-        if(loc?.start?.cfi){
-          const sectionHref = rendition.location?.start?.href;
-          const section = sectionHref
-            ? book.spine.get(sectionHref)
-            : book.spine.get(loc.start.cfi);
+        // 嘗試從 location 取 href（epub.js 不同版本結構不同，做防禦性取值）
+        const href = loc?.start?.href
+          || rendition.location?.start?.href
+          || loc?.start?.cfi;
+        if(href){
+          const section = book.spine.get(href);
           if(section){
             return section.load(book.load.bind(book)).then(contents=>{
-              const text = (contents?.documentElement || contents)
-                ?.textContent?.trim() || '';
+              // contents 可能是 Document 或 Element
+              const root = contents?.documentElement || contents?.body || contents;
+              const text = root?.textContent?.trim() || '';
+              if(!text) return [];
               return text.split(/\n+/).map(s=>s.trim()).filter(s=>s.length>1);
-            });
+            }).catch(()=>[]);
           }
         }
       }
-      // fallback：從 iframe DOM 取
-      const viewer = document.getElementById('epub-viewer');
-      const iframe = viewer?.querySelector('iframe');
-      const doc    = iframe?.contentDocument || iframe?.contentWindow?.document;
-      if(!doc) return [];
-      const paras  = [...doc.body.querySelectorAll('p,h1,h2,h3,h4,li')]
-        .map(el => el.innerText?.trim()).filter(t => t && t.length > 1);
-      return paras.length ? paras : [doc.body.innerText?.trim()].filter(Boolean);
-    }catch(e){ return []; }
+    }catch(e){}
+
+    return [];
   }
 
   // ── 取得法條文字（純文字，無 emoji）────────────────────────
@@ -515,9 +556,14 @@
     if(sel) sel.value = _TTS.voiceURI;
   }
 
-  // 讀取上次儲存的聲音選擇
-  getSetting('tts_voice_uri', '').then(uri => {
-    if(uri) _TTS.voiceURI = uri;
+  // 讀取上次儲存的聲音選擇；若是 azure: 但 Key 未設定則不套用
+  getSetting('tts_voice_uri', '').then(async uri => {
+    if(!uri) return;
+    if(uri.startsWith('azure:')){
+      const key = await getSetting('tts_azure_key','').catch(()=>'');
+      if(!key) return;  // Key 不存在，不套用 azure 聲音
+    }
+    _TTS.voiceURI = uri;
   }).catch(()=>{});
 
   if(typeof speechSynthesis !== 'undefined'){

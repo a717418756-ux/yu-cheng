@@ -244,12 +244,13 @@ async function openMaterial(id){
     if(!ov || !bodyEl) return;
     if(titleEl) titleEl.textContent = m.title||'';
 
-    // 逐句渲染：每句一個可點擊段落 + 跟讀按鈕（有語音辨識才顯示）
-    const hasSR = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    // 逐句渲染：每句一個可點擊段落 + 跟讀按鈕
+    // 跟讀用 Azure（MediaRecorder 錄音），故檢測錄音能力，非 SpeechRecognition
+    const canRecord = !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
     bodyEl.innerHTML = (m.sentences||[]).map((s,i)=>`
       <div class="eng-sent-wrap">
         <p class="eng-sent" data-si="${i}">${esc(s)}</p>
-        ${hasSR ? `<div class="eng-repeat-row" data-ri="${i}">
+        ${canRecord ? `<div class="eng-repeat-row" data-ri="${i}">
           <button class="eng-repeat-btn" onclick="startRepeat(this,${i})" title="跟讀此句">🎙</button>
         </div>` : ''}
       </div>`
