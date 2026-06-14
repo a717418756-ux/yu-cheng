@@ -2233,6 +2233,94 @@ async function startNumberMode(){  try{
 // ══ bulk.js — 大量貼題 ════════════════════════════════
 // 依賴：db.js, utils.js, parser.js
 
+// ── 答案列解析：「1.A 2.B 3.C」或「ABCD」或「1A2B3C」等格式 ──
+function parseAnswerStr(str){
+  const map={};
+  if(!str||!str.trim()) return map;
+  // 格式一：「1.A 2.B」或「1、A」或「1:A」或「1A」（帶序號）
+  const pairPat=/(\d+)[.、:．\s]*([A-Da-d])/g;
+  let m;
+  let found=false;
+  while((m=pairPat.exec(str))!==null){
+    map[parseInt(m[1])]=m[2].toUpperCase();
+    found=true;
+  }
+  if(found) return map;
+  // 格式二：純字母串，如「ABCDDCBA」，依序對應第1,2,3...題
+  const letters=str.trim().replace(/[\s\n]+/g,'').match(/[A-Da-d]/gi);
+  if(letters){ letters.forEach((l,i)=>{ map[i+1]=l.toUpperCase(); }); }
+  return map;
+}
+
+// ── 題目文字解析（支援常見考試PDF複製格式）─────────────────────
+function parseBulkText(text){
+  const questions=[];
+  // 先把全形數字/括號統一轉半形
+  text=text
+    .replace(/[１２３４５６７８９０]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .replace(/（/g,'(').replace(/）/g,')');
+
+  // 切割題目：遇到「數字. 」或「(數字)」或「數字、」開頭
+  const QSP=/(?=^|\n)[ \t]*(\d+)[.、．）)]\s*/gm;
+  // 找出所有題號位置
+  const indices=[];
+  let mt;
+  const lines=text.split('\n');
+  let fullText=text;
+  // 重新以整段文字做分割
+  const parts=fullText.split(/\n(?=\s*\d+[.、．）)]\s*\S)/);
+
+  parts.forEach(part=>{
+    part=part.trim();
+    if(!part) return;
+    // 提取題號
+    const numMatch=part.match(/^(\d+)[.、．）)]\s*/);
+    if(!numMatch) return;
+    const num=parseInt(numMatch[1]);
+    let body=part.slice(numMatch[0].length).trim();
+
+    // 偵測選項（A. B. C. D. 或 (A) (B) (C) (D)）
+    const optPat=/^\s*[((（]?([A-Da-d])[)）.．]\s*/m;
+    const optSplit=/\n\s*[((（]?([A-Da-d])[)）.．]\s*/g;
+
+    const options={};
+    let stem=body;
+    let type='mc';
+    // 嘗試抓選項
+    const optMatches=[...body.matchAll(/\n[ \t]*[((（]?([A-Da-d])[)）.．][ \t]*([^\n]*)/g)];
+    if(optMatches.length>=2){
+      // stem = 第一個選項之前的文字
+      const firstOptIdx=body.search(/\n[ \t]*[((（]?[A-Da-d][)）.．]/);
+      stem=firstOptIdx>0?body.slice(0,firstOptIdx).trim():body;
+      optMatches.forEach(om=>{
+        options[om[1].toUpperCase()]=om[2].trim();
+      });
+    } else {
+      // 同行選項：「(A)xxx (B)xxx」
+      const inlineMatches=[...body.matchAll(/[((（]([A-Da-d])[)）]\s*([^(（A-Da-d][^(（]{0,80}?)(?=[((（][A-Da-d][)）]|$)/g)];
+      if(inlineMatches.length>=2){
+        const firstIdx=body.search(/[((（][A-Da-d][)）]/);
+        stem=firstIdx>0?body.slice(0,firstIdx).trim():body;
+        inlineMatches.forEach(om=>{
+          options[om[1].toUpperCase()]=om[2].trim();
+        });
+      } else {
+        type='es'; // 無選項 → 申論題
+      }
+    }
+
+    const keywords=[];
+    questions.push({
+      num, stem:stem.trim(), type,
+      options: type==='mc'?options:{},
+      answer:'', keywords,
+      createdAt: Date.now(),
+    });
+  });
+
+  return questions;
+}
+
 function parseBulk(){
   try{
     const biEl=document.getElementById('bi-text');
@@ -2414,7 +2502,8 @@ const DataMod = {
   toggleStar,
   toggleLawSort,
   rebuildLawIndex,
-  formatYearInput
+  formatYearInput,
+  editQ
 };
 window.DataMod = DataMod;
 Object.assign(window, DataMod);
