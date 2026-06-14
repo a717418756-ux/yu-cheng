@@ -191,3 +191,68 @@
 [data-theme="eink"] .eng-au-seek::-webkit-slider-thumb{ background:#000; }
 [data-theme="eink"] .eng-aum-btn{ background:#000; border-color:#000; }
 [data-theme="eink"] .eng-aum-btn.del{ background:transparent; border-color:#000; color:#000; }
+
+/* ── 跟讀糾正（Azure Pronunciation Assessment）── */
+.eng-sent-wrap{ position:relative; }
+.eng-repeat-row{
+  display:flex; justify-content:flex-end;
+  padding:0 8px 2px;
+}
+.eng-repeat-btn{
+  background:none; border:1px solid var(--bd);
+  border-radius:20px; padding:3px 10px;
+  font-size:13px; cursor:pointer; color:var(--t2);
+  transition:border-color var(--t-fast,.14s), color var(--t-fast,.14s);
+  line-height:1.4;
+}
+.eng-repeat-btn:hover{ border-color:var(--acc); color:var(--acc); }
+.eng-repeat-btn-rec{
+  border-color:var(--red,#e05c57) !important;
+  color:var(--red,#e05c57) !important;
+  animation:eng-rec-pulse 1s infinite;
+}
+@keyframes eng-rec-pulse{
+  0%,100%{ opacity:1; } 50%{ opacity:.5; }
+}
+.eng-repeat-res{
+  margin:4px 8px 14px;
+  padding:10px 12px;
+  background:var(--bg2);
+  border-left:3px solid var(--acc);
+  border-radius:0 8px 8px 0;
+  font-size:13px; line-height:1.6;
+}
+/* 四格分數列 */
+.eng-pa-scores{
+  display:flex; gap:0; margin-bottom:8px;
+  border-radius:8px; overflow:hidden;
+  border:1px solid var(--bd);
+}
+.eng-pa-score-item{
+  flex:1; display:flex; flex-direction:column; align-items:center;
+  padding:6px 4px; border-right:1px solid var(--bd); background:var(--bg1);
+}
+.eng-pa-score-item:last-child{ border-right:none; }
+.eng-pa-score-total{ background:var(--bg3); }
+.eng-pa-score-val{ font-size:20px; font-weight:800; line-height:1.1; }
+.eng-pa-score-lbl{ font-size:10px; color:var(--t2); margin-top:2px; }
+/* 逐字顯示 */
+.eng-pa-words{
+  font-family:'Noto Serif TC',Georgia,serif;
+  font-size:15px; line-height:2; word-break:break-word;
+  margin-bottom:4px;
+}
+.eng-pa-word{ margin-right:2px; cursor:default; }
+.eng-pa-err{
+  font-size:9px; font-style:normal; font-weight:700;
+  vertical-align:super; margin-left:1px;
+  color:var(--red,#e05c57);
+}
+
+/* eink 模式 */
+[data-theme="eink"] .eng-repeat-btn{ border-color:#000; color:#000; }
+[data-theme="eink"] .eng-repeat-btn-rec{ border-color:#000 !important; color:#000 !important; }
+[data-theme="eink"] .eng-repeat-res{ border-left-color:#000; background:#f0f0f0; }
+[data-theme="eink"] .eng-pa-score-item{ background:#fff; border-color:#000; }
+[data-theme="eink"] .eng-pa-score-total{ background:#eee; }
+[data-theme="eink"] .eng-pa-scores{ border-color:#000; }
