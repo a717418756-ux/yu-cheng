@@ -55,7 +55,11 @@
             action:'azure_tts', text:nextText, voiceName,
             rate:_TTS.rate, azureKey,
           }),
-        }).then(r => r.ok ? r.json() : null).catch(()=>null);
+        })
+        .then(r => r.ok ? r.json() : null)
+        // 只有真正成功（ok 且有 audio）才當有效快取，否則回 null 讓主流程重抓
+        .then(j => (j && j.ok && j.audio) ? j : null)
+        .catch(()=>null);
       }),
     };
   }
@@ -64,6 +68,8 @@
     try{
       const { key:azureKey, url:gasUrl } = await _loadAzureConfig();
       if(!azureKey || !gasUrl) throw new Error('請先設定 Azure Key 和 GAS 網址');
+
+      console.log('[Azure TTS] 請求中:', { voiceName, textLen:text.length, gasUrl:gasUrl.slice(0,40)+'…' });
 
       // 優先使用 prefetch 快取
       let json = null;
@@ -80,7 +86,9 @@
         if(!res.ok) throw new Error(`GAS HTTP ${res.status}`);
         json = await res.json();
       }
+      console.log('[Azure TTS] GAS 回傳:', { ok:json?.ok, hasAudio:!!json?.audio, audioLen:json?.audio?.length||0, error:json?.error });
       if(!json.ok) throw new Error(json.error || '無回傳音訊');
+      if(!json.audio) throw new Error('GAS 回傳缺少 audio 欄位');
       // 播放 base64 mp3（存到 _TTS.audio 讓 _pause/_stop 可控制）
       if(_TTS.audio){ _TTS.audio.pause(); _TTS.audio = null; }
       return new Promise(resolve=>{
@@ -96,16 +104,20 @@
           _speakNext();
           resolve();
         };
-        audio.onerror = ()=>{
+        audio.onerror = (ev)=>{
+          console.error('[Azure TTS] audio 播放錯誤:', audio.error?.code, audio.error?.message);
           _TTS.audio = null;
           _TTS.idx++;
           _speakNext();
           resolve();
         };
-        audio.play().catch(()=>{
+        audio.play().then(()=>{
+          console.log('[Azure TTS] 開始播放 ✓');
+        }).catch((err)=>{
+          console.error('[Azure TTS] audio.play() 被拒:', err.name, err.message);
+          // 自動播放被擋時，不要跳過該段，改用系統 TTS 念出來
           _TTS.audio = null;
-          _TTS.idx++;
-          _speakNext();
+          _speakWithSystem(text);
           resolve();
         });
       });
