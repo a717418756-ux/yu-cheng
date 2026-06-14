@@ -478,7 +478,8 @@ function closeAdd(){
 function showAdd(q){
   S.editId = q?.id || null;
   S.qType = q?.type || 'mc';
-  S.correct = q?.answer || 'A';
+  // 初始化答案為 Set（支援多選）
+  S.correct = q?.answer ? new Set([...q.answer]) : new Set(['A']);
   const title = document.getElementById('add-title');
   if(title) title.textContent = q?.id ? '編輯題目' : '新增題目';
   // 編輯模式隱藏「連續新增」按鈕
@@ -519,7 +520,7 @@ function showAdd(q){
 
 function setQT(type, opts){
   S.qType = type;
-  S.correct = S.correct || 'A';
+  if(!(S.correct instanceof Set) || S.correct.size===0) S.correct = new Set(['A']);
   const mc = document.getElementById('tmc');
   const es = document.getElementById('tes');
   const mcArea = document.getElementById('mc-opts');
@@ -534,7 +535,7 @@ function setQT(type, opts){
     if(c){
       c.innerHTML = ['A','B','C','D','E'].map(k=>`
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-          <button class="btn ${S.correct===k?'bp':'bg'}" style="width:32px;flex-shrink:0;padding:6px"
+          <button class="btn ${(S.correct instanceof Set?S.correct.has(k):S.correct===k)?'bp':'bg'}" style="width:32px;flex-shrink:0;padding:6px"
             onclick="setAns('${k}')">${k}</button>
           <input id="opt-${k}" class="inp" style="flex:1" placeholder="選項 ${k}"
             value="${esc(opts?.[k]||'')}">
@@ -544,11 +545,18 @@ function setQT(type, opts){
 }
 
 function setAns(k){
-  S.correct = k;
+  // 多選 toggle：S.correct 改為 Set
+  if(!(S.correct instanceof Set)) S.correct = new Set(S.correct ? [...S.correct] : []);
+  if(S.correct.has(k)) S.correct.delete(k); else S.correct.add(k);
+  if(S.correct.size===0) S.correct.add('A'); // 至少要有一個答案
   ['A','B','C','D','E'].forEach(l=>{
     const btn = document.getElementById('opt-'+l)?.previousElementSibling;
-    if(btn) btn.className = 'btn '+(l===k?'bp':'bg');
+    if(btn) btn.className = 'btn '+(S.correct.has(l)?'bp':'bg');
   });
+}
+function _getAnswerStr(){
+  if(S.correct instanceof Set) return [...S.correct].sort().join('');
+  return S.correct||'A';
 }
 
 function toggleGroupStem(){
@@ -590,7 +598,7 @@ async function saveQ(){
 
   const data={
     type,stem,options,
-    answer:type==='mc'?S.correct:'',
+    answer:type==='mc'?_getAnswerStr():'',
     answerEs:document.getElementById('f-es')?.value.trim()||'',
     subject:document.getElementById('f-sub').value.trim(),
     year:document.getElementById('f-yr').value.trim(),
@@ -667,14 +675,12 @@ async function saveQAndContinue(){  try{
   const isGroupChecked=document.getElementById('f-is-group')?.checked;
   const data={
     type,stem,options,
-    answer:type==='mc'?S.correct:'',
+    answer:type==='mc'?_getAnswerStr():'',
     answerEs:document.getElementById('f-es')?.value.trim()||'',
     subject:document.getElementById('f-sub').value.trim(),
     year:document.getElementById('f-yr').value.trim(),
     exam:document.getElementById('f-ex').value,
     num:document.getElementById('f-num').value.trim(),
-    keywords:kwArr(document.getElementById('f-kw').value),
-    mustKeywords,tags:[],
     note:document.getElementById('f-note').value.trim(),
     isNumberQ:document.getElementById('f-is-number')?.checked||false,
     groupStem:(isGroupChecked&&document.getElementById('f-group-stem')?.value.trim())||'',
@@ -692,9 +698,12 @@ async function saveQAndContinue(){  try{
   const clr=(id)=>{ const el=document.getElementById(id); if(el) el.value=''; };
   clr('f-stem'); clr('f-es'); clr('f-num'); clr('f-note');
   ['A','B','C','D','E'].forEach(k=>clr('opt-'+k));
-  S.correct='A'; S.editId=null;
-  // 更新選項 UI 選中狀態
-  document.querySelectorAll('.opt-ans').forEach(b=>b.classList.toggle('on', b.dataset.k==='A'));
+  S.correct=new Set(['A']); S.editId=null;
+  // 更新選項 UI 選中狀態（重置為只選A）
+  ['A','B','C','D','E'].forEach(l=>{
+    const btn=document.getElementById('opt-'+l)?.previousElementSibling;
+    if(btn) btn.className='btn '+(l==='A'?'bp':'bg');
+  });
   // 題組序號自動遞增
   const orderEl=document.getElementById('f-group-order');
   if(orderEl && orderEl.value) orderEl.value=String((parseInt(orderEl.value)||0)+1);
