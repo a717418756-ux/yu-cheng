@@ -481,6 +481,9 @@ function showAdd(q){
   S.correct = q?.answer || 'A';
   const title = document.getElementById('add-title');
   if(title) title.textContent = q?.id ? '編輯題目' : '新增題目';
+  // 編輯模式隱藏「連續新增」按鈕
+  const contBtn = document.getElementById('btn-save-cont');
+  if(contBtn) contBtn.style.display = q?.id ? 'none' : '';
   // 填入欄位
   const set = (id, v) => { const el=document.getElementById(id); if(el) el.value = v||''; };
   set('f-sub',  q?.subject||'');
@@ -643,6 +646,61 @@ async function saveQ(){
   }catch(e){logError('saveQ',e);}}
 
 async function editQ(id){  try{const q=await dg('questions',id);if(q)showAdd(q);  }catch(e){ logError('editQ',e); }}
+
+// 儲存並連續新增：保留共用欄位，只清空題目內容與選項
+async function saveQAndContinue(){  try{
+  const stem=cleanSpaces(document.getElementById('f-stem').value.trim());
+  if(!stem){toast('請填寫題目內容');return;}
+  const type=S.qType;
+  const options={};
+  if(type==='mc'){
+    ['A','B','C','D','E'].forEach(k=>{
+      const v=cleanSpaces(document.getElementById('opt-'+k)?.value.trim()||'');
+      if(v)options[k]=v;
+    });
+    if(Object.keys(options).length<2){toast('選擇題至少需要2個選項');return;}
+  }
+  const relStr=document.getElementById('f-laws')?.value.trim()||'';
+  const relatedLaws=relStr?relStr.split(/[,，]/).map(s=>({ref:s.trim()})).filter(r=>r.ref):[];
+  const mustStr=document.getElementById('f-must-kw')?.value.trim()||'';
+  const mustKeywords=mustStr?mustStr.split(/[,，]/).map(s=>s.trim()).filter(Boolean):autoKeywords(stem);
+  const isGroupChecked=document.getElementById('f-is-group')?.checked;
+  const data={
+    type,stem,options,
+    answer:type==='mc'?S.correct:'',
+    answerEs:document.getElementById('f-es')?.value.trim()||'',
+    subject:document.getElementById('f-sub').value.trim(),
+    year:document.getElementById('f-yr').value.trim(),
+    exam:document.getElementById('f-ex').value,
+    num:document.getElementById('f-num').value.trim(),
+    keywords:kwArr(document.getElementById('f-kw').value),
+    mustKeywords,tags:[],
+    note:document.getElementById('f-note').value.trim(),
+    isNumberQ:document.getElementById('f-is-number')?.checked||false,
+    groupStem:(isGroupChecked&&document.getElementById('f-group-stem')?.value.trim())||'',
+    groupId:(isGroupChecked&&document.getElementById('f-group-id')?.value.trim())||'',
+    groupOrder:parseInt(document.getElementById('f-group-order')?.value)||0,
+    relatedLaws,starred:false,createdAt:Date.now(),
+    reviewLevel:0,nextReview:Date.now(),lastReview:null,
+    wrongCount:0,correctStreak:0,difficultyScore:5
+  };
+  data.searchBlob=((data.stem||'')+' '+(data.groupStem||'')+' '+(data.subject||'')+' '+(data.year||'')+' '+(data.exam||'')+' '+(data.num||'')+' '+(data.keywords||[]).join(' ')).toLowerCase();
+  await dp('questions',data);
+  toast('已儲存 ✓ 繼續新增下一題');
+
+  // 清空：題目內容、選項、正確答案、題號（題幹/題組/科目/年度等保留）
+  const clr=(id)=>{ const el=document.getElementById(id); if(el) el.value=''; };
+  clr('f-stem'); clr('f-es'); clr('f-num'); clr('f-note');
+  ['A','B','C','D','E'].forEach(k=>clr('opt-'+k));
+  S.correct='A'; S.editId=null;
+  // 更新選項 UI 選中狀態
+  document.querySelectorAll('.opt-ans').forEach(b=>b.classList.toggle('on', b.dataset.k==='A'));
+  // 題組序號自動遞增
+  const orderEl=document.getElementById('f-group-order');
+  if(orderEl && orderEl.value) orderEl.value=String((parseInt(orderEl.value)||0)+1);
+  // 捲回頂部方便看到題幹
+  document.getElementById('add-ov')?.querySelector('.sht')?.scrollIntoView({behavior:'smooth'});
+}catch(e){logError('saveQAndContinue',e);toast('儲存失敗，請重試');}}
 async function toggleStar(id){  try{
   const q=await dg('questions',id);if(!q)return;
   q.starred=!q.starred;await dp('questions',q);
@@ -2403,6 +2461,7 @@ const DataMod = {
   setQT,
   toggleGroupStem,
   saveQ,
+  saveQAndContinue,
   toggleListSelectMode,
   confirmListSelDel,
   dupAction,
