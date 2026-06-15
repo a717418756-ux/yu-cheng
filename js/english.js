@@ -529,6 +529,52 @@ let   _mediaRec   = null;   // 目前的 MediaRecorder
 let   _recChunks  = [];
 let   _recStartTs = 0;      // 錄音起始時間（判斷是否太短）
 
+// ── 前端流量管制（避免觸發 Azure 429）────────────────────────
+let   _paLastTs    = -3000; // 上次評估完成時間（初值負，確保第一次不被擋）
+let   _paReqTimes  = [];    // 最近請求時間戳（滾動視窗限速用）
+let   _paCooldownUntil = 0; // 冷卻截止時間（429 後或正常間隔）
+const _PA_GAP_MS   = 3000;  // 兩次評估最小間隔（3 秒）
+const _PA_WINDOW_MS= 60000; // 限速視窗（60 秒）
+const _PA_MAX_IN_WINDOW = 15; // 視窗內最多請求數（Azure F0 約 20/分，留 buffer）
+
+// 檢查是否可發起評估；可則回 {ok:true}，否則回 {ok:false, wait:剩餘秒數, reason}
+function _paCanRequest(){
+  const now = Date.now();
+  // 1. 冷卻中（含 429 後）
+  if(now < _paCooldownUntil){
+    return { ok:false, wait:Math.ceil((_paCooldownUntil-now)/1000), reason:'cooldown' };
+  }
+  // 2. 距上次太近
+  if(now - _paLastTs < _PA_GAP_MS){
+    return { ok:false, wait:Math.ceil((_PA_GAP_MS-(now-_paLastTs))/1000), reason:'gap' };
+  }
+  // 3. 滾動視窗內請求過多
+  _paReqTimes = _paReqTimes.filter(t => now - t < _PA_WINDOW_MS);
+  if(_paReqTimes.length >= _PA_MAX_IN_WINDOW){
+    const oldest = _paReqTimes[0];
+    return { ok:false, wait:Math.ceil((_PA_WINDOW_MS-(now-oldest))/1000), reason:'window' };
+  }
+  return { ok:true };
+}
+
+// 429 後的倒數提示：每秒更新 toast 顯示剩餘秒數
+let _cooldownTimer = null;
+function _startCooldownToast(secs){
+  if(_cooldownTimer){ clearInterval(_cooldownTimer); }
+  let left = secs;
+  toast(`Azure 請求太頻繁，請等 ${left} 秒…`, 1100);
+  _cooldownTimer = setInterval(()=>{
+    left--;
+    if(left > 0){
+      toast(`Azure 請求太頻繁，請等 ${left} 秒…`, 1100);
+    } else {
+      clearInterval(_cooldownTimer);
+      _cooldownTimer = null;
+      toast('現在可以繼續跟讀了 ✓', 1800);
+    }
+  }, 1000);
+}
+
 // ── 取得 Azure 授權 Token（10 分鐘有效，自動快取）──────────
 async function _getAzToken(){
   const now = Date.now();
@@ -562,6 +608,16 @@ async function startRepeat(btn, idx){
   const sents = _curMaterial?.sentences || [];
   const original = sents[idx];
   if(!original) return;
+
+  // 前端流量管制：擋下過於頻繁的請求，避免觸發 Azure 429
+  const gate = _paCanRequest();
+  if(!gate.ok){
+    const msg = gate.reason==='cooldown' ? `請稍候 ${gate.wait} 秒再跟讀`
+              : gate.reason==='window'   ? `跟讀太頻繁，請休息 ${gate.wait} 秒`
+              : `請等 ${gate.wait} 秒再念下一句`;
+    toast(msg);
+    return;
+  }
 
   // 暫停 TTS 避免干擾麥克風
   if(_ttsPlaying){ _pauseTTS(); }
@@ -706,6 +762,7 @@ async function _assessPronunciation(idx, original, audioBlob, mimeType){
   else                               contentType = mimeType;
 
   let result;
+  _paReqTimes.push(Date.now());  // 記錄請求時間（滾動視窗限速）
   try{
     const res = await fetch(url, {
       method: 'POST',
@@ -719,6 +776,14 @@ async function _assessPronunciation(idx, original, audioBlob, mimeType){
     });
     if(!res.ok){
       const txt = await res.text().catch(()=>'');
+      if(res.status === 429){
+        // Azure 速率限制：進入 30 秒冷卻 + 友善倒數提示
+        _paCooldownUntil = Date.now() + 30000;
+        _clearRepeatResult(idx);
+        _startCooldownToast(30);
+        console.warn('[AzurePA] 429 限流，冷卻 30 秒');
+        return;
+      }
       throw new Error(`Azure HTTP ${res.status}：${txt.slice(0,120)}`);
     }
     result = await res.json();
@@ -747,6 +812,7 @@ async function _assessPronunciation(idx, original, audioBlob, mimeType){
     return;
   }
 
+  _paLastTs = Date.now();  // 評估完成，更新間隔基準
   _showPAResult(idx, original, result);
 }
 
