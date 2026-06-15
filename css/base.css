@@ -1191,6 +1191,37 @@ input:focus, textarea:focus, select:focus{
 /* eink 下章節短線改為純黑，維持高對比 */
 [data-theme="eink"] .sec::before{ background:#000; opacity:1; }
 
+
+/* ══════════════════════════════════════════════════════════════
+   15. 首頁三大區補強（v2.11.14）：手感 + 即時資料強調
+   ══════════════════════════════════════════════════════════════ */
+/* zone-card 按壓：保留原 brightness，疊加極輕微位移增強手感 */
+.zone-card{ transition:border-color .28s, box-shadow .28s, opacity .28s, transform var(--t-fast); }
+.zone-card:active{ filter:brightness(.85); transform:scale(.985); }
+
+/* zone-desc 即時資料：比靜態說明略強調（字重 + 主文字色），數字更顯眼 */
+.zone-desc{ font-weight:500; color:var(--t1); opacity:.82; }
+
+/* plan-badge 進場：首頁載入時依序淡入，而非硬跳 */
+@keyframes polish-badge-in{
+  from{ opacity:0; transform:translateY(4px); }
+  to  { opacity:1; transform:none; }
+}
+#h-plan-badges .plan-badge{
+  animation: polish-badge-in var(--t-base) both;
+}
+#h-plan-badges .plan-badge:nth-child(2){ animation-delay:.05s; }
+#h-plan-badges .plan-badge:nth-child(3){ animation-delay:.10s; }
+#h-plan-badges .plan-badge:nth-child(4){ animation-delay:.15s; }
+
+/* eink 降級：關閉新增的位移與進場動畫 */
+[data-theme="eink"] .zone-card{ transition:none !important; }
+[data-theme="eink"] .zone-card:active{ transform:none !important; filter:brightness(.9) !important; }
+[data-theme="eink"] #h-plan-badges .plan-badge{ animation:none !important; }
+/* eink 下 zone-desc 維持高對比純色 */
+[data-theme="eink"] .zone-desc{ color:#000; opacity:1; }
+
+
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after{
     animation-duration: .001ms !important;
