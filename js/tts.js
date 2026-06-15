@@ -53,7 +53,7 @@
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({
             action:'azure_tts', text:nextText, voiceName,
-            rate:_TTS.rate, azureKey,
+            rate:_TTS.rate, azureKey, region:'eastasia',
           }),
         })
         .then(r => r.ok ? r.json() : null)
@@ -81,7 +81,7 @@
         const res = await fetch(gasUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action:'azure_tts', text, voiceName, rate:_TTS.rate, azureKey }),
+          body: JSON.stringify({ action:'azure_tts', text, voiceName, rate:_TTS.rate, azureKey, region:'eastasia' }),
         });
         if(!res.ok) throw new Error(`GAS HTTP ${res.status}`);
         json = await res.json();

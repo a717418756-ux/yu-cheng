@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.11.9';      // 真正病根:_initDefaultVoice把Azure聲音當不存在而覆蓋回系統聲音(onvoiceschanged觸發時)
+const APP_VERSION  = '2.11.10';     // 依開發指令補上GAS缺少的region參數(Azure 401/403→fallback離線聲音的可能主因)
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
