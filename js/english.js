@@ -608,15 +608,67 @@ async function startRepeat(btn, idx){
     const dur = Date.now() - _recStartTs;
     if(dur < 800){ toast('錄音太短，請按住到念完再放開'); _recChunks=[]; return; }
     if(!_recChunks.length){ toast('未收到錄音資料，請重念'); return; }
-    const blob = new Blob(_recChunks, { type: mimeType });
+    const webmBlob = new Blob(_recChunks, { type: mimeType });
     _recChunks = [];
-    await _assessPronunciation(idx, original, blob, mimeType);
+    // 轉成 Azure 最穩定的 WAV(16kHz 單聲道 PCM)再送，解決 webm 空辨識
+    _showRepeatLoading(idx);
+    let wavBlob;
+    try{
+      wavBlob = await _webmToWav(webmBlob);
+    }catch(e){
+      console.error('[AzurePA] WAV 轉換失敗', e);
+      _clearRepeatResult(idx);
+      toast('音訊處理失敗，請重念');
+      return;
+    }
+    await _assessPronunciation(idx, original, wavBlob, 'audio/wav');
   };
 
   _recStartTs = Date.now();
   rec.start(100);  // 每 100ms 產生一次資料片段，確保短句也能完整收集
   // 最長 15 秒自動停止
   setTimeout(()=>{ if(rec.state==='recording') rec.stop(); }, 15000);
+}
+
+// ── webm/opus → WAV(16kHz 單聲道 PCM 16-bit)──────────────────
+// Azure REST 對 WAV PCM 支援最穩定，避免 webm 容器解不出語音(空辨識)
+async function _webmToWav(blob){
+  const arrayBuf = await blob.arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  const decoded = await ctx.decodeAudioData(arrayBuf);
+  ctx.close();
+
+  // 降到 16kHz 單聲道
+  const targetRate = 16000;
+  const srcCh0 = decoded.getChannelData(0);
+  const ratio = decoded.sampleRate / targetRate;
+  const outLen = Math.floor(srcCh0.length / ratio);
+  const pcm = new Float32Array(outLen);
+  for(let i=0; i<outLen; i++){
+    pcm[i] = srcCh0[Math.floor(i * ratio)];
+  }
+
+  // Float32 → Int16
+  const int16 = new Int16Array(outLen);
+  for(let i=0; i<outLen; i++){
+    const s = Math.max(-1, Math.min(1, pcm[i]));
+    int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+
+  // 組 WAV header
+  const dataSize = int16.length * 2;
+  const buf = new ArrayBuffer(44 + dataSize);
+  const dv = new DataView(buf);
+  const wr = (off, str)=>{ for(let i=0;i<str.length;i++) dv.setUint8(off+i, str.charCodeAt(i)); };
+  wr(0,'RIFF'); dv.setUint32(4, 36+dataSize, true); wr(8,'WAVE');
+  wr(12,'fmt '); dv.setUint32(16,16,true); dv.setUint16(20,1,true);
+  dv.setUint16(22,1,true); dv.setUint32(24,targetRate,true);
+  dv.setUint32(28,targetRate*2,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true);
+  wr(36,'data'); dv.setUint32(40,dataSize,true);
+  for(let i=0;i<int16.length;i++) dv.setInt16(44+i*2, int16[i], true);
+
+  return new Blob([buf], { type:'audio/wav' });
 }
 
 // ── 送 Azure Pronunciation Assessment REST ────────────────────
@@ -627,23 +679,31 @@ async function _assessPronunciation(idx, original, audioBlob, mimeType){
   try{ token = await _getAzToken(); }
   catch(e){ toast(e.message); _clearRepeatResult(idx); return; }
 
-  // Pronunciation Assessment 參數（JSON → base64）
-  const paConfig = JSON.stringify({
+  // Pronunciation Assessment 參數（JSON → base64，UTF-8 乾淨編碼）
+  const paObj = {
     ReferenceText:  original,
     GradingSystem:  'HundredMark',
+    Granularity:    'Phoneme',
     Dimension:      'Comprehensive',
     EnableMiscue:   true,
-  });
-  const paHeader = btoa(unescape(encodeURIComponent(paConfig)));
+  };
+  // 用 TextEncoder 產生標準 UTF-8 base64（Azure 要求；舊的 unescape 寫法在某些情況會被拒）
+  const paJson  = JSON.stringify(paObj);
+  const paBytes = new TextEncoder().encode(paJson);
+  let paBin = '';
+  paBytes.forEach(b => paBin += String.fromCharCode(b));
+  const paHeader = btoa(paBin);
 
   const url = `https://${_AZ_REGION}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`
     + `?language=${_AZ_LANG}&format=detailed`;
 
-  // Azure REST 對音訊容器的 Content-Type 要求精確；webm/opus 用官方指定寫法
-  let contentType = mimeType;
-  if(mimeType.includes('webm')) contentType = 'audio/webm; codecs=opus';
-  else if(mimeType.includes('ogg')) contentType = 'audio/ogg; codecs=opus';
-  else if(mimeType.includes('mp4')) contentType = 'audio/mp4';
+  // Azure REST 音訊格式宣告
+  let contentType;
+  if(mimeType.includes('wav'))       contentType = 'audio/wav; codecs=audio/pcm; samplerate=16000';
+  else if(mimeType.includes('webm')) contentType = 'audio/webm; codecs=opus';
+  else if(mimeType.includes('ogg'))  contentType = 'audio/ogg; codecs=opus';
+  else if(mimeType.includes('mp4'))  contentType = 'audio/mp4';
+  else                               contentType = mimeType;
 
   let result;
   try{
@@ -718,13 +778,21 @@ function _showPAResult(idx, original, result){
   if(!body) return;
 
   const nb    = result?.NBest?.[0];
-  const pa    = nb?.PronunciationAssessment;
+  // 發音評估分數可能在 NBest[0].PronunciationAssessment（標準），
+  // 少數情況在 result 頂層，兩處都讀，取到有效值為止
+  const pa    = nb?.PronunciationAssessment || result?.PronunciationAssessment || {};
   const words = nb?.Words || [];
 
-  const accScore   = Math.round(pa?.AccuracyScore    ?? 0);
-  const fluScore   = Math.round(pa?.FluencyScore     ?? 0);
-  const compScore  = Math.round(pa?.CompletenessScore ?? 0);
-  const totalScore = Math.round((accScore + fluScore + compScore) / 3);
+  const accScore   = Math.round(pa.AccuracyScore     ?? 0);
+  const fluScore   = Math.round(pa.FluencyScore      ?? 0);
+  const compScore  = Math.round(pa.CompletenessScore ?? 0);
+  const totalScore = Math.round(pa.PronScore ?? ((accScore + fluScore + compScore) / 3));
+
+  // 若分數全 0 但有辨識文字 → 評估沒啟動，印出結構供診斷並提示
+  if(accScore===0 && fluScore===0 && compScore===0){
+    console.warn('[AzurePA] 分數全0，PronunciationAssessment 內容：', pa, '完整 NBest[0]：', nb);
+    toast('發音評估未回傳分數，請看 Console 診斷');
+  }
 
   const scoreColor = s => s>=90 ? 'var(--grn,#4caf7d)' : s>=70 ? 'var(--org,#f5a623)' : 'var(--red,#e05c57)';
 
