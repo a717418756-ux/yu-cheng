@@ -65,10 +65,17 @@
   }
 
   async function _speakAzure(text, voiceName){
+    // 缺設定時：明確提示並停止，不要默默改用離線聲音（避免使用者誤以為 Azure 壞了）
+    const { key:azureKey, url:gasUrl } = await _loadAzureConfig();
+    if(!azureKey || !gasUrl){
+      const miss = !azureKey && !gasUrl ? 'Azure Key 和 GAS 網址'
+                 : !gasUrl ? 'GAS 網址' : 'Azure Key';
+      toast(`Azure 朗讀需要${miss}，請到設定頁填入`);
+      console.warn('[Azure TTS] 設定不完整：', { hasKey:!!azureKey, hasUrl:!!gasUrl });
+      _stop();
+      return;
+    }
     try{
-      const { key:azureKey, url:gasUrl } = await _loadAzureConfig();
-      if(!azureKey || !gasUrl) throw new Error('請先設定 Azure Key 和 GAS 網址');
-
       console.log('[Azure TTS] 請求中:', { voiceName, textLen:text.length, gasUrl:gasUrl.slice(0,40)+'…' });
 
       // 優先使用 prefetch 快取
