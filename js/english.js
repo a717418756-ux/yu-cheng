@@ -527,6 +527,7 @@ const _AZ_LANG    = 'en-US';
 let   _azPAToken  = null;   // { token, expiry }
 let   _mediaRec   = null;   // 目前的 MediaRecorder
 let   _recChunks  = [];
+let   _recStartTs = 0;      // 錄音起始時間（判斷是否太短）
 
 // ── 取得 Azure 授權 Token（10 分鐘有效，自動快取）──────────
 async function _getAzToken(){
@@ -604,13 +605,16 @@ async function startRepeat(btn, idx){
     btn.title = '跟讀此句';
     _mediaRec = null;
 
-    if(!_recChunks.length){ toast('未收到錄音資料'); return; }
+    const dur = Date.now() - _recStartTs;
+    if(dur < 800){ toast('錄音太短，請按住到念完再放開'); _recChunks=[]; return; }
+    if(!_recChunks.length){ toast('未收到錄音資料，請重念'); return; }
     const blob = new Blob(_recChunks, { type: mimeType });
     _recChunks = [];
     await _assessPronunciation(idx, original, blob, mimeType);
   };
 
-  rec.start();
+  _recStartTs = Date.now();
+  rec.start(100);  // 每 100ms 產生一次資料片段，確保短句也能完整收集
   // 最長 15 秒自動停止
   setTimeout(()=>{ if(rec.state==='recording') rec.stop(); }, 15000);
 }
@@ -635,13 +639,19 @@ async function _assessPronunciation(idx, original, audioBlob, mimeType){
   const url = `https://${_AZ_REGION}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1`
     + `?language=${_AZ_LANG}&format=detailed`;
 
+  // Azure REST 對音訊容器的 Content-Type 要求精確；webm/opus 用官方指定寫法
+  let contentType = mimeType;
+  if(mimeType.includes('webm')) contentType = 'audio/webm; codecs=opus';
+  else if(mimeType.includes('ogg')) contentType = 'audio/ogg; codecs=opus';
+  else if(mimeType.includes('mp4')) contentType = 'audio/mp4';
+
   let result;
   try{
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization':           `Bearer ${token}`,
-        'Content-Type':            mimeType,
+        'Content-Type':            contentType,
         'Pronunciation-Assessment': paHeader,
         'Accept':                  'application/json',
       },
@@ -660,6 +670,23 @@ async function _assessPronunciation(idx, original, audioBlob, mimeType){
   }
 
   _clearRepeatResult(idx);
+
+  // 先檢查辨識狀態：沒聽到語音時明確提示，而非顯示 0 分誤導
+  const status = result?.RecognitionStatus;
+  console.log('[AzurePA] 辨識結果:', { status, hasNBest:!!result?.NBest?.length, raw:result });
+  if(status && status !== 'Success'){
+    const msg = status === 'InitialSilenceTimeout' ? '沒偵測到聲音，請靠近麥克風後重念'
+              : status === 'NoMatch' ? '聽不清楚，請大聲清晰地重念一次'
+              : status === 'BabbleTimeout' ? '背景太吵，請在安靜環境重念'
+              : `辨識未成功（${status}）`;
+    toast(msg);
+    return;
+  }
+  if(!result?.NBest?.length){
+    toast('沒收到發音資料，請重念一次');
+    return;
+  }
+
   _showPAResult(idx, original, result);
 }
 

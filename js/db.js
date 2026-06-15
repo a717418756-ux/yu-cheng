@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.11.14';     // 首頁三大區補強:zone-card按壓位移+zone-desc即時資料強調+plan-badge進場(eink全降級)
+const APP_VERSION  = '2.11.15';     // 修英語糾正0分:Content-Type精確化webm/opus+檢查RecognitionStatus明確提示+錄音太短保護+診斷log
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
