@@ -778,27 +778,31 @@ function _showPAResult(idx, original, result){
   if(!body) return;
 
   const nb    = result?.NBest?.[0];
-  // 發音評估分數可能在 NBest[0].PronunciationAssessment（標準），
-  // 少數情況在 result 頂層，兩處都讀，取到有效值為止
-  const pa    = nb?.PronunciationAssessment || result?.PronunciationAssessment || {};
+  // 分數位置因 Azure 版本而異：優先讀 PronunciationAssessment 物件，
+  // 若該物件為空（此帳號的回傳），分數直接攤平在 NBest[0] 頂層
+  const pa    = nb?.PronunciationAssessment || {};
+  const src   = (pa.AccuracyScore != null) ? pa : (nb || {});
+
+  const accScore   = Math.round(src.AccuracyScore     ?? 0);
+  const fluScore   = Math.round(src.FluencyScore      ?? 0);
+  const compScore  = Math.round(src.CompletenessScore ?? 0);
+  const totalScore = Math.round(src.PronScore ?? ((accScore + fluScore + compScore) / 3));
+
   const words = nb?.Words || [];
 
-  const accScore   = Math.round(pa.AccuracyScore     ?? 0);
-  const fluScore   = Math.round(pa.FluencyScore      ?? 0);
-  const compScore  = Math.round(pa.CompletenessScore ?? 0);
-  const totalScore = Math.round(pa.PronScore ?? ((accScore + fluScore + compScore) / 3));
-
-  // 若分數全 0 但有辨識文字 → 評估沒啟動，印出結構供診斷並提示
-  if(accScore===0 && fluScore===0 && compScore===0){
-    console.warn('[AzurePA] 分數全0，PronunciationAssessment 內容：', pa, '完整 NBest[0]：', nb);
+  // 若分數全 0 但有辨識文字 → 真的沒評估，印出結構供診斷
+  if(accScore===0 && fluScore===0 && compScore===0 && words.length){
+    console.warn('[AzurePA] 分數全0，NBest[0]：', nb);
     toast('發音評估未回傳分數，請看 Console 診斷');
   }
 
   const scoreColor = s => s>=90 ? 'var(--grn,#4caf7d)' : s>=70 ? 'var(--org,#f5a623)' : 'var(--red,#e05c57)';
 
   const wordsHtml = words.map(w=>{
-    const ws  = Math.round(w.PronunciationAssessment?.AccuracyScore ?? 0);
-    const err = w.PronunciationAssessment?.ErrorType ?? 'None';
+    // 每字分數同樣優先讀 PronunciationAssessment，否則讀 word 頂層
+    const wpa = w.PronunciationAssessment || {};
+    const ws  = Math.round((wpa.AccuracyScore ?? w.AccuracyScore) ?? 0);
+    const err = (wpa.ErrorType ?? w.ErrorType) ?? 'None';
     const badge = err==='Omission'  ? '<sup class="eng-pa-err">漏</sup>'
                 : err==='Insertion' ? '<sup class="eng-pa-err">多</sup>' : '';
     return `<span class="eng-pa-word" style="color:${scoreColor(ws)}" title="準確度 ${ws}%">`
