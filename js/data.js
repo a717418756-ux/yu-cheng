@@ -91,7 +91,56 @@ async function renderHome(){  try{
   // 設定頁資訊
   const expEl=document.getElementById('exp-info');
   if(expEl)expEl.textContent=`題目 ${qs.length} 筆・法條 ${ls.length} 筆・作答 ${ats.length} 筆`;
+
+  // ── 三大區即時資料（儀表板化）─────────────────────────────
+  // 混合風格：考試看進度、休閒看最近閱讀、學習看今日時間
+  renderZoneStats(qs, ats, reviewDue, todayAts_, todayStr).catch(()=>{});
   }catch(e){ logError('renderHome',e); }}
+
+// ── 三大區 zone-desc 即時資料 ──────────────────────────────
+async function renderZoneStats(qs, ats, reviewDue, todayAts, todayStr){
+  const setDesc=(zoneId, text)=>{
+    const el=document.querySelector(`#${zoneId} .zone-desc`);
+    if(el) el.textContent=text;
+  };
+  try{
+    // 考試區：看進度（待複習優先，否則今日答題，再否則題庫量）
+    if(reviewDue>0)      setDesc('zone-exam', `待複習 ${reviewDue}・今日 ${todayAts} 題`);
+    else if(todayAts>0)  setDesc('zone-exam', `今日已答 ${todayAts} 題 ✓`);
+    else                 setDesc('zone-exam', `題庫 ${qs.length} 題待挑戰`);
+
+    // 休閒區：看最近閱讀（取 ebooks 中 lastRead 最新者）
+    const ebooks=await da('ebooks').catch(()=>[]);
+    if(ebooks.length){
+      const recent=ebooks
+        .filter(b=>b.lastRead)
+        .sort((a,b)=>(b.lastRead||0)-(a.lastRead||0))[0];
+      if(recent){
+        const title=recent.title||'未命名';
+        setDesc('zone-leisure', `最近讀・${title.length>10?title.slice(0,10)+'…':title}`);
+      } else {
+        setDesc('zone-leisure', `藏書 ${ebooks.length} 本`);
+      }
+    } else {
+      setDesc('zone-leisure', '放鬆・閱讀・電子書');
+    }
+
+    // 學習區：看今日時間（usageLogs 今日 study 秒數）
+    const dayLogs=await getDayUsage(todayStr).catch(()=>[]);
+    const studySec=dayLogs.filter(l=>l.zone==='study').reduce((s,l)=>s+(l.seconds||0),0);
+    if(studySec>=60){
+      setDesc('zone-study', `今日學習 ${Math.round(studySec/60)} 分鐘`);
+    } else {
+      const [rb,lm,em]=await Promise.all([
+        da('refbooks').catch(()=>[]),
+        da('learnmedia').catch(()=>[]),
+        da('englishMaterials').catch(()=>[]),
+      ]);
+      const total=rb.length+lm.length+em.length;
+      setDesc('zone-study', total>0?`教材 ${total} 份待學習`:'課程・音訊・碎片・複習');
+    }
+  }catch(e){ logError('renderZoneStats',e); }
+}
 
 // ── 熱力圖渲染 ───────────────────────────────────────────────
 const _HM_COLS = 35;  // 顯示35天
