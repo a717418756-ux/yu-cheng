@@ -554,10 +554,16 @@
 
   // 聲音清單非同步載入（Chrome 需要等 onvoiceschanged）
   function _initDefaultVoice(){
+    // Azure 聲音不在系統 voices 清單裡，屬正常，絕不可被重設覆蓋
+    if(_TTS.voiceURI && _TTS.voiceURI.startsWith('azure:')){
+      const sel = document.getElementById('tts-voice-sel');
+      if(sel) sel.value = _TTS.voiceURI;
+      return;
+    }
     const voices = _getVoices();
     if(!voices.length) return;
-    // 若未選或選了不存在的聲音，重設為第一個
-    if(!_TTS.voiceURI || !voices.find(v => v.voiceURI === _TTS.voiceURI)){
+    // 若未選或選了不存在的系統聲音，重設為第一個
+    if(!_TTS.voiceURI || _TTS.voiceURI === 'default' || !voices.find(v => v.voiceURI === _TTS.voiceURI)){
       _TTS.voiceURI = voices[0].voiceURI;
     }
     const sel = document.getElementById('tts-voice-sel');

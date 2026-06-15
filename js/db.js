@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.11.8';      // 還原Azure朗讀:移除多餘的key/url外層攔截(導致每段都掉回系統TTS的病根)
+const APP_VERSION  = '2.11.9';      // 真正病根:_initDefaultVoice把Azure聲音當不存在而覆蓋回系統聲音(onvoiceschanged觸發時)
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
