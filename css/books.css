@@ -448,3 +448,22 @@
   transform:none;
 }
 
+
+/* ── 電子書頂部列點擊隱藏（Kindle 式沉浸閱讀，v2.11.23）──── */
+.reader-topbar{
+  transition: max-height .28s ease, opacity .24s ease, padding .28s ease;
+  max-height: 60px; overflow: hidden;
+}
+.reader-topbar.reader-bar-hidden{
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom-width: 0;
+  pointer-events: none;
+}
+/* eink：直接切換不做動畫（Boox 重繪慢） */
+[data-theme="eink"] .reader-topbar{ transition:none !important; }
+@media (prefers-reduced-motion: reduce){
+  .reader-topbar{ transition:none !important; }
+}

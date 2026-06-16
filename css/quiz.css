@@ -327,3 +327,26 @@
 }
 
 /* ══ 影音庫 section 標題行升級（螢光白線）══════════════════ */
+/* ── 答題即時動畫反饋（v2.11.23）──────────────────────── */
+/* 答對：輕快彈跳放大 */
+@keyframes qres-pop-kf{
+  0%{ transform:scale(.92); opacity:.4; }
+  50%{ transform:scale(1.04); }
+  100%{ transform:scale(1); opacity:1; }
+}
+.qres-pop{ animation:qres-pop-kf .34s ease-out both; }
+/* 答錯：左右輕震 */
+@keyframes qres-shake-kf{
+  0%,100%{ transform:translateX(0); }
+  20%{ transform:translateX(-6px); }
+  40%{ transform:translateX(5px); }
+  60%{ transform:translateX(-3px); }
+  80%{ transform:translateX(2px); }
+}
+.qres-shake{ animation:qres-shake-kf .4s ease-in-out both; }
+/* eink / 減少動態：停用動畫（Boox 重繪慢，動畫造成殘影） */
+[data-theme="eink"] .qres-pop,
+[data-theme="eink"] .qres-shake{ animation:none !important; }
+@media (prefers-reduced-motion: reduce){
+  .qres-pop, .qres-shake{ animation:none !important; }
+}
