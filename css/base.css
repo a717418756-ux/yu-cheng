@@ -1113,3 +1113,16 @@ input:focus, textarea:focus, select:focus{
     transition-duration: .001ms !important;
   }
 }
+
+/* ── 朗讀同步反白（v2.11.24）：念到哪張法條卡片就高亮 ──── */
+.tts-reading-hl{
+  background: var(--acc-soft, rgba(110,168,254,0.14)) !important;
+  border-left-color: var(--acc) !important;
+  box-shadow: 0 0 0 2px var(--acc) inset;
+  transition: background .3s, box-shadow .3s;
+}
+[data-theme="eink"] .tts-reading-hl{
+  background: #e8e8e8 !important;
+  box-shadow: 0 0 0 2px #000 inset !important;
+  border-left-color: #000 !important;
+}
