@@ -561,6 +561,10 @@ textarea{resize:vertical;line-height:1.7}
 .plan-badge.danger{background:rgba(224,92,87,0.13);color:var(--red);border:1px solid rgba(224,92,87,0.2)}
 .plan-badge.newq  {background:rgba(110,168,254,0.11);color:var(--acc);border:1px solid rgba(110,168,254,0.18)}
 .plan-badge.time  {background:rgba(255,255,255,0.05);color:var(--t2);border:1px solid rgba(255,255,255,0.08)}
+/* 可點擊的任務 badge（v2.11.26）：游標 + 按壓回饋 */
+.plan-badge[role="button"]{ cursor:pointer; transition:transform var(--t-fast,.14s), filter var(--t-fast,.14s); }
+.plan-badge[role="button"]:active{ transform:scale(.94); filter:brightness(1.15); }
+[data-theme="eink"] .plan-badge[role="button"]:active{ transform:none; filter:none; }
 
 /* ── 兩大區塊：橫向展縮 ── */
 .home-zones{
@@ -1126,3 +1130,57 @@ input:focus, textarea:focus, select:focus{
   box-shadow: 0 0 0 2px #000 inset !important;
   border-left-color: #000 !important;
 }
+
+/* ── 法條劃線/筆記（v2.11.27）──────────────────────────── */
+.law-note-box{
+  margin-top:8px; padding:8px 10px;
+  background:rgba(212,164,56,0.10);
+  border-left:2px solid #d4a438;
+  border-radius:0 6px 6px 0;
+  font-size:12.5px; line-height:1.6; color:var(--t1);
+  white-space:pre-wrap; word-break:break-word;
+}
+.law-mark-ov{
+  position:fixed; inset:0; z-index:600;
+  background:rgba(0,0,0,0.55);
+  display:flex; align-items:center; justify-content:center;
+  padding:20px; animation:law-mark-fade .18s ease;
+}
+@keyframes law-mark-fade{ from{opacity:0} to{opacity:1} }
+.law-mark-panel{
+  width:100%; max-width:340px;
+  background:var(--bg1); border:1px solid var(--bd);
+  border-radius:16px; padding:18px;
+  box-shadow:0 12px 40px rgba(0,0,0,0.4);
+}
+.law-mark-title{ font-size:16px; font-weight:700; color:var(--t0); margin-bottom:4px; }
+.law-mark-sub{ font-size:12px; color:var(--t2); margin-bottom:14px; line-height:1.4; }
+.law-mark-colors{ display:flex; gap:8px; margin-bottom:14px; }
+.law-mark-color{
+  flex:1; height:46px; border:2px solid transparent; border-radius:10px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:600; color:#fff;
+  text-shadow:0 1px 2px rgba(0,0,0,0.3);
+}
+.law-mark-color span{ pointer-events:none; }
+.law-mark-color.sel{ border-color:var(--t0); box-shadow:0 0 0 2px var(--acc); }
+.law-mark-note{
+  width:100%; box-sizing:border-box; padding:10px;
+  background:var(--bg2); border:1px solid var(--bd); border-radius:10px;
+  color:var(--t1); font-size:13px; line-height:1.6; resize:vertical;
+  margin-bottom:14px; font-family:inherit;
+}
+.law-mark-acts{ display:flex; gap:10px; }
+.law-mark-cancel, .law-mark-save{
+  flex:1; padding:11px; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer;
+}
+.law-mark-cancel{ background:var(--bg3); border:1px solid var(--bd); color:var(--t1); }
+.law-mark-save{ background:var(--acc); border:none; color:#fff; }
+/* eink */
+[data-theme="eink"] .law-mark-ov{ animation:none; background:rgba(0,0,0,0.3); }
+[data-theme="eink"] .law-mark-panel{ background:#fff; border:2px solid #000; }
+[data-theme="eink"] .law-mark-title,[data-theme="eink"] .law-mark-sub{ color:#000; }
+[data-theme="eink"] .law-mark-color.sel{ border-color:#000; box-shadow:0 0 0 2px #000; }
+[data-theme="eink"] .law-mark-save{ background:#000; color:#fff; }
+[data-theme="eink"] .law-note-box{ background:#f0f0f0; border-left-color:#000; color:#000; }
+@media (prefers-reduced-motion: reduce){ .law-mark-ov{ animation:none !important; } }

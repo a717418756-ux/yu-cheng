@@ -256,3 +256,15 @@
 [data-theme="eink"] .eng-pa-score-item{ background:#fff; border-color:#000; }
 [data-theme="eink"] .eng-pa-score-total{ background:#eee; }
 [data-theme="eink"] .eng-pa-scores{ border-color:#000; }
+
+/* ── 跟讀重試按鈕（v2.11.26）──────────────────────────── */
+.eng-pa-retry{
+  background:none; border:1px solid var(--bd);
+  border-radius:14px; padding:3px 10px;
+  font-size:11px; color:var(--t2); cursor:pointer;
+  transition:border-color var(--t-fast,.14s), color var(--t-fast,.14s);
+  flex-shrink:0;
+}
+.eng-pa-retry:active{ border-color:var(--acc); color:var(--acc); transform:scale(.95); }
+[data-theme="eink"] .eng-pa-retry{ border-color:#000; color:#000; }
+[data-theme="eink"] .eng-pa-retry:active{ transform:none; }
