@@ -24,6 +24,9 @@ const _B = {
   bulkSelected: new Set(),
 };
 
+// epub 章節目錄是否已載入（每本書重置）
+let _epubTocLoaded = false;
+
 // ── 尺寸換算 ─────────────────────────────────────────────────
 // 1mm → px（基於手機螢幕合理顯示大小）
 const MM_TO_PX = 1.7;
@@ -1176,6 +1179,8 @@ async function openBookReader(id){
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
       </button>
       <div class="reader-title">${esc(book.title||'閱讀中')}</div>
+      ${ext==='epub' ? `<button class="vpc-btn vpc-sm" onclick="_toggleEpubToc()"
+        title="目錄" style="font-size:17px;color:rgba(255,255,255,0.7)">☰</button>` : ''}
       <button class="vpc-btn vpc-sm" id="tts-epub-btn"
         onclick="ttsReadEpub()"
         title="朗讀本頁（點擊再次可停止）"
@@ -1219,6 +1224,13 @@ async function openBookReader(id){
             <div id="epub-page-info" class="hide"
               style="text-align:center;font-size:11px;color:rgba(255,255,255,0.3);
               padding:4px 0 6px;flex-shrink:0;font-variant-numeric:tabular-nums">
+            </div>
+            <!-- 章節目錄側欄 -->
+            <div id="epub-toc-overlay" class="epub-toc-overlay hide" onclick="_toggleEpubToc()">
+              <div id="epub-toc-panel" class="epub-toc-panel" onclick="event.stopPropagation()">
+                <div class="epub-toc-head">目錄</div>
+                <div id="epub-toc-list" class="epub-toc-list"></div>
+              </div>
             </div>
           </div>`
         : ext==='txt'
@@ -1321,6 +1333,7 @@ async function _initEpubReader(url, savedCfi, bookId){
     const buf  = await resp.arrayBuffer();
     const book = ePub(buf);
     window._epubBook = book;
+    _epubTocLoaded = false;  // 新書重置目錄載入旗標
 
     // 取得容器實際高度（epub.js 需要明確像素高度）
     const viewerEl = document.getElementById('epub-viewer');
@@ -1530,6 +1543,56 @@ function _toggleReaderBars(){
   const settings=document.getElementById('reader-settings');
   if(settings && !settings.classList.contains('hide')) settings.classList.add('hide');
   haptic('light');
+}
+
+// 章節目錄：切換側欄顯示，首次開啟時載入 TOC
+async function _toggleEpubToc(){
+  const ov = document.getElementById('epub-toc-overlay');
+  if(!ov) return;
+  const willShow = ov.classList.contains('hide');
+  ov.classList.toggle('hide');
+  haptic('light');
+  if(willShow && !_epubTocLoaded) await _loadEpubToc();
+}
+
+async function _loadEpubToc(){
+  const listEl = document.getElementById('epub-toc-list');
+  const book = window._epubBook;
+  if(!listEl || !book) return;
+  listEl.innerHTML = '<div style="padding:14px;color:rgba(255,255,255,0.4);font-size:13px">載入中…</div>';
+  try{
+    const nav = await book.loaded.navigation;
+    const toc = nav?.toc || [];
+    if(!toc.length){
+      listEl.innerHTML = '<div style="padding:14px;color:rgba(255,255,255,0.4);font-size:13px">此書沒有目錄資訊</div>';
+      return;
+    }
+    // 攤平目錄（含子章節，子項縮排）
+    const rows = [];
+    const walk = (items, depth)=>{
+      items.forEach(it=>{
+        rows.push({ label: it.label?.trim()||'(未命名)', href: it.href, depth });
+        if(it.subitems?.length) walk(it.subitems, depth+1);
+      });
+    };
+    walk(toc, 0);
+    listEl.innerHTML = rows.map(r=>
+      `<button class="epub-toc-item" style="padding-left:${12 + r.depth*16}px"
+        onclick="_epubGotoChapter('${(r.href||'').replace(/'/g,"\\'")}')">${esc(r.label)}</button>`
+    ).join('');
+    _epubTocLoaded = true;
+  }catch(e){
+    listEl.innerHTML = '<div style="padding:14px;color:rgba(255,255,255,0.4);font-size:13px">目錄載入失敗</div>';
+  }
+}
+
+async function _epubGotoChapter(href){
+  const rendition = window._epubRendition;
+  if(!rendition || !href) return;
+  try{
+    await rendition.display(href);
+    _toggleEpubToc();  // 跳轉後關閉側欄
+  }catch(e){ toast('章節跳轉失敗'); }
 }
 
 function _readerFontSize(delta){
