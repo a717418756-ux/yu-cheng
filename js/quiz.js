@@ -189,6 +189,8 @@ async function ansQ(sel){  try{
 
   const resEl = document.getElementById('qres');
   resEl.className = 'qres on '+(correct ? 'c' : 'w');
+  haptic(correct ? 'success' : 'error');
+  resEl.classList.add(correct ? 'qres-pop' : 'qres-shake');
   const isMultiQ = qu.multiAnswer || (qu.answer && qu.answer.length>1 && /^[A-E]{2,}$/.test(qu.answer));
   let msg = correct ? '✓ 正確！' : '✗ 正確答案：'+(qu.answer||'')+(isMultiQ ? ' (多選)' : '');
   if(hesitant) msg += ' ⚠ 作答超過40秒，列入猶豫題';
@@ -390,6 +392,8 @@ async function ansQMulti(selected, correctStr, qu){  try{
   });
   const resEl = document.getElementById('qres');
   resEl.className = 'qres on '+(correct ? 'c' : 'w');
+  haptic(correct ? 'success' : 'error');
+  resEl.classList.add(correct ? 'qres-pop' : 'qres-shake');
   let msg = correct ? '✓ 完全正確！' : '✗ 正確答案：'+correctStr.split('').join('、');
   if(!correct && selected) msg += '（你選：'+selected.split('').join('、')+'）';
   if(hesitant) msg += ' ⚠ 超過40秒';

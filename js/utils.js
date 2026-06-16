@@ -476,3 +476,21 @@ function parseBulkText(text){
     answerEs:q.answerEs||'',
   }));
 }
+
+// ── 7. 震動回饋（Haptic Feedback）──────────────────────────
+// 在支援的裝置上輕震，提供實體操作感；不支援則靜默忽略
+// type: 'light'(輕點) | 'success'(成功) | 'error'(錯誤) | 'medium'
+function haptic(type='light'){
+  try{
+    if(!navigator.vibrate) return;
+    // eink 模式不震動（Boox 等電子閱讀器多無馬達且追求安靜）
+    if(document.documentElement.dataset.theme === 'eink') return;
+    const patterns = {
+      light:   10,
+      medium:  20,
+      success: [12, 40, 12],
+      error:   [25, 50, 25],
+    };
+    navigator.vibrate(patterns[type] ?? 10);
+  }catch(_){}
+}

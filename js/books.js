@@ -1204,6 +1204,11 @@ async function openBookReader(id){
               style="position:absolute;right:0;top:0;width:30%;height:100%;
               z-index:5;cursor:pointer;-webkit-tap-highlight-color:transparent"
               onclick="_epubNext()"></div>
+            <!-- 中央點擊區：顯示/隱藏頂部工具列（Kindle 式）-->
+            <div id="epub-center-zone"
+              style="position:absolute;left:30%;top:0;width:40%;height:100%;
+              z-index:4;cursor:pointer;-webkit-tap-highlight-color:transparent"
+              onclick="_toggleReaderBars()"></div>
             <!-- 底部進度列 -->
             <div id="epub-progress-bar"
               style="height:2px;background:rgba(255,255,255,0.1);position:relative;flex-shrink:0">
@@ -1515,6 +1520,16 @@ let _readerUIVisible = true;
 function _toggleReaderUI(){
   const settings=document.getElementById('reader-settings');
   if(settings) settings.classList.toggle('hide');
+}
+
+// 中央點擊：顯示/隱藏頂部工具列（Kindle 式沉浸閱讀）
+function _toggleReaderBars(){
+  const topbar = document.getElementById('reader-topbar');
+  if(topbar) topbar.classList.toggle('reader-bar-hidden');
+  // 點中央時若設定面板開著，一併收起
+  const settings=document.getElementById('reader-settings');
+  if(settings && !settings.classList.contains('hide')) settings.classList.add('hide');
+  haptic('light');
 }
 
 function _readerFontSize(delta){
