@@ -59,14 +59,14 @@ async function renderHome(){  try{
     const saved=await getSetting('examMotto','');
     if(saved) mottoEl.textContent=saved;
   }
-  // 今日任務 badges（精緻橫排）
+  // 今日任務 badges（精緻橫排，可點擊直接開始對應練習）
   const planEl=document.getElementById('h-plan-badges');
   if(planEl){
     const badges=[];
-    if(reviewDue>0) badges.push(`<span class="plan-badge review">待複習 ${reviewDue}</span>`);
-    if(dangerQ>0)   badges.push(`<span class="plan-badge danger">危險 ${dangerQ}</span>`);
+    if(reviewDue>0) badges.push(`<span class="plan-badge review" role="button" tabindex="0" onclick="startQ('review')" title="開始複習">待複習 ${reviewDue}</span>`);
+    if(dangerQ>0)   badges.push(`<span class="plan-badge danger" role="button" tabindex="0" onclick="startQ('all')" title="從危險題開始">危險 ${dangerQ}</span>`);
     const nq=Math.min(newQ,10);
-    if(nq>0)        badges.push(`<span class="plan-badge newq">新題 ${nq}</span>`);
+    if(nq>0)        badges.push(`<span class="plan-badge newq" role="button" tabindex="0" onclick="startQ('new')" title="練習新題">新題 ${nq}</span>`);
     if(estMin>0)    badges.push(`<span class="plan-badge time">約 ${estMin} 分鐘</span>`);
     if(!badges.length) badges.push(`<span class="plan-badge time">今日進度良好 ✓</span>`);
     planEl.innerHTML=badges.join('');
@@ -1303,16 +1303,23 @@ async function openLawGroup(lawName){  try{
       ?'<div style="margin-top:9px;font-size:11px;color:var(--t2)">🔗 關聯法條：</div>'
         +l.relatedLaws.map(r=>'<button class="chip" style="font-size:11px;margin:2px" onclick="showLawPop(\''+esc(r.ref||r.lawName||'')+'\')">⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('')
       :'';
-    return '<div data-law-id="'+l.id+'" class="law-art-card" style="margin-bottom:12px;padding:12px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--pur2)">'
+    // 劃線/筆記顯示
+    const hlColors={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'};
+    const hlC=l.hlColor&&hlColors[l.hlColor]?hlColors[l.hlColor]:'';
+    const borderC=hlC||'var(--pur2)';
+    const cardBg=hlC?`linear-gradient(to right, ${hlC}14, var(--bg2) 60%)`:'var(--bg2)';
+    const noteHtml=l.hlNote?'<div class="law-note-box">📝 '+esc(l.hlNote)+'</div>':'';
+    return '<div data-law-id="'+l.id+'" class="law-art-card" style="margin-bottom:12px;padding:12px;background:'+cardBg+';border-radius:8px;border-left:3px solid '+borderC+'">'
       +'<div style="font-size:14px;font-weight:700;color:var(--acc);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">'
         +'<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'
         +'<div style="display:flex;gap:6px">'
+          +'<button onclick="openLawMark('+l.id+')" class="law-mark-btn" style="background:none;border:none;color:'+(hlC||'var(--t2)')+';font-size:13px;cursor:pointer" title="標記/筆記">🖍</button>'
           +'<button onclick="editLawInView('+l.id+')" class="law-edit-btn" style="background:none;border:none;color:var(--t2);font-size:12px;cursor:pointer">✏</button>'
           +'<button onclick="delLaw('+l.id+')" class="law-del-btn" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">🗑</button>'
         +'</div>'
       +'</div>'
       +'<div style="font-size:14px;line-height:1.85;color:var(--t1)">'+contentHtml+'</div>'
-      +kwHtml+relHtml
+      +noteHtml+kwHtml+relHtml
     +'</div>';
   };
 
@@ -1575,6 +1582,73 @@ function parseMinguoDate(s){
 }
 
 async function editLawInView(id){  try{ const l=await dg('laws',id);if(l)showAddLaw(l);   }catch(e){ logError('editLawInView',e); }}
+
+// ── 法條劃線/筆記面板 ──────────────────────────────────────
+async function openLawMark(id){
+  try{
+    const l = await dg('laws', id);
+    if(!l) return;
+    // 移除舊面板
+    document.getElementById('law-mark-ov')?.remove();
+    const colors = [
+      { key:'',       label:'無',   c:'transparent' },
+      { key:'yellow', label:'重點', c:'#d4a438' },
+      { key:'green',  label:'已懂', c:'#4caf7d' },
+      { key:'red',    label:'易錯', c:'#e05c57' },
+    ];
+    const ov = document.createElement('div');
+    ov.id = 'law-mark-ov';
+    ov.className = 'law-mark-ov';
+    ov.onclick = (e)=>{ if(e.target===ov) ov.remove(); };
+    ov.innerHTML =
+      '<div class="law-mark-panel" onclick="event.stopPropagation()">'
+      + '<div class="law-mark-title">標記法條</div>'
+      + '<div class="law-mark-sub">'+esc(l.article||'')+(l.title?' '+esc(l.title):'')+'</div>'
+      + '<div class="law-mark-colors">'
+      + colors.map(co=>
+          '<button class="law-mark-color'+((l.hlColor||'')===co.key?' sel':'')+'" '
+          + 'data-color="'+co.key+'" '
+          + 'style="background:'+(co.c==='transparent'?'var(--bg3)':co.c)+'">'
+          + '<span>'+co.label+'</span></button>'
+        ).join('')
+      + '</div>'
+      + '<textarea id="law-mark-note" class="law-mark-note" placeholder="寫筆記（選填）…" rows="3">'+esc(l.hlNote||'')+'</textarea>'
+      + '<div class="law-mark-acts">'
+      + '<button class="law-mark-cancel" onclick="document.getElementById(\'law-mark-ov\').remove()">取消</button>'
+      + '<button class="law-mark-save" onclick="saveLawMark('+id+')">儲存</button>'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(ov);
+    // 顏色選擇互動
+    ov.querySelectorAll('.law-mark-color').forEach(btn=>{
+      btn.onclick = ()=>{
+        ov.querySelectorAll('.law-mark-color').forEach(b=>b.classList.remove('sel'));
+        btn.classList.add('sel');
+      };
+    });
+  }catch(e){ logError('openLawMark', e); }
+}
+
+async function saveLawMark(id){
+  try{
+    const ov = document.getElementById('law-mark-ov');
+    if(!ov) return;
+    const sel = ov.querySelector('.law-mark-color.sel');
+    const color = sel ? (sel.dataset.color||'') : '';
+    const note  = (ov.querySelector('#law-mark-note')?.value||'').trim();
+    const l = await dg('laws', id);
+    if(!l){ ov.remove(); return; }
+    l.hlColor = color;
+    l.hlNote  = note;
+    await dp('laws', l);
+    ov.remove();
+    haptic('light');
+    toast('已儲存標記');
+    // 即時更新該卡片外觀（重渲染當前法條檢視）
+    const curName = window.currentLawName || S.curLawName;
+    if(curName) openLawGroup(curName);
+  }catch(e){ logError('saveLawMark', e); }
+}
 
 // ── 重建條號索引：用最新 art2n 重算所有法條 articleNumber ──────
 // 修正：①舊資料 articleNumber 缺值/存錯 ②「第N條之M」子條號排序
@@ -2564,6 +2638,8 @@ const DataMod = {
   delLawGroup,
   delLaw,
   editLawInView,
+  openLawMark,
+  saveLawMark,
   openHeatmapOv,
   openImgViewer,
   previewBulkDelLaw,
