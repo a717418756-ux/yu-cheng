@@ -1262,8 +1262,8 @@ async function openBookReader(id){
     };
     reader.readAsText(book.blob,'UTF-8');
   } else if(ext==='epub'){
-    // epub.js 初始化
-    _initEpubReader(url, book.lastPage||0);
+    // epub.js 初始化（傳 lastCfi 還原閱讀位置，非 txt 用的 lastPage）
+    _initEpubReader(url, book.lastCfi||null, book.id);
   }
 
   // 恢復閱讀位置（txt：scrollTop 數字；epub：由 _initEpubReader 處理）
@@ -1279,7 +1279,7 @@ async function openBookReader(id){
 // epub.js 閱讀器
 // ════════════════════════════════════════════════════════════
 
-async function _initEpubReader(url, savedCfi){
+async function _initEpubReader(url, savedCfi, bookId){
   // 確認 epub.js 已載入
   if(typeof ePub === 'undefined'){
     const el=document.getElementById('epub-viewer');
@@ -1394,14 +1394,25 @@ async function _initEpubReader(url, savedCfi){
     const _isEink = document.documentElement.getAttribute('data-theme') === 'eink';
     rendition.themes.select(_isEink ? 'eink' : 'dark');
 
-    // 顯示（從上次位置或開頭）
+    // 註冊 relocated（加旗標：還原位置期間不存檔，避免覆蓋 savedCfi）
+    let _restoringPos = true;
+    rendition.on('relocated', loc=>{
+      _updateEpubProgress(book, loc);
+      if(_restoringPos) return;  // 還原期間不存，避免把好的 CFI 覆蓋成開頭
+      if(loc?.start?.cfi && bookId) _saveEpubCfiThrottled(bookId, loc.start.cfi);
+    });
+
+    // 顯示（CFI 本身含章節定位資訊，不需等 locations 生成即可跳轉）
     if(savedCfi && typeof savedCfi === 'string' && savedCfi.startsWith('epubcfi')){
       await rendition.display(savedCfi);
     } else {
       await rendition.display();
     }
 
-    // 生成位置索引（讓 percentageFromCfi 能正確計算進度）
+    // display 完成後，延遲開放存檔（確保 display 引發的 relocated 已結束，不會覆蓋）
+    setTimeout(()=>{ _restoringPos = false; }, 400);
+
+    // 背景生成位置索引（僅供百分比進度用，不阻塞開書速度）
     book.locations.generate(1024).then(()=>{
       const loc = rendition.currentLocation();
       if(loc) _updateEpubProgress(book, loc);
@@ -1409,11 +1420,6 @@ async function _initEpubReader(url, savedCfi){
 
     // 閱讀模式：直接在 overlay 上設 class（不改 html[data-reading]，避免影響 epub.js 寬度計算）
     document.documentElement.classList.add('reader-active');
-
-    // 翻頁後更新進度
-    rendition.on('relocated', loc=>{
-      _updateEpubProgress(book, loc);
-    });
 
     // 觸控滑動翻頁
     rendition.on('touchstart', e=>{ _epubTouchStart = e.touches[0].clientX; });
@@ -1435,6 +1441,29 @@ async function _initEpubReader(url, savedCfi){
 }
 
 let _epubTouchStart = null;
+
+// 即時儲存 epub 閱讀位置（節流：最多每 1.5 秒寫一次 DB）
+let _saveCfiTimer = null;
+let _pendingCfi = null;
+function _saveEpubCfiThrottled(bookId, cfi){
+  _pendingCfi = cfi;
+  if(_saveCfiTimer) return;  // 已有排程，等它執行
+  _saveCfiTimer = setTimeout(async ()=>{
+    _saveCfiTimer = null;
+    const cfiToSave = _pendingCfi;
+    _pendingCfi = null;
+    try{
+      const book = await dg('ebooks', bookId);
+      if(book){
+        book.lastCfi  = cfiToSave;
+        book.lastRead = Date.now();
+        await dp('ebooks', book);
+        const idx = _B.allBooks.findIndex(b=>b.id===bookId);
+        if(idx>=0){ _B.allBooks[idx].lastCfi=cfiToSave; _B.allBooks[idx].lastRead=book.lastRead; }
+      }
+    }catch(_){}
+  }, 1500);
+}
 
 function _updateEpubProgress(book, loc){
   if(!loc) return;
