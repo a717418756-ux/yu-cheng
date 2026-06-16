@@ -276,10 +276,7 @@
 }
 /* 閱讀器頂列：純淨高對比 */
 [data-theme="eink"] .reader-active .reader-topbar,
-[data-theme="eink"] .epub-bottom-bar{
-  background:#F6F4EE;
-  border-color:#888;
-}
+
 /* 法條檢視內文：eink 下襯線 + 加大行距，與書籍一致的閱讀質感 */
 [data-theme="eink"] #lv{
   background:#F6F4EE;

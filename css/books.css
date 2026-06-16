@@ -447,8 +447,4 @@
   pointer-events:auto;
   transform:none;
 }
-.reader-active .epub-bottom-bar{
-  opacity:1;
-  pointer-events:auto;
-  transform:none;
-}
+
