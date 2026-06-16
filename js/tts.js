@@ -20,6 +20,7 @@
     panel:      null,
     collapsed:  false,
     audio:      null,  // Azure 播放用的 HTMLAudioElement
+    highlightEls: null, // 朗讀同步反白：每段對應的 DOM 元素（法條卡片）
   };
 
   // ── Azure TTS via GAS ───────────────────────────────────────
@@ -197,12 +198,19 @@
     const rawText = _TTS.utterances[_TTS.idx];
     if(!rawText?.trim()){ _TTS.idx++; _speakNext(); return; }
 
+    // 朗讀同步反白：高亮當前段對應的 DOM 元素（法條卡片）
+    _applyReadingHighlight(_TTS.idx);
+
     // 限 150 字，超過截斷插回佇列（Android bug：長段落易靜默停止）
     const text = rawText.length > 150
       ? rawText.slice(0, rawText.lastIndexOf('，', 150) + 1 || 150)
       : rawText;
     if(text.length < rawText.length){
       _TTS.utterances.splice(_TTS.idx + 1, 0, rawText.slice(text.length));
+      // highlightEls 同步插入（截斷出的後半段沿用同一元素），避免索引錯位
+      if(Array.isArray(_TTS.highlightEls)){
+        _TTS.highlightEls.splice(_TTS.idx + 1, 0, _TTS.highlightEls[_TTS.idx] || null);
+      }
     }
 
     // 若選了 Azure 聲音，直接走 Azure 引擎（內部會自行檢查 key/url 並 fallback）
@@ -258,6 +266,8 @@
     _TTS.speaking = false;
     _TTS.paused   = false;
     _TTS.idx      = 0;
+    _clearReadingHighlight();      // 清除朗讀同步反白
+    _TTS.highlightEls = null;
     _updatePanelState();
   }
 
@@ -325,6 +335,22 @@
   }
 
   // ── 取得法條文字（純文字，無 emoji）────────────────────────
+  // 套用朗讀反白到第 idx 段對應的元素，並捲動到可視區
+  function _applyReadingHighlight(idx){
+    const els = _TTS.highlightEls;
+    if(!Array.isArray(els)) return;
+    _clearReadingHighlight();
+    const el = els[idx];
+    if(!el) return;
+    el.classList.add('tts-reading-hl');
+    try{ el.scrollIntoView({ behavior:'smooth', block:'center' }); }catch(_){}
+  }
+  // 清除所有朗讀反白
+  function _clearReadingHighlight(){
+    document.querySelectorAll('.tts-reading-hl')
+      .forEach(el => el.classList.remove('tts-reading-hl'));
+  }
+
   function _getLawText(){
     const lawName    = window.currentLawName    || document.getElementById('lv-name')?.textContent?.trim() || '';
     const lawContent = window.currentLawContent || '';
@@ -334,7 +360,25 @@
       lawContent.split('\n').map(s=>s.trim()).filter(s=>s.length>1)
         .forEach(s => segments.push(s));
     }
+    // 建立段落→法條卡片對應（供朗讀同步反白）：依文字比對找出每段所屬卡片
+    try{
+      _TTS.highlightEls = _mapSegmentsToLawCards(segments);
+    }catch(_){ _TTS.highlightEls = null; }
     return segments;
+  }
+
+  // 把朗讀段落對應到畫面上的法條卡片元素（以「條」為高亮單位）
+  function _mapSegmentsToLawCards(segments){
+    const cards = [...document.querySelectorAll('#lbody .law-art-card[data-law-id]')];
+    if(!cards.length) return null;
+    // 每張卡片的純文字（去空白）供比對
+    const cardTexts = cards.map(c => (c.textContent||'').replace(/\s+/g,''));
+    return segments.map(seg=>{
+      const key = seg.replace(/\s+/g,'').slice(0, 12);  // 取前段特徵比對
+      if(!key) return null;
+      const i = cardTexts.findIndex(t => t.includes(key));
+      return i >= 0 ? cards[i] : null;
+    });
   }
 
   // ── 浮動控制列 ───────────────────────────────────────────────

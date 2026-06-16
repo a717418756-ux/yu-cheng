@@ -1303,7 +1303,7 @@ async function openLawGroup(lawName){  try{
       ?'<div style="margin-top:9px;font-size:11px;color:var(--t2)">🔗 關聯法條：</div>'
         +l.relatedLaws.map(r=>'<button class="chip" style="font-size:11px;margin:2px" onclick="showLawPop(\''+esc(r.ref||r.lawName||'')+'\')">⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('')
       :'';
-    return '<div style="margin-bottom:12px;padding:12px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--pur2)">'
+    return '<div data-law-id="'+l.id+'" class="law-art-card" style="margin-bottom:12px;padding:12px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--pur2)">'
       +'<div style="font-size:14px;font-weight:700;color:var(--acc);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">'
         +'<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'
         +'<div style="display:flex;gap:6px">'
