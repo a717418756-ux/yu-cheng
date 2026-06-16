@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.11.20';     // 修電子書回到第一頁:display(savedCfi)後relocated會覆蓋存檔，加_restoringPos旗標保護還原期間不誤存
+const APP_VERSION  = '2.11.21';     // 備份強化:書架排序localStorage→DB; 本地備份涵蓋全部store+設定; GAS備份加答題/倒數/統計/設定
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

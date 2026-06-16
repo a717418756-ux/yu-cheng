@@ -18,6 +18,7 @@ const _B = {
   page:      0,
   PAGE:      30,
   allBooks:  [],
+  bookOrder: [],   // 書架手動排序（存 DB settings，取代 localStorage）
   mode:      'spine',
   bulkMode:  false,
   bulkSelected: new Set(),
@@ -60,9 +61,28 @@ const _SPINE_THEMES = [
 async function renderBooks(){
   try{
     _B.page     = 0;
+    // 載入書架排序（從 DB settings，含舊 localStorage 自動遷移）
+    _B.bookOrder = await _loadBooksOrder();
     _B.allBooks = await _getBooksMetaList();
     _renderBooksPage();
   }catch(e){ logError('renderBooks',e); }
+}
+
+// 讀書架排序：優先 DB，若 DB 無但 localStorage 有舊資料→自動遷移到 DB
+async function _loadBooksOrder(){
+  try{
+    let order = await getSetting('booksOrder', null);
+    if(order == null){
+      // 一次性遷移舊的 localStorage 資料
+      const legacy = localStorage.getItem('booksOrder');
+      if(legacy){
+        order = JSON.parse(legacy);
+        await setSetting('booksOrder', order);
+        try{ localStorage.removeItem('booksOrder'); }catch(_){}
+      }
+    }
+    return Array.isArray(order) ? order : (order ? JSON.parse(order) : []);
+  }catch(e){ return []; }
 }
 
 async function _getBooksMetaList(){
@@ -1600,10 +1620,10 @@ async function closeBookReader(id){
 // 書庫批量刪除
 // ════════════════════════════════════════════════════════════
 // ── 書庫排序模式 ─────────────────────────────────────────
-// sortOrder：儲存在 localStorage，key = 'booksOrder'，值為 id 陣列
+// sortOrder：儲存在 DB settings（key='booksOrder'），記憶體鏡像 _B.bookOrder
 function _getSortedBooks(books){
   try{
-    const order = JSON.parse(localStorage.getItem('booksOrder')||'[]');
+    const order = _B.bookOrder || [];
     if(!order.length) return books;
     const map = new Map(books.map(b=>[b.id, b]));
     const sorted = order.map(id=>map.get(id)).filter(Boolean);
@@ -1612,7 +1632,9 @@ function _getSortedBooks(books){
   }catch(e){ return books; }
 }
 function _saveBooksOrder(books){
-  localStorage.setItem('booksOrder', JSON.stringify(books.map(b=>b.id)));
+  const order = books.map(b=>b.id);
+  _B.bookOrder = order;                          // 同步更新記憶體
+  setSetting('booksOrder', order).catch(()=>{}); // 持久化到 DB
 }
 
 let _sortMode = false;

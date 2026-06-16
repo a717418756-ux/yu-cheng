@@ -49,13 +49,24 @@ async function gdriveBackup(){ try{
   const { url, pwd } = await _gasGetConfig();
   if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
   toast('備份中…');
-  // 雲端備份只含考試區：題庫 + 法條
-  const [qs, ls] = await Promise.all([da('questions'), da('laws')]);
+  // 雲端備份：考試區 + 答題記錄 + 倒數日 + 使用統計 + 設定（不含 blob 類大檔）
+  const [qs, ls, ats, countdowns, usageLogs, settings] = await Promise.all([
+    da('questions'), da('laws'), da('attempts'),
+    da('countdowns'), da('usageLogs'), da('settings')
+  ]);
   const payload = {
     password: pwd,
     action:   'backup',
     filename: GAS_BACKUP_FILE,
-    data: JSON.stringify({ questions:qs, laws:ls })
+    data: JSON.stringify({
+      version: 2,
+      questions: qs,
+      laws: ls,
+      attempts: ats,
+      countdowns: countdowns,
+      usageLogs: usageLogs,
+      settings: settings
+    })
   };
   const res  = await fetch(url, {
     method:'POST',
@@ -106,6 +117,20 @@ async function gdriveRestore(){ try{
       await dc('questions'); await dc('laws');
       if(bk.questions?.length) await bulkPut('questions', bk.questions);
       if(bk.laws?.length)      await bulkPut('laws',      bk.laws);
+
+      // 答題記錄 / 倒數日 / 使用統計
+      if(bk.attempts?.length){   await dc('attempts');   await bulkPut('attempts', bk.attempts); }
+      if(bk.countdowns?.length){ await dc('countdowns'); await bulkPut('countdowns', bk.countdowns); }
+      if(bk.usageLogs?.length){  await dc('usageLogs');  await bulkPut('usageLogs', bk.usageLogs); }
+
+      // 設定（逐筆覆蓋；保留當前 GAS 網址，避免還原後連線設定錯亂）
+      if(Array.isArray(bk.settings)){
+        for(const s of bk.settings){
+          if(!s || s.key == null) continue;
+          if(s.key === 'gasWebAppUrl') continue;  // 不覆蓋當前網址
+          await dp('settings', s);
+        }
+      }
 
       _cacheInvalidate();
       const rt = new Date().toLocaleString('zh-TW');
@@ -284,19 +309,30 @@ async function localBackup(){
     const dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
     toast('備份中…請稍候');
 
-    const [ebooks, media, qs, ls] = await Promise.all([
-      da('ebooks'), da('leisuremedia'), da('questions'), da('laws')
+    const [ebooks, media, qs, ls, ats, settings, countdowns, usageLogs, refbooks, learnmedia, engMats] = await Promise.all([
+      da('ebooks'), da('leisuremedia'), da('questions'), da('laws'),
+      da('attempts'), da('settings'), da('countdowns'), da('usageLogs'),
+      da('refbooks'), da('learnmedia'), da('englishMaterials')
     ]);
 
     let count = 0;
 
-    // ── 題庫 + 法條備份（JSON 單檔）──
+    // ── 完整資料備份（JSON 單檔，含設定/答題/倒數/統計等非 blob 資料）──
+    // englishMaterials 可能含大型內容，但無獨立 blob 欄位，一併寫入
     const examHandle = await dirHandle.getFileHandle('exam_data.json', { create:true });
     const examWriter = await examHandle.createWritable();
     await examWriter.write(JSON.stringify({
+      version: 3,
       exportedAt: new Date().toISOString(),
       questions: qs,
-      laws: ls
+      laws: ls,
+      attempts: ats,
+      settings: settings,
+      countdowns: countdowns,
+      usageLogs: usageLogs,
+      refbooks: refbooks,
+      learnmedia: learnmedia,
+      englishMaterials: engMats
     }));
     await examWriter.close();
     count++;  // exam_data.json 計入項目數
@@ -372,7 +408,7 @@ async function localRestore(){
     toast('你的瀏覽器不支援資料夾存取，請用 Chrome 或 Edge');
     return;
   }
-  cfm('本地完整還原', '所有資料（題庫、法條、書庫、影音庫）將被覆蓋，確定繼續？', async()=>{
+  cfm('本地完整還原', '所有資料（題庫、法條、答題記錄、設定、倒數日、統計、書庫、影音、英語庫）將被覆蓋，確定繼續？', async()=>{
     try{
       const dirHandle = await window.showDirectoryPicker({ mode:'read' });
       toast('還原中…請稍候');
@@ -393,6 +429,48 @@ async function localRestore(){
           await dc('laws');
           await bulkPut('laws', examData.laws);
           count += examData.laws.length;
+        }
+        // 答題記錄
+        if(examData.attempts?.length){
+          await dc('attempts');
+          await bulkPut('attempts', examData.attempts);
+          count += examData.attempts.length;
+        }
+        // 倒數日
+        if(examData.countdowns?.length){
+          await dc('countdowns');
+          await bulkPut('countdowns', examData.countdowns);
+          count += examData.countdowns.length;
+        }
+        // 使用統計
+        if(examData.usageLogs?.length){
+          await dc('usageLogs');
+          await bulkPut('usageLogs', examData.usageLogs);
+          count += examData.usageLogs.length;
+        }
+        // 學習區教材 meta（refbooks/learnmedia 的 blob 在各自資料夾，這裡僅還原 meta 清單）
+        if(examData.refbooks?.length){
+          await dc('refbooks');
+          await bulkPut('refbooks', examData.refbooks);
+          count += examData.refbooks.length;
+        }
+        if(examData.learnmedia?.length){
+          await dc('learnmedia');
+          await bulkPut('learnmedia', examData.learnmedia);
+          count += examData.learnmedia.length;
+        }
+        // 英語學習庫
+        if(examData.englishMaterials?.length){
+          await dc('englishMaterials');
+          await bulkPut('englishMaterials', examData.englishMaterials);
+          count += examData.englishMaterials.length;
+        }
+        // 設定（主鍵為 key，逐筆 put 覆蓋，不清空避免破壞他鍵）
+        if(Array.isArray(examData.settings)){
+          for(const s of examData.settings){
+            if(s && s.key != null) await dp('settings', s);
+          }
+          count += examData.settings.length;
         }
       }catch(e){ /* exam_data.json 不存在就跳過 */ }
 
