@@ -52,7 +52,7 @@ async function _fillMediaThumbs(container){
     const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
     const img = document.createElement('img');
     img.loading = 'lazy';
-    img.style.cssText = `width:100%;height:100%;object-fit:cover;border-radius:${isAudio?'50%':'10px'}`;
+    img.className = 'media-thumb-img'+(isAudio?' audio':'');
     if(raw instanceof Blob){ img.onload = ()=> URL.revokeObjectURL(src); }
     img.src = src;
     if(el.isConnected){ el.innerHTML=''; el.appendChild(img); }
@@ -158,7 +158,6 @@ function _mkHScrollSection(title, type, items, showMore=true, featured=false){
   if(!items.length){
     const empty = document.createElement('div');
     empty.className='media-empty-sec';
-    empty.style.cssText='padding:12px 14px 18px;font-size:12px;color:var(--t2)';
     empty.textContent = title==='收藏' ? '尚未收藏任何影音' : '尚無內容';
     wrap.appendChild(empty);
     return wrap;
@@ -261,7 +260,6 @@ function _renderExpandMode(el){
     const backBtn = document.createElement('button');
     backBtn.id='expand-back-btn';
     backBtn.className='hd-btn bg';
-    backBtn.style.cssText='';
     backBtn.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
     backBtn.onclick=()=>_closeExpandMode();
     hdLeft.appendChild(backBtn);
@@ -272,7 +270,6 @@ function _renderExpandMode(el){
       const bulkBtn = document.createElement('button');
       bulkBtn.id='expand-bulk-btn';
       bulkBtn.className='hd-btn red';
-      bulkBtn.style.cssText='';
       // fav 模式：移除收藏圖示（愛心劃叉）；一般模式：垃圾桶
       bulkBtn.innerHTML=isFavMode
         ?'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/><line x1="4" y1="4" x2="20" y2="20"/></svg>'
@@ -1165,7 +1162,7 @@ function openVpPlaylist(){
     if(m.thumbnail){
       const img = document.createElement('img');
       img.src = m.thumbnail;
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+      img.className = 'media-thumb-img audio';
       thumb.appendChild(img);
     } else {
       // 無封面：顯示黑膠紋路圖案
@@ -1215,7 +1212,7 @@ function openVpPlaylist(){
       if(!thumbDiv) return;
       const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
       const img = document.createElement('img');
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+      img.className = 'media-thumb-img audio';
       if(raw instanceof Blob){ img.onload = ()=> URL.revokeObjectURL(src); }
       img.src = src;
       thumbDiv.innerHTML = '';
