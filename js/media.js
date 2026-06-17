@@ -11,6 +11,8 @@ const _M = {
   PAGE:       20,
   allMedia:   [],
   expandMode:   null,
+  expandPage:   0,    // 展開列表分頁（每頁 10 筆）
+  EXPAND_PAGE:  10,
   bulkMode:     false,
   bulkSelected: new Set(),
   loopMode:   false,  // 單曲循環
@@ -240,7 +242,53 @@ function _mkVideoThumbCard(m, isFeatured=false){
 // ── 「更多」展開模式：全螢幕縱向列表 ──────────────────────
 function _openExpandMode(type){
   _M.expandMode = type;
+  _M.expandPage = 0;  // 進入展開模式回到第一頁
   _renderMediaPage();
+}
+
+// 通用分頁列：‹ 頁碼 ›，當前頁高亮，智慧省略中間頁碼
+function _mkPagerBar(current, total, scope){
+  const bar = document.createElement('div');
+  bar.className = 'pager-bar';
+  const go = p => {
+    if(scope==='expand'){
+      _M.expandPage = p;
+      const host = document.getElementById('pg-media');
+      if(host){ _renderExpandMode(host); host.scrollTo({top:0,behavior:'smooth'}); }
+    }
+  };
+  const pages = [];
+  const win = 1;
+  for(let i=0;i<total;i++){
+    if(i===0 || i===total-1 || (i>=current-win && i<=current+win)) pages.push(i);
+    else if(pages[pages.length-1] !== '...') pages.push('...');
+  }
+  const prev = document.createElement('button');
+  prev.className = 'pager-btn pager-nav';
+  prev.textContent = '\u2039';
+  prev.disabled = current===0;
+  prev.onclick = ()=>go(current-1);
+  bar.appendChild(prev);
+  pages.forEach(p=>{
+    if(p==='...'){
+      const dots = document.createElement('span');
+      dots.className = 'pager-dots'; dots.textContent = '\u2026';
+      bar.appendChild(dots);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'pager-btn'+(p===current?' active':'');
+      btn.textContent = p+1;
+      btn.onclick = ()=>go(p);
+      bar.appendChild(btn);
+    }
+  });
+  const next = document.createElement('button');
+  next.className = 'pager-btn pager-nav';
+  next.textContent = '\u203a';
+  next.disabled = current===total-1;
+  next.onclick = ()=>go(current+1);
+  bar.appendChild(next);
+  return bar;
 }
 
 function _renderExpandMode(el){
@@ -332,13 +380,20 @@ function _renderExpandMode(el){
   cntDiv.textContent=`共 ${items.length} 筆`;
   el.appendChild(cntDiv);
 
+  // ── 分頁：每頁 10 筆 ──
+  const totalPages = Math.max(1, Math.ceil(items.length / _M.EXPAND_PAGE));
+  if(_M.expandPage >= totalPages) _M.expandPage = totalPages - 1;
+  if(_M.expandPage < 0) _M.expandPage = 0;
+  const pageStart = _M.expandPage * _M.EXPAND_PAGE;
+  const pageItems = items.slice(pageStart, pageStart + _M.EXPAND_PAGE);
+
   // 列表
   const list=document.createElement('div');
   list.id='expand-list';
 
   if(type==='audio'){
     list.className='media-audio-list';
-    items.forEach((m,i)=>{
+    pageItems.forEach((m,i)=>{
       const row = _mkAudioRow(m,i);
       if(_M.bulkMode){
         const cb=document.createElement('input');
@@ -361,7 +416,7 @@ function _renderExpandMode(el){
     });
   } else {
     list.className='media-video-grid';
-    items.forEach(m=>{
+    pageItems.forEach(m=>{
       const card=_mkVideoCard(m);
       if(_M.bulkMode){
         card.style.position='relative';
@@ -386,6 +441,11 @@ function _renderExpandMode(el){
   el.appendChild(list);
   // 填充縮圖（音頻圓形/影片方形，按需讀取）
   setTimeout(()=>_fillMediaThumbs(list), 0);
+
+  // ── 底部分頁列（多於一頁才顯示）──
+  if(totalPages > 1){
+    el.appendChild(_mkPagerBar(_M.expandPage, totalPages, 'expand'));
+  }
   if(_M.bulkMode){
     const bar=document.createElement('div');
     bar.className='media-bulk-bar';
@@ -1651,6 +1711,7 @@ async function confirmDeleteMedia(id){
 function searchMedia(){
   _M.kw=(document.getElementById('media-si')?.value||'').trim();
   _M.page=0;
+  _M.expandPage=0;  // 搜尋變動回到第一頁
   if(_M.kw){
     // 有關鍵字：進入搜尋展開模式
     _M.expandMode='search';
