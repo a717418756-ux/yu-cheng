@@ -46,10 +46,25 @@ async function _fillMediaThumbs(container){
     if(!id || !el.isConnected) continue;
     const raw = await _getMediaThumb(id);
     if(!raw || !el.isConnected) continue;
+    const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
+    // 影片展開卡 poster：保留播放圖示/時長 badge，只替換無封面佔位、插入背景縮圖
+    if(el.dataset.vthumb){
+      const noPoster = el.querySelector('.mvc-no-poster');
+      if(noPoster) noPoster.remove();
+      // 避免重複插入
+      if(!el.querySelector('img.mvc-thumb-img')){
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.className = 'mvc-thumb-img';
+        if(raw instanceof Blob){ img.onload = ()=> URL.revokeObjectURL(src); }
+        img.src = src;
+        el.insertBefore(img, el.firstChild);
+      }
+      continue;
+    }
+    // 音頻橫向卡 / 其他：原邏輯（清空後放圓形/方形縮圖）
     const isAudio = el.classList.contains('audio');
     const durEl = el.querySelector('.media-hcard-dur');
-    // 相容舊 base64 字串和新 Blob
-    const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
     const img = document.createElement('img');
     img.loading = 'lazy';
     img.className = 'media-thumb-img'+(isAudio?' audio':'');
@@ -354,8 +369,8 @@ function _renderExpandMode(el){
     });
   }
   el.appendChild(list);
-
-  // 批量模式：底部確認列
+  // 填充縮圖（音頻圓形/影片方形，按需讀取）
+  setTimeout(()=>_fillMediaThumbs(list), 0);
   if(_M.bulkMode){
     const bar=document.createElement('div');
     bar.className='media-bulk-bar';
@@ -471,11 +486,8 @@ function _mkVideoCard(m){
   div.className='media-vcard';
   const dur=m.duration?_fmtDur(m.duration):'';
   div.innerHTML=`
-    <div class="mvc-poster" onclick="playVideo(${m.id})">
-      ${m.thumbnail
-        ?`<img src="${m.thumbnail}" loading="lazy"
-            style="width:100%;height:100%;object-fit:cover;border-radius:10px 10px 0 0">`
-        :`<div class="mvc-no-poster">🎬</div>`}
+    <div class="mvc-poster" data-mid="${m.id}" data-vthumb="1" onclick="playVideo(${m.id})">
+      <div class="mvc-no-poster">🎬</div>
       ${dur?`<div class="mvc-dur-badge">${dur}</div>`:''}
       <div class="mvc-play-icon">▶</div>
     </div>
@@ -498,7 +510,7 @@ function _mkAudioRow(m,i){
   div.className='media-arow';
   div.id=`arow-${m.id}`;
   const dur=m.duration?_fmtDur(m.duration):'';
-  const isPlaying=_M.nowId===m.id;
+  const isPlaying=_M.nowId===m.id && _audioEl && !_audioEl.paused;
   div.innerHTML=`
     <div class="mar-vinyl${isPlaying?' spinning':''}" onclick="playAudio(${m.id})">
       ${m.thumbnail
