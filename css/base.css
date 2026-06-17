@@ -1140,47 +1140,18 @@ input:focus, textarea:focus, select:focus{
   font-size:12.5px; line-height:1.6; color:var(--t1);
   white-space:pre-wrap; word-break:break-word;
 }
-.law-mark-ov{
-  position:fixed; inset:0; z-index:600;
-  background:rgba(0,0,0,0.55);
-  display:flex; align-items:center; justify-content:center;
-  padding:20px; animation:law-mark-fade .18s ease;
+.note-mark-row{ display:flex; gap:8px; margin-bottom:8px; }
+.note-mark-dot{
+  width:30px; height:30px; border-radius:50%;
+  border:2px solid transparent; cursor:pointer; padding:0;
+  transition:transform .12s, border-color .12s;
 }
-@keyframes law-mark-fade{ from{opacity:0} to{opacity:1} }
-.law-mark-panel{
-  width:100%; max-width:340px;
-  background:var(--bg1); border:1px solid var(--bd);
-  border-radius:16px; padding:18px;
-  box-shadow:0 12px 40px rgba(0,0,0,0.4);
+.note-mark-dot.sel{ border-color:var(--t0); transform:scale(1.12); box-shadow:0 0 0 2px var(--acc); }
+.note-mark-dot[data-color=""]{ position:relative; }
+.note-mark-dot[data-color=""]::after{
+  content:"✕"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:13px; color:var(--t2);
 }
-.law-mark-title{ font-size:16px; font-weight:700; color:var(--t0); margin-bottom:4px; }
-.law-mark-sub{ font-size:12px; color:var(--t2); margin-bottom:14px; line-height:1.4; }
-.law-mark-colors{ display:flex; gap:8px; margin-bottom:14px; }
-.law-mark-color{
-  flex:1; height:46px; border:2px solid transparent; border-radius:10px;
-  cursor:pointer; display:flex; align-items:center; justify-content:center;
-  font-size:12px; font-weight:600; color:#fff;
-  text-shadow:0 1px 2px rgba(0,0,0,0.3);
-}
-.law-mark-color span{ pointer-events:none; }
-.law-mark-color.sel{ border-color:var(--t0); box-shadow:0 0 0 2px var(--acc); }
-.law-mark-note{
-  width:100%; box-sizing:border-box; padding:10px;
-  background:var(--bg2); border:1px solid var(--bd); border-radius:10px;
-  color:var(--t1); font-size:13px; line-height:1.6; resize:vertical;
-  margin-bottom:14px; font-family:inherit;
-}
-.law-mark-acts{ display:flex; gap:10px; }
-.law-mark-cancel, .law-mark-save{
-  flex:1; padding:11px; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer;
-}
-.law-mark-cancel{ background:var(--bg3); border:1px solid var(--bd); color:var(--t1); }
-.law-mark-save{ background:var(--acc); border:none; color:#fff; }
-/* eink */
-[data-theme="eink"] .law-mark-ov{ animation:none; background:rgba(0,0,0,0.3); }
-[data-theme="eink"] .law-mark-panel{ background:#fff; border:2px solid #000; }
-[data-theme="eink"] .law-mark-title,[data-theme="eink"] .law-mark-sub{ color:#000; }
-[data-theme="eink"] .law-mark-color.sel{ border-color:#000; box-shadow:0 0 0 2px #000; }
-[data-theme="eink"] .law-mark-save{ background:#000; color:#fff; }
 [data-theme="eink"] .law-note-box{ background:#f0f0f0; border-left-color:#000; color:#000; }
-@media (prefers-reduced-motion: reduce){ .law-mark-ov{ animation:none !important; } }
+[data-theme="eink"] .note-mark-dot.sel{ border-color:#000; box-shadow:0 0 0 2px #000; }
+
