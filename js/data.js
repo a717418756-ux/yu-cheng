@@ -409,10 +409,9 @@ async function openYearGroup(year){  try{
 
   // 返回按鈕
   const backDiv=document.createElement('div');
-  backDiv.style.cssText='padding:4px 0 8px;';
+  backDiv.className='list-back-row';
   const backBtn=document.createElement('button');
-  backBtn.className='btn bg';
-  backBtn.style.cssText='font-size:13px;padding:6px 14px;display:inline-flex;align-items:center;gap:6px';
+  backBtn.className='btn bg list-back-btn';
   backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回列表';
   backBtn.onclick=()=>{ _qGroupYear=''; _qGroupSubject=''; renderList(); };
   backDiv.appendChild(backBtn);
@@ -479,10 +478,9 @@ async function openQGroup(year, subject){  try{
   el.innerHTML='';
   // 返回按鈕區
   const backDiv=document.createElement('div');
-  backDiv.style.cssText='padding:4px 0 8px;';
+  backDiv.className='list-back-row';
   const backBtn=document.createElement('button');
-  backBtn.className='btn bg';
-  backBtn.style.cssText='font-size:13px;padding:6px 14px;display:inline-flex;align-items:center;gap:6px';
+  backBtn.className='btn bg list-back-btn';
   backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回年度';
   backBtn.onclick=()=>openYearGroup(year);
   backDiv.appendChild(backBtn);
@@ -794,7 +792,6 @@ function _applyListSelUI(){
       if(!card.querySelector('.list-sel-chk')){
         const chk = document.createElement('span');
         chk.className='list-sel-chk';
-        chk.style.cssText='font-size:18px;color:var(--acc);margin-right:6px;flex-shrink:0';
         chk.textContent='☐';
         card.querySelector('.qch')?.prepend(chk);
       }
@@ -1122,12 +1119,11 @@ async function renderDB(){  try{
       const isImg = (l.content||'').startsWith('data:');
       const preview = isImg ? '🖼 圖片內容' : esc((l.content||'').slice(0,80));
       const div=document.createElement('div');
-      div.className='card';
-      div.style.cssText='margin:5px 12px;cursor:pointer';
+      div.className='card law-search-card';
       div.innerHTML=
-        '<div style="font-size:11px;color:var(--t2);margin-bottom:4px">'+esc(l.lawName||'')+'</div>'+
-        '<div style="font-size:13px;font-weight:700;color:var(--acc);margin-bottom:4px">'+esc(l.article||'')+(l.title?' <span style="font-weight:400;color:var(--t2)">'+esc(l.title)+'</span>':'')+' </div>'+
-        '<div style="font-size:13px;color:var(--t1);line-height:1.7">'+preview+'</div>';
+        '<div class="law-search-lawname">'+esc(l.lawName||'')+'</div>'+
+        '<div class="law-search-article">'+esc(l.article||'')+(l.title?' <span class="law-search-title">'+esc(l.title)+'</span>':'')+' </div>'+
+        '<div class="law-search-preview">'+preview+'</div>';
       div.onclick=()=>openLawGroup(l.lawName);
       el.appendChild(div);
     });
@@ -1778,24 +1774,24 @@ function openImgViewer(src){
   // ── 全螢幕遮罩 ──
   const ov=document.createElement('div');
   ov.id='img-viewer';
-  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column;overflow:hidden';
+  ov.className='img-viewer-ov';
 
   // ── 頂部工具列 ──
   const bar=document.createElement('div');
-  bar.style.cssText='display:flex;align-items:center;justify-content:flex-end;padding:0 12px;height:44px;background:rgba(0,0,0,0.75);flex-shrink:0';
+  bar.className='img-viewer-bar';
   const closeBtn=document.createElement('button');
   closeBtn.textContent='✕';
-  closeBtn.style.cssText='background:rgba(255,255,255,0.18);color:#fff;border:none;border-radius:6px;width:40px;height:32px;font-size:18px;cursor:pointer';
+  closeBtn.className='img-viewer-close';
   closeBtn.onclick=()=>ov.remove();
   bar.appendChild(closeBtn);
 
   // ── 圖片容器 ──
   const wrap=document.createElement('div');
-  wrap.style.cssText='flex:1;overflow:hidden;position:relative;touch-action:none;cursor:grab';
+  wrap.className='img-viewer-wrap';
 
   const img=document.createElement('img');
   img.src=src;
-  img.style.cssText='position:absolute;top:0;left:0;width:100%;height:auto;transform-origin:0 0;user-select:none;-webkit-user-drag:none';
+  img.className='img-viewer-img';
   img.draggable=false;
 
   // ── 狀態 ──
