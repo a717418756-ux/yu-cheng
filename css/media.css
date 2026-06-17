@@ -1318,3 +1318,8 @@
 .mvc-poster{ position:relative; }
 .mvc-poster .mvc-dur-badge,
 .mvc-poster .mvc-play-icon{ position:relative; z-index:1; }
+
+/* ── 音頻列唱盤縮圖（v2.11.44）──────────────────────── */
+.mar-thumb-img{
+  width:100%; height:100%; object-fit:cover; border-radius:50%; display:block;
+}
