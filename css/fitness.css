@@ -1,0 +1,100 @@
+/* ════════════════════════════════════════════════════════════
+   【運動健康庫】CSS - 專業健康儀表板
+   ════════════════════════════════════════════════════════════ */
+
+.fit-date{
+  font-size:13px; color:var(--t2); margin-bottom:14px; font-weight:600;
+}
+
+/* 主數據卡 2×2 網格 */
+.fit-grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;
+}
+.fit-card{
+  background:var(--bg2); border-radius:16px; padding:16px 14px;
+  border:1px solid rgba(255,255,255,0.06);
+  position:relative; overflow:hidden;
+}
+.fit-card::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+}
+.fit-card-move::before{   background:linear-gradient(90deg,#4caf7d,#6ee0a0); }
+.fit-card-burn::before{   background:linear-gradient(90deg,#e0623c,#ff8a5c); }
+.fit-card-intake::before{ background:linear-gradient(90deg,#e0a020,#ffc850); }
+.fit-card-steps::before{  background:linear-gradient(90deg,#3d7ec8,#6ea8fe); }
+.fit-card-ico{ font-size:22px; margin-bottom:8px; }
+.fit-card-val{
+  font-size:26px; font-weight:800; color:var(--t0); line-height:1.1;
+  font-variant-numeric:tabular-nums;
+}
+.fit-card-unit{ font-size:12px; font-weight:600; color:var(--t2); margin-left:3px; }
+.fit-card-lab{ font-size:12px; color:var(--t2); margin-top:4px; }
+
+/* 熱量結餘 */
+.fit-balance{
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--bg2); border-radius:14px; padding:14px 16px;
+  border:1px solid rgba(255,255,255,0.06);
+}
+.fit-balance-lab{ font-size:13px; color:var(--t1); font-weight:600; }
+.fit-balance-val{ font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
+.fit-balance-hint{
+  font-size:11px; color:var(--t2); margin:6px 2px 18px; text-align:right;
+}
+
+/* 資料來源 */
+.fit-source{
+  background:rgba(110,168,254,0.06);
+  border:1px solid rgba(110,168,254,0.15);
+  border-radius:14px; padding:14px 16px; margin-bottom:20px;
+}
+.fit-source-row{
+  display:flex; align-items:center; justify-content:space-between;
+  font-size:13px; color:var(--t1); font-weight:600;
+}
+.fit-health-btn{
+  background:var(--acc); color:#fff; border:none; border-radius:8px;
+  padding:7px 14px; font-size:12px; font-weight:700; cursor:pointer;
+  -webkit-tap-highlight-color:transparent; transition:transform .1s;
+}
+.fit-health-btn:active{ transform:scale(0.94); }
+.fit-source-note{
+  font-size:11px; color:var(--t2); margin-top:8px; line-height:1.6;
+}
+
+/* 手動記錄 */
+.fit-edit-title{
+  font-size:13px; font-weight:700; color:var(--t0); margin-bottom:10px;
+}
+.fit-edit-grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;
+}
+.fit-edit-item{
+  display:flex; flex-direction:column; gap:5px;
+}
+.fit-edit-item span{ font-size:11px; color:var(--t2); }
+.fit-edit-item input{
+  background:var(--bg2); border:1px solid var(--bd); border-radius:9px;
+  padding:11px 12px; color:var(--t0); font-size:15px;
+  font-variant-numeric:tabular-nums; -webkit-appearance:none;
+}
+.fit-edit-item input:focus{ border-color:var(--acc); outline:none; }
+.fit-save-btn{
+  width:100%; padding:13px; background:var(--acc); color:#fff;
+  border:none; border-radius:11px; font-size:14px; font-weight:700;
+  cursor:pointer; -webkit-tap-highlight-color:transparent; transition:transform .1s;
+}
+.fit-save-btn:active{ transform:scale(0.98); }
+
+/* eink 模式：去漸層、純黑白高對比 */
+[data-theme="eink"] .fit-card,
+[data-theme="eink"] .fit-balance,
+[data-theme="eink"] .fit-edit-item input{ background:#fff; border-color:#999; }
+[data-theme="eink"] .fit-card::before{ background:#000 !important; }
+[data-theme="eink"] .fit-card-val,
+[data-theme="eink"] .fit-edit-title{ color:#000; }
+[data-theme="eink"] .fit-source{ background:#f0f0f0; border-color:#999; }
+[data-theme="eink"] .fit-health-btn,
+[data-theme="eink"] .fit-save-btn{ background:#000; color:#fff; transition:none; }
+[data-theme="eink"] .fit-health-btn:active,
+[data-theme="eink"] .fit-save-btn:active{ transform:none; }
