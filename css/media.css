@@ -1245,3 +1245,13 @@
   -webkit-box-orient:vertical;
 }
 .vp-pl-name.active{ font-weight:700; color:#ffffff; }
+
+/* ── 批量選取模式：列點擊切換 + 選中高亮（v2.11.38）──── */
+.bulk-selecting{ cursor:pointer; }
+.bulk-selecting .mar-vinyl,
+.bulk-selecting .mar-info,
+.bulk-selecting .mvc-poster{ pointer-events:none; }  /* 批量模式停用內部播放點擊區 */
+.media-arow.bulk-selected{ background:rgba(110,168,254,0.14); }
+.media-vcard.bulk-selected{ outline:2px solid var(--acc); outline-offset:-2px; }
+[data-theme="eink"] .media-arow.bulk-selected{ background:#e0e0e0; }
+[data-theme="eink"] .media-vcard.bulk-selected{ outline-color:#000; }
