@@ -1155,3 +1155,21 @@ input:focus, textarea:focus, select:focus{
 [data-theme="eink"] .law-note-box{ background:#f0f0f0; border-left-color:#000; color:#000; }
 [data-theme="eink"] .note-mark-dot.sel{ border-color:#000; box-shadow:0 0 0 2px #000; }
 
+
+/* ── 法條卡片（v2.11.29：inline style 抽取為 class）──────── */
+.law-art-card{
+  margin-bottom:12px; padding:12px;
+  border-radius:8px; border-left:3px solid var(--pur2);
+  background:var(--bg2);
+  /* 註：有標記時 background 與 border-left-color 由 JS 設動態顏色覆蓋 */
+}
+.law-art-head{
+  font-size:14px; font-weight:700; color:var(--acc); margin-bottom:6px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.law-art-acts{ display:flex; gap:6px; }
+.law-edit-btn{ background:none; border:none; color:var(--t2); font-size:12px; cursor:pointer; }
+.law-del-btn{ background:none; border:none; color:var(--red); font-size:12px; cursor:pointer; }
+.law-art-body{ font-size:14px; line-height:1.85; color:var(--t1); }
+.law-art-rel-title{ margin-top:9px; font-size:11px; color:var(--t2); }
+.law-rel-chip{ font-size:11px; margin:2px; }
