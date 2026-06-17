@@ -754,7 +754,14 @@
       <div id="mc-opts" class="fg"><label class="fl">選項（點 ✓ 標記正確答案）</label><div id="opts-c"></div></div>
       <div id="es-area" class="fg hide"><label class="fl">參考答案 / 解析</label><textarea id="f-es" rows="4" placeholder="參考解析..."></textarea></div>
       <div class="fg"><label class="fl">關鍵概念（逗號分隔）</label><input id="f-kw" placeholder="比例原則,臨檢"></div>
-      <div class="fg"><label class="fl">備註</label><textarea id="f-note" rows="2" placeholder="個人筆記..."></textarea></div>
+      <div class="fg"><label class="fl">備註 / 標記</label>
+        <div class="note-mark-row" id="f-mark-row">
+          <button type="button" class="note-mark-dot" data-color=""       style="background:var(--bg3)" title="無標記"></button>
+          <button type="button" class="note-mark-dot" data-color="yellow" style="background:#d4a438" title="重點"></button>
+          <button type="button" class="note-mark-dot" data-color="green"  style="background:#4caf7d" title="已懂"></button>
+          <button type="button" class="note-mark-dot" data-color="red"    style="background:#e05c57" title="易錯"></button>
+        </div>
+        <textarea id="f-note" rows="2" placeholder="個人筆記..."></textarea></div>
       <div class="fg" style="display:flex;align-items:center;gap:10px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="f-is-number" style="width:18px;height:18px"><span class="fl" style="margin:0">🔢 數字魔鬼題（含重要數字/期限）</span></label></div>
       <div class="fg"><label class="fl">關聯法條（如：警職法§6）</label><input id="f-laws" placeholder="警職法§6"></div>
       <div class="fg hide" id="must-kw-wrap"><label class="fl">申論必寫關鍵概念（逗號分隔）</label><input id="f-must-kw" placeholder="比例原則,正當法律程序,釋字535號"></div>
@@ -802,7 +809,14 @@
       <div class="fg"><label class="fl">關鍵概念</label><input id="l-kw" placeholder="臨檢,比例原則"></div>
       <div class="fg"><label class="fl">關聯法條（母法/子法）</label><input id="l-related" placeholder="憲法§108,警察法施行細則"></div>
       <div class="fg"><label class="fl">來源</label><input id="l-src" placeholder="全國法規資料庫"></div>
-      <div class="fg"><label class="fl">備註</label><textarea id="l-note" rows="2" placeholder="個人標記、補充說明..."></textarea></div>
+      <div class="fg"><label class="fl">備註 / 標記</label>
+        <div class="note-mark-row" id="l-mark-row">
+          <button type="button" class="note-mark-dot" data-color=""       style="background:var(--bg3)" title="無標記"></button>
+          <button type="button" class="note-mark-dot" data-color="yellow" style="background:#d4a438" title="重點"></button>
+          <button type="button" class="note-mark-dot" data-color="green"  style="background:#4caf7d" title="已懂"></button>
+          <button type="button" class="note-mark-dot" data-color="red"    style="background:#e05c57" title="易錯"></button>
+        </div>
+        <textarea id="l-note" rows="2" placeholder="個人標記、補充說明..."></textarea></div>
       <div class="fg" style="display:flex;gap:7px">
         <button class="btn bg" style="flex:1;padding:12px" onclick="closeLawSh()">取消</button>
         <button class="btn blue" style="flex:2;padding:12px;font-size:15px;background:rgba(37,98,200,0.85);color:#fff;border:1px solid rgba(110,168,254,0.45)" onclick="saveLaw()">儲存資料</button>
