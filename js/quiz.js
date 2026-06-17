@@ -76,7 +76,7 @@ function renderQCard(){
   document.getElementById('qres').className = 'qres';
   document.getElementById('qres').textContent = '';
   const noteEl = document.getElementById('qnote');
-  noteEl.style.display = 'none'; noteEl.textContent = '';
+  noteEl.style.display = 'none'; noteEl.textContent = ''; noteEl.style.borderLeft = '';
 
   // 收藏
   const star = document.getElementById('qstar');
@@ -196,9 +196,13 @@ async function ansQ(sel){  try{
   if(hesitant) msg += ' ⚠ 作答超過40秒，列入猶豫題';
   resEl.textContent = msg;
 
-  if(qu.note){
+  if(qu.note || qu.hlColor){
     const noteEl = document.getElementById('qnote');
-    noteEl.style.display = 'block'; noteEl.textContent = '📝 '+qu.note;
+    const hlMap={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'};
+    const hlC=qu.hlColor&&hlMap[qu.hlColor]?hlMap[qu.hlColor]:'';
+    noteEl.style.display = 'block';
+    noteEl.style.borderLeft = hlC ? ('3px solid '+hlC) : '';
+    noteEl.textContent = qu.note ? ('📝 '+qu.note) : '🖍 已標記';
   }
   document.getElementById('qnxt').classList.remove('hide');
 
@@ -398,7 +402,7 @@ async function ansQMulti(selected, correctStr, qu){  try{
   if(!correct && selected) msg += '（你選：'+selected.split('').join('、')+'）';
   if(hesitant) msg += ' ⚠ 超過40秒';
   resEl.textContent = msg;
-  if(qu.note){ const noteEl=document.getElementById('qnote'); noteEl.style.display='block'; noteEl.textContent='📝 '+qu.note; }
+  if(qu.note || qu.hlColor){ const noteEl=document.getElementById('qnote'); const hlMap={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'}; const hlC=qu.hlColor&&hlMap[qu.hlColor]?hlMap[qu.hlColor]:''; noteEl.style.display='block'; noteEl.style.borderLeft=hlC?('3px solid '+hlC):''; noteEl.textContent=qu.note?('📝 '+qu.note):'🖍 已標記'; }
   document.getElementById('qnxt').classList.remove('hide');
 
   // 隱藏確認按鈕
