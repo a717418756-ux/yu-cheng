@@ -1309,3 +1309,12 @@
 .media-detail-thumb.vinyl .mar-vinyl-inner{ width:100%; height:100%; }
 [data-theme="eink"] .media-detail-thumb{ background:#e8e8e8; }
 [data-theme="eink"] .media-detail-thumb.placeholder{ color:#000; }
+
+/* ── 影片展開卡縮圖（v2.11.42）：墊在 poster 底層 ──────── */
+.mvc-thumb-img{
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:cover; border-radius:10px 10px 0 0; display:block; z-index:0;
+}
+.mvc-poster{ position:relative; }
+.mvc-poster .mvc-dur-badge,
+.mvc-poster .mvc-play-icon{ position:relative; z-index:1; }
