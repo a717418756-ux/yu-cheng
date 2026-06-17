@@ -73,6 +73,24 @@ _db.version(4).stores({
   englishVocab:     '++id, word, materialId, reviewLevel, nextReview, createdAt'
 });
 
+// version(5)：運動健康庫（healthLogs 以日期字串為主鍵，每日一筆）
+_db.version(5).stores({
+  questions:   '++id, subject, createdAt, nextReview, reviewLevel, difficultyScore, type, starred',
+  laws:        '++id, lawName, category, articleNumber',
+  attempts:    '++id, qid, date, responseTime',
+  settings:    'key',
+  countdowns:  '++id',
+  refbooks:    '++id, title, category, fileType, lastRead, createdAt',
+  learnmedia:  '++id, title, mediaType, subject, lastPlay, createdAt',
+  ebooks:      '++id, title, author, category, fileType, lastRead, createdAt, favorite',
+  leisuremedia:'++id, title, type, category, lastPlay, createdAt, favorite',
+  usageLogs:   '++id, [date+zone], date, zone',
+  englishMaterials: '++id, title, sourceType, createdAt, lastRead, favorite',
+  englishVocab:     '++id, word, materialId, reviewLevel, nextReview, createdAt',
+  // 健康數據：以日期 YYYY-MM-DD 為主鍵，每日一筆（運動時長/消耗/攝取/步數）
+  healthLogs:  'id, updatedAt'
+});
+
 // ── 遺忘曲線間隔 ─────────────────────────────────────────────
 const REVIEW_INTERVALS = [1, 3, 7, 14, 30, 60, 180];
 
@@ -306,5 +324,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '3.1.1';     // 版本號改為 3.1.1
+const APP_VERSION  = '3.2.0';     // 學習區改成長區+英語按鈕統一zpanel-main樣式;新增運動健康庫(健康儀表板,手動記錄+預留三星健康Capacitor接入);首頁每日任務(可編輯/勾選/進度條);DB升級v5加healthLogs
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

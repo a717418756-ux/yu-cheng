@@ -227,6 +227,7 @@ function goPage(pg, btn){
     books:renderBooks,
     media:renderMedia,
     english:renderEnglish,
+    fitness:renderFitness,
   })[pg]?.();
 }
 

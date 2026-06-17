@@ -77,6 +77,7 @@ async function renderHome(){  try{
 
   // 熱力圖
   renderHeatmap();
+  renderDtask().catch(()=>{});
 
   // 考試倒數
   renderCountdown();
@@ -196,7 +197,7 @@ async function openHeatmapOv(dateStr, label){
   const ZONE_CFG = {
     exam:    { label:'考試區', color:'#6ea8fe' },
     leisure: { label:'休閒區', color:'#ffb340' },
-    study:   { label:'學習區', color:'#4caf7d' },
+    study:   { label:'成長區', color:'#4caf7d' },
   };
 
   if(!logs.length){
