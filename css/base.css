@@ -1198,3 +1198,39 @@ input:focus, textarea:focus, select:focus{
 .bulk-sel-acts .btn.bg.dim{ color:var(--t2); }
 [data-theme="eink"] .bulk-sel-panel{ background:#fff; }
 [data-theme="eink"] .bulk-sel-title{ color:#000; }
+
+/* ── 圖片檢視器（v2.11.34：inline 抽取，transform 仍動態）── */
+.img-viewer-ov{
+  position:fixed; inset:0; z-index:9999;
+  background:#000; display:flex; flex-direction:column; overflow:hidden;
+}
+.img-viewer-bar{
+  display:flex; align-items:center; justify-content:flex-end;
+  padding:0 12px; height:44px; background:rgba(0,0,0,0.75); flex-shrink:0;
+}
+.img-viewer-close{
+  background:rgba(255,255,255,0.18); color:#fff; border:none; border-radius:6px;
+  width:40px; height:32px; font-size:18px; cursor:pointer;
+}
+.img-viewer-wrap{
+  flex:1; overflow:hidden; position:relative; touch-action:none; cursor:grab;
+}
+.img-viewer-img{
+  position:absolute; top:0; left:0; width:100%; height:auto;
+  transform-origin:0 0; user-select:none; -webkit-user-drag:none;
+}
+
+/* ── 列表返回按鈕（v2.11.35：inline 抽取，兩處共用）────── */
+.list-back-row{ padding:4px 0 8px; }
+.list-back-btn{
+  font-size:13px; padding:6px 14px;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.list-sel-chk{ font-size:18px; color:var(--acc); margin-right:6px; flex-shrink:0; }
+
+/* ── 法條搜尋結果卡片（v2.11.35）──────────────────────── */
+.law-search-card{ margin:5px 12px; cursor:pointer; }
+.law-search-lawname{ font-size:11px; color:var(--t2); margin-bottom:4px; }
+.law-search-article{ font-size:13px; font-weight:700; color:var(--acc); margin-bottom:4px; }
+.law-search-article .law-search-title{ font-weight:400; color:var(--t2); }
+.law-search-preview{ font-size:13px; color:var(--t1); line-height:1.7; }
