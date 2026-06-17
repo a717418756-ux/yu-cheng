@@ -71,7 +71,9 @@ async function renderFitness(){
     <div class="fit-source">
       <div class="fit-source-row">
         <span>📲 資料來源</span>
-        <button class="fit-health-btn" onclick="openHealthApp()">開啟三星健康</button>
+        <button class="fit-health-btn" onclick="openHealthApp()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>開啟三星健康
+        </button>
       </div>
       <div class="fit-source-note">
         目前數據為手動記錄。以 Capacitor 打包為 App 後，可自動同步三星健康（Health Connect）的運動與熱量資料。
@@ -133,18 +135,40 @@ async function saveFitData(){
   }
 }
 
-// 開啟三星健康 App（Capacitor 包殼後才能用原生開啟；網頁版嘗試 deep link）
-function openHealthApp(){
-  // 三星健康 package: com.sec.android.app.shealth
-  // Capacitor 環境：用 App 外掛或 intent 開啟；網頁版用 intent URL 嘗試
-  try{
-    // Android intent：嘗試開啟三星健康
-    window.location.href = 'intent://#Intent;package=com.sec.android.app.shealth;end';
-  }catch(e){
-    toast('無法開啟健康 App（需在 App 環境中使用）');
+// 開啟三星健康 App
+// Capacitor 包殼後：用原生 AppLauncher 外掛直接開啟（最佳）
+// 純網頁環境：嘗試 deep link，但不導向商店（避免跑到 Play 商店）
+async function openHealthApp(){
+  const pkg = 'com.sec.android.app.shealth';
+  // 1) Capacitor 環境：用原生外掛開啟（打包後可用）
+  if(window.Capacitor?.isNativePlatform?.()){
+    try{
+      // 需安裝 @capacitor/app-launcher 外掛
+      const launcher = window.Capacitor.Plugins?.AppLauncher;
+      if(launcher){
+        const { value } = await launcher.canOpenUrl({ url: pkg });
+        if(value){
+          await launcher.openUrl({ url: pkg });
+          return;
+        }
+      }
+    }catch(e){ /* 落到下方提示 */ }
+    toast('找不到三星健康，請確認已安裝');
+    return;
   }
-  // 提示：若沒反應，多半是在純網頁環境，需打包成 App 後才能開啟
+  // 2) 純網頁環境：用 intent 但不帶 Play 商店 fallback
+  // （S Browser/Chrome 上若已裝 app 會直接開，未裝則無動作，不會跳商店）
+  try{
+    const intent = `intent://com.sec.android.app.shealth/#Intent;scheme=samsunghealth;package=${pkg};end`;
+    const a = document.createElement('a');
+    a.href = intent;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>a.remove(), 100);
+  }catch(e){}
+  // 提示（網頁環境本就難直接開啟其他 app）
   setTimeout(()=>{
-    toast('若無反應，需以 App 形式安裝後才能開啟三星健康');
-  }, 800);
+    toast('網頁版較難直接開啟；打包成 App 後可一鍵開啟三星健康');
+  }, 600);
 }
