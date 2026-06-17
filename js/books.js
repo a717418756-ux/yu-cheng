@@ -26,6 +26,7 @@ const _B = {
 
 // epub 章節目錄是否已載入（每本書重置）
 let _epubTocLoaded = false;
+let _epubChapterMap = null;  // {href(無錨點): label} 供進度顯示章節名
 
 // ── 尺寸換算 ─────────────────────────────────────────────────
 // 1mm → px（基於手機螢幕合理顯示大小）
@@ -1319,6 +1320,10 @@ async function _initEpubReader(url, savedCfi, bookId){
     const _isEink = document.documentElement.getAttribute('data-theme') === 'eink';
     rendition.themes.select(_isEink ? 'eink' : 'dark');
 
+    // 建立章節對照表（供進度列顯示章節名，背景進行不阻塞）
+    _epubChapterMap = null;
+    _buildEpubChapterMap(book);
+
     // 註冊 relocated（加旗標：還原位置期間不存檔，避免覆蓋 savedCfi）
     let _restoringPos = true;
     rendition.on('relocated', loc=>{
@@ -1390,18 +1395,54 @@ function _saveEpubCfiThrottled(bookId, cfi){
   }, 1500);
 }
 
+// 建立章節對照表（href→label），供進度列顯示目前章節名
+async function _buildEpubChapterMap(book){
+  try{
+    const nav = await book.loaded.navigation;
+    const toc = nav?.toc || [];
+    const map = {};
+    const walk = items => items.forEach(it=>{
+      if(it.href){
+        const key = it.href.split('#')[0];  // 去掉錨點，只留檔名
+        if(!map[key]) map[key] = it.label?.trim() || '';
+      }
+      if(it.subitems?.length) walk(it.subitems);
+    });
+    walk(toc);
+    _epubChapterMap = map;
+  }catch(e){ _epubChapterMap = {}; }
+}
+
+// 由目前位置的 href 找出章節名
+function _chapterNameFromLoc(loc){
+  if(!_epubChapterMap || !loc?.start?.href) return '';
+  const href = loc.start.href.split('#')[0];
+  // 直接命中
+  if(_epubChapterMap[href]) return _epubChapterMap[href];
+  // 部分比對（href 結尾相符，處理路徑前綴差異）
+  for(const key in _epubChapterMap){
+    if(href.endsWith(key) || key.endsWith(href)) return _epubChapterMap[key];
+  }
+  return '';
+}
+
 function _updateEpubProgress(book, loc){
   if(!loc) return;
   try{
+    const chapter = _chapterNameFromLoc(loc);
     const result = book.locations.percentageFromCfi(loc.start.cfi);
     const applyPct = pct => {
       if(typeof pct !== 'number' || isNaN(pct)) return;
       const fill=document.getElementById('epub-progress-fill');
       if(fill) fill.style.width=(pct*100).toFixed(1)+'%';
       const info=document.getElementById('epub-page-info');
-      if(info){ info.textContent=`${Math.round(pct*100)}%`; info.classList.remove('hide'); }
+      if(info){
+        const pctTxt = `${Math.round(pct*100)}%`;
+        // 有章節名則顯示「章節 · X%」，否則只顯示 X%
+        info.textContent = chapter ? `${chapter} · ${pctTxt}` : pctTxt;
+        info.classList.remove('hide');
+      }
     };
-    // 兼容同步和非同步兩種返回
     if(result && typeof result.then === 'function') result.then(applyPct).catch(()=>{});
     else applyPct(result);
   }catch(e){}

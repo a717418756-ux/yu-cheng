@@ -42,6 +42,7 @@ function _splitSentences(text){
 async function renderEnglish(){
   const el = document.getElementById('eng-list');
   if(!el) return;
+  showSkeleton('eng-list', 4);  // 載入前先顯示骨架屏
   let mats = [];
   try{ mats = await da('englishMaterials'); }catch(e){ logError('renderEnglish',e); }
   mats.sort((a,b)=>(b.lastRead||b.createdAt||0)-(a.lastRead||a.createdAt||0));
@@ -904,6 +905,7 @@ function _showPAResult(idx, original, result){
       </div>
     </div>
     <div class="eng-pa-words">${wordsHtml || '<span style="color:var(--t2)">（未偵測到語音）</span>'}</div>
+    <div id="eng-pa-hist-${idx}" class="eng-pa-hist"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
       <span style="font-size:10px;color:var(--t2)">辨識：${esc(nb?.Display || nb?.Lexical || '—')}</span>
       <button class="eng-pa-retry" onclick="retryRepeat(${idx})" title="重試這句">🔄 重試</button>
@@ -911,6 +913,51 @@ function _showPAResult(idx, original, result){
 
   _insertAfterSent(body, idx, div);
   div.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  // 記錄練習歷史並顯示趨勢（不阻塞畫面）
+  _recordPAHistory(idx, totalScore);
+}
+
+// 記錄某句的跟讀練習歷史（存進 material），並更新趨勢顯示
+async function _recordPAHistory(idx, score){
+  try{
+    if(!_curMaterial?.id) return;
+    const m = await dg('englishMaterials', _curMaterial.id);
+    if(!m) return;
+    if(!m.paHistory) m.paHistory = {};
+    const key = String(idx);
+    if(!m.paHistory[key]) m.paHistory[key] = [];
+    m.paHistory[key].push({ s: score, t: Date.now() });
+    // 每句最多保留最近 20 筆，避免無限增長
+    if(m.paHistory[key].length > 20) m.paHistory[key] = m.paHistory[key].slice(-20);
+    await dp('englishMaterials', m);
+    _renderPAHistory(idx, m.paHistory[key]);
+  }catch(e){ logError('_recordPAHistory', e); }
+}
+
+// 顯示某句的練習次數、最佳分、最近趨勢
+function _renderPAHistory(idx, hist){
+  const el = document.getElementById(`eng-pa-hist-${idx}`);
+  if(!el || !hist?.length) return;
+  const times = hist.length;
+  const best = Math.max(...hist.map(h=>h.s));
+  // 最近 8 次的迷你趨勢（▁▂▃▄▅▆▇█ 依分數高低）
+  const bars = '▁▂▃▄▅▆▇█';
+  const recent = hist.slice(-8);
+  const spark = recent.map(h=>{
+    const lv = Math.min(7, Math.max(0, Math.round(h.s/100*7)));
+    return bars[lv];
+  }).join('');
+  // 與前一次比較的箭頭
+  let trend = '';
+  if(hist.length >= 2){
+    const diff = hist[hist.length-1].s - hist[hist.length-2].s;
+    trend = diff > 0 ? `<span class="eng-pa-up">▲${diff}</span>`
+          : diff < 0 ? `<span class="eng-pa-down">▼${Math.abs(diff)}</span>`
+          : `<span class="eng-pa-flat">＝</span>`;
+  }
+  el.innerHTML = `<span class="eng-pa-hist-spark">${spark}</span>`
+    + `<span class="eng-pa-hist-stat">練習 ${times} 次 · 最佳 ${best}</span>`
+    + trend;
 }
 
 

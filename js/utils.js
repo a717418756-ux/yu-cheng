@@ -494,3 +494,22 @@ function haptic(type='light'){
     navigator.vibrate(patterns[type] ?? 10);
   }catch(_){}
 }
+
+// ── 骨架屏載入（v2.11.45）：在資料載入前顯示佔位，減少空白感 ──
+function showSkeleton(containerId, rows){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  rows = rows || 4;
+  let html = '<div class="skeleton-wrap">';
+  for(let i=0;i<rows;i++){
+    html += `<div class="skeleton-row">
+      <div class="skeleton-thumb"></div>
+      <div class="skeleton-lines">
+        <div class="skeleton-line w70"></div>
+        <div class="skeleton-line w40"></div>
+      </div>
+    </div>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}

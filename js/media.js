@@ -32,6 +32,7 @@ let _sleepTimer = null;   // 睡眠定時器
 // ════════════════════════════════════════════════════════════
 async function renderMedia(){
   try{
+    showSkeleton('media-list', 5);  // 載入前先顯示骨架屏
     _M.page     = 0;
     _M.allMedia = await _getMediaMetaList();
     _renderMediaPage();
@@ -912,7 +913,7 @@ async function _applyCoverCrop(mediaId, dataUrl){
   const x = parseFloat(document.getElementById('crop-x')?.value||0);
   const y = parseFloat(document.getElementById('crop-y')?.value||0);
 
-  const SIZE = 300; // 輸出尺寸
+  const SIZE = 240; // 輸出尺寸（詳情頁顯示 120px 的 2x，清晰又省空間）
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = SIZE;
   const ctx = canvas.getContext('2d');
@@ -1543,7 +1544,7 @@ function _compressMediaThumb(file){
       const img=new Image();
       img.onload=()=>{
         const canvas=document.createElement('canvas');
-        const maxW=180,maxH=180;
+        const maxW=240,maxH=240;  // 詳情頁顯示 120px，存 2x 供高解析螢幕清晰
         let w=img.width,h=img.height;
         const scale=Math.min(maxW/w,maxH/h,1);
         canvas.width=Math.round(w*scale);
