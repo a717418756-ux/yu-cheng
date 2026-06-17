@@ -1280,14 +1280,15 @@ input:focus, textarea:focus, select:focus{
 
 /* ════ 【每日任務】首頁 - 商業高級感 ════════════════════════ */
 .dtask-wrap{
-  margin:14px 14px 0; padding:16px;
-  background:var(--bg2); border-radius:16px;
-  border:1px solid rgba(255,255,255,0.06);
+  margin:10px 14px 6px; padding:12px 14px 14px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:14px;
 }
 .dtask-header{
-  display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;
 }
-.dtask-title{ font-size:15px; font-weight:700; color:var(--t0); }
+.dtask-title{ font-size:12px; font-weight:700; color:var(--t1); letter-spacing:.04em; }
 .dtask-edit-btn{
   background:none; border:none; color:var(--acc); font-size:13px;
   font-weight:600; cursor:pointer; padding:4px 8px; -webkit-tap-highlight-color:transparent;
