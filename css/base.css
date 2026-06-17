@@ -1247,3 +1247,33 @@ input:focus, textarea:focus, select:focus{
 .log-viewer-header{ display:flex; align-items:center; gap:8px; padding:10px 14px; background:#0d0d0d; border-bottom:1px solid #333; flex-shrink:0; }
 .log-viewer-list{ flex:1; overflow-y:auto; padding:8px 0; font-family:monospace; font-size:12px; }
 .log-viewer-row{ padding:6px 14px; border-bottom:1px solid #1a1a1a; }
+
+/* ── 骨架屏載入（v2.11.45）──────────────────────────── */
+.skeleton-wrap{ padding:8px 14px; }
+.skeleton-row{
+  display:flex; align-items:center; gap:12px;
+  padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.skeleton-thumb{
+  width:48px; height:48px; border-radius:50%; flex-shrink:0;
+  background:rgba(255,255,255,0.06);
+}
+.skeleton-lines{ flex:1; display:flex; flex-direction:column; gap:8px; }
+.skeleton-line{ height:12px; border-radius:6px; background:rgba(255,255,255,0.06); }
+.skeleton-line.w70{ width:70%; }
+.skeleton-line.w40{ width:40%; }
+/* 微光掃過動畫 */
+.skeleton-thumb, .skeleton-line{
+  position:relative; overflow:hidden;
+}
+.skeleton-thumb::after, .skeleton-line::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  transform:translateX(-100%); animation:skeleton-shine 1.3s infinite;
+}
+@keyframes skeleton-shine{ to{ transform:translateX(100%); } }
+/* eink 模式：停用動畫，純灰塊 */
+[data-theme="eink"] .skeleton-thumb,
+[data-theme="eink"] .skeleton-line{ background:#ddd; }
+[data-theme="eink"] .skeleton-thumb::after,
+[data-theme="eink"] .skeleton-line::after{ display:none; }

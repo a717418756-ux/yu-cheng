@@ -268,3 +268,17 @@
 .eng-pa-retry:active{ border-color:var(--acc); color:var(--acc); transform:scale(.95); }
 [data-theme="eink"] .eng-pa-retry{ border-color:#000; color:#000; }
 [data-theme="eink"] .eng-pa-retry:active{ transform:none; }
+
+/* ── 跟讀練習歷史趨勢（v2.11.45）──────────────────────── */
+.eng-pa-hist{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  margin-top:6px; font-size:11px; color:var(--t2);
+}
+.eng-pa-hist:empty{ display:none; }
+.eng-pa-hist-spark{
+  font-family:monospace; letter-spacing:1px; color:var(--acc); font-size:13px;
+}
+.eng-pa-hist-stat{ color:var(--t2); }
+.eng-pa-up{ color:#4caf7d; font-weight:700; }
+.eng-pa-down{ color:#e05c57; font-weight:700; }
+.eng-pa-flat{ color:var(--t2); }

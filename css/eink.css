@@ -331,3 +331,22 @@
 [data-theme="eink"] .reader-topbar button{
   color:#000 !important;
 }
+
+/* ══ eink 影音庫：全面停用動畫/過場，消除電子紙殘影延遲（v2.11.46）══ */
+[data-theme="eink"] #pg-media *,
+[data-theme="eink"] #media-mini-bar *,
+[data-theme="eink"] [id^="vinyl-player"] *,
+[data-theme="eink"] #media-detail-ov *{
+  transition:none !important;
+  animation:none !important;
+}
+/* 黑膠唱片停止旋轉（電子紙不適合持續轉動） */
+[data-theme="eink"] .mar-vinyl.spinning,
+[data-theme="eink"] .vp-record-outer.spinning{
+  animation:none !important;
+}
+/* 骨架屏微光在 eink 已停用（前面 base.css 已處理），此處確保展開過場也不動 */
+[data-theme="eink"] .media-sec-wrap,
+[data-theme="eink"] .zpanel-main{
+  transition:none !important;
+}
