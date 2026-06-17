@@ -627,12 +627,12 @@ function openDebugPanel(){
   document.getElementById('debug-panel-ov')?.remove();
   const ov = document.createElement('div');
   ov.id = 'debug-panel-ov';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:flex;flex-direction:column';
+  ov.className = 'ov-full-col';
   const dot = document.getElementById('debug-dot');
   if(dot) dot.style.display = 'none';
 
   const header = document.createElement('div');
-  header.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:#0d0d0d;border-bottom:1px solid #333;flex-shrink:0';
+  header.className = 'log-viewer-header';
   header.innerHTML = `
     <span style="font-size:13px;font-weight:700;color:#fff;flex:1">偵錯紀錄（最新在上）</span>
     <button data-dbg="copy" title="全部複製" style="background:none;border:none;cursor:pointer;color:#aaa;padding:6px">
@@ -655,14 +655,15 @@ function openDebugPanel(){
   ov.appendChild(header);
 
   const list = document.createElement('div');
-  list.style.cssText = 'flex:1;overflow-y:auto;padding:8px 0;font-family:monospace;font-size:12px';
+  list.className = 'log-viewer-list';
   if(!_debugLogs.length){
     list.innerHTML = '<div style="color:#555;padding:20px 16px">目前無錯誤紀錄</div>';
   } else {
     _debugLogs.forEach(l => {
       const div = document.createElement('div');
-      div.style.cssText = 'padding:6px 14px;border-bottom:1px solid #1a1a1a;'
-        + (l.level==='error' ? 'background:rgba(200,50,50,0.12);color:#f87171;' : 'color:#fbbf24;');
+      div.className = 'log-viewer-row';
+      div.style.cssText =
+        (l.level==='error' ? 'background:rgba(200,50,50,0.12);color:#f87171;' : 'color:#fbbf24;');
       div.innerHTML = '<span style="opacity:.5;margin-right:8px">' + l.t + '</span>'
         + '<span style="opacity:.6;margin-right:8px;font-size:10px;text-transform:uppercase">[' + l.level + ']</span>'
         + esc(l.msg).replace(/\n/g,'<br>');

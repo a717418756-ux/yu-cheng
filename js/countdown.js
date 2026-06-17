@@ -98,7 +98,7 @@ function openCountdownMgr(){
   if(existing) existing.remove();
   const modal = document.createElement('div');
   modal.id = 'countdown-add-modal';
-  modal.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center';
+  modal.className = 'ov-sheet-c z400';
   modal.innerHTML = `
     <div class="cd-sheet" style="width:100%;max-width:520px;background:var(--bg1);border-radius:20px 20px 0 0;padding:20px 18px 36px;animation:sup .23s cubic-bezier(.4,0,.2,1)">
       <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 18px"></div>

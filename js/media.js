@@ -1559,11 +1559,11 @@ async function openMediaDetail(id){
   if(rawThumb instanceof Blob) thumbUrl=URL.createObjectURL(rawThumb);
   else if(typeof rawThumb==='string') thumbUrl=rawThumb;
   const isAudio=m.type!=='video';
-  // 有縮圖顯示圖；無縮圖：音頻用黑膠唱片圖案（與列表一致）、影片用 🎬
+  // 有縮圖顯示圖；無縮圖：音頻顯示黑膠唱片圈+音符、影片顯示 🎬
   const thumbHtml=thumbUrl
     ? `<img src="${thumbUrl}" alt="" class="media-detail-thumb${isAudio?' audio':''}">`
     : isAudio
-      ? `<div class="media-detail-thumb audio vinyl"><div class="mar-vinyl-inner"></div></div>`
+      ? `<div class="media-detail-thumb audio vinyl">🎵</div>`
       : `<div class="media-detail-thumb placeholder">🎬</div>`;
   const ov=document.createElement('div');
   ov.id='media-detail-ov';

@@ -100,7 +100,7 @@ async function _delMaterial(id){
 function openEngUpload(){
   const ov = document.createElement('div');
   ov.id = 'eng-upload-ov';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center';
+  ov.className = 'ov-sheet-c z400';
   ov.innerHTML = `<div class="eng-sheet">
     <div class="eng-sheet-bar"></div>
     <div class="eng-sheet-title">上傳英語材料</div>
@@ -129,7 +129,7 @@ function _startUpload(src){
 function _uploadText(){
   const ov = document.createElement('div');
   ov.id = 'eng-text-ov';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center';
+  ov.className = 'ov-sheet-c z400';
   ov.innerHTML = `<div class="eng-sheet">
     <div class="eng-sheet-bar"></div>
     <div class="eng-sheet-title">貼上英文</div>
@@ -202,7 +202,7 @@ function _uploadOCR(){
 
 function _ocrProgress(){
   const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center';
+  ov.className = 'ov-center';
   ov.innerHTML = `<div style="background:var(--bg1);border-radius:14px;padding:24px 32px;text-align:center;min-width:200px">
     <div style="font-size:13px;color:var(--t1);margin-bottom:10px">OCR 辨識中…</div>
     <div style="font-size:24px;font-weight:700;color:var(--acc)"><span id="ocr-pct">0</span>%</div>
@@ -442,7 +442,7 @@ function openEngAudioMgr(){
   const m = _curMaterial;
   const ov = document.createElement('div');
   ov.id = 'eng-audio-mgr';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:420;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center';
+  ov.className = 'ov-sheet-c z420';
   const row = (kind,label,icon)=>{
     const has = (kind==='read'?m.audioRead:m.audioDetail) instanceof Blob;
     return `<div class="eng-aum-row">
@@ -598,6 +598,12 @@ function _stopRecording(){
 }
 
 // ── 主入口：點 🎙 按鈕 ────────────────────────────────────────
+// 重試這句：定位該句的 🎙 按鈕並重新開始跟讀
+function retryRepeat(idx){
+  const btn = document.querySelector(`.eng-repeat-row[data-ri="${idx}"] .eng-repeat-btn`);
+  if(btn) startRepeat(btn, idx);
+}
+
 async function startRepeat(btn, idx){
   // 若正在錄音 → 停止
   if(_mediaRec && _mediaRec.state === 'recording'){
@@ -898,8 +904,9 @@ function _showPAResult(idx, original, result){
       </div>
     </div>
     <div class="eng-pa-words">${wordsHtml || '<span style="color:var(--t2)">（未偵測到語音）</span>'}</div>
-    <div style="font-size:10px;color:var(--t2);margin-top:6px">
-      辨識：${esc(nb?.Display || nb?.Lexical || '—')}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+      <span style="font-size:10px;color:var(--t2)">辨識：${esc(nb?.Display || nb?.Lexical || '—')}</span>
+      <button class="eng-pa-retry" onclick="retryRepeat(${idx})" title="重試這句">🔄 重試</button>
     </div>`;
 
   _insertAfterSent(body, idx, div);
@@ -945,7 +952,7 @@ const English = {
   renderEnglish, openEngUpload, openMaterial, closeMaterial,
   toggleEngTTS, setEngRate, engRateStep,
   openEngAudioMgr, toggleEngAudio, engAudioSeek,
-  startRepeat,
+  startRepeat, retryRepeat,
 };
 window.English = English;
 Object.assign(window, English);

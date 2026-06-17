@@ -273,7 +273,7 @@ async function init(){  try{
     logError('init', e);
     // 顯示錯誤提示但不讓畫面全黑，仍顯示 FAB
     const errDiv = document.createElement('div');
-    errDiv.style.cssText = 'position:fixed;top:60px;left:0;right:0;margin:12px;background:#2a1010;border:1px solid var(--red);border-radius:10px;padding:14px;font-size:13px;color:#e05c57;z-index:9999;line-height:1.7';
+    errDiv.className = 'app-err-banner';
     errDiv.innerHTML = '⚠ 資料庫初始化失敗<br><span style="font-size:11px;color:#888">'+esc(String(e.message||e))+'</span><br><button id="init-reload-btn" style="margin-top:8px;padding:6px 14px;background:#3a1212;border:1px solid #e05c57;color:#e05c57;border-radius:6px;cursor:pointer;font-size:12px">重新載入</button>';
     document.body.appendChild(errDiv);
     document.getElementById('init-reload-btn')?.addEventListener('click', ()=>location.reload());
