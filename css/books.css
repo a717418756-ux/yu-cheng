@@ -508,3 +508,40 @@
 @media (prefers-reduced-motion: reduce){
   .epub-toc-overlay, .epub-toc-panel{ animation:none !important; }
 }
+
+/* ── 書庫清單收藏鈕（v2.11.30：inline 抽 class + 修復未顯示）── */
+.shelf-list-fav{
+  background:none; border:none; cursor:pointer;
+  font-size:18px; padding:8px; flex-shrink:0;
+  color:rgba(255,255,255,0.25);
+}
+.shelf-list-fav.on{ color:#ec4899; }
+[data-theme="eink"] .shelf-list-fav{ color:#999; }
+[data-theme="eink"] .shelf-list-fav.on{ color:#000; }
+
+/* ── 書庫空狀態 + 批量列容器（v2.11.30：inline 抽 class）── */
+.books-empty{ padding:40px 0; }
+.books-bulk-bar{
+  position:sticky; bottom:0; background:var(--bg1);
+  border-top:1px solid rgba(255,255,255,0.08);
+  padding:12px 14px; display:flex; gap:10px; z-index:10;
+}
+
+/* ── 封面模式卡片（v2.11.30：inline style 抽取）──────────── */
+.shelf-cover-placeholder{
+  width:100%; height:100%;
+  display:flex; align-items:center; justify-content:center;
+  writing-mode:vertical-rl; font-size:11px;
+  color:rgba(255,255,255,0.6); text-align:center; padding:6px;
+  line-height:1.4; word-break:break-all;
+}
+.shelf-cover-actions{
+  display:flex; align-items:center; justify-content:center; margin-top:2px;
+}
+.shelf-cover-fav{
+  background:none; border:none; cursor:pointer; font-size:14px; padding:2px 6px;
+  color:rgba(255,255,255,0.3);
+}
+.shelf-cover-fav.on{ color:#ec4899; }
+[data-theme="eink"] .shelf-cover-placeholder{ color:#000; }
+[data-theme="eink"] .shelf-cover-fav{ color:#000; }
