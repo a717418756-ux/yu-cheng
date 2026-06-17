@@ -62,6 +62,20 @@ async function _fillMediaThumbs(container){
       }
       continue;
     }
+    // 音頻列唱盤 mar-vinyl：替換黑膠佔位為圓形縮圖
+    if(el.dataset.athumb){
+      if(!el.querySelector('img.mar-thumb-img')){
+        const inner = el.querySelector('.mar-vinyl-inner');
+        if(inner) inner.remove();
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.className = 'mar-thumb-img';
+        if(raw instanceof Blob){ img.onload = ()=> URL.revokeObjectURL(src); }
+        img.src = src;
+        el.appendChild(img);
+      }
+      continue;
+    }
     // 音頻橫向卡 / 其他：原邏輯（清空後放圓形/方形縮圖）
     const isAudio = el.classList.contains('audio');
     const durEl = el.querySelector('.media-hcard-dur');
@@ -477,6 +491,7 @@ function _setExpandCat(btn, cat){
   } else {
     items.forEach(m=>list.appendChild(_mkVideoCard(m)));
   }
+  setTimeout(()=>_fillMediaThumbs(list), 0);
 }
 
 // _mkVideoSection 已整合至 _mkHScrollSection
@@ -512,11 +527,8 @@ function _mkAudioRow(m,i){
   const dur=m.duration?_fmtDur(m.duration):'';
   const isPlaying=_M.nowId===m.id && _audioEl && !_audioEl.paused;
   div.innerHTML=`
-    <div class="mar-vinyl${isPlaying?' spinning':''}" onclick="playAudio(${m.id})">
-      ${m.thumbnail
-        ?`<img src="${m.thumbnail}" loading="lazy"
-            style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
-        :`<div class="mar-vinyl-inner"></div>`}
+    <div class="mar-vinyl${isPlaying?' spinning':''}" data-mid="${m.id}" data-athumb="1" onclick="playAudio(${m.id})">
+      <div class="mar-vinyl-inner"></div>
     </div>
     <div class="mar-info" onclick="playAudio(${m.id})">
       <div class="mar-title${isPlaying?' playing':''}">${esc(m.title||'未命名')}</div>

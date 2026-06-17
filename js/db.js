@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.11.43';     // 零星inline全清:app/countdown/english/settings遮罩等抽通用class,音頻詳情改單層音符圖示更可靠，全專案cssText僅剩3處動態值
+const APP_VERSION  = '2.11.44';     // 修音頻列表縮圖全黑:音頻列原讀被排除的thumbnail欄位永遠空,改data-athumb+_fillMediaThumbs按需填充(同影片卡修法),並補搜尋重渲染後的填充呼叫
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
