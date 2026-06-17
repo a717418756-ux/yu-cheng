@@ -39,6 +39,9 @@ function _splitSentences(text){
 }
 
 // ════════ 列表頁渲染 ════════
+// ════════════════════════════════════════════════════════════
+// 【英語庫：清單載入與渲染】
+// ════════════════════════════════════════════════════════════
 async function renderEnglish(){
   const el = document.getElementById('eng-list');
   if(!el) return;
@@ -98,6 +101,9 @@ async function _delMaterial(id){
 }
 
 // ════════ 上傳：選擇來源 ════════
+// ════════════════════════════════════════════════════════════
+// 【英語庫：上傳（文字/PDF/OCR）】
+// ════════════════════════════════════════════════════════════
 function openEngUpload(){
   const ov = document.createElement('div');
   ov.id = 'eng-upload-ov';
@@ -231,6 +237,9 @@ async function _saveMaterial(title, sourceType, rawText){
 }
 
 // ════════ 閱讀器 ════════
+// ════════════════════════════════════════════════════════════
+// 【英語閱讀器：開啟材料】
+// ════════════════════════════════════════════════════════════
 async function openMaterial(id){
   try{
     const m = await dg('englishMaterials', id);
@@ -272,6 +281,9 @@ function closeMaterial(){
 }
 
 // ════════ TTS 逐句高亮朗讀 ════════
+// ════════════════════════════════════════════════════════════
+// 【英語閱讀器：TTS 朗讀與高亮】
+// ════════════════════════════════════════════════════════════
 function toggleEngTTS(){
   if(_ttsPlaying){ _pauseTTS(); }
   else{ _playTTS(); }
@@ -361,6 +373,9 @@ const _engAudio = { read:null, detail:null };  // Audio 物件
 let _engAudioUrls = { read:null, detail:null }; // objectURL（用後釋放）
 
 // 開啟閱讀器時，載入該材料的音檔
+// ════════════════════════════════════════════════════════════
+// 【英語閱讀器：音檔對照播放】
+// ════════════════════════════════════════════════════════════
 function _setupAudio(material){
   _teardownAudio();
   const bar = document.getElementById('eng-audio-bar');
@@ -539,6 +554,9 @@ const _PA_WINDOW_MS= 60000; // 限速視窗（60 秒）
 const _PA_MAX_IN_WINDOW = 15; // 視窗內最多請求數（Azure F0 約 20/分，留 buffer）
 
 // 檢查是否可發起評估；可則回 {ok:true}，否則回 {ok:false, wait:剩餘秒數, reason}
+// ════════════════════════════════════════════════════════════
+// 【發音評估：速率限制】
+// ════════════════════════════════════════════════════════════
 function _paCanRequest(){
   const now = Date.now();
   // 1. 冷卻中（含 429 後）
@@ -605,6 +623,9 @@ function retryRepeat(idx){
   if(btn) startRepeat(btn, idx);
 }
 
+// ════════════════════════════════════════════════════════════
+// 【發音評估：錄音與跟讀】
+// ════════════════════════════════════════════════════════════
 async function startRepeat(btn, idx){
   // 若正在錄音 → 停止
   if(_mediaRec && _mediaRec.state === 'recording'){
@@ -735,6 +756,9 @@ async function _webmToWav(blob){
 }
 
 // ── 送 Azure Pronunciation Assessment REST ────────────────────
+// ════════════════════════════════════════════════════════════
+// 【發音評估：Azure 評分】
+// ════════════════════════════════════════════════════════════
 async function _assessPronunciation(idx, original, audioBlob, mimeType){
   _showRepeatLoading(idx);
 
@@ -846,6 +870,9 @@ function _insertAfterSent(body, idx, el){
 }
 
 // ── 解析並顯示結果 ────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// 【發音評估：結果顯示】
+// ════════════════════════════════════════════════════════════
 function _showPAResult(idx, original, result){
   const body = document.getElementById('eng-reader-body');
   if(!body) return;
@@ -918,6 +945,9 @@ function _showPAResult(idx, original, result){
 }
 
 // 記錄某句的跟讀練習歷史（存進 material），並更新趨勢顯示
+// ════════════════════════════════════════════════════════════
+// 【發音評估：練習歷史與趨勢】
+// ════════════════════════════════════════════════════════════
 async function _recordPAHistory(idx, score){
   try{
     if(!_curMaterial?.id) return;
@@ -962,6 +992,9 @@ function _renderPAHistory(idx, hist){
 
 
 let _pdfLib = null;
+// ════════════════════════════════════════════════════════════
+// 【工具：外部函式庫載入】
+// ════════════════════════════════════════════════════════════
 async function _ensurePdfLib(){
   if(_pdfLib) return _pdfLib;
   await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');

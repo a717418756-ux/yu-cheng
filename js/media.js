@@ -32,6 +32,9 @@ let _sleepTimer = null;   // 睡眠定時器
 // ════════════════════════════════════════════════════════════
 // 頁面渲染入口
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// 【影音庫：清單載入與渲染】
+// ════════════════════════════════════════════════════════════
 async function renderMedia(){
   try{
     showSkeleton('media-list', 5);  // 載入前先顯示骨架屏
@@ -175,6 +178,9 @@ function _renderMediaPage(){
 }
 
 // ── 橫向捲動 section ──────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// 【影音庫：首頁橫向捲動卡片】
+// ════════════════════════════════════════════════════════════
 function _mkHScrollSection(title, type, items, showMore=true, featured=false){
   // 外層 wrap 負責底部分隔線
   const wrap = document.createElement('div');
@@ -240,6 +246,9 @@ function _mkVideoThumbCard(m, isFeatured=false){
 }
 
 // ── 「更多」展開模式：全螢幕縱向列表 ──────────────────────
+// ════════════════════════════════════════════════════════════
+// 【影音庫：展開列表與分頁】
+// ════════════════════════════════════════════════════════════
 function _openExpandMode(type){
   _M.expandMode = type;
   _M.expandPage = 0;  // 進入展開模式回到第一頁
@@ -475,6 +484,9 @@ function _closeExpandMode(){
 }
 
 // 批量模式切換
+// ════════════════════════════════════════════════════════════
+// 【影音庫：批量選取與刪除】
+// ════════════════════════════════════════════════════════════
 function _toggleBulkMode(){
   _M.bulkMode = !_M.bulkMode;
   _M.bulkSelected = new Set();
@@ -558,6 +570,9 @@ function _setExpandCat(btn, cat){
 
 // _mkVideoSection 已整合至 _mkHScrollSection
 
+// ════════════════════════════════════════════════════════════
+// 【影音庫：展開列表卡片（影片/音頻列）】
+// ════════════════════════════════════════════════════════════
 function _mkVideoCard(m){
   const div=document.createElement('div');
   div.className='media-vcard';
@@ -607,6 +622,9 @@ function _mkAudioRow(m,i){
 
 // ════════════════════════════════════════════════════════════
 // 音頻播放器（黑膠模式）
+// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// 【音頻播放器（黑膠唱片）】
 // ════════════════════════════════════════════════════════════
 async function playAudio(id){
   let meta=_M.allMedia.find(m=>m.id===id);
@@ -1197,6 +1215,9 @@ function _vpSleepTimer(btn){
 }
 
 // 播放列表彈窗
+// ════════════════════════════════════════════════════════════
+// 【音頻播放器：播放清單面板】
+// ════════════════════════════════════════════════════════════
 function openVpPlaylist(){
   const wrap = document.getElementById('vp-playlist-wrap');
   if(!wrap) return;
@@ -1297,6 +1318,9 @@ function openVpPlaylist(){
 
 // ════════════════════════════════════════════════════════════
 // 影片播放器
+// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// 【影片播放器】
 // ════════════════════════════════════════════════════════════
 async function playVideo(id){
   const full=await dg('leisuremedia',id);
@@ -1416,6 +1440,9 @@ async function closeVideoPlayer(id){
 // ════════════════════════════════════════════════════════════
 // 迷你播放列（底部常駐）
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// 【迷你播放列】
+// ════════════════════════════════════════════════════════════
 function _showMiniBar(title, type){
   let bar=document.getElementById('media-mini-bar');
   if(!bar){
@@ -1464,6 +1491,9 @@ function _updateAudioRowHighlight(id){
 
 // ════════════════════════════════════════════════════════════
 // 新增影音（上傳表單）
+// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// 【新增影音：上傳表單】
 // ════════════════════════════════════════════════════════════
 function openAddMedia(){
   const ov=document.createElement('div');
@@ -1514,6 +1544,23 @@ function openAddMedia(){
           onchange="am_onFileChange(this)">
       </label>
 
+      <div id="am-compress-box" style="margin-bottom:16px">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:5px">儲存方式</div>
+        <div style="display:flex;gap:8px">
+          <button id="am-comp-none" onclick="setAmCompress(false,this)"
+            style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--acc);
+            background:rgba(110,168,254,0.15);color:var(--acc);font-size:12px;cursor:pointer">
+            原檔（音質最佳）</button>
+          <button id="am-comp-on" onclick="setAmCompress(true,this)"
+            style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);
+            background:rgba(255,255,255,0.04);color:var(--t2);font-size:12px;cursor:pointer">
+            壓縮（省空間）</button>
+        </div>
+        <div style="font-size:10px;color:var(--t2);margin-top:5px;line-height:1.5">
+          壓縮會降低取樣率與聲道（適合人聲、課程錄音；音樂建議用原檔）。若壓縮後反而變大，將自動保留原檔。
+        </div>
+      </div>
+
       <div style="display:flex;gap:8px">
         <button onclick="document.getElementById('add-media-ov').remove()"
           style="flex:1;padding:12px;background:rgba(255,255,255,0.06);border:1px solid var(--bd);
@@ -1527,6 +1574,24 @@ function openAddMedia(){
   document.body.appendChild(ov);
   // 預設選影片
   window._amType='video';
+  window._amCompress=false;  // 預設原檔
+  // 預設影片，壓縮框先隱藏
+  const _cbox=document.getElementById('am-compress-box');
+  if(_cbox) _cbox.style.display='none';
+}
+
+function setAmCompress(on, btn){
+  window._amCompress=on;
+  const map={ 'am-comp-none':!on, 'am-comp-on':on };
+  for(const id in map){
+    const b=document.getElementById(id);
+    if(!b) continue;
+    const active=map[id];
+    b.style.borderColor=active?'var(--acc)':'rgba(255,255,255,0.12)';
+    b.style.background=active?'rgba(110,168,254,0.15)':'rgba(255,255,255,0.04)';
+    b.style.color=active?'var(--acc)':'var(--t2)';
+    b.style.borderWidth=active?'1.5px':'1px';
+  }
 }
 
 function setAmType(type, btn){
@@ -1539,6 +1604,9 @@ function setAmType(type, btn){
     b.style.background=on?'rgba(110,168,254,0.15)':'rgba(255,255,255,0.04)';
     b.style.color=on?'var(--acc)':'var(--t2)';
   });
+  // 壓縮選項僅音頻顯示（影片壓縮瀏覽器端不可靠，隱藏）
+  const cbox=document.getElementById('am-compress-box');
+  if(cbox) cbox.style.display = type==='audio' ? 'block' : 'none';
 }
 
 function previewMediaThumb(inp){
@@ -1574,13 +1642,28 @@ async function saveNewMedia(){
   if(thumbInp?.files[0]){
     thumbnail=await _compressMediaThumb(thumbInp.files[0]);
   }
+  let blob = fileInp?.files[0]||null;
+  let fileSize = blob?.size||0;
+  // 音頻 + 選擇壓縮：降取樣率/單聲道重新編碼（只在確實變小時採用）
+  if(blob && window._amType==='audio' && window._amCompress){
+    try{
+      toast('壓縮中…');
+      const compressed = await _compressAudio(blob);
+      if(compressed && compressed.size < blob.size){
+        blob = compressed; fileSize = compressed.size;
+        toast('壓縮完成，已省空間');
+      } else {
+        toast('壓縮後未變小，保留原檔');
+      }
+    }catch(e){ logError('_compressAudio',e); toast('壓縮失敗，保留原檔'); }
+  }
   const media={
     title,
     type:     window._amType||'video',
     category: document.getElementById('am-category')?.value.trim()||'',
     fileType: fileInp?.files[0]?.name.split('.').pop().toLowerCase()||'',
-    fileSize: fileInp?.files[0]?.size||0,
-    blob:     fileInp?.files[0]||null,
+    fileSize: fileSize,
+    blob:     blob,
     thumbnail,
     duration: null,
     tags:     [],
@@ -1596,6 +1679,61 @@ async function saveNewMedia(){
     document.getElementById('add-media-ov')?.remove();
     renderMedia();
   }catch(e){logError('saveNewMedia',e);toast('儲存失敗：'+e.message);}
+}
+
+// 音訊壓縮：Web Audio 解碼 → 降取樣率(22050)+單聲道 → 編成 WAV
+// 適合語音；瀏覽器原生不支援 MP3 編碼，故用 WAV（靠降規格省空間）
+// ════════════════════════════════════════════════════════════
+// 【新增影音：音訊壓縮（WebAudio→WAV）】
+// ════════════════════════════════════════════════════════════
+async function _compressAudio(file){
+  const arrayBuf = await file.arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const tmpCtx = new AC();
+  const decoded = await tmpCtx.decodeAudioData(arrayBuf.slice(0));
+  tmpCtx.close();
+  const targetRate = 22050;        // 降取樣率（語音足夠）
+  const targetCh   = 1;            // 單聲道
+  const duration   = decoded.duration;
+  const frames     = Math.ceil(duration * targetRate);
+  if(!frames || frames < 1) throw new Error('音檔長度為 0，無法壓縮');
+  const offline = new OfflineAudioContext(targetCh, frames, targetRate);
+  const srcNode = offline.createBufferSource();
+  srcNode.buffer = decoded;
+  srcNode.connect(offline.destination);
+  srcNode.start(0);
+  const rendered = await offline.startRendering();
+  return _audioBufferToWavBlob(rendered);
+}
+
+// AudioBuffer → WAV Blob（16-bit PCM）
+function _audioBufferToWavBlob(buffer){
+  const numCh = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const numFrames = buffer.length;
+  const bytesPerSample = 2;
+  const blockAlign = numCh * bytesPerSample;
+  const dataSize = numFrames * blockAlign;
+  const ab = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(ab);
+  const wStr=(off,s)=>{ for(let i=0;i<s.length;i++) view.setUint8(off+i, s.charCodeAt(i)); };
+  wStr(0,'RIFF'); view.setUint32(4, 36+dataSize, true); wStr(8,'WAVE');
+  wStr(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);
+  view.setUint16(22,numCh,true); view.setUint32(24,sampleRate,true);
+  view.setUint32(28,sampleRate*blockAlign,true); view.setUint16(32,blockAlign,true);
+  view.setUint16(34,16,true); wStr(36,'data'); view.setUint32(40,dataSize,true);
+  // 交錯寫入 16-bit PCM
+  let offset=44;
+  const chans=[];
+  for(let c=0;c<numCh;c++) chans.push(buffer.getChannelData(c));
+  for(let i=0;i<numFrames;i++){
+    for(let c=0;c<numCh;c++){
+      let s=Math.max(-1,Math.min(1,chans[c][i]));
+      view.setInt16(offset, s<0 ? s*0x8000 : s*0x7FFF, true);
+      offset+=2;
+    }
+  }
+  return new Blob([ab], {type:'audio/wav'});
 }
 
 function _compressMediaThumb(file){
@@ -1622,6 +1760,9 @@ function _compressMediaThumb(file){
 
 // ════════════════════════════════════════════════════════════
 // 影音詳情 / 下載 / 收藏 / 刪除
+// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// 【影音詳情頁】
 // ════════════════════════════════════════════════════════════
 async function openMediaDetail(id){
   const m=await dg('leisuremedia',id);
@@ -1725,6 +1866,9 @@ function searchMedia(){
 
 // ════════════════════════════════════════════════════════════
 // 工具
+// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// 【工具函式（時長/大小格式化）】
 // ════════════════════════════════════════════════════════════
 function _fmtDur(sec){
   if(!sec) return '';
