@@ -149,8 +149,7 @@ function _renderBooksPage(){
 
   if(!filtered.length){
     const emptyDiv = document.createElement('div');
-    emptyDiv.className='empty';
-    emptyDiv.style.cssText='padding:40px 0';
+    emptyDiv.className='empty books-empty';
     emptyDiv.innerHTML='<span class="ic">📚</span><span>' +
       (_B.filter==='fav' ? '尚未收藏任何書籍' : '尚無書籍') + '</span>';
     el.appendChild(emptyDiv);
@@ -170,9 +169,7 @@ function _renderBooksPage(){
   // 批量模式：底部確認列
   if(_B.bulkMode){
     const bar=document.createElement('div');
-    bar.style.cssText=`position:sticky;bottom:0;background:var(--bg1);
-      border-top:1px solid rgba(255,255,255,0.08);
-      padding:12px 14px;display:flex;gap:10px;z-index:10`;
+    bar.className='books-bulk-bar';
     bar.innerHTML=`
       <button onclick="toggleBooksBulk(document.getElementById('books-bulk-btn'))"
         style="flex:1;padding:11px;background:rgba(255,255,255,0.06);border:1px solid var(--bd);
@@ -474,21 +471,17 @@ function _mkCoverGrid(books, total){
       _fillThumb(img, b.id, 'cover');
     } else {
       img.style.background=`linear-gradient(160deg,${t.bg},${t.dark})`;
-      img.innerHTML=`<div style="width:100%;height:100%;display:flex;align-items:center;
-        justify-content:center;writing-mode:vertical-rl;font-size:11px;
-        color:rgba(255,255,255,0.6);text-align:center;padding:6px;
-        line-height:1.4;word-break:break-all">${esc(b.title||'未命名')}</div>`;
+      img.innerHTML=`<div class="shelf-cover-placeholder">${esc(b.title||'未命名')}</div>`;
     }
     const name=document.createElement('div');
     name.className='shelf-cover-name';
     name.textContent=b.title||'未命名';
     // 底部操作列
     const actions=document.createElement('div');
-    actions.style.cssText='display:flex;align-items:center;justify-content:center;margin-top:2px';
+    actions.className='shelf-cover-actions';
     const favBtn=document.createElement('button');
-    favBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:14px;padding:2px 6px';
+    favBtn.className='shelf-cover-fav'+(b.favorite?' on':'');
     favBtn.textContent=b.favorite?'♥':'♡';
-    favBtn.style.color=b.favorite?'#ec4899':'rgba(255,255,255,0.3)';
     favBtn.onclick=e=>{e.stopPropagation();_quickToggleBookFav(b.id,favBtn);};
     actions.appendChild(favBtn);
     card.appendChild(img);
@@ -532,12 +525,12 @@ function _mkListView(books, total){
         <div class="shelf-list-progress-fill" style="width:${pct}%"></div>
       </div>`:''}`;
     const favBtn=document.createElement('button');
-    favBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:18px;padding:8px;flex-shrink:0';
+    favBtn.className='shelf-list-fav'+(b.favorite?' on':'');
     favBtn.textContent=b.favorite?'♥':'♡';
-    favBtn.style.color=b.favorite?'#ec4899':'rgba(255,255,255,0.25)';
     favBtn.onclick=e=>{e.stopPropagation();_quickToggleBookFav(b.id,favBtn);};
     item.appendChild(cover);
     item.appendChild(info);
+    item.appendChild(favBtn);
 
     wrap.appendChild(item);
   });
@@ -1132,7 +1125,7 @@ async function _quickToggleBookFav(id, btn){
     // 更新按鈕外觀
     if(btn){
       btn.textContent=book.favorite?'♥':'♡';
-      btn.style.color=book.favorite?'#ec4899':'rgba(255,255,255,0.3)';
+      btn.classList.toggle('on', book.favorite);
     }
     // 若目前在收藏模式，重渲染
     if(_B.filter==='fav') _renderBooksPage();

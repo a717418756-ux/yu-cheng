@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.11.29';     // inline style抽取示範:法條卡片固定樣式抽成CSS class(law-art-card等),僅保留動態顏色inline,外觀逐項比對零變化
+const APP_VERSION  = '2.11.30';     // inline抽取第2區:書庫封面模式卡片(placeholder/actions/fav按鈕)抽成class,順帶統一收藏按鈕用.on機制,外觀逐項驗證零變化
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
