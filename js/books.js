@@ -115,7 +115,7 @@ async function _fillThumb(el, id, type){
     const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
     const img = document.createElement('img');
     img.loading = 'lazy'; img.alt = '';
-    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block';
+    img.className = 'book-thumb-fill';
     if(raw instanceof Blob){
       img.onload = ()=> URL.revokeObjectURL(src);  // 顯示後立即釋放
     }
@@ -328,7 +328,7 @@ function _mkShelf(books, total){
 
   const fillRow = document.createElement('div');
   fillRow.className = 'shelf-row shelf-fill-row';
-  fillRow.style.cssText = 'flex:1;min-height:60px';  // 撐滿剩餘空間
+  // 撐滿剩餘空間（樣式見 .shelf-fill-row）
   const fillSlot = document.createElement('div');
   fillSlot.className = 'shelf-empty-slot';
   fillRow.appendChild(fillSlot);
@@ -378,7 +378,7 @@ function _mkSpine(b, dispW, dispH){
       if(!raw || !div.isConnected) return;
       const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
       const img = document.createElement('img');
-      img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block';
+      img.className = 'book-thumb-abs';
       if(raw instanceof Blob) img.onload = ()=> URL.revokeObjectURL(src);
       img.src = src;
       if(div.isConnected){
@@ -476,9 +476,7 @@ async function openBookCover(id){
 
   const ov=document.createElement('div');
   ov.id='book-cover-ov';
-  ov.style.cssText=`position:fixed;inset:0;z-index:500;
-    background:rgba(0,0,0,0.85);display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:16px`;
+  ov.className='book-ov-center';
   ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
 
   const t=_SPINE_THEMES[(b.id||0)%_SPINE_THEMES.length];
@@ -522,7 +520,7 @@ async function openBookCover(id){
 function openAddBook(){
   const ov=document.createElement('div');
   ov.id='add-book-ov';
-  ov.style.cssText='position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end';
+  ov.className='book-ov-sheet z500';
   ov.innerHTML=`
     <div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);
       border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:90vh;overflow-y:auto">
@@ -781,20 +779,20 @@ async function openBookDetail(id){
 
   const ov=document.createElement('div');
   ov.id='book-detail-ov';
-  ov.style.cssText='position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end';
+  ov.className='book-ov-sheet z600';
   const ext=(book.fileType||'').toUpperCase();
   // coverThumb 可能是 Blob（新版）或 base64 字串（舊版）
   const coverSrc = book.coverThumb instanceof Blob
     ? URL.createObjectURL(book.coverThumb)
     : (book.coverThumb || '');
   const detailPanel = document.createElement('div');
-  detailPanel.style.cssText='width:100%;max-width:520px;margin:0 auto;background:var(--bg1);border-radius:20px 20px 0 0;padding:20px 16px 32px';
+  detailPanel.className='book-detail-panel';
   // 封面圖：用 DOM 操作，避免 blob URL 在 template literal 裡斷裂
   const coverEl = coverSrc
     ? (() => {
         const img = document.createElement('img');
         img.src = coverSrc;
-        img.style.cssText='width:60px;height:80px;object-fit:cover;border-radius:4px;flex-shrink:0';
+        img.className='book-detail-cover';
         if(book.coverThumb instanceof Blob){
           img.onload=()=>URL.revokeObjectURL(coverSrc);
         }
@@ -867,7 +865,7 @@ async function _openBookEdit(id){
 
   const ov = document.createElement('div');
   ov.id = 'book-edit-ov';
-  ov.style.cssText='position:fixed;inset:0;z-index:610;background:rgba(0,0,0,0.8);display:flex;align-items:flex-end';
+  ov.className='book-ov-sheet z610';
   ov.innerHTML=`
     <div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);
       border-radius:20px 20px 0 0;padding:20px 16px 32px">
@@ -1056,8 +1054,7 @@ async function openBookReader(id){
 
   const ov = document.createElement('div');
   ov.id = 'book-reader-ov';
-  ov.style.cssText = `position:fixed;inset:0;z-index:800;
-    background:#111;display:flex;flex-direction:column`;
+  ov.className = 'book-ov-full';
 
 
 

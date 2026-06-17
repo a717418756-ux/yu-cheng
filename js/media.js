@@ -1541,14 +1541,18 @@ async function openMediaDetail(id){
   const m=await dg('leisuremedia',id);
   if(!m){toast('找不到');return;}
   document.getElementById('media-detail-ov')?.remove();
-  // 縮圖可能是 Blob（新）或 base64 字串（舊），統一轉為可顯示 URL
+  // 縮圖按需讀取（與列表同機制）：可能是 Blob（新）或 base64（舊）
+  const rawThumb = await _getMediaThumb(id);
   let thumbUrl='';
-  if(m.thumbnail instanceof Blob) thumbUrl=URL.createObjectURL(m.thumbnail);
-  else if(typeof m.thumbnail==='string') thumbUrl=m.thumbnail;
+  if(rawThumb instanceof Blob) thumbUrl=URL.createObjectURL(rawThumb);
+  else if(typeof rawThumb==='string') thumbUrl=rawThumb;
   const isAudio=m.type!=='video';
+  // 有縮圖顯示圖；無縮圖：音頻用黑膠唱片圖案（與列表一致）、影片用 🎬
   const thumbHtml=thumbUrl
     ? `<img src="${thumbUrl}" alt="" class="media-detail-thumb${isAudio?' audio':''}">`
-    : `<div class="media-detail-thumb placeholder${isAudio?' audio':''}">${isAudio?'🎵':'🎬'}</div>`;
+    : isAudio
+      ? `<div class="media-detail-thumb audio vinyl"><div class="mar-vinyl-inner"></div></div>`
+      : `<div class="media-detail-thumb placeholder">🎬</div>`;
   const ov=document.createElement('div');
   ov.id='media-detail-ov';
   ov.className='media-ov-sheet z700-d';
