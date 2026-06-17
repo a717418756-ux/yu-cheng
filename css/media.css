@@ -1171,3 +1171,77 @@
 .media-empty-sec{ padding:12px 14px 18px; font-size:12px; color:var(--t2); }
 .media-thumb-img{ width:100%; height:100%; object-fit:cover; border-radius:10px; }
 .media-thumb-img.audio{ border-radius:50%; }
+
+/* ── 計數 + 批量 checkbox（v2.11.36：inline 抽取）──────── */
+.media-count{ font-size:11px; color:var(--t2); padding:4px 14px 8px; }
+.media-bulk-cb{ width:18px; height:18px; margin:0 10px 0 14px; flex-shrink:0; accent-color:var(--acc); }
+.media-bulk-cb-card{ position:absolute; top:8px; left:8px; width:20px; height:20px; z-index:2; accent-color:var(--acc); }
+
+/* ── 底部批量操作列（v2.11.36）──────────────────────── */
+.media-bulk-bar{
+  position:sticky; bottom:0; background:var(--bg1);
+  border-top:1px solid rgba(255,255,255,0.08);
+  padding:12px 14px; display:flex; gap:10px; z-index:10;
+}
+.media-bulk-cancel{
+  flex:1; padding:11px; background:rgba(255,255,255,0.06);
+  border:1px solid var(--bd); color:var(--t1); border-radius:10px;
+  font-size:13px; cursor:pointer;
+}
+.media-bulk-confirm{
+  flex:2; padding:11px; color:#fff; border:none; border-radius:10px;
+  font-size:13px; font-weight:700; cursor:pointer;
+  /* 註：background 由 JS 依 expandMode 設動態色 */
+}
+
+/* ── 迷你播放器播放清單面板（v2.11.37：inline 抽取）────── */
+.vp-pl-panel{
+  background:rgba(8,8,12,0.97);
+  border-top:2px solid rgba(255,255,255,0.08);
+  padding:0 0 20px;
+}
+.vp-pl-titlebar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 16px 8px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.vp-pl-title{ font-size:13px; font-weight:700; color:rgba(255,255,255,0.85); }
+.vp-pl-count{ font-size:11px; color:rgba(255,255,255,0.35); margin-left:auto; }
+.vp-pl-row{
+  display:flex; flex-direction:row; align-items:center; gap:12px;
+  padding:8px 16px 0;
+  overflow-x:auto; overflow-y:hidden;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch;
+}
+.vp-pl-card{
+  flex-shrink:0; width:70px;
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+  cursor:pointer; opacity:0.65; transition:opacity .15s;
+}
+.vp-pl-card.active{ opacity:1; }
+.vp-pl-thumb{
+  width:56px; height:56px; border-radius:50%;
+  background:radial-gradient(circle at 50%,#2a2a36 0%,#111 25%,#1c1c24 45%,#111 65%,#0e0e12 100%);
+  overflow:hidden; flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,0,0,0.5);
+  position:relative; display:flex; align-items:center; justify-content:center;
+}
+.vp-pl-thumb.active{ box-shadow:0 0 0 2.5px #ffffff,0 0 0 4px rgba(255,255,255,0.15); }
+.vp-pl-vinyl{
+  width:100%; height:100%; border-radius:50%;
+  background:radial-gradient(circle at 50% 50%,#333 0%,#111 30%,#222 55%,#1a1a1a 70%,#111 100%);
+}
+.vp-pl-dot{
+  position:absolute; bottom:3px; right:3px;
+  width:10px; height:10px; border-radius:50%;
+  background:rgba(255,255,255,0.9); border:1.5px solid #0a0a0a;
+}
+.vp-pl-name{
+  font-size:10px; font-weight:500;
+  color:rgba(255,255,255,0.65);
+  text-align:center; line-height:1.3;
+  width:100%; overflow:hidden;
+  display:-webkit-box; -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+}
+.vp-pl-name.active{ font-weight:700; color:#ffffff; }
