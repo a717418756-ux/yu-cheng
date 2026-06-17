@@ -119,9 +119,9 @@
   background:rgba(0,0,0,0.2);
 }
 
-.shelf-mode-btns{display:flex;gap:4px}
+{display:flex;gap:4px}
 
-.shelf-mode-btn.on{
+{
   background:rgba(255,220,140,0.12);
   border-color:rgba(255,220,140,0.25);
   color:rgba(255,220,160,0.9);
@@ -333,17 +333,17 @@
 }
 
 /* ── 封面牆模式 ── */
-.shelf-cover-grid{
+{
   display:grid;
   grid-template-columns:repeat(3,1fr);
   gap:10px;
   padding:12px 14px;
 }
-.shelf-cover-card{
+{
   display:flex;flex-direction:column;gap:5px;
   cursor:pointer;
 }
-.shelf-cover-img{
+{
   width:100%;aspect-ratio:2/3;
   border-radius:4px 6px 6px 4px;
   overflow:hidden;
@@ -353,14 +353,14 @@
     -1px 0 0 rgba(0,0,0,0.5);
   transition:transform .18s,box-shadow .18s;
 }
-.shelf-cover-img:active{
+{
   transform:scale(0.95);
   box-shadow:1px 2px 8px rgba(0,0,0,0.5);
 }
-.shelf-cover-img img{
+{
   width:100%;height:100%;object-fit:cover;display:block;
 }
-.shelf-cover-name{
+{
   font-size:11px;color:var(--t1);text-align:center;
   display:-webkit-box;-webkit-line-clamp:2;
   -webkit-box-orient:vertical;overflow:hidden;
@@ -368,34 +368,34 @@
 }
 
 /* ── 清單模式（BOOX）── */
-.shelf-list-item{
+{
   display:flex;align-items:center;gap:12px;
   padding:10px 14px;
   border-bottom:1px solid rgba(255,255,255,0.05);
   cursor:pointer;
 }
-.shelf-list-item:active{background:rgba(255,255,255,0.04)}
-.shelf-list-cover{
+{background:rgba(255,255,255,0.04)}
+{
   width:40px;height:56px;
   border-radius:2px 4px 4px 2px;
   overflow:hidden;flex-shrink:0;
   background:rgba(255,255,255,0.08);
   box-shadow:2px 2px 6px rgba(0,0,0,0.5);
 }
-.shelf-list-cover img{width:100%;height:100%;object-fit:cover}
-.shelf-list-info{flex:1;min-width:0}
-.shelf-list-title{
+{width:100%;height:100%;object-fit:cover}
+{flex:1;min-width:0}
+{
   font-size:13px;font-weight:600;color:var(--t0);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   margin-bottom:3px;
 }
-.shelf-list-meta{font-size:11px;color:var(--t2)}
-.shelf-list-progress{
+{font-size:11px;color:var(--t2)}
+{
   height:2px;border-radius:1px;
   background:rgba(255,255,255,0.1);
   margin-top:6px;position:relative;overflow:hidden;
 }
-.shelf-list-progress-fill{
+{
   position:absolute;inset:0;right:auto;
   background:var(--acc);border-radius:1px;
 }
@@ -510,14 +510,14 @@
 }
 
 /* ── 書庫清單收藏鈕（v2.11.30：inline 抽 class + 修復未顯示）── */
-.shelf-list-fav{
+{
   background:none; border:none; cursor:pointer;
   font-size:18px; padding:8px; flex-shrink:0;
   color:rgba(255,255,255,0.25);
 }
-.shelf-list-fav.on{ color:#ec4899; }
-[data-theme="eink"] .shelf-list-fav{ color:#999; }
-[data-theme="eink"] .shelf-list-fav.on{ color:#000; }
+{ color:#ec4899; }
+{ color:#999; }
+{ color:#000; }
 
 /* ── 書庫空狀態 + 批量列容器（v2.11.30：inline 抽 class）── */
 .books-empty{ padding:40px 0; }
@@ -528,20 +528,20 @@
 }
 
 /* ── 封面模式卡片（v2.11.30：inline style 抽取）──────────── */
-.shelf-cover-placeholder{
+{
   width:100%; height:100%;
   display:flex; align-items:center; justify-content:center;
   writing-mode:vertical-rl; font-size:11px;
   color:rgba(255,255,255,0.6); text-align:center; padding:6px;
   line-height:1.4; word-break:break-all;
 }
-.shelf-cover-actions{
+{
   display:flex; align-items:center; justify-content:center; margin-top:2px;
 }
-.shelf-cover-fav{
+{
   background:none; border:none; cursor:pointer; font-size:14px; padding:2px 6px;
   color:rgba(255,255,255,0.3);
 }
-.shelf-cover-fav.on{ color:#ec4899; }
-[data-theme="eink"] .shelf-cover-placeholder{ color:#000; }
-[data-theme="eink"] .shelf-cover-fav{ color:#000; }
+{ color:#ec4899; }
+{ color:#000; }
+{ color:#000; }
