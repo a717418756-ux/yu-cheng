@@ -317,6 +317,15 @@ function _renderExpandMode(el){
         cb.checked=_M.bulkSelected.has(m.id);
         cb.onchange=()=>_toggleBulkSelect(m.id);
         row.insertBefore(cb, row.firstChild);
+        // 批量模式：攔截整列點擊→切換勾選，並阻止內部 playAudio 觸發
+        row.classList.add('bulk-selecting');
+        row.addEventListener('click', (e)=>{
+          // 點到 checkbox 本身則交給它的 onchange 處理，不重複切換
+          if(e.target.tagName==='INPUT') return;
+          e.preventDefault();
+          e.stopPropagation();
+          _toggleBulkSelect(m.id);
+        }, true);  // capture：在內部 onclick 之前攔截
       }
       list.appendChild(row);
     });
@@ -332,6 +341,14 @@ function _renderExpandMode(el){
         cb.checked=_M.bulkSelected.has(m.id);
         cb.onchange=e=>{e.stopPropagation();_toggleBulkSelect(m.id);};
         card.appendChild(cb);
+        // 批量模式：攔截卡片點擊→切換勾選，並阻止內部 playVideo 觸發
+        card.classList.add('bulk-selecting');
+        card.addEventListener('click', (e)=>{
+          if(e.target.tagName==='INPUT') return;
+          e.preventDefault();
+          e.stopPropagation();
+          _toggleBulkSelect(m.id);
+        }, true);
       }
       list.appendChild(card);
     });
@@ -382,9 +399,13 @@ function _toggleBulkMode(){
 function _toggleBulkSelect(id){
   if(_M.bulkSelected.has(id)) _M.bulkSelected.delete(id);
   else _M.bulkSelected.add(id);
+  const selected = _M.bulkSelected.has(id);
   // 更新勾選狀態 UI
   const cb = document.getElementById(`bulk-cb-${id}`);
-  if(cb) cb.checked = _M.bulkSelected.has(id);
+  if(cb) cb.checked = selected;
+  // 更新該列/卡片的選中高亮
+  const row = document.getElementById(`arow-${id}`) || cb?.closest('.bulk-selecting');
+  if(row) row.classList.toggle('bulk-selected', selected);
   // 更新確認按鈕
   const confirmBtn = document.getElementById('bulk-confirm-btn');
   if(confirmBtn) confirmBtn.textContent =
