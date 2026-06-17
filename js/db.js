@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.11.30';     // inline抽取第2區:書庫封面模式卡片(placeholder/actions/fav按鈕)抽成class,順帶統一收藏按鈕用.on機制,外觀逐項驗證零變化
+const APP_VERSION  = '2.11.31';     // 移除書庫封面/清單模式只留書架:刪setBooksMode/_mkCoverGrid/_mkListView函式+模式切換按鈕+27個死碼CSS規則,書架模式完整保留
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

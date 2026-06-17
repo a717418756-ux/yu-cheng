@@ -158,13 +158,10 @@ function _renderBooksPage(){
 
   const batch = filtered.slice(0, (_B.page+1)*_B.PAGE);
 
-  if(_B.mode === 'spine'){
-    const shelfEl = _mkShelf(batch, filtered.length);
-    el.appendChild(shelfEl);
-    if(_sortMode) _enableDragSort(shelfEl, _B.allBooks);
-  }
-  else if(_B.mode === 'cover') el.appendChild(_mkCoverGrid(batch, filtered.length));
-  else                          el.appendChild(_mkListView(batch, filtered.length));
+  // 只保留書架模式（spine）
+  const shelfEl = _mkShelf(batch, filtered.length);
+  el.appendChild(shelfEl);
+  if(_sortMode) _enableDragSort(shelfEl, _B.allBooks);
 
   // 批量模式：底部確認列
   if(_B.bulkMode){
@@ -240,14 +237,6 @@ function _mkModeBar(){
       <span style="color:rgba(255,200,80,0.3);font-size:14px;padding:0 4px">｜</span>
       <button class="shelf-section-tab${isShowingFav?' on':''}"
         onclick="toggleShelfSection('fav')">收藏</button>
-    </div>
-    <div class="shelf-mode-btns">
-      <button class="shelf-mode-btn${_B.mode==='spine'?' on':''}"
-        onclick="setBooksMode('spine',this)">書架</button>
-      <button class="shelf-mode-btn${_B.mode==='cover'?' on':''}"
-        onclick="setBooksMode('cover',this)">封面</button>
-      <button class="shelf-mode-btn${_B.mode==='list'?' on':''}"
-        onclick="setBooksMode('list',this)">清單</button>
     </div>`;
   return bar;
 }
@@ -257,15 +246,6 @@ function toggleShelfSection(section){
   _B.filter = section;
   _B.page = 0;
   _renderBooksPage();
-}
-
-function setBooksMode(mode, btn){
-  _B.mode = mode;
-  document.querySelectorAll('.shelf-mode-btn').forEach(b=>b.classList.remove('on'));
-  btn.classList.add('on');
-  // 只重渲染內容區（不重跑 renderBooksPage 以免清掉最近閱讀）
-  const el = document.getElementById('books-list');
-  if(el) _renderBooksPage();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -452,89 +432,6 @@ function _pullBook(id, el){
     el.classList.remove('pulling');
     openBookCover(id);
   }, 200);
-}
-
-// ════════════════════════════════════════════════════════════
-// 封面牆模式（cover）
-// ════════════════════════════════════════════════════════════
-function _mkCoverGrid(books, total){
-  const grid = document.createElement('div');
-  grid.className='shelf-cover-grid';
-  books.forEach(b=>{
-    const card=document.createElement('div');
-    card.className='shelf-cover-card';
-    card.onclick=()=>_B.bulkMode?_toggleBookSelect(b.id,card.querySelector('.shelf-cover-img')):openBookCover(b.id);
-    const t=_SPINE_THEMES[(b.id||0)%_SPINE_THEMES.length];
-    const img=document.createElement('div');
-    img.className='shelf-cover-img';
-    if(b.coverThumb){
-      _fillThumb(img, b.id, 'cover');
-    } else {
-      img.style.background=`linear-gradient(160deg,${t.bg},${t.dark})`;
-      img.innerHTML=`<div class="shelf-cover-placeholder">${esc(b.title||'未命名')}</div>`;
-    }
-    const name=document.createElement('div');
-    name.className='shelf-cover-name';
-    name.textContent=b.title||'未命名';
-    // 底部操作列
-    const actions=document.createElement('div');
-    actions.className='shelf-cover-actions';
-    const favBtn=document.createElement('button');
-    favBtn.className='shelf-cover-fav'+(b.favorite?' on':'');
-    favBtn.textContent=b.favorite?'♥':'♡';
-    favBtn.onclick=e=>{e.stopPropagation();_quickToggleBookFav(b.id,favBtn);};
-    actions.appendChild(favBtn);
-    card.appendChild(img);
-    card.appendChild(name);
-    card.appendChild(actions);
-    grid.appendChild(card);
-  });
-  return grid;
-}
-
-// ════════════════════════════════════════════════════════════
-// 清單模式（list，適合 BOOX）
-// ════════════════════════════════════════════════════════════
-function _mkListView(books, total){
-  const wrap=document.createElement('div');
-  books.forEach(b=>{
-    const item=document.createElement('div');
-    item.className='shelf-list-item';
-    item.onclick=()=>_B.bulkMode?_toggleBookSelect(b.id,item):openBookDetail(b.id);
-    const t=_SPINE_THEMES[(b.id||0)%_SPINE_THEMES.length];
-    const cover=document.createElement('div');
-    cover.className='shelf-list-cover';
-    if(b.coverThumb){
-      cover.innerHTML=`<img src="${b.coverThumb}" loading="lazy" alt="">`;
-    } else if(b.id){
-      // _B.allBooks 不含縮圖，非同步填充
-      _fillThumb(cover, b.id, 'cover');
-    } else {
-      cover.style.background=`linear-gradient(160deg,${t.bg},${t.dark})`;
-    }
-    const info=document.createElement('div');
-    info.className='shelf-list-info';
-    const pct = b.lastPage && b.totalPages ? Math.round(b.lastPage/b.totalPages*100) : 0;
-    info.innerHTML=`
-      <div class="shelf-list-title">${esc(b.title||'未命名')}</div>
-      <div class="shelf-list-meta">
-        ${b.author?esc(b.author)+' · ':''}${(b.fileType||'').toUpperCase()||'書'}
-        ${b.fileSize?' · '+_fmtSize(b.fileSize):''}
-      </div>
-      ${pct>0?`<div class="shelf-list-progress">
-        <div class="shelf-list-progress-fill" style="width:${pct}%"></div>
-      </div>`:''}`;
-    const favBtn=document.createElement('button');
-    favBtn.className='shelf-list-fav'+(b.favorite?' on':'');
-    favBtn.textContent=b.favorite?'♥':'♡';
-    favBtn.onclick=e=>{e.stopPropagation();_quickToggleBookFav(b.id,favBtn);};
-    item.appendChild(cover);
-    item.appendChild(info);
-    item.appendChild(favBtn);
-
-    wrap.appendChild(item);
-  });
-  return wrap;
 }
 
 // ════════════════════════════════════════════════════════════
