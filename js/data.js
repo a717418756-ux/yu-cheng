@@ -1303,24 +1303,24 @@ async function openLawGroup(lawName){  try{
     const contentHtml=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px;cursor:zoom-in" onclick="openImgViewer(this.src)" title="點擊放大">':_hl(l.content||'');
     const kwHtml=(l.keywords||[]).length?'<div style="margin-top:8px">'+l.keywords.map(k=>'<span class="tag">'+esc(k)+'</span>').join('')+'</div>':'';
     const relHtml=(l.relatedLaws||[]).length
-      ?'<div style="margin-top:9px;font-size:11px;color:var(--t2)">🔗 關聯法條：</div>'
-        +l.relatedLaws.map(r=>'<button class="chip" style="font-size:11px;margin:2px" onclick="showLawPop(\''+esc(r.ref||r.lawName||'')+'\')">⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('')
+      ?'<div class="law-art-rel-title">🔗 關聯法條：</div>'
+        +l.relatedLaws.map(r=>'<button class="chip law-rel-chip" onclick="showLawPop(\''+esc(r.ref||r.lawName||'')+'\')">⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('')
       :'';
     // 劃線/筆記顯示（顏色標記 hlColor + 備註 note，整合進編輯表單）
     const hlColors={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'};
     const hlC=l.hlColor&&hlColors[l.hlColor]?hlColors[l.hlColor]:'';
-    const borderC=hlC||'var(--pur2)';
-    const cardBg=hlC?`linear-gradient(to right, ${hlC}14, var(--bg2) 60%)`:'var(--bg2)';
+    // 動態顏色（隨資料變）只能 inline；固定樣式已抽到 .law-art-card class
+    const dynStyle=hlC?` style="background:linear-gradient(to right, ${hlC}14, var(--bg2) 60%);border-left-color:${hlC}"`:'';
     const noteHtml=l.note?'<div class="law-note-box">📝 '+esc(l.note)+'</div>':'';
-    return '<div data-law-id="'+l.id+'" class="law-art-card" style="margin-bottom:12px;padding:12px;background:'+cardBg+';border-radius:8px;border-left:3px solid '+borderC+'">'
-      +'<div style="font-size:14px;font-weight:700;color:var(--acc);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">'
+    return '<div data-law-id="'+l.id+'" class="law-art-card"'+dynStyle+'>'
+      +'<div class="law-art-head">'
         +'<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'
-        +'<div style="display:flex;gap:6px">'
-          +'<button onclick="editLawInView('+l.id+')" class="law-edit-btn" style="background:none;border:none;color:var(--t2);font-size:12px;cursor:pointer">✏</button>'
-          +'<button onclick="delLaw('+l.id+')" class="law-del-btn" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">🗑</button>'
+        +'<div class="law-art-acts">'
+          +'<button onclick="editLawInView('+l.id+')" class="law-edit-btn">✏</button>'
+          +'<button onclick="delLaw('+l.id+')" class="law-del-btn">🗑</button>'
         +'</div>'
       +'</div>'
-      +'<div style="font-size:14px;line-height:1.85;color:var(--t1)">'+contentHtml+'</div>'
+      +'<div class="law-art-body">'+contentHtml+'</div>'
       +noteHtml+kwHtml+relHtml
     +'</div>';
   };
