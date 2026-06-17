@@ -579,9 +579,7 @@ function _showVinylPlayer(meta, url, full){
 
   const ov=document.createElement('div');
   ov.id='vinyl-player-ov';
-  ov.style.cssText=`position:fixed;inset:0;z-index:600;
-    background:#0a0a0a;
-    display:flex;flex-direction:column;overflow:hidden`;
+  ov.className='media-ov-fullplayer';
 
   const lastPos=full.lastPos||0;
 
@@ -782,8 +780,7 @@ function _openAudioMenu(id){
   document.getElementById('audio-menu-sheet')?.remove();
   const sheet = document.createElement('div');
   sheet.id = 'audio-menu-sheet';
-  sheet.style.cssText = `position:fixed;inset:0;z-index:700;
-    background:rgba(0,0,0,0.6);display:flex;align-items:flex-end`;
+  sheet.className = 'media-ov-sheet z700';
   sheet.onclick = e=>{ if(e.target===sheet) sheet.remove(); };
   dg('leisuremedia', id).then(m=>{
     if(!m) return;
@@ -835,9 +832,7 @@ function _showCoverCropUI(dataUrl, mediaId){
 
   const ui = document.createElement('div');
   ui.id = 'cover-crop-ui';
-  ui.style.cssText = `position:fixed;inset:0;z-index:700;
-    background:rgba(0,0,0,0.92);display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:16px`;
+  ui.className = 'media-ov-zoom';
 
   let scale = 1, tx = 0, ty = 0;
 
@@ -1231,8 +1226,7 @@ async function playVideo(id){
   const url=URL.createObjectURL(full.blob);
   const ov=document.createElement('div');
   ov.id='video-player-ov';
-  ov.style.cssText=`position:fixed;inset:0;z-index:600;background:#000;
-    display:flex;flex-direction:column`;
+  ov.className='media-ov-fullplayer video';
 
   ov.innerHTML=`
     <div class="vvp-topbar">
@@ -1264,8 +1258,7 @@ async function _openVideoMenu(id, btn){
   document.getElementById('video-menu-sheet')?.remove();
   const sheet = document.createElement('div');
   sheet.id = 'video-menu-sheet';
-  sheet.style.cssText = `position:fixed;inset:0;z-index:700;
-    background:rgba(0,0,0,0.6);display:flex;align-items:flex-end`;
+  sheet.className = 'media-ov-sheet z700';
   sheet.onclick = e=>{ if(e.target===sheet) sheet.remove(); };
   // 先讀取資料再顯示
   const _m = await dg('leisuremedia', id);
@@ -1389,7 +1382,7 @@ function _updateAudioRowHighlight(id){
 function openAddMedia(){
   const ov=document.createElement('div');
   ov.id='add-media-ov';
-  ov.style.cssText='position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end';
+  ov.className='media-ov-sheet z500';
   ov.innerHTML=`
     <div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);
       border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:90vh;overflow-y:auto">
@@ -1550,7 +1543,7 @@ async function openMediaDetail(id){
   document.getElementById('media-detail-ov')?.remove();
   const ov=document.createElement('div');
   ov.id='media-detail-ov';
-  ov.style.cssText='position:fixed;inset:0;z-index:700;background:rgba(0,0,0,0.75);display:flex;align-items:flex-end';
+  ov.className='media-ov-sheet z700-d';
   ov.innerHTML=`
     <div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);
       border-radius:20px 20px 0 0;padding:8px 0 28px">
