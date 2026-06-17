@@ -1280,3 +1280,27 @@
   display:flex; flex-direction:column;
   align-items:center; justify-content:center; gap:16px;
 }
+
+/* ── 影音詳情面板 + 縮圖預覽（v2.11.40）──────────────── */
+.media-detail-panel{
+  width:100%; max-width:520px; margin:0 auto;
+  background:var(--bg1); border-radius:20px 20px 0 0; padding:8px 0 28px;
+}
+.media-detail-handle{
+  width:36px; height:4px; background:var(--bd);
+  border-radius:2px; margin:10px auto 14px;
+}
+.media-detail-thumb-wrap{
+  display:flex; justify-content:center; padding:6px 20px 14px;
+}
+.media-detail-thumb{
+  width:120px; height:120px; object-fit:cover; border-radius:12px;
+  background:#1a1a1a;
+}
+.media-detail-thumb.audio{ border-radius:50%; }
+.media-detail-thumb.placeholder{
+  display:flex; align-items:center; justify-content:center;
+  font-size:42px; color:rgba(255,255,255,0.3);
+}
+[data-theme="eink"] .media-detail-thumb{ background:#e8e8e8; }
+[data-theme="eink"] .media-detail-thumb.placeholder{ color:#000; }
