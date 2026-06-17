@@ -253,8 +253,9 @@ function _mkPagerBar(current, total, scope){
   const go = p => {
     if(scope==='expand'){
       _M.expandPage = p;
-      const host = document.getElementById('pg-media');
-      if(host){ _renderExpandMode(host); host.scrollTo({top:0,behavior:'smooth'}); }
+      _renderMediaPage();  // 走正確流程，重建 header（返回鍵/搜尋）+ 內容
+      const el = document.getElementById('media-list');
+      if(el) el.scrollTo({top:0,behavior:'smooth'});
     }
   };
   const pages = [];
