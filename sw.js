@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '3.1.1';
+const APP_VERSION = '3.2.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
@@ -21,6 +21,7 @@ const CORE_ASSETS = [
   './css/eink.css',
   './css/splash.css',
   './css/english.css',
+  './css/fitness.css',
   './js/db.js',
   './js/books.js',
   './js/media.js',
@@ -28,6 +29,8 @@ const CORE_ASSETS = [
   './js/quiz.js',
   './js/data.js',
   './js/english.js',
+  './js/fitness.js',
+  './js/dtask.js',
   './js/stats.js',
   './js/settings.js',
   './js/countdown.js',

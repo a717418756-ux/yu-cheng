@@ -26,6 +26,7 @@
   <link rel="stylesheet" href="css/eink.css">
 <link rel="stylesheet" href="css/splash.css">
 <link rel="stylesheet" href="css/english.css">
+<link rel="stylesheet" href="css/fitness.css">
 <script>
 /* 早期主題套用：避免畫面閃白（IDB 非同步，先暫存到 localStorage） */
 (function(){
@@ -115,7 +116,7 @@
       <div class="zone-bar"></div>
       <div class="zone-body">
         <div class="zone-icon">🎧</div>
-        <div class="zone-title">學習區</div>
+        <div class="zone-title">成長區</div>
         <div class="zone-desc">課程・音訊・碎片・複習</div>
       </div>
     </div>
@@ -157,6 +158,15 @@
       <span class="heatmap-dot" style="background:var(--hm4)"></span>
       <span class="heatmap-legend-l">多</span>
     </div>
+  </div>
+
+  <!-- 每日任務 -->
+  <div class="dtask-wrap" id="dtask-wrap">
+    <div class="dtask-header">
+      <span class="dtask-title">每日任務</span>
+      <button class="dtask-edit-btn" id="dtask-edit-btn" onclick="toggleDtaskEdit()">編輯</button>
+    </div>
+    <div class="dtask-list" id="dtask-list"></div>
   </div>
 
   <!-- 熱力圖點擊視窗（當日圓餅）-->
@@ -244,15 +254,24 @@
     </div>
   </div>
 
-  <!-- 學習區展開面板 -->
+  <!-- 成長區展開面板 -->
   <div class="zone-panel" id="panel-study">
     <div class="zone-panel-inner">
-      <button class="zone-act-btn" onclick="goPage('english')">
-        <span style="font-size:22px">🗣️</span>
-        <span style="display:flex;flex-direction:column;align-items:flex-start;gap:1px">
-          <b style="font-size:14px">英語學習庫</b>
-          <small style="font-size:11px;color:var(--t2)">上傳英文・聽讀・朗讀跟讀</small>
-        </span>
+      <button class="zpanel-main" onclick="goPage('english')">
+        <span class="zpanel-main-icon">🗣️</span>
+        <div class="zpanel-main-text">
+          <div class="t">英語學習庫</div>
+          <div class="s">上傳英文・聽讀・朗讀跟讀</div>
+        </div>
+        <span class="zpanel-main-arrow">›</span>
+      </button>
+      <button class="zpanel-main" onclick="goPage('fitness')">
+        <span class="zpanel-main-icon">🏃</span>
+        <div class="zpanel-main-text">
+          <div class="t">運動健康庫</div>
+          <div class="s">運動時長・消耗與攝取卡路里</div>
+        </div>
+        <span class="zpanel-main-arrow">›</span>
       </button>
     </div>
   </div>
@@ -440,6 +459,17 @@
   </div>
   <div style="font-size:11px;color:var(--t2);padding:8px 14px 4px">點材料開始閱讀，朗讀時逐句高亮</div>
   <div id="eng-list" style="padding:8px 12px"></div>
+</div>
+
+<!-- FITNESS 運動健康庫 -->
+<div id="pg-fitness" class="page hide">
+  <div class="hd">
+    <div class="hdt">運動健康庫</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="hd-btn blue plus" onclick="openHealthApp()" title="開啟健康 App">♥</button>
+    </div>
+  </div>
+  <div id="fitness-body" style="padding:12px 14px 40px"></div>
 </div>
 
 <!-- 英語閱讀器（覆蓋層）-->
@@ -901,6 +931,8 @@
 <script src="js/quiz.js"></script>
 <script src="js/data.js"></script>
 <script src="js/english.js"></script>
+<script src="js/fitness.js"></script>
+<script src="js/dtask.js"></script>
 <script src="js/stats.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/countdown.js"></script>
