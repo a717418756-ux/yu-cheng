@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.11.39';     // inline抽取第9區:media.js全部7處全螢幕遮罩抽成語意class(sheet/fullplayer/zoom+z-index變體),media.js的cssText全部歸零
+const APP_VERSION  = '2.11.40';     // 影音詳情頁加縮圖預覽:原本只有文字無圖，現顯示縮圖(正確處理Blob/base64),無圖則placeholder圖示，順手把面板inline抽class
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

@@ -1541,16 +1541,24 @@ async function openMediaDetail(id){
   const m=await dg('leisuremedia',id);
   if(!m){toast('找不到');return;}
   document.getElementById('media-detail-ov')?.remove();
+  // 縮圖可能是 Blob（新）或 base64 字串（舊），統一轉為可顯示 URL
+  let thumbUrl='';
+  if(m.thumbnail instanceof Blob) thumbUrl=URL.createObjectURL(m.thumbnail);
+  else if(typeof m.thumbnail==='string') thumbUrl=m.thumbnail;
+  const isAudio=m.type!=='video';
+  const thumbHtml=thumbUrl
+    ? `<img src="${thumbUrl}" alt="" class="media-detail-thumb${isAudio?' audio':''}">`
+    : `<div class="media-detail-thumb placeholder${isAudio?' audio':''}">${isAudio?'🎵':'🎬'}</div>`;
   const ov=document.createElement('div');
   ov.id='media-detail-ov';
   ov.className='media-ov-sheet z700-d';
   ov.innerHTML=`
-    <div style="width:100%;max-width:520px;margin:0 auto;background:var(--bg1);
-      border-radius:20px 20px 0 0;padding:8px 0 28px">
-      <div style="width:36px;height:4px;background:var(--bd);border-radius:2px;margin:10px auto 14px"></div>
-      <!-- 詳細資料：直接顯示，不需按鈕 -->
+    <div class="media-detail-panel">
+      <div class="media-detail-handle"></div>
+      <div class="media-detail-thumb-wrap">${thumbHtml}</div>
+      <!-- 詳細資料 -->
       <div style="padding:0 20px 16px">
-        <div style="font-size:16px;font-weight:700;color:var(--t0);margin-bottom:8px">
+        <div style="font-size:16px;font-weight:700;color:var(--t0);margin-bottom:8px;text-align:center">
           ${esc(m.title||'未命名')}
         </div>
         <div style="font-size:12px;color:var(--t2);line-height:2">
