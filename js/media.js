@@ -298,7 +298,7 @@ function _renderExpandMode(el){
 
   // 計數
   const cntDiv=document.createElement('div');
-  cntDiv.style.cssText='font-size:11px;color:var(--t2);padding:4px 14px 8px';
+  cntDiv.className='media-count';
   cntDiv.textContent=`共 ${items.length} 筆`;
   el.appendChild(cntDiv);
 
@@ -313,7 +313,7 @@ function _renderExpandMode(el){
       if(_M.bulkMode){
         const cb=document.createElement('input');
         cb.type='checkbox'; cb.id=`bulk-cb-${m.id}`;
-        cb.style.cssText='width:18px;height:18px;margin:0 10px 0 14px;flex-shrink:0;accent-color:var(--acc)';
+        cb.className='media-bulk-cb';
         cb.checked=_M.bulkSelected.has(m.id);
         cb.onchange=()=>_toggleBulkSelect(m.id);
         row.insertBefore(cb, row.firstChild);
@@ -328,7 +328,7 @@ function _renderExpandMode(el){
         card.style.position='relative';
         const cb=document.createElement('input');
         cb.type='checkbox'; cb.id=`bulk-cb-${m.id}`;
-        cb.style.cssText='position:absolute;top:8px;left:8px;width:20px;height:20px;z-index:2;accent-color:var(--acc)';
+        cb.className='media-bulk-cb-card';
         cb.checked=_M.bulkSelected.has(m.id);
         cb.onchange=e=>{e.stopPropagation();_toggleBulkSelect(m.id);};
         card.appendChild(cb);
@@ -341,18 +341,11 @@ function _renderExpandMode(el){
   // 批量模式：底部確認列
   if(_M.bulkMode){
     const bar=document.createElement('div');
-    bar.style.cssText=`position:sticky;bottom:0;background:var(--bg1);
-      border-top:1px solid rgba(255,255,255,0.08);
-      padding:12px 14px;display:flex;gap:10px;z-index:10`;
+    bar.className='media-bulk-bar';
     bar.innerHTML=`
-      <button onclick="_toggleBulkMode()"
-        style="flex:1;padding:11px;background:rgba(255,255,255,0.06);
-        border:1px solid var(--bd);color:var(--t1);border-radius:10px;
-        font-size:13px;cursor:pointer">取消</button>
-      <button id="bulk-confirm-btn" onclick="_executeBulk()"
-        style="flex:2;padding:11px;
-        background:${_M.expandMode==='fav'?'rgba(37,98,200,0.85)':'rgba(200,50,50,0.8)'};
-        color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">
+      <button onclick="_toggleBulkMode()" class="media-bulk-cancel">取消</button>
+      <button id="bulk-confirm-btn" onclick="_executeBulk()" class="media-bulk-confirm"
+        style="background:${_M.expandMode==='fav'?'rgba(37,98,200,0.85)':'rgba(200,50,50,0.8)'}">
         ${_M.expandMode==='fav'?'移除收藏 (0)':'刪除 (0)'}
       </button>`;
     el.appendChild(bar);
@@ -1111,54 +1104,35 @@ function openVpPlaylist(){
   // 橫向捲動卡片列表（唱盤縮圖 + 名稱）
   const panel = document.createElement('div');
   panel.id = 'vp-playlist-panel';
-  panel.style.cssText = `
-    background:rgba(8,8,12,0.97);
-    border-top:2px solid rgba(255,255,255,0.08);
-    padding:0 0 20px;`;
+  panel.className = 'vp-pl-panel';
 
   // 標題列
   const titleBar = document.createElement('div');
-  titleBar.style.cssText = `
-    display:flex;align-items:center;justify-content:space-between;
-    padding:10px 16px 8px;
-    border-bottom:1px solid rgba(255,255,255,0.05);`;
+  titleBar.className = 'vp-pl-titlebar';
   const _listCategory = _M.playlist[0]?.category || '';
   titleBar.innerHTML = `
-    <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.85)">
+    <div class="vp-pl-title">
       ${_listCategory ? esc(_listCategory) : '播放清單'}
     </div>
-    <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-left:auto">
+    <div class="vp-pl-count">
       共 ${_M.playlist.length} 首
     </div>`;
   panel.appendChild(titleBar);
 
   // 橫向捲動列
   const row = document.createElement('div');
-  row.style.cssText = `
-    display:flex;flex-direction:row;align-items:center;gap:12px;
-    padding:8px 16px 0;
-    overflow-x:auto;overflow-y:hidden;
-    scrollbar-width:none;-webkit-overflow-scrolling:touch;`;
+  row.className = 'vp-pl-row';
 
   _M.playlist.forEach((m, i)=>{
     const isActive = (i === _M.playIdx);
     const card = document.createElement('div');
-    card.style.cssText = `
-      flex-shrink:0;width:70px;
-      display:flex;flex-direction:column;align-items:center;gap:5px;
-      cursor:pointer;opacity:${isActive?'1':'0.65'};
-      transition:opacity .15s;`;
+    card.className = 'vp-pl-card'+(isActive?' active':'');
     card.onclick = ()=>playAudio(m.id);
 
     // 唱盤縮圖（小圓形）
     const thumb = document.createElement('div');
     thumb.dataset.pthumb = '1';  // 供非同步 thumbnail 填充識別
-    thumb.style.cssText = `
-      width:56px;height:56px;border-radius:50%;
-      background:radial-gradient(circle at 50%,#2a2a36 0%,#111 25%,#1c1c24 45%,#111 65%,#0e0e12 100%);
-      overflow:hidden;flex-shrink:0;
-      box-shadow:${isActive?'0 0 0 2.5px #ffffff,0 0 0 4px rgba(255,255,255,0.15)':'0 2px 8px rgba(0,0,0,0.5)'};
-      position:relative;display:flex;align-items:center;justify-content:center;`;
+    thumb.className = 'vp-pl-thumb'+(isActive?' active':'');
     if(m.thumbnail){
       const img = document.createElement('img');
       img.src = m.thumbnail;
@@ -1167,29 +1141,19 @@ function openVpPlaylist(){
     } else {
       // 無封面：顯示黑膠紋路圖案
       const inner = document.createElement('div');
-      inner.style.cssText = 'width:100%;height:100%;border-radius:50%;'
-        +'background:radial-gradient(circle at 50% 50%,#333 0%,#111 30%,#222 55%,#1a1a1a 70%,#111 100%)';
+      inner.className = 'vp-pl-vinyl';
       thumb.appendChild(inner);
     }
     // 正在播放指示
     if(isActive){
       const dot = document.createElement('div');
-      dot.style.cssText = `
-        position:absolute;bottom:3px;right:3px;
-        width:10px;height:10px;border-radius:50%;
-        background:rgba(255,255,255,0.9);border:1.5px solid #0a0a0a;`;
+      dot.className = 'vp-pl-dot';
       thumb.appendChild(dot);
     }
 
     // 名稱
     const name = document.createElement('div');
-    name.style.cssText = `
-      font-size:10px;font-weight:${isActive?'700':'500'};
-      color:${isActive?'#ffffff':'rgba(255,255,255,0.65)'};
-      text-align:center;line-height:1.3;
-      width:100%;overflow:hidden;
-      display:-webkit-box;-webkit-line-clamp:2;
-      -webkit-box-orient:vertical;`;
+    name.className = 'vp-pl-name'+(isActive?' active':'');
     name.textContent = m.title||'未命名';
 
     card.appendChild(thumb);

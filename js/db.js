@@ -306,5 +306,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '2.11.35';     // inline抽取第6區:data.js返回按鈕(2處共用)+選取checkbox+法條搜尋卡片抽class,data.js的cssText已全部清零
+const APP_VERSION  = '2.11.37';     // inline抽取第8區:迷你播放器播放清單面板整組(10個vp-pl class)抽取,active狀態用修飾類,動態值逐一核對,media.js剩7處
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
