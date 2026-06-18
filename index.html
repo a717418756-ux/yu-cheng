@@ -143,6 +143,9 @@
   </div>
 
   <!-- 熱力圖（過去35天）-->
+  <!-- 運動健康摘要（與成長軌跡連動顯示/隱藏）-->
+  <div class="fitsum-wrap" id="fit-summary"></div>
+
   <div class="heatmap-wrap" id="heatmap-wrap">
     <div class="heatmap-header">
       <span class="heatmap-title">成長軌跡</span>
@@ -164,13 +167,13 @@
   <div class="dtask-wrap" id="dtask-wrap">
     <div class="dtask-header">
       <span class="dtask-title">每日任務</span>
-      <button class="dtask-edit-btn" id="dtask-edit-btn" onclick="toggleDtaskEdit()">編輯</button>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="dtask-edit-btn" id="dtask-hist-btn" onclick="openDtaskHistory()">歷史</button>
+        <button class="dtask-edit-btn" id="dtask-edit-btn" onclick="toggleDtaskEdit()">編輯</button>
+      </div>
     </div>
     <div class="dtask-list" id="dtask-list"></div>
   </div>
-
-  <!-- 運動健康摘要（與成長軌跡連動顯示/隱藏）-->
-  <div class="fitsum-wrap" id="fit-summary"></div>
 
   <!-- 熱力圖點擊視窗（當日圓餅）-->
   <div class="ov" id="heatmap-ov" onclick="closeHeatmapOv()">
