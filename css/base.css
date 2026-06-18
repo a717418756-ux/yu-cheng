@@ -1294,21 +1294,10 @@ input:focus, textarea:focus, select:focus{
   font-weight:600; cursor:pointer; padding:4px 8px; -webkit-tap-highlight-color:transparent;
 }
 /* 進度條 */
-.dtask-progress{
-  display:flex; align-items:center; gap:10px; margin-bottom:12px;
-}
-.dtask-progress-bar{
-  flex:1; height:6px; background:rgba(255,255,255,0.08);
-  border-radius:3px; overflow:hidden;
-}
-.dtask-progress-fill{
-  height:100%; background:linear-gradient(90deg,#4caf7d,#6ee0a0);
-  border-radius:3px; transition:width .3s ease;
-}
-.dtask-progress-txt{
-  font-size:12px; color:var(--t2); font-weight:600;
-  font-variant-numeric:tabular-nums; min-width:32px; text-align:right;
-}
+
+
+
+
 /* 任務項 */
 .dtask-item{
   display:flex; align-items:center; gap:11px;
@@ -1349,7 +1338,7 @@ input:focus, textarea:focus, select:focus{
 /* eink 高對比 */
 [data-theme="eink"] .dtask-wrap{ background:#fff; border-color:#999; }
 [data-theme="eink"] .dtask-title{ color:#000; }
-[data-theme="eink"] .dtask-progress-fill{ background:#000; }
+[data-theme="eink"] 
 [data-theme="eink"] .dtask-item.done .dtask-check{ background:#000; border-color:#000; }
 [data-theme="eink"] .dtask-check{ border-color:#555; }
 [data-theme="eink"] .dtask-text{ color:#000; }
@@ -1369,19 +1358,60 @@ input:focus, textarea:focus, select:focus{
 .dtask-ach{ width:22px; height:22px; }
 .dtask-ach-full{ color:#e0a020; }   /* 全達成金 */
 .dtask-ach-half{ color:#4caf7d; }   /* 過半綠 */
-.dtask-ach-low{  color:rgba(255,255,255,0.2); }  /* 未過半灰 */
+  /* 未過半灰 */
 .dtask-hist-date{ font-size:9px; color:var(--t2); }
-.dtask-hist-stat{
-  display:flex; gap:12px; justify-content:center; flex-wrap:wrap;
-}
-.dtask-stat-item{ font-size:11px; color:var(--t2); display:flex; align-items:center; gap:3px; }
-.dtask-stat-ico{ font-size:12px; }
-.dtask-stat-ico.full{ color:#e0a020; }
-.dtask-stat-ico.half{ color:#4caf7d; }
-.dtask-stat-ico.low{ color:rgba(255,255,255,0.3); }
+
+
+
+
+
+
 /* eink */
 [data-theme="eink"] .dtask-ach-full{ color:#000; }
 [data-theme="eink"] .dtask-ach-half{ color:#444; }
-[data-theme="eink"] .dtask-ach-low{ color:#bbb; }
+[data-theme="eink"] 
 [data-theme="eink"] .dtask-stat-ico.full,
-[data-theme="eink"] .dtask-stat-ico.half{ color:#000; }
+[data-theme="eink"] 
+
+/* ════ 【每日任務】v3.2.3 圓形進度 + 左右佈局 + 達成圖示 ════ */
+/* 主體：左任務 右圓環 */
+.dtask-main{
+  display:flex; align-items:center; gap:16px;
+}
+.dtask-tasks{ flex:1; min-width:0; }
+/* 圓形進度環 */
+.dtask-ring-box{
+  position:relative; width:84px; height:84px; flex-shrink:0;
+}
+.dtask-ring{ width:84px; height:84px; }
+.dtask-ring-bg{
+  fill:none; stroke:rgba(255,255,255,0.08); stroke-width:6;
+}
+.dtask-ring-fg{
+  fill:none; stroke-width:6; stroke-linecap:round;
+  transition:stroke-dasharray .5s cubic-bezier(.4,0,.2,1);
+}
+.dtask-ring-txt{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:1px;
+}
+.dtask-ring-pct{
+  font-size:20px; font-weight:800; color:var(--t0);
+  line-height:1; font-variant-numeric:tabular-nums;
+}
+.dtask-ring-pct small{ font-size:11px; font-weight:600; color:var(--t2); }
+.dtask-ring-sub{ font-size:10px; color:var(--t2); font-variant-numeric:tabular-nums; }
+/* 達成歷史：只有圖示 */
+.dtask-ach-full{ color:#e0a020; }  /* 獎盃金 */
+.dtask-ach-half{ color:#d4d8e0; }  /* 星星銀 */
+.dtask-ach-low{  color:#e08a3c; }  /* 三角驚嘆橘 */
+.dtask-ach-none{ color:rgba(255,255,255,0.22); }  /* 叉叉灰 */
+/* eink 四圖示 */
+[data-theme="eink"] .dtask-ach-full,
+[data-theme="eink"] .dtask-ach-half,
+[data-theme="eink"] .dtask-ach-low{ color:#000; }
+[data-theme="eink"] .dtask-ach-none{ color:#bbb; }
+[data-theme="eink"] .dtask-ring-fg{ stroke:#000 !important; }
+[data-theme="eink"] .dtask-ring-pct{ color:#000; }
+/* 勾選改用 SVG */
+.dtask-check svg{ width:14px; height:14px; }
