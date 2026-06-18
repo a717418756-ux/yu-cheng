@@ -155,6 +155,7 @@ async function renderFitness(){
     </div>
     <button class="fit-save-btn" onclick="saveFitData()">儲存今日數據</button>
   `;
+  _applyHealthData(); // 頁面渲染完後，補上 Health Connect 資料
 }
 
 function _fitDateLabel(){
@@ -233,19 +234,29 @@ async function openHealthApp(){
 }
 
 // 【Health Connect 自動同步】
-window.addEventListener('healthData', function(e) {
-  const d = e.detail;
+let _pendingHealthData = null;
 
-  // 填入 input 欄位（手動輸入區）
+window.addEventListener('healthData', function(e) {
+  _pendingHealthData = e.detail;
+  _applyHealthData();
+});
+
+function _applyHealthData() {
+  const d = _pendingHealthData;
+  if (!d) return;
+
   const inActive = document.getElementById('fit-in-active');
   const inBurned = document.getElementById('fit-in-burned');
   const inIntake = document.getElementById('fit-in-intake');
 
-  if (inActive && d.exerciseMinutes) inActive.value = d.exerciseMinutes;
-  if (inBurned && d.caloriesBurned) inBurned.value = d.caloriesBurned;
-  if (inIntake && d.caloriesIntake) inIntake.value = d.caloriesIntake;
+  if (!inActive) return; // 頁面還沒渲染，等之後再試
 
-  // 同時觸發儲存，讓畫面顯示區也一起更新
+  if (d.exerciseMinutes) inActive.value = d.exerciseMinutes;
+  if (d.caloriesBurned) inBurned.value = d.caloriesBurned;
+  if (d.caloriesIntake) inIntake.value = d.caloriesIntake;
+
   const saveBtn = document.querySelector('#fitness-body button[onclick*="saveFit"]');
   if (saveBtn) saveBtn.click();
-});
+
+  _pendingHealthData = null;
+}
