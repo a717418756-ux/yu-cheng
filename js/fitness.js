@@ -198,39 +198,16 @@ async function saveFitData(){
 // ════════════════════════════════════════════════════════════
 // 【運動健康庫：開啟三星健康 App】
 // ════════════════════════════════════════════════════════════
-async function openHealthApp(){
-  const pkg = 'com.sec.android.app.shealth';
-  // 1) Capacitor 環境：用原生外掛開啟（打包後可用）
-  if(window.Capacitor?.isNativePlatform?.()){
-    try{
-      // 需安裝 @capacitor/app-launcher 外掛
-      const launcher = window.Capacitor.Plugins?.AppLauncher;
-      if(launcher){
-        const { value } = await launcher.canOpenUrl({ url: pkg });
-        if(value){
-          await launcher.openUrl({ url: pkg });
-          return;
-        }
-      }
-    }catch(e){ /* 落到下方提示 */ }
-    toast('找不到三星健康，請確認已安裝');
+async function openHealthApp() {
+  if (window.Capacitor?.isNativePlatform?.()) {
+    try {
+      window.location.href = 'intent://com.sec.android.app.shealth/#Intent;scheme=samsunghealth;package=com.sec.android.app.shealth;launchFlags=0x10000000;end';
+    } catch(e) {
+      toast('找不到三星健康，請確認已安裝');
+    }
     return;
   }
-  // 2) 純網頁環境：用 intent 但不帶 Play 商店 fallback
-  // （S Browser/Chrome 上若已裝 app 會直接開，未裝則無動作，不會跳商店）
-  try{
-    const intent = `intent://com.sec.android.app.shealth/#Intent;scheme=samsunghealth;package=${pkg};end`;
-    const a = document.createElement('a');
-    a.href = intent;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(()=>a.remove(), 100);
-  }catch(e){}
-  // 提示（網頁環境本就難直接開啟其他 app）
-  setTimeout(()=>{
-    toast('網頁版較難直接開啟；打包成 App 後可一鍵開啟三星健康');
-  }, 600);
+  toast('網頁版無法直接開啟 App');
 }
 
 // 【Health Connect 自動同步】
@@ -240,6 +217,21 @@ window.addEventListener('healthData', function(e) {
   _pendingHealthData = e.detail;
   _applyHealthData();
 });
+
+function _applyHealthData() {
+  const d = _pendingHealthData;
+  if (!d) return;
+  const inActive = document.getElementById('fit-in-active');
+  const inBurned = document.getElementById('fit-in-burned');
+  const inIntake = document.getElementById('fit-in-intake');
+  if (!inActive) return;
+  if (d.exerciseMinutes) inActive.value = d.exerciseMinutes;
+  if (d.caloriesBurned) inBurned.value = d.caloriesBurned;
+  if (d.caloriesIntake) inIntake.value = d.caloriesIntake;
+  const saveBtn = document.querySelector('#fitness-body button[onclick*="saveFit"]');
+  if (saveBtn) saveBtn.click();
+  _pendingHealthData = null;
+}
 
 function _applyHealthData() {
   const d = _pendingHealthData;
