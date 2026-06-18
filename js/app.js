@@ -14,15 +14,20 @@
 function _setHomeWidgets(show, zone){
   const dataBar = document.getElementById('h-data-bar');
   const heatmap = document.getElementById('heatmap-wrap');
+  const dtask   = document.getElementById('dtask-wrap');
+  const fitsum  = document.getElementById('fit-summary');
   if(!dataBar || !heatmap) return;
   if(show){
-    // 無區展開：只顯示熱力圖，數據橫條屬於考試區不顯示
+    // 無區展開：顯示成長軌跡 + 每日任務 + 運動摘要
     dataBar.style.display = 'none';
     heatmap.style.display = '';
+    if(dtask) dtask.style.display = '';
+    if(fitsum) fitsum.style.display = '';
   } else {
-    // 有區展開：熱力圖隱藏
+    // 有區展開：首頁總覽元件一起隱藏
     heatmap.style.display = 'none';
-    // 數據橫條只在考試區顯示
+    if(dtask) dtask.style.display = 'none';
+    if(fitsum) fitsum.style.display = 'none';
     dataBar.style.display = (zone === 'exam') ? '' : 'none';
   }
 }

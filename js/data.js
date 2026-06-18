@@ -78,6 +78,7 @@ async function renderHome(){  try{
   // 熱力圖
   renderHeatmap();
   renderDtask().catch(()=>{});
+  if(typeof renderFitSummary==='function') renderFitSummary().catch(()=>{});
 
   // 考試倒數
   renderCountdown();

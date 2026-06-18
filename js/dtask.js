@@ -46,19 +46,13 @@ async function renderDtask(){
     return;
   }
 
-  // 完成進度
   const doneCount = items.filter(it=>done.includes(it.id)).length;
   const pct = Math.round(doneCount / items.length * 100);
 
-  // 達成歷史（最近 7 天圖示 + 統計）
+  // ── 達成歷史（最近 7 天，只顯示圖示，可查 35 天）──
   const hist = await _getDtaskHistory();
-  const histKeys = Object.keys(hist).sort();  // 日期升序
+  const histKeys = Object.keys(hist).sort();
   const recent = histKeys.slice(-7);
-  let fullCnt=0, halfCnt=0, lowCnt=0;
-  for(const k of histKeys){
-    const r = hist[k];
-    if(r>=1) fullCnt++; else if(r>=0.5) halfCnt++; else lowCnt++;
-  }
   let histHtml = '';
   if(recent.length && !_dtaskEditMode){
     const icons = recent.map(k=>{
@@ -69,43 +63,56 @@ async function renderDtask(){
         <span class="dtask-hist-date">${dd}</span>
       </div>`;
     }).join('');
-    histHtml = `
-      <div class="dtask-hist">
-        <div class="dtask-hist-row">${icons}</div>
-        <div class="dtask-hist-stat">
-          <span class="dtask-stat-item"><span class="dtask-stat-ico full">★</span>全達成 ${fullCnt}</span>
-          <span class="dtask-stat-item"><span class="dtask-stat-ico half">◑</span>過半 ${halfCnt}</span>
-          <span class="dtask-stat-item"><span class="dtask-stat-ico low">○</span>未過半 ${lowCnt}</span>
-        </div>
-      </div>`;
+    histHtml = `<div class="dtask-hist"><div class="dtask-hist-row">${icons}</div></div>`;
   }
 
-  let html = histHtml + `
-    <div class="dtask-progress">
-      <div class="dtask-progress-bar"><div class="dtask-progress-fill" style="width:${pct}%"></div></div>
-      <span class="dtask-progress-txt">${doneCount}/${items.length}</span>
-    </div>`;
-
-  html += items.map(it=>{
-    const isDone = done.includes(it.id);
-    if(_dtaskEditMode){
-      return `<div class="dtask-item editing">
+  // ── 編輯模式：清單 + 新增 ──
+  if(_dtaskEditMode){
+    let editHtml = items.map(it=>`
+      <div class="dtask-item editing">
         <input class="dtask-item-input" value="${_esc(it.text)}" data-id="${it.id}"
           oninput="dtaskEditText('${it.id}', this.value)">
         <button class="dtask-del" onclick="dtaskDelete('${it.id}')">✕</button>
-      </div>`;
-    }
+      </div>`).join('');
+    editHtml += `<button class="dtask-add" onclick="dtaskAdd()">＋ 新增任務</button>`;
+    list.innerHTML = editHtml;
+    return;
+  }
+
+  // ── 一般模式：左任務清單 + 右圓形進度 ──
+  const tasksHtml = items.map(it=>{
+    const isDone = done.includes(it.id);
     return `<div class="dtask-item${isDone?' done':''}" onclick="dtaskToggle('${it.id}')">
-      <span class="dtask-check">${isDone?'✓':''}</span>
+      <span class="dtask-check">${isDone?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</span>
       <span class="dtask-text">${_esc(it.text)}</span>
     </div>`;
   }).join('');
 
-  if(_dtaskEditMode){
-    html += `<button class="dtask-add" onclick="dtaskAdd()">＋ 新增任務</button>`;
-  }
+  // 圓形進度條（SVG 環形）
+  const R = 30, C = 2 * Math.PI * R;
+  const dash = C * (pct/100);
+  const ringColor = pct>=100 ? '#e0a020' : pct>=50 ? '#4caf7d' : '#6ea8fe';
+  const ringHtml = `
+    <div class="dtask-ring-box">
+      <svg class="dtask-ring" viewBox="0 0 72 72">
+        <circle class="dtask-ring-bg" cx="36" cy="36" r="${R}"></circle>
+        <circle class="dtask-ring-fg" cx="36" cy="36" r="${R}"
+          stroke="${ringColor}"
+          stroke-dasharray="${dash} ${C}"
+          stroke-dashoffset="0"
+          transform="rotate(-90 36 36)"></circle>
+      </svg>
+      <div class="dtask-ring-txt">
+        <span class="dtask-ring-pct">${pct}<small>%</small></span>
+        <span class="dtask-ring-sub">${doneCount}/${items.length}</span>
+      </div>
+    </div>`;
 
-  list.innerHTML = html;
+  list.innerHTML = histHtml + `
+    <div class="dtask-main">
+      <div class="dtask-tasks">${tasksHtml}</div>
+      ${ringHtml}
+    </div>`;
 }
 
 function _esc(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -145,17 +152,21 @@ async function _recordDtaskHistory(){
   }catch(e){ logError('_recordDtaskHistory', e); }
 }
 
-// 達成等級圖示（三種質感 SVG）：全達成/過半/未過半
+// 達成等級圖示（四種質感 SVG）
+// 全達成→獎盃　過半→星星　未過半(>0)→三角驚嘆　都沒有→叉叉
 function _dtaskAchieveIcon(ratio){
   if(ratio >= 1){
-    // 全達成：獎章星形（金）
-    return `<svg class="dtask-ach dtask-ach-full" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.3L12 14.8 7.2 17.6l.9-5.3L4.2 8.5l5.4-.8z"/></svg>`;
+    // 獎盃（金）
+    return `<svg class="dtask-ach dtask-ach-full" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h12v2h2.5a1.5 1.5 0 0 1 1.5 1.5c0 2.5-1.8 4.6-4.2 5.2A6 6 0 0 1 13 16.9V19h3v2H8v-2h3v-2.1a6 6 0 0 1-4.8-4.2C3.8 12.1 2 10 2 7.5A1.5 1.5 0 0 1 3.5 6H6V4zm0 4H4c0 1.5 1 2.8 2.4 3.3A6 6 0 0 1 6 9.5V8zm12 0v1.5c0 .6-.1 1.2-.4 1.8C19 10.8 20 9.5 20 8h-2z"/></svg>`;
   } else if(ratio >= 0.5){
-    // 過半：半滿圓環（綠）
-    return `<svg class="dtask-ach dtask-ach-half" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>`;
+    // 星星（銀亮）
+    return `<svg class="dtask-ach dtask-ach-half" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.8.7-5.1 4.6 1.4 6.7L12 17.8 6 20.3l1.4-6.7L2.3 9l6.8-.7z"/></svg>`;
+  } else if(ratio > 0){
+    // 三角驚嘆號（橘）
+    return `<svg class="dtask-ach dtask-ach-low" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 20h20L12 3z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17.5" r="0.6" fill="currentColor"/></svg>`;
   } else {
-    // 未過半：空圓環（灰）
-    return `<svg class="dtask-ach dtask-ach-low" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/></svg>`;
+    // 叉叉（灰）
+    return `<svg class="dtask-ach dtask-ach-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9" stroke-width="2"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/><line x1="15.5" y1="8.5" x2="8.5" y2="15.5"/></svg>`;
   }
 }
 

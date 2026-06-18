@@ -21,7 +21,57 @@ async function _getFitData(dateKey){
 }
 
 // ════════════════════════════════════════════════════════════
-// 【運動健康庫：渲染儀表板】
+// 【運動健康庫：首頁摘要卡】顯示今日數據 + 最近7天趨勢，點擊進完整頁
+// ════════════════════════════════════════════════════════════
+async function renderFitSummary(){
+  const el = document.getElementById('fit-summary');
+  if(!el) return;
+  const key = _fitTodayKey();
+  const d = await _getFitData(key);
+  // 最近 7 天運動時長（小長條）
+  const bars = [];
+  for(let i=6;i>=0;i--){
+    const dt = new Date(); dt.setDate(dt.getDate()-i);
+    const k = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+    const row = await _getFitData(k);
+    bars.push({ d:`${dt.getMonth()+1}/${dt.getDate()}`, v:row.activeMin||0 });
+  }
+  const maxV = Math.max(30, ...bars.map(b=>b.v));
+  const barsHtml = bars.map(b=>{
+    const h = Math.round(b.v/maxV*100);
+    return `<div class="fitsum-bar-cell">
+      <div class="fitsum-bar-track"><div class="fitsum-bar-fill" style="height:${h}%"></div></div>
+      <span class="fitsum-bar-date">${b.d}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="fitsum-header" onclick="goPage('fitness')">
+      <span class="fitsum-title">運動健康</span>
+      <span class="fitsum-more">詳情 ›</span>
+    </div>
+    <div class="fitsum-stats">
+      <div class="fitsum-stat">
+        <span class="fitsum-stat-val">${d.activeMin||0}<small>分</small></span>
+        <span class="fitsum-stat-lab">🏃 運動</span>
+      </div>
+      <div class="fitsum-stat">
+        <span class="fitsum-stat-val">${d.burned||0}<small>kcal</small></span>
+        <span class="fitsum-stat-lab">🔥 消耗</span>
+      </div>
+      <div class="fitsum-stat">
+        <span class="fitsum-stat-val">${d.intake||0}<small>kcal</small></span>
+        <span class="fitsum-stat-lab">🍽️ 攝取</span>
+      </div>
+    </div>
+    <div class="fitsum-trend">
+      <div class="fitsum-trend-row">${barsHtml}</div>
+      <div class="fitsum-trend-lab">近 7 日運動時長</div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// 【運動健康庫：渲染完整儀表板】
 // ════════════════════════════════════════════════════════════
 async function renderFitness(){
   const el = document.getElementById('fitness-body');
