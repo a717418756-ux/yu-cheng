@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '3.2.6';
+const APP_VERSION = '3.2.7';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
@@ -54,7 +54,9 @@ const OPTIONAL_ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
 ];
 
-/* ── 安裝：預快取核心資源後進入 waiting（等待使用者確認更新）── */
+/* ── 安裝：預快取核心資源 ── */
+/* v3.2.7 限定：因前幾版快取卡住，本次啟用 skipWaiting 強制更新，
+   讓使用者重開即生效，不需手動點更新橫幅。下版可視情況改回 waiting。 */
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
@@ -63,9 +65,7 @@ self.addEventListener('install', e => {
         OPTIONAL_ASSETS.map(url => cache.add(url).catch(() => {}))
       );
       return Promise.all([corePromise, optionalPromise]);
-    })
-    // 注意：不呼叫 skipWaiting()。
-    // 由 app.js 的更新橫幅送出 SKIP_WAITING 訊息後才接管。
+    }).then(() => self.skipWaiting())  // 強制立即接管
   );
 });
 
