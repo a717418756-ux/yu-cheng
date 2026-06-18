@@ -201,7 +201,8 @@ async function saveFitData(){
 async function openHealthApp() {
   if (window.Capacitor?.isNativePlatform?.()) {
     try {
-      window.location.href = 'intent://com.sec.android.app.shealth/#Intent;scheme=samsunghealth;package=com.sec.android.app.shealth;launchFlags=0x10000000;end';
+      const url = 'intent://com.sec.android.app.shealth/#Intent;scheme=samsunghealth;package=com.sec.android.app.shealth;launchFlags=0x10000000;end';
+      window.open(url, '_system');
     } catch(e) {
       toast('找不到三星健康，請確認已安裝');
     }
