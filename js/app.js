@@ -15,19 +15,14 @@ function _setHomeWidgets(show, zone){
   const dataBar = document.getElementById('h-data-bar');
   const heatmap = document.getElementById('heatmap-wrap');
   const dtask   = document.getElementById('dtask-wrap');
-  const fitsum  = document.getElementById('fit-summary');
   if(!dataBar || !heatmap) return;
   if(show){
-    // 無區展開：顯示成長軌跡 + 每日任務 + 運動摘要
     dataBar.style.display = 'none';
     heatmap.style.display = '';
     if(dtask) dtask.style.display = '';
-    if(fitsum) fitsum.style.display = '';
   } else {
-    // 有區展開：首頁總覽元件一起隱藏
     heatmap.style.display = 'none';
     if(dtask) dtask.style.display = 'none';
-    if(fitsum) fitsum.style.display = 'none';
     dataBar.style.display = (zone === 'exam') ? '' : 'none';
   }
 }
@@ -223,7 +218,18 @@ function goPage(pg, btn){
   if(btn) btn.classList.add('on');
   S.page = pg;
   ({
-    home:()=>{ _setHomeWidgets(true); renderHome(); },
+    home:()=>{
+      // 回首頁：完整收合所有展開區塊，恢復三區未展開狀態
+      ['exam','leisure','study'].forEach(z=>{
+        document.getElementById('zone-'+z)?.classList.remove('zone-active','zone-shrink');
+        document.getElementById('panel-'+z)?.classList.remove('open');
+      });
+      _stopZoneTimer();
+      _activeZone = null;
+      _closeZoneQuiz();
+      _setHomeWidgets(true);
+      renderHome();
+    },
     list:renderList,
     laws:renderDB,
     db:renderDB,

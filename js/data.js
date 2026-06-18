@@ -78,7 +78,6 @@ async function renderHome(){  try{
   // 熱力圖
   renderHeatmap();
   renderDtask().catch(()=>{});
-  if(typeof renderFitSummary==='function') renderFitSummary().catch(()=>{});
 
   // 考試倒數
   renderCountdown();
@@ -190,7 +189,7 @@ async function openHeatmapOv(dateStr, label){
   const body= document.getElementById('heatmap-ov-body');
   if(!ov||!ttl||!body) return;
 
-  ttl.textContent = label + ' 學習詳情';
+  ttl.textContent = label + ' 成長詳情';
   body.innerHTML = '<div style="text-align:center;padding:16px;color:var(--t2);font-size:12px">載入中…</div>';
   ov.classList.add('on');
 
@@ -253,6 +252,30 @@ async function openHeatmapOv(dateStr, label){
       </svg>
       <div class="hm-pie-legend">${legendHTML}</div>
     </div>`;
+
+  // 整合運動數據（當天運動時長 + 熱量結餘）
+  try{
+    if(typeof _getFitData === 'function'){
+      const fit = await _getFitData(dateStr);
+      const bal = (fit.intake||0) - (fit.burned||0);
+      const balColor = bal > 0 ? '#e0a020' : '#4caf7d';
+      const balSign = bal > 0 ? '+' : '';
+      body.innerHTML += `
+        <div class="hm-fit-section">
+          <div class="hm-fit-title">運動健康</div>
+          <div class="hm-fit-grid">
+            <div class="hm-fit-item">
+              <span class="hm-fit-val">${fit.activeMin||0}<small>分</small></span>
+              <span class="hm-fit-lab">🏃 運動時長</span>
+            </div>
+            <div class="hm-fit-item">
+              <span class="hm-fit-val" style="color:${balColor}">${balSign}${bal}<small>kcal</small></span>
+              <span class="hm-fit-lab">⚖️ 熱量結餘</span>
+            </div>
+          </div>
+        </div>`;
+    }
+  }catch(e){ /* 無運動數據不影響主視窗 */ }
 }
 
 function closeHeatmapOv(){
