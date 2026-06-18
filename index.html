@@ -145,7 +145,7 @@
   <!-- 熱力圖（過去35天）-->
   <div class="heatmap-wrap" id="heatmap-wrap">
     <div class="heatmap-header">
-      <span class="heatmap-title">學習軌跡</span>
+      <span class="heatmap-title">成長軌跡</span>
       <span class="heatmap-sub" id="heatmap-sub">過去35天</span>
     </div>
     <div class="heatmap-grid" id="heatmap-grid"></div>
@@ -158,15 +158,6 @@
       <span class="heatmap-dot" style="background:var(--hm4)"></span>
       <span class="heatmap-legend-l">多</span>
     </div>
-  </div>
-
-  <!-- 每日任務 -->
-  <div class="dtask-wrap" id="dtask-wrap">
-    <div class="dtask-header">
-      <span class="dtask-title">每日任務</span>
-      <button class="dtask-edit-btn" id="dtask-edit-btn" onclick="toggleDtaskEdit()">編輯</button>
-    </div>
-    <div class="dtask-list" id="dtask-list"></div>
   </div>
 
   <!-- 熱力圖點擊視窗（當日圓餅）-->
@@ -274,6 +265,15 @@
         <span class="zpanel-main-arrow">›</span>
       </button>
     </div>
+  </div>
+
+  <!-- 每日任務（放最底部，不被展開面板干擾）-->
+  <div class="dtask-wrap" id="dtask-wrap">
+    <div class="dtask-header">
+      <span class="dtask-title">每日任務</span>
+      <button class="dtask-edit-btn" id="dtask-edit-btn" onclick="toggleDtaskEdit()">編輯</button>
+    </div>
+    <div class="dtask-list" id="dtask-list"></div>
   </div>
 
 </div>
