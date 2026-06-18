@@ -231,3 +231,21 @@ async function openHealthApp(){
     toast('網頁版較難直接開啟；打包成 App 後可一鍵開啟三星健康');
   }, 600);
 }
+
+// 【Health Connect 自動同步】
+window.addEventListener('healthData', function(e) {
+  const d = e.detail;
+
+  // 填入 input 欄位（手動輸入區）
+  const inActive = document.getElementById('fit-in-active');
+  const inBurned = document.getElementById('fit-in-burned');
+  const inIntake = document.getElementById('fit-in-intake');
+
+  if (inActive && d.exerciseMinutes) inActive.value = d.exerciseMinutes;
+  if (inBurned && d.caloriesBurned) inBurned.value = d.caloriesBurned;
+  if (inIntake && d.caloriesIntake) inIntake.value = d.caloriesIntake;
+
+  // 同時觸發儲存，讓畫面顯示區也一起更新
+  const saveBtn = document.querySelector('#fitness-body button[onclick*="saveFit"]');
+  if (saveBtn) saveBtn.click();
+});
