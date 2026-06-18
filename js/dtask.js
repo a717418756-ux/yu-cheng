@@ -49,23 +49,6 @@ async function renderDtask(){
   const doneCount = items.filter(it=>done.includes(it.id)).length;
   const pct = Math.round(doneCount / items.length * 100);
 
-  // ── 達成歷史（最近 7 天，只顯示圖示，可查 35 天）──
-  const hist = await _getDtaskHistory();
-  const histKeys = Object.keys(hist).sort();
-  const recent = histKeys.slice(-7);
-  let histHtml = '';
-  if(recent.length && !_dtaskEditMode){
-    const icons = recent.map(k=>{
-      const d = new Date(k);
-      const dd = `${d.getMonth()+1}/${d.getDate()}`;
-      return `<div class="dtask-hist-cell">
-        ${_dtaskAchieveIcon(hist[k])}
-        <span class="dtask-hist-date">${dd}</span>
-      </div>`;
-    }).join('');
-    histHtml = `<div class="dtask-hist"><div class="dtask-hist-row">${icons}</div></div>`;
-  }
-
   // ── 編輯模式：清單 + 新增 ──
   if(_dtaskEditMode){
     let editHtml = items.map(it=>`
@@ -108,11 +91,61 @@ async function renderDtask(){
       </div>
     </div>`;
 
-  list.innerHTML = histHtml + `
+  list.innerHTML = `
     <div class="dtask-main">
       <div class="dtask-tasks">${tasksHtml}</div>
       ${ringHtml}
     </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// 【每日任務：歷史查閱】30 天達成圖示 + 點某日看完成/未完成清單
+// ════════════════════════════════════════════════════════════
+async function openDtaskHistory(){
+  document.getElementById('dtask-hist-ov')?.remove();
+  const hist = await _getDtaskHistory();
+  const keys = Object.keys(hist).sort().reverse();  // 新到舊
+
+  let rowsHtml;
+  if(!keys.length){
+    rowsHtml = `<div class="dtask-empty">尚無歷史紀錄</div>`;
+  } else {
+    rowsHtml = keys.map(k=>{
+      const rec = hist[k];
+      const ratio = (typeof rec==='object') ? rec.r : rec;  // 相容舊格式
+      const tasks = (typeof rec==='object' && rec.tasks) ? rec.tasks : [];
+      const d = new Date(k);
+      const wd = ['日','一','二','三','四','五','六'][d.getDay()];
+      const dateLab = `${d.getMonth()+1}/${d.getDate()} 週${wd}`;
+      const doneN = tasks.filter(t=>t.done).length;
+      const taskList = tasks.length
+        ? tasks.map(t=>`<div class="dthist-task ${t.done?'done':'undone'}">
+            <span class="dthist-task-ic">${t.done?'✓':'✕'}</span>${_esc(t.text)}
+          </div>`).join('')
+        : '<div class="dthist-task undone">（無明細）</div>';
+      return `<div class="dthist-day">
+        <div class="dthist-day-head">
+          <span class="dthist-day-ic">${_dtaskAchieveIcon(ratio)}</span>
+          <span class="dthist-day-date">${dateLab}</span>
+          <span class="dthist-day-cnt">${doneN}/${tasks.length||'-'}</span>
+        </div>
+        <div class="dthist-day-tasks">${taskList}</div>
+      </div>`;
+    }).join('');
+  }
+
+  const ov = document.createElement('div');
+  ov.id = 'dtask-hist-ov';
+  ov.className = 'ov-sheet-c z420';
+  ov.innerHTML = `
+    <div class="dthist-panel">
+      <div class="dthist-handle"></div>
+      <div class="dthist-title">每日任務歷史　<small>近 30 天</small></div>
+      <div class="dthist-list">${rowsHtml}</div>
+      <button class="dthist-close" onclick="document.getElementById('dtask-hist-ov').remove()">關閉</button>
+    </div>`;
+  ov.onclick = e=>{ if(e.target===ov) ov.remove(); };
+  document.body.appendChild(ov);
 }
 
 function _esc(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -132,19 +165,24 @@ async function dtaskToggle(id){
   renderDtask();
 }
 
-// 記錄當日達成比例到歷史（只保留最近 35 天）
+// 記錄當日達成到歷史（保留 30 天，含完成明細供歷史查閱）
 async function _recordDtaskHistory(){
   try{
     const items = await _getDtaskItems();
     const done  = await _getDtaskDone();
     if(!items.length) return;
-    const ratio = done.filter(id=>items.some(it=>it.id===id)).length / items.length;
+    const doneIds = done.filter(id=>items.some(it=>it.id===id));
+    const ratio = doneIds.length / items.length;
     const dateStr = _dtaskTodayKey().replace('dtask_done_','');
     let hist = {};
     try{ const v = await getSetting('dtask_history'); if(v && typeof v==='object') hist = v; }catch(e){}
-    hist[dateStr] = ratio;  // 0~1
-    // 只保留最近 35 天：刪掉超過 35 天的 key
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-35);
+    // 存：比例 + 當日任務快照（文字 + 是否完成），供歷史查閱顯示清單
+    hist[dateStr] = {
+      r: ratio,
+      tasks: items.map(it=>({ text: it.text, done: doneIds.includes(it.id) })),
+    };
+    // 只保留最近 30 天
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
     for(const k in hist){
       if(new Date(k) < cutoff) delete hist[k];
     }
