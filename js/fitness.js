@@ -20,6 +20,9 @@ async function _getFitData(dateKey){
   }
 }
 
+// ════════════════════════════════════════════════════════════
+// 【運動健康庫：渲染儀表板】
+// ════════════════════════════════════════════════════════════
 async function renderFitness(){
   const el = document.getElementById('fitness-body');
   if(!el) return;
@@ -111,6 +114,9 @@ function _fitDateLabel(){
 }
 
 // 儲存今日手動數據
+// ════════════════════════════════════════════════════════════
+// 【運動健康庫：儲存今日數據】
+// ════════════════════════════════════════════════════════════
 async function saveFitData(){
   const key = _fitTodayKey();
   const num = id => {
@@ -138,6 +144,9 @@ async function saveFitData(){
 // 開啟三星健康 App
 // Capacitor 包殼後：用原生 AppLauncher 外掛直接開啟（最佳）
 // 純網頁環境：嘗試 deep link，但不導向商店（避免跑到 Play 商店）
+// ════════════════════════════════════════════════════════════
+// 【運動健康庫：開啟三星健康 App】
+// ════════════════════════════════════════════════════════════
 async function openHealthApp(){
   const pkg = 'com.sec.android.app.shealth';
   // 1) Capacitor 環境：用原生外掛開啟（打包後可用）
