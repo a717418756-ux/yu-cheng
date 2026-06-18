@@ -93,8 +93,8 @@ async function renderDtask(){
 
   list.innerHTML = `
     <div class="dtask-main">
-      <div class="dtask-tasks">${tasksHtml}</div>
       ${ringHtml}
+      <div class="dtask-tasks">${tasksHtml}</div>
     </div>`;
 }
 
