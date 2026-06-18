@@ -92,8 +92,8 @@ async function renderDtask(){
     </div>`;
 
   list.innerHTML = `
-    <div class="dtask-main">
-      ${ringHtml}
+    <div class="dtask-flexrow">
+      <div class="dtask-ring-col">${ringHtml}</div>
       <div class="dtask-tasks">${tasksHtml}</div>
     </div>`;
 }
