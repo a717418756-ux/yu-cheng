@@ -1375,15 +1375,9 @@ input:focus, textarea:focus, select:focus{
 
 /* ════ 【每日任務】v3.2.3 圓形進度 + 左右佈局 + 達成圖示 ════ */
 /* 主體：左任務 右圓環 */
-.dtask-main{
-  display:grid; grid-template-columns:84px 1fr;
-  align-items:center; gap:16px;
-}
-.dtask-tasks{ min-width:0; }
-.dtask-ring-box{
-  width:84px; height:84px;
-  position:relative;
-}
+
+
+
 .dtask-ring{ width:84px; height:84px; }
 .dtask-ring-bg{
   fill:none; stroke:rgba(255,255,255,0.08); stroke-width:6;
@@ -1525,3 +1519,23 @@ input:focus, textarea:focus, select:focus{
 [data-theme="eink"] .dthist-title,
 [data-theme="eink"] .dthist-day-date{ color:#000; }
 [data-theme="eink"] .dthist-close{ background:#eee; color:#000; }
+
+/* ════ 【每日任務】佈局 v8：左圓環 右任務（單一乾淨方案）════ */
+.dtask-flexrow{
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  gap:16px !important;
+}
+.dtask-ring-col{
+  flex:0 0 84px !important;
+  width:84px !important;
+}
+.dtask-ring-box{
+  position:relative;
+  width:84px; height:84px;
+}
+.dtask-tasks{
+  flex:1 1 auto !important;
+  min-width:0 !important;
+}
