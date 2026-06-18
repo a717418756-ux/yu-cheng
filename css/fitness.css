@@ -149,3 +149,11 @@
 [data-theme="eink"] .fitsum-stat-val{ color:#000; }
 [data-theme="eink"] .fitsum-stat{ background:#f0f0f0; }
 [data-theme="eink"] .fitsum-bar-fill{ background:#000; }
+
+/* 雙擊編輯提示 */
+.fit-edit-hint{
+  font-size:11px; color:var(--t2); text-align:center;
+  margin:-4px 0 16px;
+}
+.fit-card{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
+[data-theme="eink"] .fit-edit-hint{ color:#555; }

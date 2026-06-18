@@ -1535,3 +1535,26 @@ input:focus, textarea:focus, select:focus{
   flex:1 1 auto !important;
   min-width:0 !important;
 }
+
+/* ════ 成長詳情：整合運動數據 ════════════════════════════ */
+.hm-fit-section{
+  margin-top:16px; padding-top:16px;
+  border-top:1px solid rgba(255,255,255,0.08);
+}
+.hm-fit-title{
+  font-size:12px; font-weight:700; color:var(--t1);
+  letter-spacing:.04em; margin-bottom:10px; text-align:center;
+}
+.hm-fit-grid{ display:flex; gap:10px; }
+.hm-fit-item{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:5px;
+  padding:12px 8px; background:rgba(255,255,255,0.03); border-radius:12px;
+}
+.hm-fit-val{
+  font-size:20px; font-weight:800; color:var(--t0);
+  font-variant-numeric:tabular-nums; line-height:1;
+}
+.hm-fit-val small{ font-size:11px; font-weight:600; color:var(--t2); margin-left:2px; }
+.hm-fit-lab{ font-size:11px; color:var(--t2); }
+[data-theme="eink"] .hm-fit-item{ background:#f0f0f0; }
+[data-theme="eink"] .hm-fit-val{ color:#000; }
