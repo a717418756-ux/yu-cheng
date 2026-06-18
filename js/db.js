@@ -324,5 +324,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '3.3.0';     // 體檢清理:移除v8測試標記;清3處破損孤立CSS選擇器(dtask-stat-ico殘骸/2個eink孤立data-theme/media-hscroll-row殘骸);確認無死碼/無重複/舊佈局dtask-main已淨空;語法CSS括號全通過
+const APP_VERSION  = '3.3.1';     // 體檢清理:移除v8測試標記;清3處破損孤立CSS選擇器(dtask-stat-ico殘骸/2個eink孤立data-theme/media-hscroll-row殘骸);確認無死碼/無重複/舊佈局dtask-main已淨空;語法CSS括號全通過
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
