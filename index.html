@@ -160,6 +160,18 @@
     </div>
   </div>
 
+  <!-- 每日任務（緊鄰成長軌跡，與其連動顯示/隱藏）-->
+  <div class="dtask-wrap" id="dtask-wrap">
+    <div class="dtask-header">
+      <span class="dtask-title">每日任務</span>
+      <button class="dtask-edit-btn" id="dtask-edit-btn" onclick="toggleDtaskEdit()">編輯</button>
+    </div>
+    <div class="dtask-list" id="dtask-list"></div>
+  </div>
+
+  <!-- 運動健康摘要（與成長軌跡連動顯示/隱藏）-->
+  <div class="fitsum-wrap" id="fit-summary"></div>
+
   <!-- 熱力圖點擊視窗（當日圓餅）-->
   <div class="ov" id="heatmap-ov" onclick="closeHeatmapOv()">
     <div class="sh" onclick="event.stopPropagation()">
@@ -265,15 +277,6 @@
         <span class="zpanel-main-arrow">›</span>
       </button>
     </div>
-  </div>
-
-  <!-- 每日任務（放最底部，不被展開面板干擾）-->
-  <div class="dtask-wrap" id="dtask-wrap">
-    <div class="dtask-header">
-      <span class="dtask-title">每日任務</span>
-      <button class="dtask-edit-btn" id="dtask-edit-btn" onclick="toggleDtaskEdit()">編輯</button>
-    </div>
-    <div class="dtask-list" id="dtask-list"></div>
   </div>
 
 </div>
