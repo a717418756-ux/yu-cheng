@@ -285,6 +285,33 @@ async function openHeatmapOv(dateStr, label){
         </div>`;
     }
   }catch(e){ /* 無運動數據不影響主視窗 */ }
+
+  // 整合每日任務達成狀況（當天）
+  try{
+    if(typeof _getDtaskHistory === 'function' && typeof _dtaskAchieveIcon === 'function'){
+      const hist = await _getDtaskHistory();
+      const rec = hist[dateStr];
+      if(rec && rec.tasks && rec.tasks.length){
+        const doneN = rec.tasks.filter(t=>t.done).length;
+        const tasksHtml = rec.tasks.map(t=>`
+          <div class="hm-dt-task ${t.done?'done':'undone'}">
+            <span class="hm-dt-tick">${t.done
+              ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>'
+              : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>'}</span>
+            <span class="hm-dt-text">${esc(t.text)}</span>
+          </div>`).join('');
+        body.innerHTML += `
+          <div class="hm-dt-section">
+            <div class="hm-dt-title">
+              <span class="hm-dt-ic">${_dtaskAchieveIcon(rec.r)}</span>
+              每日任務
+              <span class="hm-dt-cnt">${doneN}/${rec.tasks.length}</span>
+            </div>
+            <div class="hm-dt-list">${tasksHtml}</div>
+          </div>`;
+      }
+    }
+  }catch(e){ /* 無任務資料不影響主視窗 */ }
 }
 
 function closeHeatmapOv(){

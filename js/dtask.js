@@ -98,56 +98,6 @@ async function renderDtask(){
     </div>`;
 }
 
-// ════════════════════════════════════════════════════════════
-// 【每日任務：歷史查閱】30 天達成圖示 + 點某日看完成/未完成清單
-// ════════════════════════════════════════════════════════════
-async function openDtaskHistory(){
-  document.getElementById('dtask-hist-ov')?.remove();
-  const hist = await _getDtaskHistory();
-  const keys = Object.keys(hist).sort().reverse();  // 新到舊
-
-  let rowsHtml;
-  if(!keys.length){
-    rowsHtml = `<div class="dtask-empty">尚無歷史紀錄</div>`;
-  } else {
-    rowsHtml = keys.map(k=>{
-      const rec = hist[k];
-      const ratio = (typeof rec==='object') ? rec.r : rec;  // 相容舊格式
-      const tasks = (typeof rec==='object' && rec.tasks) ? rec.tasks : [];
-      const d = new Date(k);
-      const wd = ['日','一','二','三','四','五','六'][d.getDay()];
-      const dateLab = `${d.getMonth()+1}/${d.getDate()} 週${wd}`;
-      const doneN = tasks.filter(t=>t.done).length;
-      const taskList = tasks.length
-        ? tasks.map(t=>`<div class="dthist-task ${t.done?'done':'undone'}">
-            <span class="dthist-task-ic">${t.done?'✓':'✕'}</span>${_esc(t.text)}
-          </div>`).join('')
-        : '<div class="dthist-task undone">（無明細）</div>';
-      return `<div class="dthist-day">
-        <div class="dthist-day-head">
-          <span class="dthist-day-ic">${_dtaskAchieveIcon(ratio)}</span>
-          <span class="dthist-day-date">${dateLab}</span>
-          <span class="dthist-day-cnt">${doneN}/${tasks.length||'-'}</span>
-        </div>
-        <div class="dthist-day-tasks">${taskList}</div>
-      </div>`;
-    }).join('');
-  }
-
-  const ov = document.createElement('div');
-  ov.id = 'dtask-hist-ov';
-  ov.className = 'ov-sheet-c z420';
-  ov.innerHTML = `
-    <div class="dthist-panel">
-      <div class="dthist-handle"></div>
-      <div class="dthist-title">每日任務歷史　<small>近 30 天</small></div>
-      <div class="dthist-list">${rowsHtml}</div>
-      <button class="dthist-close" onclick="document.getElementById('dtask-hist-ov').remove()">關閉</button>
-    </div>`;
-  ov.onclick = e=>{ if(e.target===ov) ov.remove(); };
-  document.body.appendChild(ov);
-}
-
 function _esc(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 // 勾選完成（非編輯模式）
@@ -194,17 +144,36 @@ async function _recordDtaskHistory(){
 // 全達成→獎盃　過半→星星　未過半(>0)→三角驚嘆　都沒有→叉叉
 function _dtaskAchieveIcon(ratio){
   if(ratio >= 1){
-    // 獎盃（金）
-    return `<svg class="dtask-ach dtask-ach-full" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h12v2h2.5a1.5 1.5 0 0 1 1.5 1.5c0 2.5-1.8 4.6-4.2 5.2A6 6 0 0 1 13 16.9V19h3v2H8v-2h3v-2.1a6 6 0 0 1-4.8-4.2C3.8 12.1 2 10 2 7.5A1.5 1.5 0 0 1 3.5 6H6V4zm0 4H4c0 1.5 1 2.8 2.4 3.3A6 6 0 0 1 6 9.5V8zm12 0v1.5c0 .6-.1 1.2-.4 1.8C19 10.8 20 9.5 20 8h-2z"/></svg>`;
+    // 獎盃（金，含底座與光澤細節）
+    return `<svg class="dtask-ach dtask-ach-full" viewBox="0 0 24 24" fill="none">
+      <path d="M7 4h10v5a5 5 0 0 1-10 0V4z" fill="currentColor"/>
+      <path d="M7 5H4.5A1.5 1.5 0 0 0 3 6.5C3 9 5 11 7.5 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <path d="M17 5h2.5A1.5 1.5 0 0 1 21 6.5C21 9 19 11 16.5 11" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <path d="M12 14v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M8.5 20.5h7l-.8-2.5a1 1 0 0 0-1-.7h-3.4a1 1 0 0 0-1 .7z" fill="currentColor"/>
+      <path d="M10 6.5l1.2 1.2L14 5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+    </svg>`;
   } else if(ratio >= 0.5){
-    // 星星（銀亮）
-    return `<svg class="dtask-ach dtask-ach-half" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.3 6.8.7-5.1 4.6 1.4 6.7L12 17.8 6 20.3l1.4-6.7L2.3 9l6.8-.7z"/></svg>`;
+    // 星星（雙層，內層留白增添層次）
+    return `<svg class="dtask-ach dtask-ach-half" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2.5l2.7 5.8 6.3.7-4.7 4.3 1.3 6.2L12 16.6 6.1 19.5l1.3-6.2L2.7 9l6.3-.7z" fill="currentColor"/>
+      <path d="M12 6.5l1.5 3.2 3.4.4-2.5 2.3.7 3.4L12 14.1l-3.1 1.7.7-3.4L7.1 10l3.4-.4z" fill="#fff" opacity="0.32"/>
+    </svg>`;
   } else if(ratio > 0){
-    // 三角驚嘆號（橘）
-    return `<svg class="dtask-ach dtask-ach-low" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L2 20h20L12 3z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17.5" r="0.6" fill="currentColor"/></svg>`;
+    // 三角驚嘆（橘，圓角飽滿質感）
+    return `<svg class="dtask-ach dtask-ach-low" viewBox="0 0 24 24" fill="none">
+      <path d="M10.3 3.6a2 2 0 0 1 3.4 0l8 13.9a2 2 0 0 1-1.7 3H4a2 2 0 0 1-1.7-3z" fill="currentColor"/>
+      <line x1="12" y1="9" x2="12" y2="14" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
+      <circle cx="12" cy="17" r="1.1" fill="#fff" opacity="0.9"/>
+    </svg>`;
   } else {
-    // 叉叉（灰）
-    return `<svg class="dtask-ach dtask-ach-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9" stroke-width="2"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/><line x1="15.5" y1="8.5" x2="8.5" y2="15.5"/></svg>`;
+    // 叉叉（灰，圓底填色更精緻）
+    return `<svg class="dtask-ach dtask-ach-none" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9.5" fill="currentColor" opacity="0.18"/>
+      <circle cx="12" cy="12" r="9.5" stroke="currentColor" stroke-width="1.6"/>
+      <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>`;
   }
 }
 
@@ -221,7 +190,14 @@ async function _getDtaskHistory(){
 function toggleDtaskEdit(){
   _dtaskEditMode = !_dtaskEditMode;
   const btn = document.getElementById('dtask-edit-btn');
-  if(btn) btn.textContent = _dtaskEditMode ? '完成' : '編輯';
+  if(btn){
+    btn.title = _dtaskEditMode ? '完成編輯' : '編輯任務';
+    btn.innerHTML = _dtaskEditMode
+      // 完成：打勾
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+      // 編輯：筆
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+  }
   renderDtask();
 }
 
