@@ -578,15 +578,31 @@
 /* zone-card */
 
 .zone-panel{
-  margin:0 14px;border-radius:14px;overflow:hidden;
+  margin:0 14px;border-radius:14px;
   border:1px solid rgba(255,255,255,0.07);
   background:rgba(12,12,18,0.6);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  max-height:0;opacity:0;
+  /* grid-rows 0fr→1fr：依實際內容高度平滑展開，動畫永遠跟手 */
+  display:grid;
+  grid-template-rows:0fr;
+  opacity:0;
   margin-bottom:0;
-  transition:max-height .36s cubic-bezier(.4,0,.2,1),opacity .26s,margin-bottom .36s;
+  border-width:0;
+  transition:grid-template-rows .34s cubic-bezier(.4,0,.2,1),
+             opacity .24s ease,
+             margin-bottom .34s ease,
+             border-width .34s ease;
 }
-.zone-panel.open{max-height:720px;opacity:1;margin-bottom:10px}
+.zone-panel > *{
+  overflow:hidden;  /* grid-rows 動畫必須：子元素隱藏溢出 */
+  min-height:0;
+}
+.zone-panel.open{
+  grid-template-rows:1fr;
+  opacity:1;
+  margin-bottom:10px;
+  border-width:1px;
+}
 .zone-panel-inner{padding:4px 0}
 
 /* 面板主按鈕（測驗 toggle） */
