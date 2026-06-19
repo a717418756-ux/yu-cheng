@@ -308,11 +308,16 @@ function _mkShelf(books, total){
     const thickMM  = b.thickMM  || _BOOK_DEFAULT_MM.thickMM;
     const heightMM = b.heightMM || _BOOK_DEFAULT_MM.heightMM;
     // 書架高度固定（讓所有書等高，視覺整齊）
-    const SHELF_H = 160;   // 固定書架顯示高度（px）
+    const SHELF_H = 160;   // 書架基準高度（px）
     const MIN_W   = 18;    // 最薄書的最小寬度（px）
-    const dispH = SHELF_H;
+    const MIN_H   = 120;   // 書本最矮（過矮才夾住）
+    const MAX_H   = 195;   // 書本最高（過高才夾住）
+    // 書本高度依實際比例（以標準高度 210mm 為基準縮放），只在過高/過矮才夾住
+    const STD_H_MM = 210;  // 基準書高（A4 高度，對應 SHELF_H）
+    const rawH = SHELF_H * heightMM / STD_H_MM;
+    const dispH = Math.round(Math.min(MAX_H, Math.max(MIN_H, rawH)));
     // 書背寬按真實比例（厚度/高度），最小 MIN_W 避免太窄
-    const dispW = Math.max(MIN_W, Math.round(SHELF_H * thickMM / heightMM));
+    const dispW = Math.max(MIN_W, Math.round(dispH * thickMM / heightMM));
 
     if(rowUsed + dispW + GAP > containerW && rowUsed > 0){
       _newRow();

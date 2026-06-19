@@ -10,6 +10,9 @@
 
 let _dchart=null;
 
+// ════════════════════════════════════════════════════════════
+// 【統計頁渲染】
+// ════════════════════════════════════════════════════════════
 async function renderStats(){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const total=qs.length, totalAts=ats.length;
@@ -142,6 +145,9 @@ async function clearWrongAts(){  try{
   toast('已刪除 '+wrong.length+' 筆錯誤記錄 ✓');
   }catch(e){ logError('clearWrongAts',e); }}
 
+// ════════════════════════════════════════════════════════════
+// 【AI 分析匯出】
+// ════════════════════════════════════════════════════════════
 async function buildAI(){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const today_=today();

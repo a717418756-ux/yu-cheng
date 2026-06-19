@@ -1880,8 +1880,4 @@ function _fmtDurSec(sec){
   const m=Math.floor(sec/60),s=Math.floor(sec%60);
   return `${m}:${String(s).padStart(2,'0')}`;
 }
-function _fmtSize(bytes){
-  if(!bytes) return '';
-  if(bytes<1048576) return (bytes/1024).toFixed(1)+'KB';
-  return (bytes/1048576).toFixed(1)+'MB';
-}
+// _fmtSize 已於 books.js 定義（共用），此處不重複定義

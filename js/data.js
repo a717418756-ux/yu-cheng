@@ -31,6 +31,9 @@ const LEVEL_STYLE = {
 
 let _dupResolve=null;
 
+// ════════════════════════════════════════════════════════════
+// 【首頁渲染與分區統計】
+// ════════════════════════════════════════════════════════════
 async function renderHome(){  try{
   const [qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
   const now=Date.now();
@@ -146,6 +149,9 @@ async function renderZoneStats(qs, ats, reviewDue, todayAts, todayStr){
 // ── 熱力圖渲染 ───────────────────────────────────────────────
 const _HM_COLS = 35;  // 顯示35天
 
+// ════════════════════════════════════════════════════════════
+// 【成長軌跡熱力圖】
+// ════════════════════════════════════════════════════════════
 async function renderHeatmap(){
   const grid = document.getElementById('heatmap-grid');
   if(!grid) return;
@@ -183,6 +189,9 @@ async function renderHeatmap(){
 }
 
 // 開啟熱力圖日期視窗
+// ════════════════════════════════════════════════════════════
+// 【成長詳情彈窗（含運動數據）】
+// ════════════════════════════════════════════════════════════
 async function openHeatmapOv(dateStr, label){
   const ov  = document.getElementById('heatmap-ov');
   const ttl = document.getElementById('heatmap-ov-date');
@@ -292,6 +301,9 @@ function setF(el, f){
 }
 
 
+// ════════════════════════════════════════════════════════════
+// 【題庫列表】
+// ════════════════════════════════════════════════════════════
 async function renderList(){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const kw=(document.getElementById('si')?.value||'').toLowerCase().trim();
@@ -413,6 +425,9 @@ async function renderList(){  try{
 }catch(e){ logError('renderList',e); }}
 
 // ── 年度選擇頁（第二層）─────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// 【題庫三層導覽（年度/科目）】
+// ════════════════════════════════════════════════════════════
 async function openYearGroup(year){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const ws=getWrong(qs,ats);
@@ -547,6 +562,9 @@ function closeAdd(){
   S.qType = 'mc';
 }
 
+// ════════════════════════════════════════════════════════════
+// 【新增/編輯題目表單】
+// ════════════════════════════════════════════════════════════
 function showAdd(q){
   S.editId = q?.id || null;
   S.qType = q?.type || 'mc';
@@ -651,6 +669,9 @@ function formatYearInput(el){
   el.value=v;
 }
 
+// ════════════════════════════════════════════════════════════
+// 【題目儲存】
+// ════════════════════════════════════════════════════════════
 async function saveQ(){
   try{
   const stem=cleanSpaces(document.getElementById('f-stem').value.trim());
@@ -793,6 +814,9 @@ async function toggleStar(id){  try{
 
 // ── 題目選擇刪除模式 ──────────────────────────────────────────
 
+// ════════════════════════════════════════════════════════════
+// 【題庫批量勾選刪除】
+// ════════════════════════════════════════════════════════════
 function toggleListSelectMode(){
   _listSelMode = !_listSelMode;
   _listSelected.clear();

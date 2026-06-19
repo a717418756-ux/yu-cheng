@@ -11,6 +11,9 @@
 'use strict';
 
 // ── 首頁小工具顯示控制 ─────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// 【首頁總覽元件顯示控制】
+// ════════════════════════════════════════════════════════════
 function _setHomeWidgets(show, zone){
   const dataBar = document.getElementById('h-data-bar');
   const heatmap = document.getElementById('heatmap-wrap');
@@ -33,6 +36,9 @@ let _zoneTick  = 0;
 let _zoneQuizOpen = false;
 let _activeZone = null;
 
+// ════════════════════════════════════════════════════════════
+// 【區域使用計時】
+// ════════════════════════════════════════════════════════════
 function _startZoneTimer(zone){
   _stopZoneTimer();
   _zoneTick = Date.now();
@@ -55,6 +61,9 @@ function _stopZoneTimer(){
   }
 }
 
+// ════════════════════════════════════════════════════════════
+// 【三大區塊展開/收合】
+// ════════════════════════════════════════════════════════════
 function toggleZone(zone){
   const zones  = ['exam','leisure','study'];
   const cards  = zones.map(z=>document.getElementById('zone-'+z));
@@ -107,6 +116,9 @@ function _closeZoneQuiz(){
 }
 
 // ── 加號下拉選單（題目管理）──────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// 【新增選單（題目/法規）】
+// ════════════════════════════════════════════════════════════
 function toggleAddQMenu(){
   const m = document.getElementById('add-q-menu');
   const open = m.style.display==='none';
@@ -139,6 +151,9 @@ const _F_HOME  = {pg:'home',  icon:'🏠', label:'首頁'};
 const _F_SET   = {pg:'set',   icon:'⚙️', label:'設定'};
 
 // FAB 規則：題庫/資料庫已移至主選單，FAB 只保留導航和設定
+// ════════════════════════════════════════════════════════════
+// 【浮動按鈕（FAB）】
+// ════════════════════════════════════════════════════════════
 function _fabItemsForPage(pg){
   switch(pg){
     case 'home':   return [_F_SET];
@@ -209,6 +224,9 @@ function fabGo(pg){
   goPage(pg, null);
 }
 
+// ════════════════════════════════════════════════════════════
+// 【頁面切換主控】
+// ════════════════════════════════════════════════════════════
 function goPage(pg, btn){
   // bulk 是 overlay，不跳頁，直接開啟後返回
   if(pg==='bulk'){ openBulkQ(); return; }
@@ -255,6 +273,9 @@ const _splashStart = Date.now();
    儲存於 IndexedDB settings store，key: 'displayTheme'
    ══════════════════════════════════════════════════════════════ */
 
+// ════════════════════════════════════════════════════════════
+// 【主題系統（深色/電子紙）】
+// ════════════════════════════════════════════════════════════
 async function initTheme(){
   const saved = await getSetting('displayTheme', 'dark');
   _applyTheme(saved);
@@ -276,6 +297,9 @@ function _applyTheme(theme){
 }
 
 /* ── 初始化 ── */
+// ════════════════════════════════════════════════════════════
+// 【App 啟動初始化】
+// ════════════════════════════════════════════════════════════
 async function init(){  try{
   await initDB();
   await initTheme();
@@ -340,6 +364,9 @@ if('serviceWorker' in navigator){
   });
 }
 
+// ════════════════════════════════════════════════════════════
+// 【版本更新橫幅】
+// ════════════════════════════════════════════════════════════
 function _showUpdateBanner(reg){
   if(document.getElementById('sw-update-banner')) return;
   const banner = document.createElement('div');

@@ -10,6 +10,9 @@
 'use strict';
 
 // 計算距離考試的天數
+// ════════════════════════════════════════════════════════════
+// 【倒數計時：日期計算】
+// ════════════════════════════════════════════════════════════
 function _daysUntil(dateStr){
   const now  = new Date(); now.setHours(0,0,0,0);
   const exam = new Date(dateStr); exam.setHours(0,0,0,0);
@@ -17,6 +20,9 @@ function _daysUntil(dateStr){
 }
 
 // 渲染倒數區塊（首頁）
+// ════════════════════════════════════════════════════════════
+// 【倒數計時：首頁顯示】
+// ════════════════════════════════════════════════════════════
 async function renderCountdown(){
   const el = document.getElementById('h-countdown');
   if(!el) return;
@@ -93,6 +99,9 @@ async function delCountdownSet(id){
 }
 
 // 新增考試 bottom sheet
+// ════════════════════════════════════════════════════════════
+// 【倒數計時：管理介面】
+// ════════════════════════════════════════════════════════════
 function openCountdownMgr(){
   const existing = document.getElementById('countdown-add-modal');
   if(existing) existing.remove();
@@ -145,6 +154,9 @@ async function _saveCountdownFromModal(){
 }
 
 // ── 勉勵語編輯 ──────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// 【每日格言編輯】
+// ════════════════════════════════════════════════════════════
 async function editMotto(){
   const el = document.getElementById('h-motto');
   if(!el) return;

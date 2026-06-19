@@ -15,6 +15,9 @@ let _lastPool = [];         // 完成後供「再練習一次」用
 let _lastMode = 'all';
 
 // ════════ 啟動入口 ════════
+// ════════════════════════════════════════════════════════════
+// 【答題：啟動與題目池】
+// ════════════════════════════════════════════════════════════
 async function startQ(mode){  try{
   const pool = await getPriorityPool(mode);
   if(!pool.length){ toast(mode==='wrong' ? '目前沒有錯題' : '目前沒有題目'); return; }
@@ -31,6 +34,9 @@ function startQWithPool(pool, mode){
 }
 
 // ════════ 題卡渲染 ════════
+// ════════════════════════════════════════════════════════════
+// 【答題：題目卡渲染】
+// ════════════════════════════════════════════════════════════
 function renderQCard(){
   const {q, idx} = S.quiz;
   if(idx >= q.length){ showQDone(); return; }
@@ -134,6 +140,9 @@ function showQLawLinks(qu){
 }
 
 // ════════ 作答（單選）════════
+// ════════════════════════════════════════════════════════════
+// 【答題：單選作答與批改】
+// ════════════════════════════════════════════════════════════
 async function ansQ(sel){  try{
   const qu = S.quiz.q[S.quiz.idx];
   if(S.quiz.ans) return;
@@ -236,6 +245,9 @@ function revealES(){
 }
 
 // ════════ 流程控制 ════════
+// ════════════════════════════════════════════════════════════
+// 【答題：導覽與收藏】
+// ════════════════════════════════════════════════════════════
 function nextQ(){
   S.quiz.idx++;
   S.quiz.ans = false;
@@ -260,6 +272,9 @@ async function toggleQStar(){  try{
   }catch(e){ logError('toggleQStar', e); }}
 
 // ════════ 完成畫面 ════════
+// ════════════════════════════════════════════════════════════
+// 【答題：完成結算】
+// ════════════════════════════════════════════════════════════
 function showQDone(){
   const res = S.quiz.res;
   const total    = res.length;
@@ -308,6 +323,9 @@ function replayQuiz(){
 }
 
 // ════════ 模擬考模式 ════════
+// ════════════════════════════════════════════════════════════
+// 【答題：模擬考/快刷】
+// ════════════════════════════════════════════════════════════
 async function startExam(totalQ=50, timeLimitMin=50){  try{
   const pool = await getPriorityPool('all');
   if(pool.length < 5){ toast('題目不足，請先匯入題目'); return; }
@@ -337,6 +355,9 @@ async function startQuick(){  try{
   }catch(e){ logError('startQuick', e); }}
 
 // ════════ 選項選取 ════════
+// ════════════════════════════════════════════════════════════
+// 【答題：複選作答】
+// ════════════════════════════════════════════════════════════
 function selectOpt(el, key){
   if(S.quiz.ans) return;
   if(!S.quiz._selected) S.quiz._selected = new Set();

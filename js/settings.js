@@ -21,6 +21,9 @@ const GAS_URL_KEY      = 'gasWebAppUrl';
 const GAS_PWD_KEY      = 'gasPassword';
 const GAS_BACKUP_FILE  = 'YC_Platform_backup.json';
 
+// ════════════════════════════════════════════════════════════
+// 【雲端備份：GAS 設定】
+// ════════════════════════════════════════════════════════════
 async function _gasGetConfig(){
   const url = await getSetting(GAS_URL_KEY,'');
   const pwd = await getSetting(GAS_PWD_KEY,'');
@@ -45,6 +48,9 @@ async function _gasLoadSavedConfig(){
 }
 
 // ── 備份 ────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// 【雲端備份：備份/還原】
+// ════════════════════════════════════════════════════════════
 async function gdriveBackup(){ try{
   const { url, pwd } = await _gasGetConfig();
   if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
@@ -145,6 +151,9 @@ async function gdriveRestore(){ try{
 }catch(e){ logError('gdriveRestore',e); toast('還原失敗：'+e.message); }}
 
 
+// ════════════════════════════════════════════════════════════
+// 【設定頁渲染】
+// ════════════════════════════════════════════════════════════
 async function renderSet(){  _renderAzureKey().catch(()=>{}); try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
   document.getElementById('exp-info').textContent=`${qs.length} 題 · ${ls.length} 條法條 · ${ats.length} 筆作答`;
@@ -183,6 +192,9 @@ async function renderSet(){  _renderAzureKey().catch(()=>{}); try{
   }
   }catch(e){ logError('renderSet',e); }}
 
+// ════════════════════════════════════════════════════════════
+// 【資料匯出/匯入】
+// ════════════════════════════════════════════════════════════
 async function expJSON(){  try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
   dl(JSON.stringify({version:2,exportedAt:new Date().toISOString(),questions:qs,laws:ls,attempts:ats},null,2),'警察考題庫_'+today()+'.json','application/json');
@@ -273,6 +285,9 @@ function _buildHTML(qs,title){
   return out+'\n</body></html>';
 }
 
+// ════════════════════════════════════════════════════════════
+// 【資料清除】
+// ════════════════════════════════════════════════════════════
 async function clearAts(){  try{
   await dc('attempts');
   toast('作答記錄已清除');
