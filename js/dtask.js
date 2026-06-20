@@ -67,6 +67,7 @@ async function renderDtask(){
       </div>`;
     }).join('');
     editHtml += `<button class="dtask-add" onclick="dtaskAdd()">＋ 新增任務</button>`;
+    editHtml += `<button class="dtask-done-edit" onclick="toggleDtaskEdit()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;vertical-align:-3px;margin-right:5px"><path d="M20 6L9 17l-5-5"/></svg>完成編輯</button>`;
     editHtml += `<div class="dtask-edit-hint">點任務後方標籤可設定「自動完成條件」，回首頁按 🔄 即比對資料自動勾選</div>`;
     list.innerHTML = editHtml;
     return;
@@ -86,7 +87,7 @@ async function renderDtask(){
   const dash = C * (pct/100);
   const ringColor = pct>=100 ? '#e0a020' : pct>=50 ? '#4caf7d' : '#6ea8fe';
   const ringHtml = `
-    <div class="dtask-ring-box">
+    <div class="dtask-ring-box" ondblclick="toggleDtaskEdit()" title="雙擊編輯任務" style="cursor:pointer">
       <svg class="dtask-ring" viewBox="0 0 72 72">
         <circle class="dtask-ring-bg" cx="36" cy="36" r="${R}"></circle>
         <circle class="dtask-ring-fg" cx="36" cy="36" r="${R}"
@@ -130,9 +131,9 @@ async function dtaskEditAuto(id){
     <div class="sh" onclick="event.stopPropagation()" style="max-width:440px">
       <div class="shdl"></div>
       <div class="sht"><span>自動完成條件</span>
-        <button class="shx" onclick="document.getElementById('dtask-auto-ov').remove()">\u2715</button></div>
+        <button class="shx" onclick="document.getElementById('dtask-auto-ov').remove()">✕</button></div>
       <div style="padding:4px 18px 24px">
-        <p class="dtask-auto-desc">設定後，回首頁按 \ud83d\udd04 比對資料，達標自動勾選「${_esc(it.text)}」</p>
+        <p class="dtask-auto-desc">設定後，回首頁按 🔄 比對資料，達標自動勾選「${_esc(it.text)}」</p>
         <label class="dtask-auto-label">條件類型</label>
         <select class="dtask-auto-sel" id="da-type" onchange="_daTypeChange()">
           <option value="">手動（不自動）</option>
@@ -366,15 +367,6 @@ async function _getDtaskHistory(){
 // ════════════════════════════════════════════════════════════
 function toggleDtaskEdit(){
   _dtaskEditMode = !_dtaskEditMode;
-  const btn = document.getElementById('dtask-edit-btn');
-  if(btn){
-    btn.title = _dtaskEditMode ? '完成編輯' : '編輯任務';
-    btn.innerHTML = _dtaskEditMode
-      // 完成：打勾
-      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
-      // 編輯：筆
-      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
-  }
   renderDtask();
 }
 

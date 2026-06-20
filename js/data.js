@@ -82,6 +82,7 @@ async function renderHome(){  try{
   renderHeatmap();
   renderDtask().catch(()=>{});
   if(typeof renderPlan==='function') renderPlan().catch(()=>{});
+  if(typeof renderMilestones==='function') renderMilestones().catch(()=>{});
 
   // 考試倒數
   renderCountdown();
@@ -355,7 +356,7 @@ function showSearchHelp(){
     <div class="sh" onclick="event.stopPropagation()" style="max-width:480px">
       <div class="shdl"></div>
       <div class="sht"><span>搜尋說明</span>
-        <button class="shx" onclick="document.getElementById('search-help-ov').remove()">\u2715</button></div>
+        <button class="shx" onclick="document.getElementById('search-help-ov').remove()">✕</button></div>
       <div style="padding:4px 18px 24px">
         <p class="shelp-intro">直接輸入文字即可搜尋，會同時比對下列欄位（不分大小寫）：</p>
         <div class="shelp-list">
@@ -366,7 +367,7 @@ function showSearchHelp(){
           <div class="shelp-row"><span class="shelp-tag">題號</span><span class="shelp-ex">例：15 → 第 15 題</span></div>
           <div class="shelp-row"><span class="shelp-tag">關鍵字</span><span class="shelp-ex">例：正當防衛 → 標註此關鍵字的題</span></div>
         </div>
-        <p class="shelp-tip">\ud83d\udca1 多個詞用空白分開可組合，例如「<b>行政法 112</b>」會找 112 年的行政法題目。</p>
+        <p class="shelp-tip">💡 多個詞用空白分開可組合，例如「<b>行政法 112</b>」會找 112 年的行政法題目。</p>
       </div>
     </div>`;
   document.body.appendChild(ov);
