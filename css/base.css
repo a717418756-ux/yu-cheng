@@ -1481,12 +1481,7 @@ input:focus, textarea:focus, select:focus{
 }
 
 /* ════ 【計畫表（行事曆）】時間軸日檢視 ════════════════════ */
-.plan-wrap{
-  margin:10px 14px 6px; padding:12px 14px 14px;
-  background:rgba(255,255,255,0.03);
-  border:1px solid rgba(255,255,255,0.07);
-  border-radius:14px;
-}
+/* plan-wrap 外框已由 planner-wrap 接管，此處僅保留標題殘留相容 */
 .plan-header{ margin-bottom:10px; }
 .plan-title{ font-size:12px; font-weight:700; color:var(--t1); letter-spacing:.04em; }
 /* 日期導航（純滑動切換，日期可點回今天）*/
@@ -1649,22 +1644,6 @@ input:focus, textarea:focus, select:focus{
 [data-theme="eink"] .dtask-auto-sel,[data-theme="eink"] .dtask-auto-input{ background:#fff; border-color:#999; color:#000; }
 
 /* ════ 【複習里程碑】分階段複習進度 ════════════════════════ */
-.ms-wrap{
-  margin:10px 14px 6px; padding:12px 14px 14px;
-  background:rgba(255,255,255,0.03);
-  border:1px solid rgba(255,255,255,0.07);
-  border-radius:14px;
-}
-.ms-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.ms-title{ font-size:12px; font-weight:700; color:var(--t1); letter-spacing:.04em; }
-.ms-edit-btn{
-  width:30px; height:30px; padding:0; border-radius:8px;
-  display:flex; align-items:center; justify-content:center;
-  background:rgba(255,255,255,0.05); border:none; color:var(--acc);
-  cursor:pointer; -webkit-tap-highlight-color:transparent;
-}
-.ms-edit-btn svg{ width:16px; height:16px; }
-.ms-edit-btn:active{ background:rgba(255,255,255,0.12); }
 .ms-empty{ font-size:12px; color:var(--t2); line-height:1.7; text-align:center; padding:8px 0; }
 .ms-empty-eg{ font-size:11px; color:var(--t2); opacity:0.7; }
 .ms-body{ display:flex; flex-direction:column; gap:10px; }
@@ -1713,9 +1692,46 @@ input:focus, textarea:focus, select:focus{
   background:var(--acc); color:#fff; border:none;
   border-radius:11px; font-size:14px; font-weight:700; cursor:pointer;
 }
-[data-theme="eink"] .ms-wrap{ background:#fff; border-color:#999; }
-[data-theme="eink"] .ms-title,[data-theme="eink"] .ms-name{ color:#000; }
+[data-theme="eink"] .ms-name{ color:#000; }
 [data-theme="eink"] .ms-item{ background:#f5f5f5; border-color:#ccc; }
 [data-theme="eink"] .ms-active{ background:#eaeaea; border-color:#888; }
 [data-theme="eink"] .ms-bar-fill{ background:#000; }
 [data-theme="eink"] .ms-ed-name,[data-theme="eink"] .ms-ed-date{ background:#fff; border-color:#999; color:#000; }
+
+/* ════ 【學習規劃】里程碑+計畫表合併卡（tab 切換）════════ */
+.planner-wrap{
+  margin:10px 14px 6px; padding:6px 6px 14px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:14px;
+}
+.planner-tabs{
+  display:flex; align-items:center; gap:4px;
+  padding:6px; margin-bottom:6px;
+}
+.planner-tab{
+  padding:8px 16px; border-radius:9px; font-size:13px; font-weight:700;
+  background:transparent; border:none; color:var(--t2); cursor:pointer;
+  -webkit-tap-highlight-color:transparent; transition:all .15s;
+}
+.planner-tab.active{ background:rgba(110,168,254,0.15); color:#6ea8fe; }
+.planner-edit{
+  margin-left:auto; width:30px; height:30px; padding:0; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(255,255,255,0.05); border:none; color:var(--acc); cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.planner-edit svg{ width:16px; height:16px; }
+.planner-edit:active{ background:rgba(255,255,255,0.12); }
+.planner-panel{ padding:0 8px; }
+[data-theme="eink"] .planner-wrap{ background:#fff; border-color:#999; }
+[data-theme="eink"] .planner-tab.active{ background:#eaeaea; color:#000; }
+[data-theme="eink"] .planner-edit{ background:#eee; color:#000; }
+
+/* 每日任務：未設自動條件標示 */
+.dtask-noauto{
+  font-size:10px; color:#e0a020; margin-left:6px;
+  padding:1px 6px; border-radius:8px; background:rgba(224,160,32,0.12);
+  vertical-align:middle;
+}
+[data-theme="eink"] .dtask-noauto{ background:#f0e8d0; color:#000; }
