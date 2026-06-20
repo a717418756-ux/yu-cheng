@@ -1490,25 +1490,24 @@ input:focus, textarea:focus, select:focus{
 }
 .plan-header{ margin-bottom:10px; }
 .plan-title{ font-size:12px; font-weight:700; color:var(--t1); letter-spacing:.04em; }
-/* 日期導航 */
+/* 日期導航（純滑動切換，日期可點回今天）*/
 .plan-nav{
-  display:flex; align-items:center; justify-content:space-between;
+  display:flex; align-items:center; justify-content:center;
   margin-bottom:12px;
 }
-.plan-nav-btn{
-  width:34px; height:34px; border-radius:9px; flex-shrink:0;
-  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
-  color:var(--t1); font-size:18px; cursor:pointer;
+.plan-nav-center{
+  display:flex; align-items:center; gap:8px;
+  cursor:pointer; padding:4px 12px; border-radius:10px;
   -webkit-tap-highlight-color:transparent; transition:background .15s;
 }
-.plan-nav-btn:active{ background:rgba(255,255,255,0.12); }
-.plan-nav-center{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+.plan-nav-center:active{ background:rgba(255,255,255,0.05); }
 .plan-nav-date{ font-size:14px; font-weight:700; color:var(--t0); }
 .plan-nav-rel{
-  font-size:10px; color:var(--t2); padding:1px 8px; border-radius:10px;
+  font-size:10px; color:var(--t2); padding:2px 9px; border-radius:10px;
   background:rgba(255,255,255,0.06);
 }
 .plan-nav-rel.today{ background:rgba(110,168,254,0.2); color:#6ea8fe; }
+.plan-nav-back{ background:rgba(224,160,32,0.18); color:#e0a020; }
 /* 時間軸 */
 .plan-timeline-wrap{ position:relative; max-height:340px; overflow-y:auto; }
 .plan-timeline{ position:relative; width:100%; }
@@ -1574,7 +1573,7 @@ input:focus, textarea:focus, select:focus{
 /* eink */
 [data-theme="eink"] .plan-wrap{ background:#fff; border-color:#999; }
 [data-theme="eink"] .plan-title,[data-theme="eink"] .plan-nav-date{ color:#000; }
-[data-theme="eink"] .plan-nav-btn{ background:#fff; border-color:#999; color:#000; }
+[data-theme="eink"] .plan-nav-date{ color:#000; }
 [data-theme="eink"] .plan-hour-lbl{ background:#fff; color:#555; }
 [data-theme="eink"] .plan-hour-line{ background:#ddd; }
 [data-theme="eink"] .plan-event-title{ color:#000; }
