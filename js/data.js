@@ -2784,7 +2784,11 @@ const DataMod = {
   toggleLawSort,
   rebuildLawIndex,
   formatYearInput,
-  editQ
+  editQ,
+  showSearchHelp,
+  openYearGroup,
+  openExamGroup,
+  openQGroup
 };
 window.DataMod = DataMod;
 Object.assign(window, DataMod);

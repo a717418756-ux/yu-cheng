@@ -324,5 +324,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '3.5.3';     // 修正搜尋驚嘆號按不到的根本原因:按鈕原為absolute疊在input上,手機點右側實際點到input聚焦而非按鈕;改為獨立flex item置於輸入框右側,不再重疊,確實可點
+const APP_VERSION  = '3.5.4';     // 真正修復showSearchHelp not defined:data.js是IIFE包裝,內部函式需列入DataMod白名單才會掛上window供HTML onclick呼叫,先前漏列導致not defined;補列showSearchHelp/openExamGroup/openQGroup/openYearGroup
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
