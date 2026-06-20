@@ -18,14 +18,17 @@ function _setHomeWidgets(show, zone){
   const dataBar = document.getElementById('h-data-bar');
   const heatmap = document.getElementById('heatmap-wrap');
   const dtask   = document.getElementById('dtask-wrap');
+  const plan    = document.getElementById('plan-wrap');
   if(!dataBar || !heatmap) return;
   if(show){
     dataBar.style.display = 'none';
     heatmap.style.display = '';
     if(dtask) dtask.style.display = '';
+    if(plan) plan.style.display = '';
   } else {
     heatmap.style.display = 'none';
     if(dtask) dtask.style.display = 'none';
+    if(plan) plan.style.display = 'none';
     dataBar.style.display = (zone === 'exam') ? '' : 'none';
   }
 }

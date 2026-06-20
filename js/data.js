@@ -81,6 +81,7 @@ async function renderHome(){  try{
   // 熱力圖
   renderHeatmap();
   renderDtask().catch(()=>{});
+  if(typeof renderPlan==='function') renderPlan().catch(()=>{});
 
   // 考試倒數
   renderCountdown();
@@ -164,8 +165,14 @@ async function renderHeatmap(){
     dayMap[l.date] = (dayMap[l.date] || 0) + (l.seconds || 0);
   });
 
-  // 最大值（用於色階計算）
-  const maxSec = Math.max(...Object.values(dayMap), 1);
+  // 每日任務完成度（供綜合評分）
+  let taskHist = {};
+  try{
+    if(typeof _getDtaskHistory === 'function') taskHist = await _getDtaskHistory();
+  }catch(e){}
+
+  // 絕對門檻：學習時間以 60 分鐘為達標基準（差→優反映實際努力，非相對比較）
+  const TARGET_SEC = 60 * 60;
 
   const today_ = today();
   const cells = [];
@@ -173,7 +180,14 @@ async function renderHeatmap(){
     const d = new Date(Date.now() - i * 86400000);
     const dateStr = d.toISOString().slice(0, 10);
     const sec = dayMap[dateStr] || 0;
-    const level = sec === 0 ? 0 : Math.min(4, Math.ceil(sec / maxSec * 4));
+    // 時間分（0~1，60分鐘封頂）+ 任務分（0~1，當日完成比例）
+    const timeScore = Math.min(1, sec / TARGET_SEC);
+    const taskRec = taskHist[dateStr];
+    const taskScore = taskRec ? (taskRec.r || 0) : 0;
+    // 綜合：時間佔 6 成、任務佔 4 成
+    const combined = timeScore * 0.6 + taskScore * 0.4;
+    // 0 分=level0；其餘依綜合分映射 1~4 級
+    const level = combined <= 0 ? 0 : Math.min(4, Math.max(1, Math.ceil(combined * 4)));
     const isToday = dateStr === today_;
     const mm = String(d.getMonth()+1).padStart(2,'0');
     const dd_ = String(d.getDate()).padStart(2,'0');
