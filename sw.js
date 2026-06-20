@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '3.5.0';
+const APP_VERSION = '3.5.1';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
@@ -32,6 +32,7 @@ const CORE_ASSETS = [
   './js/fitness.js',
   './js/dtask.js',
   './js/plan.js',
+  './js/milestone.js',
   './js/stats.js',
   './js/settings.js',
   './js/countdown.js',
