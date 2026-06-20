@@ -1578,3 +1578,80 @@ input:focus, textarea:focus, select:focus{
 [data-theme="eink"] .plan-hour-line{ background:#ddd; }
 [data-theme="eink"] .plan-event-title{ color:#000; }
 [data-theme="eink"] .plan-ed-input{ background:#fff; border-color:#999; color:#000; }
+
+/* 考試別分組：未建題的項目（灰階、不可點）*/
+.qc.exam-empty{
+  opacity:0.55;
+  background:rgba(255,255,255,0.015);
+  border:1px dashed rgba(255,255,255,0.1);
+}
+[data-theme="eink"] .qc.exam-empty{
+  opacity:1; background:#f5f5f5; border:1px dashed #bbb; color:#888;
+}
+
+/* ════ 搜尋說明 ════════════════════════════════════════════ */
+.search-help-btn{
+  flex-shrink:0; width:30px; height:30px; margin-left:4px;
+  background:transparent; border:none; color:var(--t2);
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  border-radius:50%; -webkit-tap-highlight-color:transparent;
+}
+.search-help-btn:active{ background:rgba(255,255,255,0.08); }
+.shelp-intro{ font-size:13px; color:var(--t1); line-height:1.6; margin:6px 0 14px; }
+.shelp-list{ display:flex; flex-direction:column; gap:8px; }
+.shelp-row{ display:flex; align-items:center; gap:10px; }
+.shelp-tag{
+  flex-shrink:0; width:64px; font-size:12px; font-weight:700; color:#6ea8fe;
+  text-align:center; padding:5px 0; border-radius:7px;
+  background:rgba(110,168,254,0.1);
+}
+.shelp-ex{ font-size:12px; color:var(--t2); line-height:1.4; }
+.shelp-tip{
+  font-size:12px; color:var(--t1); line-height:1.6; margin:16px 0 0;
+  padding:11px 13px; background:rgba(224,160,32,0.08);
+  border-radius:10px; border:1px solid rgba(224,160,32,0.15);
+}
+.shelp-tip b{ color:var(--t0); }
+[data-theme="eink"] .shelp-tag{ background:#eef; color:#004; }
+[data-theme="eink"] .shelp-tip{ background:#f5f0e0; border-color:#ccb; }
+
+/* ════ 每日任務：自動完成相關 ════════════════════════════ */
+.dtask-sync-btn{
+  width:30px; height:30px; margin-right:2px;
+  background:transparent; border:none; color:var(--t2);
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  border-radius:8px; -webkit-tap-highlight-color:transparent;
+}
+.dtask-sync-btn svg{ width:16px; height:16px; }
+.dtask-sync-btn:active{ background:rgba(255,255,255,0.08); transform:rotate(180deg); transition:transform .3s; }
+.dtask-auto-btn{
+  flex-shrink:0; font-size:10px; padding:4px 8px; border-radius:7px;
+  background:rgba(110,168,254,0.12); color:#6ea8fe; border:none;
+  cursor:pointer; white-space:nowrap; max-width:90px; overflow:hidden;
+  text-overflow:ellipsis;
+}
+.dtask-edit-hint{
+  font-size:11px; color:var(--t2); line-height:1.5; margin-top:8px;
+  padding:8px 10px; background:rgba(255,255,255,0.02); border-radius:8px;
+}
+.dtask-auto-desc{ font-size:12px; color:var(--t1); line-height:1.6; margin:4px 0 16px; }
+.dtask-auto-label{ display:block; font-size:11px; color:var(--t2); margin:14px 0 5px; }
+.dtask-auto-sel,.dtask-auto-input{
+  width:100%; background:var(--bg2); border:1px solid var(--bd);
+  border-radius:9px; padding:11px 12px; color:var(--t0); font-size:15px;
+  -webkit-appearance:none; box-sizing:border-box; font-family:inherit;
+}
+.dtask-auto-actions{ margin-top:20px; }
+.dtask-auto-save{
+  width:100%; padding:13px; background:var(--acc); color:#fff; border:none;
+  border-radius:11px; font-size:14px; font-weight:700; cursor:pointer;
+}
+/* 計畫表事件完成 */
+.plan-event-done .plan-event-title{ text-decoration:line-through; opacity:0.7; }
+.plan-ed-done{
+  display:flex; align-items:center; gap:8px; margin-top:16px;
+  font-size:13px; color:var(--t1); cursor:pointer;
+}
+.plan-ed-done input{ width:18px; height:18px; accent-color:var(--acc); }
+[data-theme="eink"] .dtask-auto-btn{ background:#eef; color:#004; }
+[data-theme="eink"] .dtask-auto-sel,[data-theme="eink"] .dtask-auto-input{ background:#fff; border-color:#999; color:#000; }
