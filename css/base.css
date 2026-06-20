@@ -1382,59 +1382,81 @@ input:focus, textarea:focus, select:focus{
 }
 
 /* ════ 成長詳情：整合運動數據 ════════════════════════════ */
+/* ════ 成長詳情：運動健康（升級版）════════════════════════ */
 .hm-fit-section{
-  margin-top:16px; padding-top:16px;
-  border-top:1px solid rgba(255,255,255,0.08);
+  margin-top:18px; padding-top:18px;
+  border-top:1px solid rgba(255,255,255,0.07);
 }
 .hm-fit-title{
-  font-size:12px; font-weight:700; color:var(--t1);
-  letter-spacing:.04em; margin-bottom:10px; text-align:center;
+  font-size:13px; font-weight:700; color:var(--t0);
+  letter-spacing:.03em; margin-bottom:12px;
+  display:flex; align-items:center; gap:7px;
+}
+.hm-fit-title::before{
+  content:''; width:3px; height:14px; border-radius:2px;
+  background:linear-gradient(180deg,#6ee0a0,#4caf7d);
 }
 .hm-fit-grid{ display:flex; gap:10px; }
 .hm-fit-item{
-  flex:1; display:flex; flex-direction:column; align-items:center; gap:5px;
-  padding:12px 8px; background:rgba(255,255,255,0.03); border-radius:12px;
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:6px;
+  padding:16px 8px;
+  background:linear-gradient(160deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02));
+  border:1px solid rgba(255,255,255,0.05);
+  border-radius:14px;
 }
 .hm-fit-val{
-  font-size:20px; font-weight:800; color:var(--t0);
+  font-size:24px; font-weight:800; color:var(--t0);
   font-variant-numeric:tabular-nums; line-height:1;
 }
 .hm-fit-val small{ font-size:11px; font-weight:600; color:var(--t2); margin-left:2px; }
 .hm-fit-lab{ font-size:11px; color:var(--t2); }
-[data-theme="eink"] .hm-fit-item{ background:#f0f0f0; }
+[data-theme="eink"] .hm-fit-item{ background:#f4f4f4; border-color:#ddd; }
 [data-theme="eink"] .hm-fit-val{ color:#000; }
+[data-theme="eink"] .hm-fit-title::before{ background:#000; }
 
-/* ════ 成長詳情：整合每日任務 ════════════════════════════ */
+/* ════ 成長詳情：每日任務（升級版）════════════════════════ */
 .hm-dt-section{
-  margin-top:16px; padding-top:16px;
-  border-top:1px solid rgba(255,255,255,0.08);
+  margin-top:18px; padding-top:18px;
+  border-top:1px solid rgba(255,255,255,0.07);
 }
 .hm-dt-title{
   display:flex; align-items:center; gap:8px;
-  font-size:12px; font-weight:700; color:var(--t1);
-  letter-spacing:.04em; margin-bottom:12px;
+  font-size:13px; font-weight:700; color:var(--t0);
+  letter-spacing:.03em; margin-bottom:14px;
 }
 .hm-dt-ic{ display:flex; }
-.hm-dt-ic .dtask-ach{ width:20px; height:20px; }
+.hm-dt-ic .dtask-ach{ width:22px; height:22px; }
 .hm-dt-cnt{
-  margin-left:auto; font-size:12px; color:var(--t2);
-  font-variant-numeric:tabular-nums; letter-spacing:0;
+  margin-left:auto;
+  font-size:12px; font-weight:700; color:var(--t1);
+  font-variant-numeric:tabular-nums;
+  padding:3px 10px; border-radius:20px;
+  background:rgba(255,255,255,0.06);
 }
-.hm-dt-list{ display:flex; flex-direction:column; gap:7px; }
+.hm-dt-list{
+  display:flex; flex-direction:column; gap:2px;
+  background:rgba(255,255,255,0.02);
+  border-radius:14px; padding:6px;
+}
 .hm-dt-task{
-  display:flex; align-items:center; gap:9px; font-size:13px;
+  display:flex; align-items:center; gap:11px; font-size:14px;
+  padding:10px 12px; border-radius:10px;
 }
+.hm-dt-task.done{ background:rgba(76,175,125,0.06); }
 .hm-dt-tick{
-  width:18px; height:18px; flex-shrink:0; border-radius:50%;
+  width:20px; height:20px; flex-shrink:0; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
 }
-.hm-dt-tick svg{ width:12px; height:12px; }
-.hm-dt-task.done .hm-dt-tick{ background:rgba(76,175,125,0.2); color:#4caf7d; }
-.hm-dt-task.undone .hm-dt-tick{ background:rgba(224,92,87,0.15); color:#e05c57; }
-.hm-dt-task.done .hm-dt-text{ color:var(--t1); }
+.hm-dt-tick svg{ width:13px; height:13px; }
+.hm-dt-task.done .hm-dt-tick{ background:#4caf7d; color:#fff; }
+.hm-dt-task.undone .hm-dt-tick{ background:rgba(255,255,255,0.06); color:var(--t2); border:1.5px solid rgba(255,255,255,0.15); }
+.hm-dt-task.done .hm-dt-text{ color:var(--t0); }
 .hm-dt-task.undone .hm-dt-text{ color:var(--t2); }
-[data-theme="eink"] .hm-dt-task.done .hm-dt-tick{ background:#ddd; color:#000; }
-[data-theme="eink"] .hm-dt-task.undone .hm-dt-tick{ background:#eee; color:#555; }
+[data-theme="eink"] .hm-dt-task.done{ background:#f0f0f0; }
+[data-theme="eink"] .hm-dt-task.done .hm-dt-tick{ background:#000; color:#fff; }
+[data-theme="eink"] .hm-dt-task.undone .hm-dt-tick{ background:#fff; color:#888; border-color:#aaa; }
+[data-theme="eink"] .hm-dt-cnt{ background:#eee; color:#000; }
+
 
 /* 編輯按鈕 SVG 圖示 */
 .dtask-edit-btn svg{ width:17px; height:17px; display:block; }
@@ -1446,3 +1468,77 @@ input:focus, textarea:focus, select:focus{
 }
 .dtask-edit-btn:active{ background:rgba(255,255,255,0.12); }
 [data-theme="eink"] .dtask-edit-btn{ background:#eee; color:#000; }
+
+/* ════ 成長詳情彈窗：標題列固定（捲動不重疊）════════════════ */
+#heatmap-ov .shdl{ margin:10px auto 0; }
+#heatmap-ov .sht{
+  position:sticky; top:0; z-index:5;
+  background:var(--bg1);
+  padding:14px 16px;
+  margin-top:-2px;
+  box-shadow:0 6px 16px -10px rgba(0,0,0,0.7);
+}
+
+/* ════ 【三日計畫表】昨/今唯讀，明日可編輯 ════════════════ */
+.plan-wrap{
+  margin:10px 14px 6px; padding:12px 14px 14px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:14px;
+}
+.plan-header{ margin-bottom:12px; }
+.plan-title{
+  font-size:12px; font-weight:700; color:var(--t1); letter-spacing:.04em;
+}
+.plan-body{ display:flex; flex-direction:column; gap:8px; }
+.plan-day{
+  background:rgba(255,255,255,0.02);
+  border:1px solid rgba(255,255,255,0.05);
+  border-radius:11px; padding:11px 13px;
+}
+.plan-day-today{
+  background:rgba(110,168,254,0.06);
+  border-color:rgba(110,168,254,0.2);
+}
+.plan-day-edit{
+  background:rgba(76,175,125,0.05);
+  border-color:rgba(76,175,125,0.18);
+}
+.plan-day-head{
+  display:flex; align-items:center; gap:8px; margin-bottom:8px;
+}
+.plan-day-name{
+  font-size:13px; font-weight:700; color:var(--t0);
+}
+.plan-day-today .plan-day-name{ color:#6ea8fe; }
+.plan-day-edit .plan-day-name{ color:#4caf7d; }
+.plan-day-date{ font-size:11px; color:var(--t2); }
+.plan-edit-ic{ width:14px; height:14px; color:#4caf7d; margin-left:auto; }
+.plan-day-content{ display:flex; flex-direction:column; gap:5px; }
+.plan-line{
+  font-size:13px; color:var(--t1); line-height:1.5;
+  padding-left:14px; position:relative;
+}
+.plan-line::before{
+  content:'·'; position:absolute; left:4px; color:var(--t2);
+}
+.plan-empty-line{ font-size:12px; color:var(--t2); font-style:italic; }
+.plan-textarea{
+  width:100%; min-height:64px; resize:vertical;
+  background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.08);
+  border-radius:9px; padding:10px 12px;
+  color:var(--t0); font-size:13px; line-height:1.6; font-family:inherit;
+  -webkit-appearance:none;
+}
+.plan-textarea:focus{ outline:none; border-color:#4caf7d; }
+.plan-textarea::placeholder{ color:var(--t2); }
+/* eink */
+[data-theme="eink"] .plan-wrap{ background:#fff; border-color:#999; }
+[data-theme="eink"] .plan-title{ color:#000; }
+[data-theme="eink"] .plan-day{ background:#f5f5f5; border-color:#ccc; }
+[data-theme="eink"] .plan-day-today{ background:#eaeaea; border-color:#888; }
+[data-theme="eink"] .plan-day-edit{ background:#f0f0f0; border-color:#888; }
+[data-theme="eink"] .plan-day-name{ color:#000 !important; }
+[data-theme="eink"] .plan-line{ color:#000; }
+[data-theme="eink"] .plan-textarea{ background:#fff; border-color:#999; color:#000; }
+[data-theme="eink"] .plan-edit-ic{ color:#000; }
