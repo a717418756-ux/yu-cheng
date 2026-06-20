@@ -81,8 +81,8 @@ async function renderHome(){  try{
   // 熱力圖
   renderHeatmap();
   renderDtask().catch(()=>{});
-  if(typeof renderPlan==='function') renderPlan().catch(()=>{});
   if(typeof renderMilestones==='function') renderMilestones().catch(()=>{});
+  if(typeof renderPlan==='function' && typeof _plannerTab!=='undefined' && _plannerTab==='plan') renderPlan().catch(()=>{});
 
   // 考試倒數
   renderCountdown();

@@ -156,3 +156,37 @@ async function _msSaveStages(){
     renderMilestones();
   }catch(e){ logError('msSave', e); toast('儲存失敗'); }
 }
+
+// ════════════════════════════════════════════════════════════
+// 【學習規劃：里程碑/計畫表 tab 切換】
+// ════════════════════════════════════════════════════════════
+let _plannerTab = 'ms';
+function switchPlanner(tab){
+  _plannerTab = tab;
+  const msPanel = document.getElementById('planner-ms');
+  const planPanel = document.getElementById('planner-plan');
+  const msTab = document.getElementById('ptab-ms');
+  const planTab = document.getElementById('ptab-plan');
+  if(tab==='ms'){
+    if(msPanel) msPanel.style.display='';
+    if(planPanel) planPanel.style.display='none';
+    msTab?.classList.add('active');
+    planTab?.classList.remove('active');
+  } else {
+    if(msPanel) msPanel.style.display='none';
+    if(planPanel) planPanel.style.display='';
+    planTab?.classList.add('active');
+    msTab?.classList.remove('active');
+    if(typeof renderPlan==='function') renderPlan().catch(()=>{});
+  }
+}
+
+// 編輯鈕：依當前 tab 決定動作（里程碑→階段設定；計畫表→新增今日事件）
+function plannerEditAction(){
+  if(_plannerTab==='ms'){
+    openMilestoneEdit();
+  } else {
+    const key = (typeof _planDateKey==='function') ? _planDateKey(0) : new Date().toISOString().slice(0,10);
+    if(typeof _openPlanEditor==='function') _openPlanEditor(key, null, 540);
+  }
+}

@@ -76,9 +76,10 @@ async function renderDtask(){
   // ── 一般模式：左任務清單 + 右圓形進度 ──
   const tasksHtml = items.map(it=>{
     const isDone = done.includes(it.id);
+    const noAuto = !it.auto;
     return `<div class="dtask-item${isDone?' done':''}" onclick="dtaskToggle('${it.id}')">
       <span class="dtask-check">${isDone?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</span>
-      <span class="dtask-text">${_esc(it.text)}</span>
+      <span class="dtask-text">${_esc(it.text)}${noAuto?'<span class="dtask-noauto">未設條件</span>':''}</span>
     </div>`;
   }).join('');
 
@@ -286,9 +287,16 @@ async function dtaskToggle(id){
   if(_dtaskEditMode) return;
   const done = await _getDtaskDone();
   const idx = done.indexOf(id);
-  if(idx>=0) done.splice(idx,1); else done.push(id);
+  if(idx>=0){
+    // 已完成 → 允許取消（誤判時可手動取消）
+    done.splice(idx,1);
+  } else {
+    // 未完成 → 不允許手動勾，改用重新整理鈕比對資料（防偷懶）
+    toast('請按右上角 🔄 由系統比對資料完成');
+    return;
+  }
   try{ await setSetting(_dtaskTodayKey(), done); }catch(e){ logError('dtaskToggle',e); }
-  await _recordDtaskHistory();  // 更新當日達成歷史
+  await _recordDtaskHistory();
   if(typeof haptic==='function') haptic('light');
   renderDtask();
 }
