@@ -324,5 +324,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '3.5.4';     // 真正修復showSearchHelp not defined:data.js是IIFE包裝,內部函式需列入DataMod白名單才會掛上window供HTML onclick呼叫,先前漏列導致not defined;補列showSearchHelp/openExamGroup/openQGroup/openYearGroup
+const APP_VERSION  = '3.5.6';     // 大量匯入選項符號擴充:新增圈圈字母Ⓐ-Ⓔ/ⓐ-ⓔ/括號字母⒜-⒠/全形字母Ａ-Ｅ自動轉選項;半形(A)(B)及全形（A）（B）本就支援,確認大小寫皆可
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
