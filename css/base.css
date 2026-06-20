@@ -394,10 +394,12 @@ textarea{resize:vertical;line-height:1.7}
 
 /* Header — 透明融入，無邊框 */
 .hd-home{
-  height:auto;min-height:80px;padding:16px 18px 8px;
+  height:auto;min-height:80px;padding:16px 18px 12px;
   flex-direction:column;align-items:flex-start;gap:0;
-  background:transparent;border-bottom:none;
-  box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+  background:rgba(20,20,22,0.86);
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  box-shadow:0 6px 18px -12px rgba(0,0,0,0.8);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
 }
 .hd-home-inner{width:100%}
 .h-motto{
@@ -1479,66 +1481,101 @@ input:focus, textarea:focus, select:focus{
   box-shadow:0 6px 16px -10px rgba(0,0,0,0.7);
 }
 
-/* ════ 【三日計畫表】昨/今唯讀，明日可編輯 ════════════════ */
+/* ════ 【計畫表（行事曆）】時間軸日檢視 ════════════════════ */
 .plan-wrap{
   margin:10px 14px 6px; padding:12px 14px 14px;
   background:rgba(255,255,255,0.03);
   border:1px solid rgba(255,255,255,0.07);
   border-radius:14px;
 }
-.plan-header{ margin-bottom:12px; }
-.plan-title{
-  font-size:12px; font-weight:700; color:var(--t1); letter-spacing:.04em;
+.plan-header{ margin-bottom:10px; }
+.plan-title{ font-size:12px; font-weight:700; color:var(--t1); letter-spacing:.04em; }
+/* 日期導航 */
+.plan-nav{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:12px;
 }
-.plan-body{ display:flex; flex-direction:column; gap:8px; }
-.plan-day{
-  background:rgba(255,255,255,0.02);
-  border:1px solid rgba(255,255,255,0.05);
-  border-radius:11px; padding:11px 13px;
+.plan-nav-btn{
+  width:34px; height:34px; border-radius:9px; flex-shrink:0;
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
+  color:var(--t1); font-size:18px; cursor:pointer;
+  -webkit-tap-highlight-color:transparent; transition:background .15s;
 }
-.plan-day-today{
-  background:rgba(110,168,254,0.06);
-  border-color:rgba(110,168,254,0.2);
+.plan-nav-btn:active{ background:rgba(255,255,255,0.12); }
+.plan-nav-center{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+.plan-nav-date{ font-size:14px; font-weight:700; color:var(--t0); }
+.plan-nav-rel{
+  font-size:10px; color:var(--t2); padding:1px 8px; border-radius:10px;
+  background:rgba(255,255,255,0.06);
 }
-.plan-day-edit{
-  background:rgba(76,175,125,0.05);
-  border-color:rgba(76,175,125,0.18);
+.plan-nav-rel.today{ background:rgba(110,168,254,0.2); color:#6ea8fe; }
+/* 時間軸 */
+.plan-timeline-wrap{ position:relative; max-height:340px; overflow-y:auto; }
+.plan-timeline{ position:relative; width:100%; }
+.plan-hour-line{
+  position:absolute; left:0; right:0; height:1px;
+  background:rgba(255,255,255,0.05);
 }
-.plan-day-head{
-  display:flex; align-items:center; gap:8px; margin-bottom:8px;
+.plan-hour-lbl{
+  position:absolute; left:0; top:-7px; font-size:10px; color:var(--t2);
+  background:var(--bg1); padding-right:4px; width:46px;
+  font-variant-numeric:tabular-nums;
 }
-.plan-day-name{
-  font-size:13px; font-weight:700; color:var(--t0);
+/* 事件區塊 */
+.plan-event{
+  position:absolute; border-radius:7px; padding:4px 8px;
+  overflow:hidden; cursor:pointer; box-sizing:border-box;
+  transition:transform .1s;
 }
-.plan-day-today .plan-day-name{ color:#6ea8fe; }
-.plan-day-edit .plan-day-name{ color:#4caf7d; }
-.plan-day-date{ font-size:11px; color:var(--t2); }
-.plan-edit-ic{ width:14px; height:14px; color:#4caf7d; margin-left:auto; }
-.plan-day-content{ display:flex; flex-direction:column; gap:5px; }
-.plan-line{
-  font-size:13px; color:var(--t1); line-height:1.5;
-  padding-left:14px; position:relative;
+.plan-event:active{ transform:scale(0.98); }
+.plan-event-time{ font-size:9px; color:var(--t2); font-variant-numeric:tabular-nums; line-height:1.3; }
+.plan-event-title{
+  font-size:12px; font-weight:600; color:var(--t0); line-height:1.3;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.plan-line::before{
-  content:'·'; position:absolute; left:4px; color:var(--t2);
+/* 現在時間線 */
+.plan-now-line{
+  position:absolute; left:46px; right:0; height:2px;
+  background:#e05c57; z-index:3;
 }
-.plan-empty-line{ font-size:12px; color:var(--t2); font-style:italic; }
-.plan-textarea{
-  width:100%; min-height:64px; resize:vertical;
-  background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.08);
-  border-radius:9px; padding:10px 12px;
-  color:var(--t0); font-size:13px; line-height:1.6; font-family:inherit;
-  -webkit-appearance:none;
+.plan-now-dot{
+  position:absolute; left:-4px; top:-3px; width:8px; height:8px;
+  border-radius:50%; background:#e05c57;
 }
-.plan-textarea:focus{ outline:none; border-color:#4caf7d; }
-.plan-textarea::placeholder{ color:var(--t2); }
+.plan-hint{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  font-size:12px; color:var(--t2); pointer-events:none; text-align:center;
+}
+/* 編輯彈窗 */
+.plan-editor-sheet{ max-width:480px; }
+.plan-ed-label{ display:block; font-size:11px; color:var(--t2); margin:12px 0 5px; }
+.plan-ed-input{
+  width:100%; background:var(--bg2); border:1px solid var(--bd);
+  border-radius:9px; padding:11px 12px; color:var(--t0); font-size:15px;
+  -webkit-appearance:none; box-sizing:border-box; font-family:inherit;
+}
+.plan-ed-input:focus{ outline:none; border-color:var(--acc); }
+.plan-ed-row{ display:flex; gap:10px; }
+.plan-ed-colors{ display:flex; gap:10px; margin-top:6px; }
+.plan-ed-color{
+  width:32px; height:32px; border-radius:50%; cursor:pointer;
+  border:2px solid transparent; -webkit-tap-highlight-color:transparent;
+}
+.plan-ed-color.sel{ border-color:var(--t0); transform:scale(1.1); }
+.plan-ed-actions{ display:flex; gap:10px; margin-top:20px; }
+.plan-ed-save{
+  flex:1; padding:13px; background:var(--acc); color:#fff; border:none;
+  border-radius:11px; font-size:14px; font-weight:700; cursor:pointer;
+}
+.plan-ed-del{
+  padding:13px 20px; background:rgba(224,92,87,0.15); color:#e05c57;
+  border:none; border-radius:11px; font-size:14px; font-weight:600; cursor:pointer;
+}
 /* eink */
 [data-theme="eink"] .plan-wrap{ background:#fff; border-color:#999; }
-[data-theme="eink"] .plan-title{ color:#000; }
-[data-theme="eink"] .plan-day{ background:#f5f5f5; border-color:#ccc; }
-[data-theme="eink"] .plan-day-today{ background:#eaeaea; border-color:#888; }
-[data-theme="eink"] .plan-day-edit{ background:#f0f0f0; border-color:#888; }
-[data-theme="eink"] .plan-day-name{ color:#000 !important; }
-[data-theme="eink"] .plan-line{ color:#000; }
-[data-theme="eink"] .plan-textarea{ background:#fff; border-color:#999; color:#000; }
-[data-theme="eink"] .plan-edit-ic{ color:#000; }
+[data-theme="eink"] .plan-title,[data-theme="eink"] .plan-nav-date{ color:#000; }
+[data-theme="eink"] .plan-nav-btn{ background:#fff; border-color:#999; color:#000; }
+[data-theme="eink"] .plan-hour-lbl{ background:#fff; color:#555; }
+[data-theme="eink"] .plan-hour-line{ background:#ddd; }
+[data-theme="eink"] .plan-event-title{ color:#000; }
+[data-theme="eink"] .plan-ed-input{ background:#fff; border-color:#999; color:#000; }
