@@ -124,12 +124,10 @@ async function renderPlan(){
 
   body.innerHTML = `
     <div class="plan-nav">
-      <button class="plan-nav-btn" onclick="planPrevDay()" aria-label="前一天">‹</button>
-      <div class="plan-nav-center">
+      <div class="plan-nav-center" onclick="planGoToday()" title="點此回今天">
         <span class="plan-nav-date">${lbl.full}（${lbl.wd}）</span>
-        ${lbl.rel ? `<span class="plan-nav-rel${lbl.isToday?' today':''}">${lbl.rel}</span>` : ''}
+        ${lbl.rel ? `<span class="plan-nav-rel${lbl.isToday?' today':''}">${lbl.rel}</span>` : `<span class="plan-nav-rel plan-nav-back">回今天</span>`}
       </div>
-      <button class="plan-nav-btn" onclick="planNextDay()" aria-label="後一天">›</button>
     </div>
     <div class="plan-timeline-wrap" id="plan-timeline-wrap">
       <div class="plan-timeline" style="height:${totalH}px"
@@ -138,7 +136,7 @@ async function renderPlan(){
         ${eventsHtml}
         ${nowLine}
       </div>
-      ${events.length===0 ? `<div class="plan-hint">${editable?'點時間軸新增事件':'這天沒有計畫'}</div>` : ''}
+      ${events.length===0 ? `<div class="plan-hint">${editable?'點時間軸新增事件　·　左右滑動換日':'這天沒有計畫　·　左右滑動換日'}</div>` : ''}
     </div>`;
 
   _bindPlanSwipe();
@@ -163,6 +161,7 @@ function _bindPlanSwipe(){
 
 function planPrevDay(){ _planOffset--; renderPlan(); }
 function planNextDay(){ _planOffset++; renderPlan(); }
+function planGoToday(){ if(_planOffset!==0){ _planOffset=0; renderPlan(); } }
 
 // 點時間軸空白處：以該位置的時間新增事件
 function planTimelineTap(e, dateKey){
