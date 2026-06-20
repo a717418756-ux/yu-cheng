@@ -49,15 +49,25 @@ async function renderDtask(){
   const doneCount = items.filter(it=>done.includes(it.id)).length;
   const pct = Math.round(doneCount / items.length * 100);
 
-  // ── 編輯模式：清單 + 新增 ──
+  // ── 編輯模式：清單 + 新增 + 自動條件 ──
   if(_dtaskEditMode){
-    let editHtml = items.map(it=>`
+    let editHtml = items.map(it=>{
+      const a = it.auto || {};
+      const autoLabel = !it.auto ? '手動' :
+        a.type==='quiz' ? `答題≥${a.target}` :
+        a.type==='time' ? `${_zoneLabel(a.zone)}≥${a.target}分` :
+        a.type==='fit'  ? `${_fitLabel(a.field)}≥${a.target}` :
+        a.type==='plan' ? `計畫:${a.match||'任一'}` : '手動';
+      return `
       <div class="dtask-item editing">
         <input class="dtask-item-input" value="${_esc(it.text)}" data-id="${it.id}"
           oninput="dtaskEditText('${it.id}', this.value)">
+        <button class="dtask-auto-btn" onclick="dtaskEditAuto('${it.id}')" title="設定自動完成條件">${autoLabel}</button>
         <button class="dtask-del" onclick="dtaskDelete('${it.id}')">✕</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     editHtml += `<button class="dtask-add" onclick="dtaskAdd()">＋ 新增任務</button>`;
+    editHtml += `<div class="dtask-edit-hint">點任務後方標籤可設定「自動完成條件」，回首頁按 🔄 即比對資料自動勾選</div>`;
     list.innerHTML = editHtml;
     return;
   }
@@ -99,6 +109,173 @@ async function renderDtask(){
 }
 
 function _esc(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ════════════════════════════════════════════════════════════
+// 自動條件標籤輔助
+function _zoneLabel(z){ return z==='exam'?'考試區':z==='leisure'?'休閒區':z==='study'?'成長區':'學習'; }
+function _fitLabel(f){ return f==='activeMin'?'運動時長':f==='burned'?'消耗熱量':f==='intake'?'攝取熱量':f==='steps'?'步數':f; }
+
+// 設定任務的自動完成條件（編輯模式點標籤）
+async function dtaskEditAuto(id){
+  const items = await _getDtaskItems();
+  const it = items.find(x=>x.id===id);
+  if(!it) return;
+  const a = it.auto || {};
+
+  const ov = document.createElement('div');
+  ov.className = 'ov on';
+  ov.id = 'dtask-auto-ov';
+  ov.onclick = (e)=>{ if(e.target===ov) ov.remove(); };
+  ov.innerHTML = `
+    <div class="sh" onclick="event.stopPropagation()" style="max-width:440px">
+      <div class="shdl"></div>
+      <div class="sht"><span>自動完成條件</span>
+        <button class="shx" onclick="document.getElementById('dtask-auto-ov').remove()">\u2715</button></div>
+      <div style="padding:4px 18px 24px">
+        <p class="dtask-auto-desc">設定後，回首頁按 \ud83d\udd04 比對資料，達標自動勾選「${_esc(it.text)}」</p>
+        <label class="dtask-auto-label">條件類型</label>
+        <select class="dtask-auto-sel" id="da-type" onchange="_daTypeChange()">
+          <option value="">手動（不自動）</option>
+          <option value="quiz">今日答題數達標</option>
+          <option value="time">今日某區使用時間達標</option>
+          <option value="fit">今日運動數據達標</option>
+          <option value="plan">計畫表完成對應事件</option>
+        </select>
+        <div id="da-extra"></div>
+        <div class="dtask-auto-actions">
+          <button class="dtask-auto-save" onclick="_dtaskSaveAuto('${id}')">儲存</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.getElementById('da-type').value = a.type || '';
+  _daTypeChange();
+  // 回填現有值
+  if(a.type==='quiz' || a.type==='fit' || a.type==='time'){
+    const t = document.getElementById('da-target'); if(t) t.value = a.target||'';
+  }
+  if(a.type==='time'){ const z=document.getElementById('da-zone'); if(z) z.value=a.zone||'exam'; }
+  if(a.type==='fit'){ const f=document.getElementById('da-field'); if(f) f.value=a.field||'activeMin'; }
+  if(a.type==='plan'){ const m=document.getElementById('da-match'); if(m) m.value=a.match||''; }
+}
+
+function _daTypeChange(){
+  const type = document.getElementById('da-type').value;
+  const extra = document.getElementById('da-extra');
+  if(!extra) return;
+  if(type==='quiz'){
+    extra.innerHTML = `<label class="dtask-auto-label">目標題數</label>
+      <input class="dtask-auto-input" id="da-target" type="number" inputmode="numeric" placeholder="例：20" value="20">`;
+  } else if(type==='time'){
+    extra.innerHTML = `<label class="dtask-auto-label">區域</label>
+      <select class="dtask-auto-sel" id="da-zone">
+        <option value="exam">考試區</option><option value="leisure">休閒區</option><option value="study">成長區</option>
+      </select>
+      <label class="dtask-auto-label">目標分鐘</label>
+      <input class="dtask-auto-input" id="da-target" type="number" inputmode="numeric" placeholder="例：30" value="30">`;
+  } else if(type==='fit'){
+    extra.innerHTML = `<label class="dtask-auto-label">項目</label>
+      <select class="dtask-auto-sel" id="da-field">
+        <option value="activeMin">運動時長（分）</option><option value="burned">消耗熱量</option>
+        <option value="intake">攝取熱量</option><option value="steps">步數</option>
+      </select>
+      <label class="dtask-auto-label">目標值</label>
+      <input class="dtask-auto-input" id="da-target" type="number" inputmode="numeric" placeholder="例：30" value="30">`;
+  } else if(type==='plan'){
+    extra.innerHTML = `<label class="dtask-auto-label">計畫事件含關鍵字（留空=任一已完成事件）</label>
+      <input class="dtask-auto-input" id="da-match" type="text" placeholder="例：複習">`;
+  } else {
+    extra.innerHTML = '';
+  }
+}
+
+async function _dtaskSaveAuto(id){
+  const type = document.getElementById('da-type').value;
+  let auto = null;
+  if(type==='quiz'){
+    auto = { type:'quiz', target:parseInt(document.getElementById('da-target').value)||1 };
+  } else if(type==='time'){
+    auto = { type:'time', zone:document.getElementById('da-zone').value, target:parseInt(document.getElementById('da-target').value)||1 };
+  } else if(type==='fit'){
+    auto = { type:'fit', field:document.getElementById('da-field').value, target:parseInt(document.getElementById('da-target').value)||1 };
+  } else if(type==='plan'){
+    auto = { type:'plan', match:document.getElementById('da-match').value.trim() };
+  }
+  const items = await _getDtaskItems();
+  const it = items.find(x=>x.id===id);
+  if(it){ if(auto) it.auto = auto; else delete it.auto; }
+  await setSetting('dtask_items', items);
+  document.getElementById('dtask-auto-ov')?.remove();
+  renderDtask();
+}
+
+// ════════════════════════════════════════════════════════════
+// 【每日任務：比對資料自動完成】
+// 按重新整理鈕，依各任務綁定的自動條件比對資料，達標者自動勾選
+//   auto 條件格式：
+//     {type:'quiz', target:20}              今日答題數 ≥ target
+//     {type:'time', zone:'exam', target:30} 今日某區使用 ≥ target 分鐘
+//     {type:'fit',  field:'activeMin', target:30} 今日運動數據 ≥ target
+//     {type:'plan', match:'關鍵字'}          計畫表今日有完成含關鍵字的事件
+//     null / 無                              純手動
+// ════════════════════════════════════════════════════════════
+async function dtaskSyncAuto(){
+  if(_dtaskEditMode) return;
+  const items = await _getDtaskItems();
+  const hasAuto = items.some(it=>it.auto);
+  if(!hasAuto){
+    toast('尚未設定自動條件，可在編輯中設定');
+    return;
+  }
+
+  const done = await _getDtaskDone();
+  let changed = 0;
+
+  // 預先抓取比對所需資料
+  const todayStr = new Date().toISOString().slice(0,10);
+  let qs=[], ats=[], usage=[], fit=null, planEvents=[];
+  try{ [qs, ats] = await Promise.all([da('questions'), da('attempts')]); }catch(e){}
+  try{ usage = await da('usageLogs'); }catch(e){}
+  try{ if(typeof _getFitData==='function') fit = await _getFitData(todayStr); }catch(e){}
+  try{
+    const pv = await getSetting('plan_' + todayStr);
+    if(Array.isArray(pv)) planEvents = pv;
+  }catch(e){}
+
+  for(const it of items){
+    if(!it.auto || done.includes(it.id)) continue;
+    let reached = false;
+    const a = it.auto;
+
+    if(a.type==='quiz'){
+      const todayAns = ats.filter(t=> t.date===todayStr).length;
+      reached = todayAns >= (a.target||1);
+
+    } else if(a.type==='time'){
+      const sec = usage.filter(l=>l.date===todayStr && (!a.zone || l.zone===a.zone))
+        .reduce((s,l)=>s+(l.seconds||0),0);
+      reached = (sec/60) >= (a.target||1);
+
+    } else if(a.type==='fit'){
+      const val = fit ? (fit[a.field]||0) : 0;
+      reached = val >= (a.target||1);
+
+    } else if(a.type==='plan'){
+      reached = planEvents.some(ev=> ev.done && (!a.match || (ev.title||'').includes(a.match)));
+    }
+
+    if(reached){ done.push(it.id); changed++; }
+  }
+
+  if(changed>0){
+    await setSetting(_dtaskTodayKey(), done);
+    await _recordDtaskHistory();
+    toast(`已自動完成 ${changed} 項任務`);
+    renderDtask();
+  } else {
+    toast('目前沒有達標的任務');
+  }
+}
 
 // 勾選完成（非編輯模式）
 // ════════════════════════════════════════════════════════════

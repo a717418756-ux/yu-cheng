@@ -101,13 +101,13 @@ async function renderPlan(){
     const colW = 100 / ev._totalCols;
     const left = ev._col * colW;
     const color = ev.color || _PLAN_COLORS[0];
-    eventsHtml += `<div class="plan-event" style="
+    eventsHtml += `<div class="plan-event${ev.done?' plan-event-done':''}" style="
         top:${top}px; height:${height}px;
         left:calc(${left}% + 52px); width:calc(${colW}% - 56px);
         background:${color}22; border-left:3px solid ${color};"
         ${editable ? `onclick="openPlanEventEdit('${key}','${ev.id}')"` : ''}>
       <div class="plan-event-time">${_minToHHMM(ev.start)}–${_minToHHMM(ev.end)}</div>
-      <div class="plan-event-title">${_planEsc(ev.title)}</div>
+      <div class="plan-event-title">${ev.done?'✓ ':''}${_planEsc(ev.title)}</div>
     </div>`;
   });
 
@@ -214,6 +214,10 @@ async function _openPlanEditor(dateKey, eventId, defaultStart){
         <div class="plan-ed-colors" id="plan-ed-colors">
           ${_PLAN_COLORS.map(c=>`<button class="plan-ed-color${c===ev.color?' sel':''}" style="background:${c}" data-color="${c}" onclick="_planPickColor(this)"></button>`).join('')}
         </div>
+        <label class="plan-ed-done">
+          <input type="checkbox" id="plan-ed-done" ${ev.done?'checked':''}>
+          <span>標記為已完成（可連動每日任務）</span>
+        </label>
         <div class="plan-ed-actions">
           ${!isNew ? `<button class="plan-ed-del" onclick="_planDeleteEvent('${dateKey}','${ev.id}')">刪除</button>` : ''}
           <button class="plan-ed-save" onclick="_planSaveEvent('${dateKey}','${ev.id}',${isNew})">儲存</button>
@@ -242,13 +246,14 @@ async function _planSaveEvent(dateKey, eventId, isNew){
   const end   = _hhmmToMin(document.getElementById('plan-ed-end').value);
   if(end <= start){ toast('結束時間需晚於開始'); return; }
   const color = document.getElementById('plan-editor-ov')._editColor || _PLAN_COLORS[0];
+  const isDone = document.getElementById('plan-ed-done')?.checked || false;
 
   const events = await _getPlanEvents(dateKey);
   if(isNew){
-    events.push({ id:eventId, title, start, end, color });
+    events.push({ id:eventId, title, start, end, color, done:isDone });
   } else {
     const ev = events.find(x=>x.id===eventId);
-    if(ev){ ev.title=title; ev.start=start; ev.end=end; ev.color=color; }
+    if(ev){ ev.title=title; ev.start=start; ev.end=end; ev.color=color; ev.done=isDone; }
   }
   await _savePlanEvents(dateKey, events);
   _cleanOldPlans();

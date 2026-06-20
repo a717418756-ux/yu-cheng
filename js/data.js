@@ -345,6 +345,33 @@ function setF(el, f){
 // ════════════════════════════════════════════════════════════
 // 【題庫列表】
 // ════════════════════════════════════════════════════════════
+// ── 搜尋說明彈窗 ──────────────────────────────────────────
+function showSearchHelp(){
+  const ov = document.createElement('div');
+  ov.className = 'ov on';
+  ov.id = 'search-help-ov';
+  ov.onclick = (e)=>{ if(e.target===ov) ov.remove(); };
+  ov.innerHTML = `
+    <div class="sh" onclick="event.stopPropagation()" style="max-width:480px">
+      <div class="shdl"></div>
+      <div class="sht"><span>搜尋說明</span>
+        <button class="shx" onclick="document.getElementById('search-help-ov').remove()">\u2715</button></div>
+      <div style="padding:4px 18px 24px">
+        <p class="shelp-intro">直接輸入文字即可搜尋，會同時比對下列欄位（不分大小寫）：</p>
+        <div class="shelp-list">
+          <div class="shelp-row"><span class="shelp-tag">題幹內容</span><span class="shelp-ex">例：刑法 → 含「刑法」的題目</span></div>
+          <div class="shelp-row"><span class="shelp-tag">科目</span><span class="shelp-ex">例：行政法 → 該科目所有題</span></div>
+          <div class="shelp-row"><span class="shelp-tag">考試別</span><span class="shelp-ex">例：升官等 → 該考試別的題</span></div>
+          <div class="shelp-row"><span class="shelp-tag">年度</span><span class="shelp-ex">例：112 → 112 年的題目</span></div>
+          <div class="shelp-row"><span class="shelp-tag">題號</span><span class="shelp-ex">例：15 → 第 15 題</span></div>
+          <div class="shelp-row"><span class="shelp-tag">關鍵字</span><span class="shelp-ex">例：正當防衛 → 標註此關鍵字的題</span></div>
+        </div>
+        <p class="shelp-tip">\ud83d\udca1 多個詞用空白分開可組合，例如「<b>行政法 112</b>」會找 112 年的行政法題目。</p>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+}
+
 async function renderList(){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const kw=(document.getElementById('si')?.value||'').toLowerCase().trim();
@@ -518,13 +545,11 @@ async function openYearGroup(year){  try{
         '<span class="tag">'+esc(sub)+'</span>'+
         '<span style="margin-left:auto;font-size:12px;color:var(--t2)">'+sqs.length+' 題'+(wrong?' · <span style="color:var(--red)">'+wrong+' 錯</span>':'')+'</span>'+
         '<span style="color:var(--t2);margin-left:6px">›</span>'+
-      '</div>'+
-      '<div style="font-size:12px;color:var(--t2);margin-top:4px">'+
-        esc((sqs[0]?.stem||'').slice(0,50))+(sqs.length>1?'…':'')+'</div>';
+      '</div>';
     div.dataset.selkey = 'sub:'+year+':'+sub;
     div.onclick=()=>{
       if(_listSelMode){ return; }
-      openQGroup(year, sub);
+      openExamGroup(year, sub);
     };
     el.appendChild(div);
   });
@@ -532,15 +557,81 @@ async function openYearGroup(year){  try{
 }catch(e){ logError('openYearGroup',e); }}
 
 // ── 題目群組詳細頁 ────────────────────────────────────────────
-let _qGroupYear='', _qGroupSubject='';
-async function openQGroup(year, subject){  try{
-  _qGroupYear=year; _qGroupSubject=subject;
+let _qGroupYear='', _qGroupSubject='', _qGroupExam='';
+// ── 考試別分組頁（第三層：年度→考科→考試別）─────────────────
+const _EXAM_TYPES_ALL = ['警佐班','升官等','警大二技','三等考試','其他'];
+let _examGroupYear='', _examGroupSubject='';
+async function openExamGroup(year, subject){  try{
+  _examGroupYear=year; _examGroupSubject=subject;
+  const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
+  const ws=getWrong(qs,ats);
+
+  // 該年度+考科下的題目
+  const scoped = qs.filter(q=>
+    (q.year||'未知年度')===year && (q.subject||'未分類')===subject
+  );
+
+  // 依考試別分組
+  const byExam={};
+  scoped.forEach(q=>{
+    const ex = q.exam || '未分類';
+    if(!byExam[ex]) byExam[ex]=[];
+    byExam[ex].push(q);
+  });
+
+  const el=document.getElementById('qlist');
+  if(!el) return;
+  if(window._vlScroll){ window.removeEventListener('scroll',window._vlScroll); window._vlScroll=null; }
+
+  const lcEl=document.getElementById('lc');
+  if(lcEl) lcEl.textContent=year+' · '+subject+' · '+scoped.length+' 題';
+
+  el.innerHTML='';
+  // 返回按鈕
+  const backDiv=document.createElement('div');
+  backDiv.className='list-back-row';
+  const backBtn=document.createElement('button');
+  backBtn.className='btn bg list-back-btn';
+  backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回考科';
+  backBtn.onclick=()=>openYearGroup(year);
+  backDiv.appendChild(backBtn);
+  el.appendChild(backDiv);
+
+  // 已知考試別（有題的）+ 標準考試別（未建題標示）合併顯示
+  const examOrder = [..._EXAM_TYPES_ALL];
+  Object.keys(byExam).forEach(e=>{ if(!examOrder.includes(e)) examOrder.push(e); });
+
+  examOrder.forEach(ex=>{
+    const eqs = byExam[ex] || [];
+    const has = eqs.length>0;
+    const wrong = eqs.filter(q=>ws.has(q.id)).length;
+    const div=document.createElement('div');
+    div.className='qc'+(has?'':' exam-empty');
+    if(has) div.style.cursor='pointer';
+    div.innerHTML=
+      '<div class="qch">'+
+        '<span class="tag">'+esc(ex)+'</span>'+
+        '<span style="margin-left:auto;font-size:12px;color:var(--t2)">'+
+          (has ? eqs.length+' 題'+(wrong?' · <span style="color:var(--red)">'+wrong+' 錯</span>':'') : '<span style="font-style:italic">尚未新增</span>')+
+        '</span>'+
+        (has?'<span style="color:var(--t2);margin-left:6px">›</span>':'')+
+      '</div>';
+    if(has){
+      div.onclick=()=>openQGroup(year, subject, ex);
+    }
+    el.appendChild(div);
+  });
+}catch(e){ logError('openExamGroup',e); }}
+
+async function openQGroup(year, subject, examType){  try{
+  _qGroupYear=year; _qGroupSubject=subject; _qGroupExam=examType||'';
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const ws=getWrong(qs,ats);
   const f=S.filter||'all';
   const fl=qs.filter(q=>{
     if((q.year||'未知年度')!==year) return false;
     if((q.subject||'未分類')!==subject) return false;
+    if(examType && (q.exam||'未分類')!==examType) return false;
     if(f==='mc'&&q.type!=='mc') return false;
     if(f==='es'&&q.type!=='es') return false;
     if(f==='wrong'&&!ws.has(q.id)) return false;
@@ -554,7 +645,7 @@ async function openQGroup(year, subject){  try{
 
   // header：返回按鈕
   const lcEl=document.getElementById('lc');
-  if(lcEl) lcEl.textContent=year+' · '+subject+' · '+fl.length+' 題';
+  if(lcEl) lcEl.textContent=year+' · '+subject+(examType?' · '+examType:'')+' · '+fl.length+' 題';
 
   el.innerHTML='';
   // 返回按鈕區
@@ -562,8 +653,8 @@ async function openQGroup(year, subject){  try{
   backDiv.className='list-back-row';
   const backBtn=document.createElement('button');
   backBtn.className='btn bg list-back-btn';
-  backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回年度';
-  backBtn.onclick=()=>openYearGroup(year);
+  backBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg> 返回考試別';
+  backBtn.onclick=()=>openExamGroup(year, subject);
   backDiv.appendChild(backBtn);
   el.appendChild(backDiv);
 
@@ -784,7 +875,7 @@ async function saveQ(){
   }
   if(S.page==='list'){
     // 編輯後回到編輯前所在的層（第三層 → 回科目群組；否則回第一層）
-    if(_qGroupYear && _qGroupSubject) openQGroup(_qGroupYear, _qGroupSubject);
+    if(_qGroupYear && _qGroupSubject) openQGroup(_qGroupYear, _qGroupSubject, _qGroupExam);
     else renderList();
   } else renderHome();
   }catch(e){logError('saveQ',e);}}
