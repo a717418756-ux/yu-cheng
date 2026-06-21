@@ -379,7 +379,7 @@
 <div class="ov" id="bulk-ov" onclick="closeBulkQ()">
   <div class="sh" onclick="event.stopPropagation()">
     <div class="shdl"></div>
-    <div class="sht"><span>大量新增（題目）</span><button class="shx" onclick="closeBulkQ()">✕</button></div>
+    <div class="sht"><span>大量新增（題目）</span><button class="markup-help-btn" onclick="showMarkupHelp()" title="標記語法說明" aria-label="標記語法說明"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8.01"/><path d="M11 12h1v4h1"/></svg></button><button class="shx" onclick="closeBulkQ()">✕</button></div>
     <div style="padding:0 0 16px">
       <div style="font-size:12px;color:var(--t2);line-height:1.65;padding:0 0 8px">💡 <b>建議流程</b>：PDF → 貼到 Word → 從 Word 複製 → 貼在此處，選項符號 <span class="tag">(A)</span><span class="tag">A.</span><span class="tag">■▪</span><span class="tag">PDF方塊符號</span> 均支援</div>
       <div class="fr fg">
@@ -397,7 +397,6 @@
       </div>
       <div class="fg" style="display:flex;gap:7px">
         <button class="btn bp bw" style="padding:11px;font-size:14px" onclick="parseBulk()">🔍 解析預覽</button>
-        <button class="btn bg" style="padding:11px;white-space:nowrap" onclick="openSymbolMap()" title="自訂符號對應">⚙ 符號</button>
         <button class="btn bg" style="padding:11px;white-space:nowrap" onclick="clearBulk()">清除</button>
       </div>
       <div id="bulk-result" class="hide">
@@ -771,7 +770,7 @@
 <div class="ov" id="add-ov" onclick="closeAdd()">
   <div class="sh" onclick="event.stopPropagation()">
     <div class="shdl"></div>
-    <div class="sht"><span id="add-title">新增題目</span><button class="shx" onclick="closeAdd()">✕</button></div>
+    <div class="sht"><span id="add-title">新增題目</span><button class="markup-help-btn" onclick="showMarkupHelp()" title="標記語法說明" aria-label="標記語法說明"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8.01"/><path d="M11 12h1v4h1"/></svg></button><button class="shx" onclick="closeAdd()">✕</button></div>
     <div style="padding:0 0 16px">
       <div class="fg"><label class="fl">題型</label>
         <div style="display:flex;gap:7px">
