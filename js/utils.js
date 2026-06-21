@@ -24,8 +24,8 @@ function renderStemMarkup(text){
     `<span class="q-blank">${inner ? '<span class="q-blank-hint">'+inner+'</span>' : ''}</span>`);
   // **文字** → 畫線強調
   h = h.replace(/\*\*([^*]+)\*\*/g, '<span class="q-underline">$1</span>');
-  // __文字__ → 粗體（雙底線夾字，須有非底線內容）
-  h = h.replace(/__([^_\n]+)__/g, '<strong class="q-bold">$1</strong>');
+  // //文字// → 粗體（改用斜線，避免與底線 ___ 衝突）
+  h = h.replace(/\/\/([^/\n]+)\/\//g, '<strong class="q-bold">$1</strong>');
   // ___ 連續3個以上底線 → 填空空格
   h = h.replace(/_{3,}/g, '<span class="q-blank"></span>');
   // 換行保留
@@ -166,22 +166,10 @@ const OPT_SYMBOL_MAP = {
   '❑':'§OPT§','❒':'§OPT§','❏':'§OPT§',
 };
 
-// 使用者自訂符號對應（由大量匯入的「符號對應」工具設定，存 settings）
-// 格式：{ '\uE18C':'A', '某亂碼':'§OPT§', ... }
-let _customOptSymbols = {};
-function setCustomOptSymbols(map){ _customOptSymbols = map || {}; }
-
 // ── 1. preprocessQuestionText ───────────────────────────────
 function preprocessQuestionText(text){
   if(!text) return '';
   let t = text;
-
-  // 使用者自訂符號對應（最優先，處理 PDF 亂碼/PUA 等特殊字元）
-  Object.entries(_customOptSymbols).forEach(([sym,val])=>{
-    if(!sym) return;
-    if(val==='§OPT§') t=t.split(sym).join('§OPT§');
-    else t=t.split(sym).join('§'+val+'§');
-  });
 
   // OCR 錯字修正
   Object.entries(OCR_FIX).forEach(([wrong,right])=>{ t=t.split(wrong).join(right); });

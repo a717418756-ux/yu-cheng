@@ -2196,10 +2196,6 @@ async function saveLaw(){  try{
 }
 
 function openBulkQ(){
-  // 載入使用者自訂符號對應（PDF 亂碼/PUA 處理用）
-  getSetting('custom_opt_symbols').then(v=>{
-    if(v && typeof v==='object' && typeof setCustomOptSymbols==='function') setCustomOptSymbols(v);
-  }).catch(()=>{});
   // 填入科目 datalist（與逐一新增共用來源）
   da('questions').then(qs=>{
     const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
@@ -2603,89 +2599,49 @@ async function startNumberMode(){  try{
 // ══ bulk.js — 大量貼題 ════════════════════════════════
 // 依賴：db.js, utils.js, parser.js
 
-// ── 自訂符號對應工具（處理 PDF 亂碼/PUA 特殊字元）──────────────
-// 偵測貼入文字中的「可疑符號」：PUA、非標準符號、行首重複的奇異字元
-async function openSymbolMap(){
-  const text = document.getElementById('bi-text')?.value || '';
-  if(!text.trim()){ toast('請先貼入考題文字'); return; }
-
-  // 載入已存的自訂對應
-  let saved = {};
-  try{ const v = await getSetting('custom_opt_symbols'); if(v && typeof v==='object') saved = v; }catch(e){}
-
-  // 偵測可疑符號：非中文/英數/常見標點的字元，且在行首出現過
-  const suspect = {};
-  text.split('\n').forEach(line=>{
-    const trimmed = line.trim();
-    if(!trimmed) return;
-    const ch = trimmed[0];
-    const cp = ch.codePointAt(0);
-    // 排除：英數、中文、常見標點
-    const isNormal =
-      (cp>=0x30&&cp<=0x39)||(cp>=0x41&&cp<=0x5A)||(cp>=0x61&&cp<=0x7A)||
-      (cp>=0x4E00&&cp<=0x9FFF)||  // 中文
-      (cp>=0x3000&&cp<=0x303F)||  // 中文標點
-      (cp>=0xFF00&&cp<=0xFFEF)||  // 全形
-      '，。、；：？！「」『』（）()[]{}.,;:?!-_'.includes(ch);
-    if(!isNormal){
-      suspect[ch] = (suspect[ch]||0) + 1;
-    }
-  });
-
-  const symbols = Object.keys(suspect);
+// ── 標記語法說明彈窗 ──────────────────────────────────────
+function showMarkupHelp(){
   const ov = document.createElement('div');
   ov.className = 'ov on';
-  ov.id = 'symmap-ov';
+  ov.id = 'markup-help-ov';
   ov.onclick = (e)=>{ if(e.target===ov) ov.remove(); };
-
-  let body;
-  if(!symbols.length){
-    body = '<p class="symmap-empty">未偵測到需對應的特殊符號。<br>若選項符號是空白/看不見，可能是 PDF 複製時已遺失字元，建議改用「行首符號偵測」或截圖方式。</p>';
-  } else {
-    body = '<p class="symmap-desc">偵測到以下符號出現在行首，請指定它們代表什麼（留空＝不處理）：</p>';
-    body += symbols.map((sym,i)=>{
-      const cp = 'U+' + sym.codePointAt(0).toString(16).toUpperCase().padStart(4,'0');
-      const cur = saved[sym] || '';
-      return `<div class="symmap-row">
-        <span class="symmap-char" title="${cp}">${esc(sym)||'␣'}</span>
-        <span class="symmap-cp">${cp}（出現 ${suspect[sym]} 次）</span>
-        <select class="symmap-sel" data-sym="${esc(sym)}">
-          <option value="">不處理</option>
-          <option value="§OPT§"${cur==='§OPT§'?' selected':''}>選項分隔（自動 A/B/C/D）</option>
-          <option value="A"${cur==='A'?' selected':''}>選項 A</option>
-          <option value="B"${cur==='B'?' selected':''}>選項 B</option>
-          <option value="C"${cur==='C'?' selected':''}>選項 C</option>
-          <option value="D"${cur==='D'?' selected':''}>選項 D</option>
-          <option value="E"${cur==='E'?' selected':''}>選項 E</option>
-        </select>
-      </div>`;
-    }).join('');
-  }
-
   ov.innerHTML = `
     <div class="sh" onclick="event.stopPropagation()" style="max-width:480px">
       <div class="shdl"></div>
-      <div class="sht"><span>符號對應</span>
-        <button class="shx" onclick="document.getElementById('symmap-ov').remove()">✕</button></div>
+      <div class="sht"><span>標記語法說明</span>
+        <button class="shx" onclick="document.getElementById('markup-help-ov').remove()">✕</button></div>
       <div style="padding:4px 18px 24px">
-        ${body}
-        ${symbols.length ? '<button class="symmap-save" onclick="_saveSymbolMap()">儲存並重新解析</button>' : ''}
+        <p class="mkhelp-intro">在題幹或選項中使用以下標記，答題時會自動呈現對應樣式：</p>
+        <div class="mkhelp-list">
+          <div class="mkhelp-row">
+            <code class="mkhelp-code">___</code>
+            <span class="mkhelp-arrow">→</span>
+            <span class="mkhelp-demo">填空底線（3 個以上底線）</span>
+          </div>
+          <div class="mkhelp-row">
+            <code class="mkhelp-code">[[提示]]</code>
+            <span class="mkhelp-arrow">→</span>
+            <span class="mkhelp-demo">填空（含淡色提示字）</span>
+          </div>
+          <div class="mkhelp-row">
+            <code class="mkhelp-code">**文字**</code>
+            <span class="mkhelp-arrow">→</span>
+            <span class="mkhelp-demo"><span style="text-decoration:underline;text-underline-offset:3px;font-weight:600">畫線強調</span></span>
+          </div>
+          <div class="mkhelp-row">
+            <code class="mkhelp-code">//文字//</code>
+            <span class="mkhelp-arrow">→</span>
+            <span class="mkhelp-demo"><strong style="font-weight:800">粗體</strong></span>
+          </div>
+        </div>
+        <div class="mkhelp-eg">
+          <div class="mkhelp-eg-title">範例</div>
+          <div class="mkhelp-eg-in">國父姓 **孫**，______ 是他的字，//三民主義// 為其思想。</div>
+          <div class="mkhelp-eg-out">國父姓 <span style="text-decoration:underline;text-underline-offset:3px;font-weight:600">孫</span>，<span style="display:inline-block;min-width:54px;border-bottom:2px solid currentColor;margin:0 3px"></span> 是他的字，<strong style="font-weight:800">三民主義</strong> 為其思想。</div>
+        </div>
       </div>
     </div>`;
   document.body.appendChild(ov);
-}
-
-async function _saveSymbolMap(){
-  const sels = document.querySelectorAll('#symmap-ov .symmap-sel');
-  const map = {};
-  sels.forEach(s=>{ if(s.value){ map[s.dataset.sym] = s.value; } });
-  try{
-    await setSetting('custom_opt_symbols', map);
-    if(typeof setCustomOptSymbols==='function') setCustomOptSymbols(map);
-    toast('已儲存符號對應');
-    document.getElementById('symmap-ov')?.remove();
-    parseBulk();  // 立即重新解析
-  }catch(e){ logError('saveSymbolMap', e); toast('儲存失敗'); }
 }
 
 function parseBulk(){
@@ -2878,8 +2834,7 @@ const DataMod = {
   openYearGroup,
   openExamGroup,
   openQGroup,
-  openSymbolMap,
-  _saveSymbolMap
+  showMarkupHelp,
 };
 window.DataMod = DataMod;
 Object.assign(window, DataMod);
