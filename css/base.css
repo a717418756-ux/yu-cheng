@@ -1732,28 +1732,33 @@ input:focus, textarea:focus, select:focus{
 }
 [data-theme="eink"] .dtask-noauto{ background:#f0e8d0; color:#000; }
 
-/* ════ 大量匯入：符號對應工具 ════════════════════════════ */
-.symmap-desc,.symmap-empty{ font-size:13px; color:var(--t1); line-height:1.7; margin:4px 0 16px; }
-.symmap-empty{ color:var(--t2); }
-.symmap-row{
-  display:flex; align-items:center; gap:10px; padding:10px 0;
-  border-bottom:1px solid rgba(255,255,255,0.06);
+/* ════ 標記語法說明 + 驚嘆號鈕 ════════════════════════════ */
+.markup-help-btn{
+  width:28px; height:28px; margin-left:auto; margin-right:6px;
+  background:transparent; border:none; color:var(--t2); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; border-radius:50%;
+  -webkit-tap-highlight-color:transparent; flex-shrink:0;
 }
-.symmap-char{
-  width:40px; height:40px; flex-shrink:0; border-radius:9px;
-  background:rgba(255,255,255,0.06); display:flex; align-items:center;
-  justify-content:center; font-size:20px; color:var(--t0);
-  border:1px solid rgba(255,255,255,0.1);
+.markup-help-btn:active{ background:rgba(255,255,255,0.1); }
+.mkhelp-intro{ font-size:13px; color:var(--t1); line-height:1.7; margin:4px 0 16px; }
+.mkhelp-list{ display:flex; flex-direction:column; gap:10px; }
+.mkhelp-row{ display:flex; align-items:center; gap:10px; }
+.mkhelp-code{
+  flex-shrink:0; min-width:84px; text-align:center;
+  font-family:monospace; font-size:13px; font-weight:700; color:#6ea8fe;
+  background:rgba(110,168,254,0.1); padding:6px 8px; border-radius:7px;
 }
-.symmap-cp{ font-size:11px; color:var(--t2); flex:1; font-variant-numeric:tabular-nums; }
-.symmap-sel{
-  background:var(--bg2); border:1px solid var(--bd); border-radius:8px;
-  padding:8px 10px; color:var(--t0); font-size:13px; -webkit-appearance:none;
+.mkhelp-arrow{ color:var(--t2); }
+.mkhelp-demo{ font-size:13px; color:var(--t1); }
+.mkhelp-eg{
+  margin-top:18px; padding:13px; border-radius:11px;
+  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
 }
-.symmap-save{
-  width:100%; margin-top:18px; padding:13px;
-  background:var(--acc); color:#fff; border:none; border-radius:11px;
-  font-size:14px; font-weight:700; cursor:pointer;
+.mkhelp-eg-title{ font-size:11px; color:var(--t2); font-weight:700; margin-bottom:8px; }
+.mkhelp-eg-in{
+  font-size:12px; color:var(--t2); font-family:monospace;
+  margin-bottom:8px; line-height:1.6; word-break:break-all;
 }
-[data-theme="eink"] .symmap-char{ background:#f0f0f0; border-color:#999; color:#000; }
-[data-theme="eink"] .symmap-sel{ background:#fff; border-color:#999; color:#000; }
+.mkhelp-eg-out{ font-size:14px; color:var(--t0); line-height:1.7; }
+[data-theme="eink"] .mkhelp-code{ background:#eef; color:#004; }
+[data-theme="eink"] .mkhelp-eg{ background:#f5f5f5; border-color:#ccc; }
