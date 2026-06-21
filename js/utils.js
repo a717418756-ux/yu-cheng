@@ -28,6 +28,13 @@ function renderStemMarkup(text){
   h = h.replace(/\/\/([^/\n]+)\/\//g, '<strong class="q-bold">$1</strong>');
   // ___ 連續3個以上底線 → 填空空格
   h = h.replace(/_{3,}/g, '<span class="q-blank"></span>');
+  // 行首 >> → 段落首行縮排兩格（須在換行轉換前處理，逐行判斷）
+  h = h.split('\n').map(line=>{
+    if(/^\s*&gt;&gt;\s?/.test(line)){
+      return '<span class="q-indent">'+line.replace(/^\s*&gt;&gt;\s?/,'')+'</span>';
+    }
+    return line;
+  }).join('\n');
   // 換行保留
   h = h.replace(/\n/g, '<br>');
   return h;

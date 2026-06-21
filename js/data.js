@@ -2633,11 +2633,16 @@ function showMarkupHelp(){
             <span class="mkhelp-arrow">→</span>
             <span class="mkhelp-demo"><strong style="font-weight:800">粗體</strong></span>
           </div>
+          <div class="mkhelp-row">
+            <code class="mkhelp-code">&gt;&gt; 文字</code>
+            <span class="mkhelp-arrow">→</span>
+            <span class="mkhelp-demo">段落首行縮排兩格（放行首）</span>
+          </div>
         </div>
         <div class="mkhelp-eg">
           <div class="mkhelp-eg-title">範例</div>
-          <div class="mkhelp-eg-in">國父姓 **孫**，______ 是他的字，//三民主義// 為其思想。</div>
-          <div class="mkhelp-eg-out">國父姓 <span style="text-decoration:underline;text-underline-offset:3px;font-weight:600">孫</span>，<span style="display:inline-block;min-width:54px;border-bottom:2px solid currentColor;margin:0 3px"></span> 是他的字，<strong style="font-weight:800">三民主義</strong> 為其思想。</div>
+          <div class="mkhelp-eg-in">&gt;&gt; 國父姓 **孫**，______ 是他的字，//三民主義// 為其思想。</div>
+          <div class="mkhelp-eg-out"><span style="display:inline">　　</span>國父姓 <span style="text-decoration:underline;text-underline-offset:3px;font-weight:600">孫</span>，<span style="display:inline-block;min-width:54px;border-bottom:2px solid currentColor;margin:0 3px"></span> 是他的字，<strong style="font-weight:800">三民主義</strong> 為其思想。</div>
         </div>
       </div>
     </div>`;
