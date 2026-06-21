@@ -9,6 +9,29 @@ const S = {
 };
 
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// ── 題幹標記語法渲染（填空、畫線、強調）─────────────────────
+// 先 esc 防 XSS，再把標記轉成樣式 HTML：
+//   ___（3個以上底線）     → 填空底線
+//   [[文字]]               → 填空（含提示字，顯示為底線含淡字）
+//   **文字**               → 畫線強調（底線）
+//   __文字__（雙底線夾字） → 粗體
+// 回傳 HTML 字串，須以 innerHTML 套用
+function renderStemMarkup(text){
+  let h = esc(text || '');
+  // [[提示]] → 填空底線含淡字（先處理，避免與 ___ 衝突）
+  h = h.replace(/\[\[([^\]]*)\]\]/g, (m, inner)=>
+    `<span class="q-blank">${inner ? '<span class="q-blank-hint">'+inner+'</span>' : ''}</span>`);
+  // **文字** → 畫線強調
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<span class="q-underline">$1</span>');
+  // __文字__ → 粗體（雙底線夾字，須有非底線內容）
+  h = h.replace(/__([^_\n]+)__/g, '<strong class="q-bold">$1</strong>');
+  // ___ 連續3個以上底線 → 填空空格
+  h = h.replace(/_{3,}/g, '<span class="q-blank"></span>');
+  // 換行保留
+  h = h.replace(/\n/g, '<br>');
+  return h;
+}
 // 將字串安全嵌入 onclick="fn('...')" 的單引號 JS 字串中：
 // 先跳脫 JS 層（\ 與 '），再跳脫 HTML 屬性層
 function escJs(s){ return esc((s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
@@ -143,10 +166,22 @@ const OPT_SYMBOL_MAP = {
   '❑':'§OPT§','❒':'§OPT§','❏':'§OPT§',
 };
 
+// 使用者自訂符號對應（由大量匯入的「符號對應」工具設定，存 settings）
+// 格式：{ '\uE18C':'A', '某亂碼':'§OPT§', ... }
+let _customOptSymbols = {};
+function setCustomOptSymbols(map){ _customOptSymbols = map || {}; }
+
 // ── 1. preprocessQuestionText ───────────────────────────────
 function preprocessQuestionText(text){
   if(!text) return '';
   let t = text;
+
+  // 使用者自訂符號對應（最優先，處理 PDF 亂碼/PUA 等特殊字元）
+  Object.entries(_customOptSymbols).forEach(([sym,val])=>{
+    if(!sym) return;
+    if(val==='§OPT§') t=t.split(sym).join('§OPT§');
+    else t=t.split(sym).join('§'+val+'§');
+  });
 
   // OCR 錯字修正
   Object.entries(OCR_FIX).forEach(([wrong,right])=>{ t=t.split(wrong).join(right); });

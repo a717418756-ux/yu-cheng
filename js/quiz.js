@@ -69,7 +69,7 @@ function renderQCard(){
   if(qGroupEl){
     if(qu.groupStem){
       const orderLabel = qu.groupOrder ? `（第 ${qu.groupOrder} 題）` : '';
-      qGroupEl.textContent = '【題組共同題幹】'+orderLabel+'\n'+qu.groupStem;
+      qGroupEl.innerHTML = '<span class="q-group-label">【題組共同題幹】'+esc(orderLabel)+'</span><br>'+renderStemMarkup(qu.groupStem);
       qGroupEl.style.display = '';
     } else {
       qGroupEl.style.display = 'none';
@@ -78,7 +78,7 @@ function renderQCard(){
   }
 
   // 題幹
-  document.getElementById('qstem').textContent = qu.stem || '';
+  document.getElementById('qstem').innerHTML = renderStemMarkup(qu.stem || '');
   document.getElementById('qres').className = 'qres';
   document.getElementById('qres').textContent = '';
   const noteEl = document.getElementById('qnote');
@@ -106,7 +106,7 @@ function renderQCard(){
     if(meta) meta.textContent = [qu.subject, qu.year, qu.num ? '第'+qu.num+'題' : ''].filter(Boolean).join(' · ');
     // 選項（事件委派處理點擊，不用 inline onclick）
     optsEl.innerHTML = Object.entries(qu.options||{}).map(([k,v])=>
-      '<div class="qopt" data-key="'+esc(k)+'"><div class="qok">'+esc(k)+'</div><div class="qov">'+esc(v)+'</div></div>'
+      '<div class="qopt" data-key="'+esc(k)+'"><div class="qok">'+esc(k)+'</div><div class="qov">'+renderStemMarkup(v)+'</div></div>'
     ).join('');
     // 多選才顯示確認按鈕，單選自動提交不需要
     const cfmBtn = document.getElementById('qmulti-confirm');
