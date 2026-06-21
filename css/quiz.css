@@ -350,3 +350,18 @@
 @media (prefers-reduced-motion: reduce){
   .qres-pop, .qres-shake{ animation:none !important; }
 }
+
+/* ════ 題幹標記語法（填空/畫線/強調）════════════════════════ */
+.q-blank{
+  display:inline-block; min-width:64px; border-bottom:2px solid var(--t1);
+  margin:0 3px; text-align:center; line-height:1.4; vertical-align:baseline;
+}
+.q-blank-hint{ font-size:0.85em; color:var(--t2); padding:0 4px; }
+.q-underline{
+  text-decoration:underline; text-underline-offset:3px;
+  text-decoration-thickness:2px; font-weight:600;
+}
+.q-bold{ font-weight:800; }
+.q-group-label{ font-size:0.85em; color:var(--t2); font-weight:700; }
+[data-theme="eink"] .q-blank{ border-bottom-color:#000; }
+[data-theme="eink"] .q-underline{ color:#000; }
