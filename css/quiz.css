@@ -365,3 +365,7 @@
 .q-group-label{ font-size:0.85em; color:var(--t2); font-weight:700; }
 [data-theme="eink"] .q-blank{ border-bottom-color:#000; }
 [data-theme="eink"] .q-underline{ color:#000; }
+
+/* 段落首行縮排（標記 >> ）*/
+.q-indent{ display:inline; }
+.q-indent::before{ content:'　　'; }
