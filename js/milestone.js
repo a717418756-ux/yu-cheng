@@ -95,7 +95,7 @@ async function openMilestoneEdit(){
     <div class="sh" onclick="event.stopPropagation()" style="max-width:480px">
       <div class="shdl"></div>
       <div class="sht"><span>複習階段設定</span>
-        <button class="shx" onclick="document.getElementById('ms-edit-ov').remove()">\u2715</button></div>
+        <button class="shx" onclick="document.getElementById('ms-edit-ov').remove()">✕</button></div>
       <div style="padding:4px 18px 24px" id="ms-edit-list"></div>
     </div>`;
   document.body.appendChild(ov);
