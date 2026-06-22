@@ -1562,7 +1562,7 @@ input:focus, textarea:focus, select:focus{
 }
 /* eink */
 [data-theme="eink"] .plan-wrap{ background:#fff; border-color:#999; }
-[data-theme="eink"] .plan-title,[data-theme="eink"] .plan-nav-date{ color:#000; }
+[data-theme="eink"] .plan-nav-date{ color:#000; }
 [data-theme="eink"] .plan-nav-date{ color:#000; }
 [data-theme="eink"] .plan-hour-lbl{ background:#fff; color:#555; }
 [data-theme="eink"] .plan-hour-line{ background:#ddd; }
