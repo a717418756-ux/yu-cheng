@@ -151,10 +151,6 @@ const OPT_SYMBOL_MAP = {
   '⒜':'A','⒝':'B','⒞':'C','⒟':'D','⒠':'E',
   // 全形括號字母 （A）（B）→ A B（全形括號 + 全形/半形字母）
   'Ａ':'A','Ｂ':'B','Ｃ':'C','Ｄ':'D','Ｅ':'E',
-  // 私人造字區（PUA）選項字元 U+E18C~U+E18F → A B C D
-  //   （此區字元無標準定義，由特定字型顯示為 (A)(B)(C)(D)，換環境會亂碼，故在此明確對應）
-  '':'A','':'B','':'C','':'D',
-  // （某些考試題庫/字型用私用區自訂 (A)(B)(C)(D) 圖案，換環境會變亂碼，故明確對應）
   // 方塊/圓形符號 → 無名選項分隔 §OPT§
   '☒':'§OPT§','☐':'§OPT§','□':'§OPT§','■':'§OPT§',
   '▢':'§OPT§','◯':'§OPT§','○':'§OPT§','●':'§OPT§',
@@ -176,6 +172,15 @@ const OPT_SYMBOL_MAP = {
 function preprocessQuestionText(text){
   if(!text) return '';
   let t = text;
+
+  // ★ PUA 私用區選項字元 → (A)(B)(C)(D)(E)(F) 文字
+  //   某些題庫 PDF 用私用區自訂字型畫選項符號，先在最前面換成標準括號字母，
+  //   後續的「(A) → §A§」流程即可正常辨識（涵蓋 E18C~E191 = A~F）
+  const _puaOpt = {
+    '\uE18C':'(A)','\uE18D':'(B)','\uE18E':'(C)',
+    '\uE18F':'(D)','\uE190':'(E)','\uE191':'(F)'
+  };
+  t = t.replace(/[\uE18C-\uE191]/g, c => _puaOpt[c] || c);
 
   // OCR 錯字修正
   Object.entries(OCR_FIX).forEach(([wrong,right])=>{ t=t.split(wrong).join(right); });
@@ -265,14 +270,14 @@ function preprocessQuestionText(text){
   // ★ 全行格式：在選項和題號前插入換行
   // 讓「...委員會 (B)...」→「...委員會\n(B)...」
   // 讓「...委員會 2. 下一題」→「...委員會\n2. 下一題」
-  t=t.replace(/([^(\n])\s*\(([A-Ea-e])\)/g,'$1\n($2)');
+  t=t.replace(/([^(\n])\s*\(([A-Ha-h])\)/g,'$1\n($2)');
   t=t.replace(/([\u4e00-\u9fff\uff00-\uffef\u3000-\u303f）)\]】」])\s*(\d{1,3}[.、．]\s)/g,'$1\n$2');
 
   // 不可見字元清除
   t=t.replace(/[\u00A0\u200B\u200C\u200D\uFEFF]/g,'').replace(/\u3000/g,' ');
 
   // 全形括號選項：（A）(A) → §A§
-  t=t.replace(/[（(]\s*([A-Ea-e])\s*[）)]/g,(_,k)=>'§'+k.toUpperCase()+'§');
+  t=t.replace(/[（(]\s*([A-Ha-h])\s*[）)]/g,(_,k)=>'§'+k.toUpperCase()+'§');
 
   // ★ 問題(1)修正：行首「孤立括號」或「bullet 類符號」→ §OPT§
   // 涵蓋 PDF 複製常見亂象：
@@ -282,18 +287,18 @@ function preprocessQuestionText(text){
   {
     const _bulletChars = '•·‧‒–—*◦▪▸→・．';
     // 全文孤立括號數（( 後非字母選項、非右括號）
-    const _parenAll = t.match(/[（(]\s*(?![A-Ea-e]\s*[）)])[^（()）]/g);
+    const _parenAll = t.match(/[（(]\s*(?![A-Ha-h]\s*[）)])[^（()）]/g);
     const parenTotal = _parenAll ? _parenAll.length : 0;
     // bullet 總數（含同行）
     const _bulletAll = t.match(new RegExp('['+_bulletChars.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+']','g'));
     const bulletTotal = _bulletAll ? _bulletAll.length : 0;
     // 孤立括號總數 ≥2 → 視為選項分隔（含同行多個的情況）
     if(parenTotal >= 2){
-      const _parenRe = /[（(]\s*(?![A-Ea-e]\s*[）)])/g;
+      const _parenRe = /[（(]\s*(?![A-Ha-h]\s*[）)])/g;
       t = t.split('\n').map(ln=>{
         const tr = ln.trim();
         // 行內含孤立括號就切（行首孤立括號，或同列多個孤立括號）
-        if(/^[（(]\s*[^A-Ea-e）)]/.test(tr) || (tr.match(_parenRe)||[]).length>=2){
+        if(/^[（(]\s*[^A-Ha-h）)]/.test(tr) || (tr.match(_parenRe)||[]).length>=2){
           return tr.replace(_parenRe, '\n§OPT§ ');
         }
         return ln;
@@ -316,7 +321,7 @@ function preprocessQuestionText(text){
 
   // 數字括號選項：(1)(2)(3)(4) → §A§§B§§C§§D§
   // 只在沒有字母選項(A)(B)(C)(D)的情況下才啟用（有字母選項時 (1) 是題號）
-  if(!/[（(][A-Ea-e][）)]/.test(t) && !/[§][A-E][§]/.test(t)){
+  if(!/[（(][A-Ha-h][）)]/.test(t) && !/[§][A-H][§]/.test(t)){
     t=t.replace(/(?:^|(?<=\n))[（(]([1-4１-４])[）)]\s*/gm,(_,n)=>{
       const MAP={'1':'A','2':'B','3':'C','4':'D','１':'A','２':'B','３':'C','４':'D'};
       return '\n§'+(MAP[n]||n)+'§ ';
@@ -325,14 +330,14 @@ function preprocessQuestionText(text){
 
   // 讓選項各自換行（§OPT§ 和 §A§ 前後加換行）
   t=t.replace(/([^\n])§OPT§/g,'$1\n§OPT§');
-  t=t.replace(/([^\n])§([A-E])§/g,'$1\n§$2§');
-  t=t.replace(/§([A-E])§\s*/g,'\n§$1§ ');
+  t=t.replace(/([^\n])§([A-H])§/g,'$1\n§$2§');
+  t=t.replace(/§([A-H])§\s*/g,'\n§$1§ ');
   t=t.replace(/§OPT§\s*/g,'\n§OPT§ ');
 
   // ★ 題號從選項內容中拆出：當選項符號後面黏著「數字+空白+中文長句」
   //   （下一題題號被前一題答案選項吸進來的情況），在題號前斷行。
   //   例：「§C§ 6 依警察教育…」→「§C§」「6 依警察教育…」
-  t=t.replace(/(§(?:OPT|[A-E])§[^\n]*?)\s(\d{1,3})\s+([\u4e00-\u9fff])/g, (m, head, num, zh)=>{
+  t=t.replace(/(§(?:OPT|[A-H])§[^\n]*?)\s(\d{1,3})\s+([\u4e00-\u9fff])/g, (m, head, num, zh)=>{
     // 量詞起頭不切（避免「§A§ 3 公里」被誤拆）
     if('年月日時分秒週天個件名條款項元萬千百公里度次'.includes(zh)) return m;
     return head + '\n' + num + ' ' + zh;
@@ -440,7 +445,7 @@ function parseQuestions(rawText){
 
   for(const line of allLines){
     // ── 已知字母選項 §A§ §B§ ─────────────────────────────────────
-    const mAlpha=line.match(/^§([A-E])§\s*(.*)/);
+    const mAlpha=line.match(/^§([A-H])§\s*(.*)/);
     if(mAlpha){
       if(!curQ) continue;
       const key=mAlpha[1];
@@ -515,7 +520,7 @@ function parseQuestions(rawText){
 function parseAnswerStr(str){
   if(!str||!str.trim()) return {};
   const map={};
-  for(const m of str.matchAll(/(\d{1,3})[.、\s]*([A-Ea-e])/g)){
+  for(const m of str.matchAll(/(\d{1,3})[.、\s]*([A-Ha-h])/g)){
     map[parseInt(m[1])]=m[2].toUpperCase();
   }
   return map;
