@@ -139,10 +139,9 @@ const OCR_FIX = {
 
 // ── 選項符號對照表（NFKC 前處理）────────────────────────────
 const OPT_SYMBOL_MAP = {
-  // 圓圈數字 → 直接對應 A B C D E
-  '①':'A','②':'B','③':'C','④':'D','⑤':'E',
-  '❶':'A','❷':'B','❸':'C','❹':'D','❺':'E',
-  '⑴':'A','⑵':'B','⑶':'C','⑷':'D','⑸':'E',
+  // 註：所有圈圈數字（①②③ / ❶❷❸ / ⑴⑵⑶）一律不列入選項對應，
+  //     因實際題目中它們是「題目內編號」（如題幹列舉「①前項 ②後項」），
+  //     而非選項符號，列入會誤切題幹
   'ㄅ':'A','ㄆ':'B','ㄇ':'C','ㄈ':'D',
   // 圈圈字母（大寫）Ⓐ Ⓑ Ⓒ Ⓓ Ⓔ → A B C D E
   'Ⓐ':'A','Ⓑ':'B','Ⓒ':'C','Ⓓ':'D','Ⓔ':'E',
@@ -249,7 +248,16 @@ function preprocessQuestionText(text){
   }
 
   // NFKC 正規化（全形→半形）
+  // ★ 但 NFKC 會把圈數字 ①→1、⑴→(1)、❶→1，破壞題目內編號，故先保護再還原
+  const _circledChars = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮❶❷❸❹❺❻❼❽❾❿⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽㈠㈡㈢㈣㈤㈥㈦㈧㈨㈩';
+  const _circledStash = [];
+  t = t.replace(new RegExp('['+_circledChars+']','g'), (ch)=>{
+    _circledStash.push(ch);
+    return '\uF0F0'+(_circledStash.length-1)+'\uF0F1';  // 用 PUA 佔位符暫存
+  });
   t=t.normalize('NFKC');
+  // 還原圈數字
+  t = t.replace(/\uF0F0(\d+)\uF0F1/g, (m,i)=>_circledStash[parseInt(i)]||'');
 
   // 換行統一
   t=t.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
