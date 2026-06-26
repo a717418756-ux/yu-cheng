@@ -456,14 +456,42 @@ function parseQuestions(rawText){
       continue;
     }
 
-    // ── 【規則1】行首數字 → 新題目 ───────────────────────────────
+    // ── 【規則1】行首數字 → 新題目（上下文安全判斷）───────────────
     const mNum=line.match(/^(\d{1,3})(?:[.、．）)）]\s*|\s+)([\s\S]+)/);
-    // 確認是題號行：數字後面有標點分隔 OR 後面是中文長句（非量詞開頭）
-    const mNumIsQ = mNum && parseInt(mNum[1])<=500 && (
-      /^(\d{1,3})[.、．）)）]/.test(line) || // 標點型：1. 1、1） 絕對是題號
-      (mNum[2].trim().length > 3 &&           // 空格型：後面要夠長
-       !/^[年月日時分秒週天個件名條款項元萬千百公里]/.test(mNum[2].trim())) // 非量詞開頭
-    );
+    let mNumIsQ = false;
+    if(mNum && parseInt(mNum[1])<=500){
+      const numVal = parseInt(mNum[1]);
+      const rest = mNum[2].trim();
+      const hasPunct = /^(\d{1,3})[.、．）)）]/.test(line);  // 數字後有標點
+      const lastNum = curQ ? parseInt(curQ.num) : 0;        // 上一題題號
+
+      // 收集「正面」與「負面」訊號，綜合判斷是否為真題號
+      // ── 真題號的特徵 ──
+      const looksLikeStem = _findQEnd(rest) >= 0;            // 後面含 ？或：（題幹特徵）
+      const numContinuous = !curQ || (numVal === lastNum + 1) || (numVal === 1); // 連續或從1開始
+      const restLongEnough = rest.length > 5;               // 題幹通常夠長
+
+      // ── 題內數字的特徵（負面訊號，傾向「不是」題號）──
+      const inOptions = curOptKey !== null;                 // 目前正在收選項中
+      const isUnitWord = /^[年月日時分秒週天個件名條款項目元萬千百公里下列何者]/.test(rest); // 量詞/列點開頭
+      const numTooFarAhead = curQ && numVal > lastNum + 3;  // 題號跳太多（可能是法條號184等）
+
+      if(hasPunct){
+        // 數字+標點：原本「絕對是題號」，現在加安全條件
+        if(inOptions && !numContinuous){
+          // 正在收選項、且號碼不連續 → 是選項內列點（如「1.比例 2.明確」），不切題
+          mNumIsQ = false;
+        } else if(numTooFarAhead && !looksLikeStem){
+          // 號碼跳太多、又不像題幹 → 可能是法條號，不切題
+          mNumIsQ = false;
+        } else {
+          mNumIsQ = true;
+        }
+      } else {
+        // 數字+空格型：要求更嚴（後面夠長、非量詞開頭、號碼合理）
+        mNumIsQ = restLongEnough && !isUnitWord && (numContinuous || !curQ);
+      }
+    }
     if(mNumIsQ){
       const num=mNum[1];
       const rest=mNum[2].trim();
