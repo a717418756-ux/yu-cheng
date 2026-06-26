@@ -503,13 +503,9 @@ function parseQuestions(rawText){
     if(mNumIsQ){
       const num=mNum[1];
       const rest=mNum[2].trim();
-      // 【規則1】找題幹結尾（？ 或 ：）
-      const endIdx=_findQEnd(rest);
-      const stemPart=endIdx>=0 ? rest.slice(0,endIdx+1) : rest;
-      const after=endIdx>=0 ? rest.slice(endIdx+1).trim() : '';
-      newQ(num, stemPart);
-      // ？/：後面可能還有選項內容（同行）
-      if(after) appendLine(after);
+      // 題幹 = 題號後的全部內容，不以 ？或：截斷
+      // 選項由後續的 (A) 等選項符號自然觸發；題幹跨行也會持續累加直到遇到選項
+      newQ(num, rest);
       continue;
     }
 
@@ -517,8 +513,7 @@ function parseQuestions(rawText){
     const mZh=line.match(/^([一二三四五六七八九十]+)[、．。]\s*([\s\S]+)/);
     if(mZh && ZH[mZh[1]]){
       const rest=mZh[2].trim();
-      const endIdx=_findQEnd(rest);
-      newQ(ZH[mZh[1]], endIdx>=0 ? rest.slice(0,endIdx+1) : rest);
+      newQ(ZH[mZh[1]], rest);
       continue;
     }
 
