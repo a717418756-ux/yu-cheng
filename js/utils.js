@@ -210,7 +210,7 @@ function preprocessQuestionText(text){
         (cp>=0x30&&cp<=0x39)||                          // 0-9
         (cp>=0x4E00&&cp<=0x9FFF)||                      // 中文
         (cp>=0xFF01&&cp<=0xFF60)||                      // 全形字母數字
-        '（(）)【】「」『』。，、；：！？…—'.includes(ch)||
+        '（(）)【】「」『』《》〈〉〔〕。，、；：！？…—·．'.includes(ch)||
         ch==='§';  // 已轉換的標記
       if(!isWordOrPunct){
         lineStartMap[ch]=(lineStartMap[ch]||0)+1;
@@ -405,7 +405,13 @@ function parseQuestions(rawText){
     curQ.stem=_tidyText(curQ.stem);
     Object.keys(curQ.options).forEach(k=>{ curQ.options[k]=_tidyText(curQ.options[k]); });
     curQ.type=Object.keys(curQ.options).length>=2?'mc':'es';
-    if(curQ.stem) questions.push(curQ);
+    // 有題幹 → 保留；無題幹但有選項（題號可能被黏住漏掉）→ 也保留並標記題幹待補
+    if(curQ.stem){
+      questions.push(curQ);
+    } else if(Object.keys(curQ.options).length>=2){
+      curQ.stem='（題幹待補：此題題號可能與上題黏連，請手動補上題幹）';
+      questions.push(curQ);
+    }
     curQ=null; curOptKey=null; optIdx=0;
   }
 
@@ -446,6 +452,21 @@ function parseQuestions(rawText){
       if(!curQ) continue;
       const key=mAlpha[1];
       if(curQ.options[key]!==undefined){
+        // 該選項字母已存在 → 通常是跨行追加
+        // 但若「已收集多個選項(≥2)且這是重複的 A/B(較前字母)」，
+        // 極可能是下一題開始了卻沒被識別題號 → 視為新題（用流水號暫代題號）
+        const existKeys = Object.keys(curQ.options);
+        const keyIdx = OPT_KEYS.indexOf(key);
+        const isEarlyDup = keyIdx<=1 && existKeys.length>=3 && curQ.options[key].length>0;
+        if(isEarlyDup){
+          // 開新題（題號用「上一題號＋流水」避免衝突，使用者可後續修正）
+          const prevNum = parseInt(curQ.num)||0;
+          newQ(String(prevNum+1), '');
+          curQ.options[key]=mAlpha[2].trim();
+          curOptKey=key;
+          optIdx=OPT_KEYS.indexOf(key)+1;
+          continue;
+        }
         curQ.options[key]+=' '+mAlpha[2]; // 跨行追加
       } else {
         curQ.options[key]=mAlpha[2].trim();
