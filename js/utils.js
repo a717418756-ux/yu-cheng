@@ -217,8 +217,10 @@ function preprocessQuestionText(text){
       }
     });
     // 找出現 2 次以上且不是已知選項標記 §A§ 的符號
+    // 排除所有圈數字（①②③…⑩、❶…❿、⑴…⑽、㈠…㈩），它們是題目內編號不是選項符號
+    const _circledAll = /^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳❶❷❸❹❺❻❼❽❾❿⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽㈠㈡㈢㈣㈤㈥㈦㈧㈨㈩]$/;
     const detected=Object.entries(lineStartMap)
-      .filter(([ch,n])=>n>=1&&!ch.match(/^[①②③④⑤❶❷❸❹]$/))
+      .filter(([ch,n])=>n>=1&&!_circledAll.test(ch))
       .sort((a,b)=>b[1]-a[1]);
     if(detected.length>0){
       detected.forEach(([sep])=>{
