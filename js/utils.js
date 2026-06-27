@@ -402,6 +402,32 @@ function parseQuestions(rawText){
 
   function finishQ(){
     if(!curQ) return;
+    // ── 補救：完全沒有選項符號時，嘗試把「？/：後的多行」當成選項 ──
+    // 嚴格條件，只處理「PDF選項符號全消失、純文字並排」的題，不碰正常題：
+    //   1. 該題完全沒有任何選項（symbol 全消失）
+    //   2. 題幹含 ？或：（疑問結尾）
+    //   3. ？後有 3~6 行，每行 4~60 字（像選項，不是長題幹）
+    if(Object.keys(curQ.options).length === 0 && curQ.stem){
+      const stem = curQ.stem;
+      // 找最後一個 ？或： 的位置（題幹結尾）
+      let qEnd = -1;
+      for(let i=0;i<stem.length;i++){
+        if('？?：:'.includes(stem[i])) qEnd = i;
+      }
+      if(qEnd >= 0 && qEnd < stem.length-1){
+        const head = stem.slice(0, qEnd+1);          // 題幹
+        const tail = stem.slice(qEnd+1).trim();       // ？後的內容
+        // 用換行切（題幹是用 \n 合併的，但 _tidyText 還沒跑，仍有 \n）
+        const segs = tail.split('\n').map(s=>s.trim()).filter(Boolean);
+        const okCount = segs.length>=3 && segs.length<=6;
+        const okLen = segs.every(s=>s.length>=4 && s.length<=60);
+        if(okCount && okLen){
+          curQ.stem = head;
+          const keys=['A','B','C','D','E','F'];
+          segs.forEach((s,i)=>{ if(i<6) curQ.options[keys[i]]=s; });
+        }
+      }
+    }
     curQ.stem=_tidyText(curQ.stem);
     Object.keys(curQ.options).forEach(k=>{ curQ.options[k]=_tidyText(curQ.options[k]); });
     curQ.type=Object.keys(curQ.options).length>=2?'mc':'es';
@@ -440,8 +466,9 @@ function parseQuestions(rawText){
       // 【規則3】選項跨行：合併到當前選項
       curQ.options[curOptKey]+=' '+text;
     } else {
-      // 【規則3】題幹跨行：合併到題幹
-      curQ.stem+=(curQ.stem?' ':'')+text;
+      // 【規則3】題幹跨行：用換行合併（保留行結構，供無符號選項偵測用；
+      //   最終 _tidyText 會處理換行，不影響正常題幹顯示）
+      curQ.stem+=(curQ.stem?'\n':'')+text;
     }
   }
 
