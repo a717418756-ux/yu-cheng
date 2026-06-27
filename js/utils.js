@@ -286,20 +286,23 @@ function preprocessQuestionText(text){
   //   一旦該符號在 2 行以上的行首重複出現，才視為選項（避免誤判單行括號補充）
   {
     const _bulletChars = '•·‧‒–—*◦▪▸→・．';
-    // 全文孤立括號數（( 後非字母選項、非右括號）
-    const _parenAll = t.match(/[（(]\s*(?![A-Ha-h]\s*[）)])[^（()）]/g);
-    const parenTotal = _parenAll ? _parenAll.length : 0;
+    // 全文「行首」孤立括號數（只算行首，避免題幹中的 (補充) 或書名號《》被誤判）
+    const _parenLineStart = t.split('\n').filter(ln=>{
+      const tr = ln.trim();
+      return /^[（(]\s*(?![A-Ha-h]\s*[）)])/.test(tr);
+    }).length;
+    const parenTotal = _parenLineStart;
     // bullet 總數（含同行）
     const _bulletAll = t.match(new RegExp('['+_bulletChars.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+']','g'));
     const bulletTotal = _bulletAll ? _bulletAll.length : 0;
-    // 孤立括號總數 ≥2 → 視為選項分隔（含同行多個的情況）
+    // 行首孤立括號 ≥2 → 視為選項分隔（只切行首，不動行中括號）
     if(parenTotal >= 2){
-      const _parenRe = /[（(]\s*(?![A-Ha-h]\s*[）)])/g;
+      const _parenRe = /^[（(]\s*(?![A-Ha-h]\s*[）)])/;
       t = t.split('\n').map(ln=>{
         const tr = ln.trim();
-        // 行內含孤立括號就切（行首孤立括號，或同列多個孤立括號）
-        if(/^[（(]\s*[^A-Ha-h）)]/.test(tr) || (tr.match(_parenRe)||[]).length>=2){
-          return tr.replace(_parenRe, '\n§OPT§ ');
+        // 只有「行首」是孤立括號才切，行中間的括號（書名號、補充說明）不動
+        if(_parenRe.test(tr)){
+          return tr.replace(/^[（(]\s*/, '§OPT§ ');
         }
         return ln;
       }).join('\n');
