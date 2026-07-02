@@ -210,15 +210,17 @@ function preprocessQuestionText(text){
         (cp>=0x30&&cp<=0x39)||                          // 0-9
         (cp>=0x4E00&&cp<=0x9FFF)||                      // 中文
         (cp>=0xFF01&&cp<=0xFF60)||                      // 全形字母數字
-        '（(）)【】「」『』。，、；：！？…—'.includes(ch)||
+        '（(）)【】「」『』《》〈〉〔〕。，、；：！？…—·．'.includes(ch)||
         ch==='§';  // 已轉換的標記
       if(!isWordOrPunct){
         lineStartMap[ch]=(lineStartMap[ch]||0)+1;
       }
     });
     // 找出現 2 次以上且不是已知選項標記 §A§ 的符號
+    // 排除所有圈數字（①②③…⑩、❶…❿、⑴…⑽、㈠…㈩），它們是題目內編號不是選項符號
+    const _circledAll = /^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳❶❷❸❹❺❻❼❽❾❿⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽㈠㈡㈢㈣㈤㈥㈦㈧㈨㈩]$/;
     const detected=Object.entries(lineStartMap)
-      .filter(([ch,n])=>n>=1&&!ch.match(/^[①②③④⑤❶❷❸❹]$/))
+      .filter(([ch,n])=>n>=1&&!_circledAll.test(ch))
       .sort((a,b)=>b[1]-a[1]);
     if(detected.length>0){
       detected.forEach(([sep])=>{
@@ -286,20 +288,23 @@ function preprocessQuestionText(text){
   //   一旦該符號在 2 行以上的行首重複出現，才視為選項（避免誤判單行括號補充）
   {
     const _bulletChars = '•·‧‒–—*◦▪▸→・．';
-    // 全文孤立括號數（( 後非字母選項、非右括號）
-    const _parenAll = t.match(/[（(]\s*(?![A-Ha-h]\s*[）)])[^（()）]/g);
-    const parenTotal = _parenAll ? _parenAll.length : 0;
+    // 全文「行首」孤立括號數（只算行首，避免題幹中的 (補充) 或書名號《》被誤判）
+    const _parenLineStart = t.split('\n').filter(ln=>{
+      const tr = ln.trim();
+      return /^[（(]\s*(?![A-Ha-h]\s*[）)])/.test(tr);
+    }).length;
+    const parenTotal = _parenLineStart;
     // bullet 總數（含同行）
     const _bulletAll = t.match(new RegExp('['+_bulletChars.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+']','g'));
     const bulletTotal = _bulletAll ? _bulletAll.length : 0;
-    // 孤立括號總數 ≥2 → 視為選項分隔（含同行多個的情況）
+    // 行首孤立括號 ≥2 → 視為選項分隔（只切行首，不動行中括號）
     if(parenTotal >= 2){
-      const _parenRe = /[（(]\s*(?![A-Ha-h]\s*[）)])/g;
+      const _parenRe = /^[（(]\s*(?![A-Ha-h]\s*[）)])/;
       t = t.split('\n').map(ln=>{
         const tr = ln.trim();
-        // 行內含孤立括號就切（行首孤立括號，或同列多個孤立括號）
-        if(/^[（(]\s*[^A-Ha-h）)]/.test(tr) || (tr.match(_parenRe)||[]).length>=2){
-          return tr.replace(_parenRe, '\n§OPT§ ');
+        // 只有「行首」是孤立括號才切，行中間的括號（書名號、補充說明）不動
+        if(_parenRe.test(tr)){
+          return tr.replace(/^[（(]\s*/, '§OPT§ ');
         }
         return ln;
       }).join('\n');
@@ -360,22 +365,14 @@ function preprocessQuestionText(text){
 // ── 2. normalizeOptions ─────────────────────────────────────
 // ── 3. parseQuestions 主解析函式 ───────────────────────────
 // ═══════════════════════════════════════════════════════════════════
-// 新解析邏輯：按用戶指定的規則
-// 規則1：行首是數字 → 題號，題幹讀到 ？ 或 ： 為止
-// 規則2：行首是不明符號（重複出現）→ 選項分隔
+// 解析邏輯（按使用者指定的規則）：
+// 規則1：行首是數字（+標點或空格）→ 題號；題幹 = 題號後一路到第一個選項符號前，
+//        中間的 ？：①②③（）數字 全部保留，不截斷
+// 規則2：行首不明符號（重複出現於多行行首）→ 選項分隔（圈數字、書名號等已排除）
 // 規則3：選項跨行 → 遇到下一個符號前都追加到同一選項
-// 規則4：(A)(B)/①② 等已知符號照常辨識
-// 規則5：題目/選項內空格跳行整理整齊
+// 規則4：(A)~(H)/PUA 等已知選項符號照常辨識
+// 規則5：選項符號全消失時，？/：後的並排多行 → 補救切為選項
 // ═══════════════════════════════════════════════════════════════════
-
-// ─────── 輔助：找題幹結尾（？ 或 ：）的位置 ──────────────────────
-function _findQEnd(str){
-  // 找第一個「？」「?」「：」「:」的位置
-  for(let i=0;i<str.length;i++){
-    if(str[i]==='？'||str[i]==='?'||str[i]==='：'||str[i]===':') return i;
-  }
-  return -1;
-}
 
 // ─────── 整理文字：去多餘空白、標點後空格 ─────────────────────────
 function _tidyText(s){
@@ -406,10 +403,42 @@ function parseQuestions(rawText){
 
   function finishQ(){
     if(!curQ) return;
+    // ── 補救：完全沒有選項符號時，嘗試把「？/：後的多行」當成選項 ──
+    // 嚴格條件，只處理「PDF選項符號全消失、純文字並排」的題，不碰正常題：
+    //   1. 該題完全沒有任何選項（symbol 全消失）
+    //   2. 題幹含 ？或：（疑問結尾）
+    //   3. ？後有 3~6 行，每行 4~60 字（像選項，不是長題幹）
+    if(Object.keys(curQ.options).length === 0 && curQ.stem){
+      const stem = curQ.stem;
+      // 找最後一個 ？或： 的位置（題幹結尾）
+      let qEnd = -1;
+      for(let i=0;i<stem.length;i++){
+        if('？?：:'.includes(stem[i])) qEnd = i;
+      }
+      if(qEnd >= 0 && qEnd < stem.length-1){
+        const head = stem.slice(0, qEnd+1);          // 題幹
+        const tail = stem.slice(qEnd+1).trim();       // ？後的內容
+        // 用換行切（題幹是用 \n 合併的，但 _tidyText 還沒跑，仍有 \n）
+        const segs = tail.split('\n').map(s=>s.trim()).filter(Boolean);
+        const okCount = segs.length>=3 && segs.length<=6;
+        const okLen = segs.every(s=>s.length>=4 && s.length<=60);
+        if(okCount && okLen){
+          curQ.stem = head;
+          const keys=['A','B','C','D','E','F'];
+          segs.forEach((s,i)=>{ if(i<6) curQ.options[keys[i]]=s; });
+        }
+      }
+    }
     curQ.stem=_tidyText(curQ.stem);
     Object.keys(curQ.options).forEach(k=>{ curQ.options[k]=_tidyText(curQ.options[k]); });
     curQ.type=Object.keys(curQ.options).length>=2?'mc':'es';
-    if(curQ.stem) questions.push(curQ);
+    // 有題幹 → 保留；無題幹但有選項（題號可能被黏住漏掉）→ 也保留並標記題幹待補
+    if(curQ.stem){
+      questions.push(curQ);
+    } else if(Object.keys(curQ.options).length>=2){
+      curQ.stem='（題幹待補：此題題號可能與上題黏連，請手動補上題幹）';
+      questions.push(curQ);
+    }
     curQ=null; curOptKey=null; optIdx=0;
   }
 
@@ -438,8 +467,9 @@ function parseQuestions(rawText){
       // 【規則3】選項跨行：合併到當前選項
       curQ.options[curOptKey]+=' '+text;
     } else {
-      // 【規則3】題幹跨行：合併到題幹
-      curQ.stem+=(curQ.stem?' ':'')+text;
+      // 【規則3】題幹跨行：用換行合併（保留行結構，供無符號選項偵測用；
+      //   最終 _tidyText 會處理換行，不影響正常題幹顯示）
+      curQ.stem+=(curQ.stem?'\n':'')+text;
     }
   }
 
@@ -450,6 +480,21 @@ function parseQuestions(rawText){
       if(!curQ) continue;
       const key=mAlpha[1];
       if(curQ.options[key]!==undefined){
+        // 該選項字母已存在 → 通常是跨行追加
+        // 但若「已收集多個選項(≥2)且這是重複的 A/B(較前字母)」，
+        // 極可能是下一題開始了卻沒被識別題號 → 視為新題（用流水號暫代題號）
+        const existKeys = Object.keys(curQ.options);
+        const keyIdx = OPT_KEYS.indexOf(key);
+        const isEarlyDup = keyIdx<=1 && existKeys.length>=3 && curQ.options[key].length>0;
+        if(isEarlyDup){
+          // 開新題（題號用「上一題號＋流水」避免衝突，使用者可後續修正）
+          const prevNum = parseInt(curQ.num)||0;
+          newQ(String(prevNum+1), '');
+          curQ.options[key]=mAlpha[2].trim();
+          curOptKey=key;
+          optIdx=OPT_KEYS.indexOf(key)+1;
+          continue;
+        }
         curQ.options[key]+=' '+mAlpha[2]; // 跨行追加
       } else {
         curQ.options[key]=mAlpha[2].trim();
