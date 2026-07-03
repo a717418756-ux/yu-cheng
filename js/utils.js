@@ -85,6 +85,7 @@ const ZHN = {'零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'�
 function zh2n(s){ let n=0,c=0;for(const ch of s){const v=ZHN[ch];if(v===undefined)continue;if(v>=10){if(c===0)c=1;n+=c*v;c=0;}else c=v;}return n+c; }
 function art2n(art){
   if(!art) return 0;
+  art=String(art).normalize('NFKC').replace(/\s+/g,'');  // NFKC轉全形數字+去空白：PDF複製常見「第 11 條」「第１１條」，否則解析失敗變0
   const m=art.match(/第([一二三四五六七八九十百千\d]+)條/);
   if(!m) return 0;
   const s=m[1];
