@@ -108,26 +108,31 @@
         _TTS.audio = audio;
         // 開始播放時預先 fetch 下一段（減少段落間停頓）
         _prefetchNext(_TTS.idx, voiceName);
-        audio.onended = ()=>{
+        // ★ 防止 onended/onerror/play().catch 多重觸發造成同段重複或跳段：
+        //   每次播放只允許「結算」一次
+        let _settled = false;
+        const _advance = (bump)=>{
+          if(_settled) return;
+          _settled = true;
           _TTS.audio = null;
           if(!_TTS.speaking){ resolve(); return; }
-          _TTS.idx++;
+          if(bump) _TTS.idx++;
           _updatePanelState();
           _speakNext();
           resolve();
         };
+        audio.onended = ()=> _advance(true);
         audio.onerror = (ev)=>{
           console.error('[Azure TTS] audio 播放錯誤:', audio.error?.code, audio.error?.message);
-          _TTS.audio = null;
-          _TTS.idx++;
-          _speakNext();
-          resolve();
+          _advance(true);
         };
         audio.play().then(()=>{
           console.log('[Azure TTS] 開始播放 ✓');
         }).catch((err)=>{
           console.error('[Azure TTS] audio.play() 被拒:', err.name, err.message);
           // 自動播放被擋時，不要跳過該段，改用系統 TTS 念出來
+          if(_settled) return;
+          _settled = true;
           _TTS.audio = null;
           _speakWithSystem(text);
           resolve();
@@ -414,6 +419,8 @@
     if(!segs?.length){ _stop(); return; }    // 新頁沒文字 → 結束（保守，不無限翻）
 
     // 續讀新頁：重設佇列與索引，繼續唸
+    // ★ 必須清空 prefetch 快取——否則舊頁殘留的預抓音訊會在新頁 idx 相同時被誤用，造成「重複播放」
+    _prefetchCache = null;
     _TTS.utterances = segs;
     _TTS.idx = 0;
     _speakNext();

@@ -324,5 +324,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '3.7.6';     // 修電子書朗讀:①重複開頭-改用currentLocation的start/end CFI取當前頁範圍文字(原本取整章body故每次從頭);②翻頁後不唸-新增epub唸完自動翻下一頁並續讀(僅mode=epub,法條朗讀不受影響),到書末自動停止,含防重入旗標
+const APP_VERSION  = '3.7.7';     // 修Azure語音一小段就重複(舊有bug):①audio的onended/onerror/play().catch可能多重觸發導致同段_TTS.idx++多次或重播,加_settled旗標確保每段只結算推進一次;②epub翻頁續讀時未清_prefetchCache,舊頁預抓音訊在新頁同索引被誤用,補清空
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
