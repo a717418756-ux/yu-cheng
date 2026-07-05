@@ -24,6 +24,7 @@
     collapsed:  false,
     audio:      null,  // Azure 播放用的 HTMLAudioElement
     highlightEls: null, // 朗讀同步反白：每段對應的 DOM 元素（法條卡片）
+    _turning:   false,  // epub 自動翻頁續讀中的防重入旗標
   };
 
   // ── Azure TTS via GAS ───────────────────────────────────────
@@ -195,6 +196,11 @@
 
   async function _speakNext(){
     if(!_TTS.speaking || _TTS.idx >= _TTS.utterances.length){
+      // epub 模式：本頁唸完 → 自動翻下一頁並續讀（法條等其他模式維持原本停止行為）
+      if(_TTS.speaking && _TTS.mode === 'epub' && !_TTS._turning){
+        _epubAdvanceAndContinue();
+        return;
+      }
       if(_TTS.speaking) _stop();
       return;
     }
@@ -269,6 +275,7 @@
     _TTS.speaking = false;
     _TTS.paused   = false;
     _TTS.idx      = 0;
+    _TTS._turning = false;      // 重置翻頁旗標，避免停止後卡住
     _clearReadingHighlight();      // 清除朗讀同步反白
     _TTS.highlightEls = null;
     _updatePanelState();
@@ -291,7 +298,34 @@
   // ── 取得 epub 當前章節文字 ──────────────────────────────────
   // 策略：優先從 iframe DOM 抓（最穩定）；若抓不到再用 epub.js API
   function _getEpubPageText(){
-    // 策略 1：直接從 epub-viewer 內的 iframe 取文字（最可靠）
+    // 策略 0（最準）：paginated 模式下用 currentLocation 的 start/end CFI 取「當前可見頁」範圍文字。
+    //   解決「每次都從整章開頭重複」——因為一個 iframe 裝的是整章，直接取 body 會取到整章。
+    try{
+      const rendition = window._epubRendition;
+      const book      = window._epubBook;
+      const loc = rendition?.currentLocation?.();
+      const sCfi = loc?.start?.cfi, eCfi = loc?.end?.cfi;
+      if(book && sCfi && eCfi){
+        // 用當前 contents 的 range 取「當前頁」DOM 範圍（paginated 模式最準）
+        const contents = rendition.getContents?.()?.[0];
+        if(contents && contents.range){
+          const range = contents.range(sCfi, eCfi);  // 當前頁的 DOM Range
+          if(range){
+            const frag = range.cloneContents();
+            const div  = document.createElement('div');
+            div.appendChild(frag);
+            const paras = [...div.querySelectorAll('p,h1,h2,h3,h4,li,div')]
+              .map(el => el.innerText?.trim()).filter(t => t && t.length > 1);
+            if(paras.length) return paras;
+            const raw = div.innerText?.trim();
+            if(raw && raw.length > 1)
+              return raw.split(/\n+/).map(s=>s.trim()).filter(s=>s.length>1);
+          }
+        }
+      }
+    }catch(e){}
+
+    // 策略 1：直接從 epub-viewer 內的 iframe 取文字（fallback，取到的是整章）
     try{
       const viewer = document.getElementById('epub-viewer');
       const iframes = viewer ? [...viewer.querySelectorAll('iframe')] : [];
@@ -335,6 +369,54 @@
     }catch(e){}
 
     return [];
+  }
+
+  // ── epub 朗讀：本頁唸完自動翻下一頁並續讀 ─────────────────────
+  // 翻頁後需等 iframe 重新渲染，才能取到新頁文字。用 relocated 事件 + 逾時保底。
+  async function _epubAdvanceAndContinue(){
+    const rendition = window._epubRendition;
+    if(!rendition){ _stop(); return; }
+    _TTS._turning = true;  // 防重入旗標
+
+    // 記錄翻頁前位置，用來判斷是否真的到了新頁（到書末則位置不變）
+    let beforeCfi = '';
+    try{ beforeCfi = rendition.currentLocation()?.start?.cfi || ''; }catch(e){}
+
+    // 等一次 relocated（翻頁完成）或逾時保底
+    const waitRelocated = ()=> new Promise(resolve=>{
+      let done = false;
+      const onRel = ()=>{ if(done) return; done = true; rendition.off('relocated', onRel); resolve(); };
+      rendition.on('relocated', onRel);
+      setTimeout(()=>{ if(done) return; done = true; rendition.off('relocated', onRel); resolve(); }, 1200);
+    });
+
+    try{
+      rendition.next();
+      await waitRelocated();
+    }catch(e){ _TTS._turning=false; _stop(); return; }
+
+    // 若朗讀已被使用者停止，放棄續讀
+    if(!_TTS.speaking){ _TTS._turning=false; return; }
+
+    // 判斷是否到書末（位置沒變 = 沒有下一頁）
+    let afterCfi = '';
+    try{ afterCfi = rendition.currentLocation()?.start?.cfi || ''; }catch(e){}
+    if(afterCfi && beforeCfi && afterCfi === beforeCfi){
+      _TTS._turning=false; _stop(); toast('已讀完'); return;
+    }
+
+    // 取新頁文字（可能是 Promise）
+    let segs = _getEpubPageText();
+    if(segs && typeof segs.then === 'function') segs = await segs.catch(()=>[]);
+    _TTS._turning = false;
+
+    if(!_TTS.speaking) return;               // 期間被停止
+    if(!segs?.length){ _stop(); return; }    // 新頁沒文字 → 結束（保守，不無限翻）
+
+    // 續讀新頁：重設佇列與索引，繼續唸
+    _TTS.utterances = segs;
+    _TTS.idx = 0;
+    _speakNext();
   }
 
   // ── 取得法條文字（純文字，無 emoji）────────────────────────
