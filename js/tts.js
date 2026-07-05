@@ -25,6 +25,7 @@
     audio:      null,  // Azure 播放用的 HTMLAudioElement
     highlightEls: null, // 朗讀同步反白：每段對應的 DOM 元素（法條卡片）
     _turning:   false,  // epub 自動翻頁續讀中的防重入旗標
+    _lastChapFp: null,  // epub 章節去重指紋（避免翻頁後重複唸同章）
   };
 
   // ── Azure TTS via GAS ───────────────────────────────────────
@@ -303,34 +304,10 @@
   // ── 取得 epub 當前章節文字 ──────────────────────────────────
   // 策略：優先從 iframe DOM 抓（最穩定）；若抓不到再用 epub.js API
   function _getEpubPageText(){
-    // 策略 0（最準）：paginated 模式下用 currentLocation 的 start/end CFI 取「當前可見頁」範圍文字。
-    //   解決「每次都從整章開頭重複」——因為一個 iframe 裝的是整章，直接取 body 會取到整章。
-    try{
-      const rendition = window._epubRendition;
-      const book      = window._epubBook;
-      const loc = rendition?.currentLocation?.();
-      const sCfi = loc?.start?.cfi, eCfi = loc?.end?.cfi;
-      if(book && sCfi && eCfi){
-        // 用當前 contents 的 range 取「當前頁」DOM 範圍（paginated 模式最準）
-        const contents = rendition.getContents?.()?.[0];
-        if(contents && contents.range){
-          const range = contents.range(sCfi, eCfi);  // 當前頁的 DOM Range
-          if(range){
-            const frag = range.cloneContents();
-            const div  = document.createElement('div');
-            div.appendChild(frag);
-            const paras = [...div.querySelectorAll('p,h1,h2,h3,h4,li,div')]
-              .map(el => el.innerText?.trim()).filter(t => t && t.length > 1);
-            if(paras.length) return paras;
-            const raw = div.innerText?.trim();
-            if(raw && raw.length > 1)
-              return raw.split(/\n+/).map(s=>s.trim()).filter(s=>s.length>1);
-          }
-        }
-      }
-    }catch(e){}
-
-    // 策略 1：直接從 epub-viewer 內的 iframe 取文字（fallback，取到的是整章）
+    // 取「整章」文字一次給足：段落多 → prefetch 有效 → 段落間無延遲。
+    //   配合 _ttsSpokenChap 去重（記錄已唸過的章節指紋），避免翻頁後重複唸同一章。
+    //   不取「當前頁」是因為分頁模式一頁段落太少，會頻繁翻頁+等待，造成明顯間隔。
+    let result = null;
     try{
       const viewer = document.getElementById('epub-viewer');
       const iframes = viewer ? [...viewer.querySelectorAll('iframe')] : [];
@@ -339,41 +316,21 @@
         if(!doc || !doc.body) continue;
         const paras = [...doc.body.querySelectorAll('p,h1,h2,h3,h4,li,div')]
           .map(el => el.innerText?.trim()).filter(t => t && t.length > 1);
-        if(paras.length) return paras;
-        // fallback：整個 body 文字
+        if(paras.length){ result = paras; break; }
         const raw = doc.body.innerText?.trim();
         if(raw && raw.length > 1){
-          return raw.split(/\n+/).map(s=>s.trim()).filter(s=>s.length>1);
+          result = raw.split(/\n+/).map(s=>s.trim()).filter(s=>s.length>1);
+          break;
         }
       }
     }catch(e){}
+    if(!result || !result.length) return [];
 
-    // 策略 2：用 epub.js rendition location 取章節文字（非同步）
-    try{
-      const rendition = window._epubRendition;
-      const book      = window._epubBook;
-      if(rendition && book){
-        const loc = rendition.currentLocation();
-        // 嘗試從 location 取 href（epub.js 不同版本結構不同，做防禦性取值）
-        const href = loc?.start?.href
-          || rendition.location?.start?.href
-          || loc?.start?.cfi;
-        if(href){
-          const section = book.spine.get(href);
-          if(section){
-            return section.load(book.load.bind(book)).then(contents=>{
-              // contents 可能是 Document 或 Element
-              const root = contents?.documentElement || contents?.body || contents;
-              const text = root?.textContent?.trim() || '';
-              if(!text) return [];
-              return text.split(/\n+/).map(s=>s.trim()).filter(s=>s.length>1);
-            }).catch(()=>[]);
-          }
-        }
-      }
-    }catch(e){}
-
-    return [];
+    // 章節去重：用前 3 段組指紋，若與上次相同 → 這章已唸過（翻頁停在同章），回空讓上層續翻
+    const fp = result.slice(0,3).join('|').slice(0,120);
+    if(_TTS._lastChapFp === fp) return null;   // null = 同章，交由翻頁邏輯處理
+    _TTS._lastChapFp = fp;
+    return result;
   }
 
   // ── epub 朗讀：本頁唸完自動翻下一頁並續讀 ─────────────────────
@@ -383,47 +340,51 @@
     if(!rendition){ _stop(); return; }
     _TTS._turning = true;  // 防重入旗標
 
-    // 記錄翻頁前位置，用來判斷是否真的到了新頁（到書末則位置不變）
-    let beforeCfi = '';
-    try{ beforeCfi = rendition.currentLocation()?.start?.cfi || ''; }catch(e){}
+    // 連續翻頁，直到取到「新章文字」或到書末（同章時 _getEpubPageText 回 null）
+    let guard = 0;                       // 防無限翻頁上限
+    while(guard++ < 60){
+      let beforeCfi = '';
+      try{ beforeCfi = rendition.currentLocation()?.start?.cfi || ''; }catch(e){}
 
-    // 等一次 relocated（翻頁完成）或逾時保底
-    const waitRelocated = ()=> new Promise(resolve=>{
-      let done = false;
-      const onRel = ()=>{ if(done) return; done = true; rendition.off('relocated', onRel); resolve(); };
-      rendition.on('relocated', onRel);
-      setTimeout(()=>{ if(done) return; done = true; rendition.off('relocated', onRel); resolve(); }, 1200);
-    });
+      const waitRelocated = ()=> new Promise(resolve=>{
+        let done = false;
+        const onRel = ()=>{ if(done) return; done = true; rendition.off('relocated', onRel); resolve(); };
+        rendition.on('relocated', onRel);
+        setTimeout(()=>{ if(done) return; done = true; rendition.off('relocated', onRel); resolve(); }, 600);
+      });
 
-    try{
-      rendition.next();
-      await waitRelocated();
-    }catch(e){ _TTS._turning=false; _stop(); return; }
+      try{
+        rendition.next();
+        await waitRelocated();
+      }catch(e){ _TTS._turning=false; _stop(); return; }
 
-    // 若朗讀已被使用者停止，放棄續讀
-    if(!_TTS.speaking){ _TTS._turning=false; return; }
+      if(!_TTS.speaking){ _TTS._turning=false; return; }  // 被停止
 
-    // 判斷是否到書末（位置沒變 = 沒有下一頁）
-    let afterCfi = '';
-    try{ afterCfi = rendition.currentLocation()?.start?.cfi || ''; }catch(e){}
-    if(afterCfi && beforeCfi && afterCfi === beforeCfi){
-      _TTS._turning=false; _stop(); toast('已讀完'); return;
+      // 到書末（位置沒變）→ 結束
+      let afterCfi = '';
+      try{ afterCfi = rendition.currentLocation()?.start?.cfi || ''; }catch(e){}
+      if(afterCfi && beforeCfi && afterCfi === beforeCfi){
+        _TTS._turning=false; _stop(); toast('已讀完'); return;
+      }
+
+      // 取新位置文字
+      let segs = _getEpubPageText();
+      if(segs && typeof segs.then === 'function') segs = await segs.catch(()=>[]);
+
+      if(segs === null) continue;         // 同章，繼續翻下一頁
+      if(!_TTS.speaking){ _TTS._turning=false; return; }
+      if(!segs?.length){ continue; }      // 空白頁，繼續翻（不停止）
+
+      // 取到新章文字 → 續讀
+      _prefetchCache = null;              // 清舊頁預抓，避免重複播放
+      _TTS.utterances = segs;
+      _TTS.idx = 0;
+      _TTS._turning = false;
+      _speakNext();
+      return;
     }
-
-    // 取新頁文字（可能是 Promise）
-    let segs = _getEpubPageText();
-    if(segs && typeof segs.then === 'function') segs = await segs.catch(()=>[]);
-    _TTS._turning = false;
-
-    if(!_TTS.speaking) return;               // 期間被停止
-    if(!segs?.length){ _stop(); return; }    // 新頁沒文字 → 結束（保守，不無限翻）
-
-    // 續讀新頁：重設佇列與索引，繼續唸
-    // ★ 必須清空 prefetch 快取——否則舊頁殘留的預抓音訊會在新頁 idx 相同時被誤用，造成「重複播放」
-    _prefetchCache = null;
-    _TTS.utterances = segs;
-    _TTS.idx = 0;
-    _speakNext();
+    // 翻頁超過上限（防呆）
+    _TTS._turning=false; _stop();
   }
 
   // ── 取得法條文字（純文字，無 emoji）────────────────────────
@@ -623,6 +584,7 @@
     // 開始朗讀時標示按鈕
     const btn = document.getElementById('tts-epub-btn');
     if(btn){ btn.style.color='var(--acc)'; btn.style.opacity='1'; }
+    _TTS._lastChapFp = null;   // 重置章節去重指紋（每次重新開始朗讀都要清）
     let segments = _getEpubPageText();
     if(segments && typeof segments.then === 'function')
       segments = await segments.catch(()=>[]);
