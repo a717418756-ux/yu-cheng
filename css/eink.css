@@ -350,3 +350,66 @@
 [data-theme="eink"] .zpanel-main{
   transition:none !important;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   e-ink 全域效能優化（v3.7.9）
+   電子紙重繪昂貴、動畫會殘影閃爍且耗電。以下一次性覆蓋全站，
+   取代先前逐區塊關閉的做法（不再有漏網動畫）。僅 eink 生效。
+   ══════════════════════════════════════════════════════════════ */
+
+/* 1. 全站停用所有動畫、過場、變形——e-ink 最關鍵的優化 */
+[data-theme="eink"] *,
+[data-theme="eink"] *::before,
+[data-theme="eink"] *::after{
+  transition: none !important;
+  animation: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* 2. 停用所有位移/縮放變形（殘影主因），但保留必要的定位用 transform
+      —— 僅清除動畫型 transform，translateY/scale 這類過場歸零 */
+[data-theme="eink"] .skeleton,
+[data-theme="eink"] .splash,
+[data-theme="eink"] [class*="fade"],
+[data-theme="eink"] [class*="slide"],
+[data-theme="eink"] [class*="anim"]{
+  animation: none !important;
+  transition: none !important;
+  opacity: 1 !important;
+}
+
+/* 3. 停用平滑捲動（e-ink 逐格捲動比平滑更清晰省電） */
+[data-theme="eink"] html,
+[data-theme="eink"] body,
+[data-theme="eink"] .scroll,
+[data-theme="eink"] [class*="scroll"]{
+  scroll-behavior: auto !important;
+}
+
+/* 4. 觸控回饋：即時邊框強調（不做整塊反白，減少 e-ink 重繪面積） */
+[data-theme="eink"] button:active,
+[data-theme="eink"] .btn:active{
+  outline: 2px solid #000 !important;
+  outline-offset: -2px;
+  transition: none !important;
+}
+
+/* 5. 移除半透明疊層的模糊（backdrop-filter 在 e-ink 上是效能殺手） */
+[data-theme="eink"] *{
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ══ e-ink 質感補充（v3.7.10）══════════════════════════════ */
+
+/* 還原字體銳利：電子紙抗鋸齒會讓字發灰，銳利才實 */
+[data-theme="eink"] body{ -webkit-font-smoothing:auto; text-rendering:auto; }
+
+/* 選取色改純黑白（電子紙無彩色，半透明藍會變髒灰） */
+[data-theme="eink"] ::selection{ background:#000; color:#fff; }
+
+/* 隱藏捲軸：Boox 用觸控捲動，捲軸出現/消失是多餘重繪 */
+[data-theme="eink"] ::-webkit-scrollbar{ width:0; height:0; }
+
+/* eink 選取色：灰底黑字（e-ink 無彩色，且避免大面積反白重繪） */
+[data-theme="eink"] ::selection{ background:#ccc; color:#000; }

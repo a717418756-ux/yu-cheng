@@ -1759,3 +1759,38 @@ input:focus, textarea:focus, select:focus{
 /* ════ 鍵盤操作焦點樣式（無障礙）════════════════════════════ */
 :focus-visible{ outline:2px solid #6ea8fe; outline-offset:2px; border-radius:4px; }
 [data-theme="eink"] :focus-visible{ outline:2px solid #000; }
+
+/* ════ 專業質感細節（v3.7.10）— 純新增，不動既有規則 ═══════════ */
+
+/* 深色模式字體平滑：深底淺字不抗鋸齒會顯粗糙（eink 於 eink.css 還原為銳利） */
+body{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+
+/* 文字選取色：與主色一致（預設藍底白字太突兀） */
+::selection{ background:rgba(110,168,254,.35); color:inherit; }
+
+/* 防過捲：app 化手感——到頂/到底不再橡皮筋回彈、不誤觸下拉重整（答題中尤其重要） */
+html,body{ overscroll-behavior-y:contain; }
+
+/* 按鈕/操作元件防選字：長按不再反白選到按鈕文字（內容區題幹/法條不受影響，仍可複製） */
+button,.btn{ -webkit-user-select:none; user-select:none; }
+
+/* 停用狀態一致化：全站按鈕 disabled 統一視覺 */
+button:disabled,.btn:disabled{ opacity:.45; cursor:not-allowed; }
+
+/* 標題斷行平衡：多行標題左右字數均衡（漸進增強，不支援的瀏覽器自動忽略） */
+h1,h2,h3,.sht span{ text-wrap:balance; }
+
+/* ════ 專業級細節（v3.7.10）：純新增，不動既有規則 ════════════ */
+
+/* 1. 文字選取色：配合深色主題（取代瀏覽器預設藍） */
+::selection{ background:rgba(110,168,254,0.35); color:inherit; }
+
+/* 2. 防止頂部下拉觸發瀏覽器「下拉重新整理」——PWA 被誤重載會丟失狀態 */
+html, body{ overscroll-behavior-y: none; }
+
+/* 3. 按鈕與導覽元件防選字（長按不再反白選到 UI 文字；內容區不受影響） */
+button, .btn, .theme-btn, .hd-btn, .shx, .fab,
+.tab, .chip, .qfb, .dtask-ring, .plan-nav-date{
+  -webkit-user-select: none;
+  user-select: none;
+}
