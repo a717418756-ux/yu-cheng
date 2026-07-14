@@ -400,16 +400,5 @@
   -webkit-backdrop-filter: none !important;
 }
 
-/* ══ e-ink 質感補充（v3.7.10）══════════════════════════════ */
-
-/* 還原字體銳利：電子紙抗鋸齒會讓字發灰，銳利才實 */
-[data-theme="eink"] body{ -webkit-font-smoothing:auto; text-rendering:auto; }
-
-/* 選取色改純黑白（電子紙無彩色，半透明藍會變髒灰） */
-[data-theme="eink"] ::selection{ background:#000; color:#fff; }
-
-/* 隱藏捲軸：Boox 用觸控捲動，捲軸出現/消失是多餘重繪 */
-[data-theme="eink"] ::-webkit-scrollbar{ width:0; height:0; }
-
 /* eink 選取色：灰底黑字（e-ink 無彩色，且避免大面積反白重繪） */
 [data-theme="eink"] ::selection{ background:#ccc; color:#000; }
