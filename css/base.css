@@ -647,7 +647,7 @@ textarea{resize:vertical;line-height:1.7}
   bottom:0; left:0; right:0;
   z-index:820;
 }
-/* 迷你浮動球（收合狀態）*/
+/* 迷你浮動球（收合狀態，預設隱藏）*/
 .tts-miniball{
   display:none;
   position:fixed;
@@ -659,9 +659,11 @@ textarea{resize:vertical;line-height:1.7}
   border:1.5px solid rgba(255,255,255,0.2);
   backdrop-filter:blur(20px);
   -webkit-backdrop-filter:blur(20px);
-  box-shadow:0 8px 28px rgba(0,0,0,0.6);
-  color:#fff; cursor:pointer;
-  align-items:center; justify-content:center;
+  box-shadow:0 8px 28px rgba(0,0,0,0.6),0 0 0 0.5px rgba(255,255,255,0.06);
+  color:#fff;
+  cursor:pointer;
+  align-items:center;
+  justify-content:center;
   animation:tts-ball-in .2s cubic-bezier(.4,0,.2,1);
 }
 .tts-miniball.tts-ball-visible{ display:flex; }
@@ -671,7 +673,7 @@ textarea{resize:vertical;line-height:1.7}
 }
 /* 收合時隱藏完整控制列 */
 .tts-sheet.tts-hidden{ display:none !important; }
-/* 完整控制列（bottom sheet 樣式）*/
+/* 完整控制列（bottom sheet 樣式，可點擊拖把手收合）*/
 .tts-sheet{
   background:#0e0e14;
   border-top:0.5px solid rgba(255,255,255,0.1);
@@ -686,9 +688,11 @@ textarea{resize:vertical;line-height:1.7}
 }
 /* 拖把手 */
 .tts-handle{
-  width:36px; height:4px; border-radius:2px;
+  width:36px; height:4px;
+  border-radius:2px;
   background:rgba(255,255,255,0.18);
-  margin:10px auto 8px; cursor:pointer;
+  margin:10px auto 14px;
+  cursor:pointer;
 }
 .tts-handle:hover{ background:rgba(255,255,255,0.32); }
 /* 引擎選單 */
@@ -702,153 +706,13 @@ textarea{resize:vertical;line-height:1.7}
   cursor:pointer; outline:none;
   -webkit-appearance:none; appearance:none;
 }
-
-/* 迷你浮動球（收合狀態，預設隱藏）*/
-.tts-miniball{
-  display:none;
-  position:fixed;
-  bottom:80px; right:16px;
-  z-index:821;
-  width:52px; height:52px;
-  border-radius:50%;
-  background:rgba(16,16,22,0.95);
-  border:1.5px solid rgba(255,255,255,0.2);
-  backdrop-filter:blur(20px);
-  -webkit-backdrop-filter:blur(20px);
-  box-shadow:0 8px 28px rgba(0,0,0,0.6),0 0 0 0.5px rgba(255,255,255,0.06);
-  color:#fff;
-  cursor:pointer;
-  align-items:center;
-  justify-content:center;
-  animation:tts-ball-in .2s cubic-bezier(.4,0,.2,1);
-}
-.tts-miniball.tts-ball-visible{ display:flex; }
-@keyframes tts-ball-in{
-  from{opacity:0;transform:scale(.7)}
-  to  {opacity:1;transform:scale(1)}
-}
-/* 收合時隱藏完整控制列 */
-.tts-sheet.tts-hidden{ display:none !important; }
-/* 完整控制列 */
-.tts-sheet{
-  background:#0e0e14;
-  border-top:0.5px solid rgba(255,255,255,0.1);
-  border-radius:20px 20px 0 0;
-  padding:0 0 max(16px,env(safe-area-inset-bottom));
-  box-shadow:0 -12px 48px rgba(0,0,0,0.7);
-  animation:tts-up .28s cubic-bezier(.4,0,.2,1);
-}
-@keyframes tts-up{
-  from{opacity:0;transform:translateY(20px)}
-  to  {opacity:1;transform:translateY(0)}
-}
-/* 拖把手 */
-.tts-handle{
-  width:36px; height:4px;
-  border-radius:2px;
-  background:rgba(255,255,255,0.18);
-  margin:10px auto 14px;
-  cursor:pointer;
-}
-.tts-handle:hover{ background:rgba(255,255,255,0.32); }
 /* 標題列 */
-
 .tts-prog{
   font-size:12px; color:rgba(255,255,255,0.4);
   font-variant-numeric:tabular-nums; letter-spacing:.04em;
 }
-
 .tts-collapse-btn:active{ color:#fff; background:rgba(255,255,255,0.1); }
-/* 聲音選擇 */
-
-/* 語速列 */
-
-.tts-track::-webkit-slider-runnable-track{
-  height:2px; border-radius:1px;
-  background:linear-gradient(
-    to right,
-    rgba(255,255,255,0.8) 0%,
-    rgba(255,255,255,0.8) var(--seek-pct,33%),
-    rgba(255,255,255,0.15) var(--seek-pct,33%),
-    rgba(255,255,255,0.15) 100%
-  );
-}
-.tts-track::-webkit-slider-thumb{
-  -webkit-appearance:none;
-  width:14px; height:14px; border-radius:50%;
-  background:#fff; cursor:pointer; margin-top:-6px;
-  box-shadow:0 0 0 1px rgba(200,200,200,0.2),0 2px 6px rgba(0,0,0,0.5);
-}
-.tts-track:active::-webkit-slider-thumb{ transform:scale(1.25); }
-
-/* 控制按鈕列 */
-
-/* 迷你浮動球（收合狀態，預設隱藏）*/
-.tts-miniball{
-  display:none;
-  position:fixed;
-  bottom:80px;
-  right:16px;
-  z-index:821;
-  width:52px; height:52px;
-  border-radius:50%;
-  background:rgba(16,16,22,0.95);
-  border:1.5px solid rgba(255,255,255,0.2);
-  backdrop-filter:blur(20px);
-  -webkit-backdrop-filter:blur(20px);
-  box-shadow:0 8px 28px rgba(0,0,0,0.6),0 0 0 0.5px rgba(255,255,255,0.06);
-  color:#fff;
-  cursor:pointer;
-  align-items:center;
-  justify-content:center;
-  animation:tts-ball-in .2s cubic-bezier(.4,0,.2,1);
-}
-.tts-miniball.tts-ball-visible{
-  display:flex;
-}
-@keyframes tts-ball-in{
-  from{opacity:0;transform:scale(.7)}
-  to  {opacity:1;transform:scale(1)}
-}
-/* 收合時隱藏完整控制列 */
-.tts-sheet.tts-hidden{
-  display:none !important;
-}
-/* 完整控制列從底部滑出 */
-.tts-sheet{
-  background:#0e0e14;
-  border-top:0.5px solid rgba(255,255,255,0.1);
-  border-radius:20px 20px 0 0;
-  padding:0 0 max(16px,env(safe-area-inset-bottom));
-  box-shadow:0 -12px 48px rgba(0,0,0,0.7);
-  animation:tts-up .28s cubic-bezier(.4,0,.2,1);
-}
-@keyframes tts-up{
-  from{opacity:0;transform:translateY(20px)}
-  to  {opacity:1;transform:translateY(0)}
-}
-/* 拖把手（可點擊收合）*/
-.tts-handle{
-  width:36px; height:4px;
-  border-radius:2px;
-  background:rgba(255,255,255,0.18);
-  margin:10px auto 14px;
-  cursor:pointer;
-}
-.tts-handle:hover{ background:rgba(255,255,255,0.32); }
-/* 標題列 */
-
-.tts-prog{
-  font-size:12px; color:rgba(255,255,255,0.4);
-  font-variant-numeric:tabular-nums;
-  letter-spacing:.04em;
-}
-
-.tts-collapse-btn:active{ color:#fff; background:rgba(255,255,255,0.1); }
-/* 聲音選擇 */
-
-/* 語速列 */
-
+/* 語速列（仿 vp-seek 進度條）*/
 .tts-track::-webkit-slider-runnable-track{
   height:2px; border-radius:1px;
   background:linear-gradient(
@@ -867,52 +731,6 @@ textarea{resize:vertical;line-height:1.7}
   box-shadow:0 0 0 1px rgba(200,200,200,0.2),0 2px 6px rgba(0,0,0,0.5);
 }
 .tts-track:active::-webkit-slider-thumb{ transform:scale(1.25); }
-
-/* 控制按鈕列 */
-
-/* 標題列 */
-/* 進度/語速滑桿（完全仿 vp-seek）*/
-
-/* 聲音選擇 */
-/* 控制列（仿 vp-controls）*/
-
-/* 第一列：進度 + 聲音 */
-/* 第二列：語速 */
-/* 第三列：控制按鈕 *//* 拖把手 */
-.tts-handle{
-  width:36px;height:4px;border-radius:2px;
-  background:rgba(255,255,255,0.18);
-  margin:10px auto 14px;
-}
-/* 標題列 */
-
-.tts-prog{
-  font-size:12px;color:rgba(255,255,255,0.4);
-  font-variant-numeric:tabular-nums;letter-spacing:.04em;
-}
-/* 聲音選擇 */
-
-/* 語速列（仿 vp-seek 進度條）*/
-
-.tts-track::-webkit-slider-runnable-track{
-  height:2px;border-radius:1px;
-  background:linear-gradient(
-    to right,
-    rgba(255,255,255,0.8) 0%,
-    rgba(255,255,255,0.8) var(--seek-pct,33%),
-    rgba(255,255,255,0.15) var(--seek-pct,33%),
-    rgba(255,255,255,0.15) 100%
-  );
-}
-.tts-track::-webkit-slider-thumb{
-  -webkit-appearance:none;
-  width:14px;height:14px;border-radius:50%;
-  background:#fff;
-  border:none;cursor:pointer;
-  margin-top:-6px;
-  box-shadow:0 0 0 1px rgba(200,200,200,0.2),0 2px 6px rgba(0,0,0,0.5);
-}
-.tts-track:active::-webkit-slider-thumb{transform:scale(1.25)}
 
 /* 控制按鈕列 */
 
