@@ -324,5 +324,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '3.8.0';     // base.css 精簡:清除TTS面板CSS的三重複區塊(645~918行,開發疊代殘留)，275行→93行、減少182行死代碼；經逐選擇器比對確認所有class計數與原版完全一致，零誤傷、無功能遺失
+const APP_VERSION  = '3.8.1';     // 修 Azure 朗讀「一小段無限重複」根因:①keepalive每3秒檢查!speechSynthesis.speaking，但Azure走HTML<audio>該值恆false→對同一idx反覆呼叫_speakNext重播同段，改為Azure播放中/選用Azure時不觸發（系統語音的Android靜默救援機制保留）②進入Azure分支先_stopKeepalive清除fallback殘留計時器 ③prefetch與播放改用共用_truncSeg同一截斷規則，原本預抓未截斷全文導致後續段落重複朗讀 ④截斷後同步更新utterances[idx]，避免idx未推進時重播同段；另含base.css清除TTS三重複區塊(-182行)
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

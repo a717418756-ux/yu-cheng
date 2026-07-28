@@ -43,12 +43,22 @@
     return { key, url };
   }
 
+  // 段落截斷規則（播放與 prefetch 共用，兩邊必須完全一致，
+  // 否則預抓的音訊比實際要唸的段落長 → 後續段落被重複朗讀）
+  function _truncSeg(raw){
+    return raw.length > 150
+      ? raw.slice(0, raw.lastIndexOf('，', 150) + 1 || 150)
+      : raw;
+  }
+
   // Prefetch：預先 fetch 下一段音訊，減少段落間停頓
   let _prefetchCache = null;  // { idx, promise }
   function _prefetchNext(idx, voiceName){
     const nextIdx  = idx + 1;
-    const nextText = _TTS.utterances[nextIdx];
-    if(!nextText?.trim()) return;
+    const nextRaw  = _TTS.utterances[nextIdx];
+    if(!nextRaw?.trim()) return;
+    // ★ 必須與 _speakNext 用同一套截斷，快取音訊才會等於屆時真正要唸的文字
+    const nextText = _truncSeg(nextRaw);
     if(_prefetchCache?.idx === nextIdx) return;  // 已在 prefetch
     _prefetchCache = {
       idx: nextIdx,
@@ -217,10 +227,11 @@
     _applyReadingHighlight(_TTS.idx);
 
     // 限 150 字，超過截斷插回佇列（Android bug：長段落易靜默停止）
-    const text = rawText.length > 150
-      ? rawText.slice(0, rawText.lastIndexOf('，', 150) + 1 || 150)
-      : rawText;
+    const text = _truncSeg(rawText);
     if(text.length < rawText.length){
+      // ★ 佇列同步更新為「實際唸出的那一段」：原本這裡留著未截斷全文，
+      //   只要 idx 有任何一次沒推進，就會重複朗讀同一小段。
+      _TTS.utterances[_TTS.idx] = text;
       _TTS.utterances.splice(_TTS.idx + 1, 0, rawText.slice(text.length));
       // highlightEls 同步插入（截斷出的後半段沿用同一元素），避免索引錯位
       if(Array.isArray(_TTS.highlightEls)){
@@ -230,6 +241,7 @@
 
     // 若選了 Azure 聲音，直接走 Azure 引擎（內部會自行檢查 key/url 並 fallback）
     if(_TTS.voiceURI && _TTS.voiceURI.startsWith('azure:')){
+      _stopKeepalive();   // 清掉先前系統語音 fallback 可能殘留的計時器，避免它打斷 Azure
       await _speakAzure(text, _TTS.voiceURI.replace('azure:',''));
       return;
     }
@@ -292,6 +304,12 @@
   function _startKeepalive(){
     _stopKeepalive();
     _keepaliveTimer = setInterval(()=>{
+      // ★ Azure 用 HTML <audio> 播放，speechSynthesis.speaking 恆為 false。
+      //   若不排除，這裡會每 3 秒對「同一個 idx」再呼叫一次 _speakNext()，
+      //   造成同一小段被重新抓取並重播 → 症狀：一小段無限重複。
+      //   keepalive 只為了解決系統語音在 Android 的靜默停止，Azure 不需要也不相容。
+      if(_TTS.audio) return;                                           // Azure 音訊播放中
+      if(_TTS.voiceURI && _TTS.voiceURI.startsWith('azure:')) return;  // 目前選用 Azure 引擎
       if(_TTS.speaking && !_TTS.paused && !speechSynthesis.speaking){
         _speakNext();
       }
