@@ -43,11 +43,20 @@
     return { key, url };
   }
 
+  // 分段長度上限（依引擎而定）
+  //   系統語音：Android 的 speechSynthesis 遇長段落會靜默停止，必須限 150 字。
+  //   Azure：播的是預先合成好的 mp3（HTML <audio>），沒有上述問題，
+  //          用較大分段 → 網路往返次數減半、接縫變少，朗讀更連貫。
+  function _segLimit(){
+    return (_TTS.voiceURI && _TTS.voiceURI.startsWith('azure:')) ? 300 : 150;
+  }
+
   // 段落截斷規則（播放與 prefetch 共用，兩邊必須完全一致，
   // 否則預抓的音訊比實際要唸的段落長 → 後續段落被重複朗讀）
   function _truncSeg(raw){
-    return raw.length > 150
-      ? raw.slice(0, raw.lastIndexOf('，', 150) + 1 || 150)
+    const lim = _segLimit();
+    return raw.length > lim
+      ? raw.slice(0, raw.lastIndexOf('，', lim) + 1 || lim)
       : raw;
   }
 
@@ -654,6 +663,11 @@
     setSetting('tts_voice_uri', uri).catch(()=>{});
     if(_TTS.speaking && !_TTS.paused){
       speechSynthesis.cancel();
+      // ★ speechSynthesis.cancel() 停不掉 Azure 的 <audio>：
+      //   不手動停會變成「舊聲音還在播、新聲音又開始」兩軌重疊；
+      //   prefetch 快取也必須丟棄，否則下一段仍是切換前的舊聲音。
+      if(_TTS.audio){ _TTS.audio.pause(); _TTS.audio = null; }
+      _prefetchCache = null;
       await new Promise(r => setTimeout(r, 80));
       _speakNext();
     }
