@@ -1376,6 +1376,7 @@ async function _initEpubReader(url, savedCfi, bookId){
     rendition.on('relocated', loc=>{
       _updateEpubProgress(book, loc);
       if(_restoringPos) return;  // 還原期間不存，避免把好的 CFI 覆蓋成開頭
+      if(_fsReflowing) return;   // 調字級重排中，位置是暫時的，別存
       if(loc?.start?.cfi && bookId) _saveEpubCfiThrottled(bookId, loc.start.cfi);
     });
 
@@ -1506,6 +1507,10 @@ function _epubPrev(){
 }
 
 let _readerFontSz = 17;
+// 調整字級會讓 epub.js 重新分頁，閱讀位置會跑掉 → 記住位置、重排後回到原處
+let _fsRestoreTimer = null;   // 連按 +/- 的防抖計時器
+let _fsAnchorCfi    = null;   // 這一輪調整前的位置（只在第一次按時記錄）
+let _fsReflowing    = false;  // 重排中：此期間不要把中途位置存成書籤
 let _readerUIVisible = true;
 
 function _toggleReaderUI(){
@@ -1580,7 +1585,23 @@ function _readerFontSize(delta){
   document.getElementById('reader-txt')?.style.setProperty('font-size',_readerFontSz+'px');
   // epub.js 字體調整
   if(window._epubRendition){
-    window._epubRendition.themes.fontSize(_readerFontSz+'px');
+    const rd = window._epubRendition;
+    // 只在這一輪的「第一次按」記錄位置；連按時沿用同一個錨點，
+    // 否則會拿到已經被重排推移過的位置，等於記錯地方。
+    if(!_fsRestoreTimer){
+      try{ _fsAnchorCfi = rd.currentLocation()?.start?.cfi || null; }catch(e){ _fsAnchorCfi = null; }
+    }
+    rd.themes.fontSize(_readerFontSz+'px');
+    // 重排需要時間，連按時只在最後一次之後還原一次
+    clearTimeout(_fsRestoreTimer);
+    _fsRestoreTimer = setTimeout(()=>{
+      _fsRestoreTimer = null;
+      if(!_fsAnchorCfi) return;
+      _fsReflowing = true;
+      Promise.resolve(rd.display(_fsAnchorCfi)).catch(()=>{}).then(()=>{
+        setTimeout(()=>{ _fsReflowing = false; _fsAnchorCfi = null; }, 300);
+      });
+    }, 260);
   }
   // 記住設定，下次開書沿用
   setSetting('reader_font_size', _readerFontSz).catch(()=>{});

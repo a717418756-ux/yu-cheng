@@ -310,9 +310,13 @@ function _applyTheme(theme){
    作法：啟動時在歷史堆疊墊一筆「緩衝」，返回時攔截 popstate 自行處理，
         處理完再補一筆緩衝，維持可持續攔截。
    ══════════════════════════════════════════════════════════════ */
-// 補一筆歷史緩衝（讓下一次返回鍵能被攔截）
+// 確保歷史堆疊上有一筆「緩衝」可供攔截；已存在就不重複推入
 function _pushBackGuard(){
-  try{ history.pushState({ ycGuard: true }, ''); }catch(e){}
+  try{
+    if(!history.state || !history.state.ycGuard){
+      history.pushState({ ycGuard: true }, '');
+    }
+  }catch(e){}
 }
 // 安全呼叫：函式不存在就跳過，避免模組差異造成錯誤
 function _callIf(name){
@@ -321,8 +325,12 @@ function _callIf(name){
   return false;
 }
 // 元素是否可見
+// 注意：這些覆蓋層多為 position:fixed，而 fixed 元素的 offsetParent 恆為 null，
+// 不能用 offsetParent 判斷，必須看實際計算後的樣式。
 function _isShown(el){
-  return !!el && el.offsetParent !== null;
+  if(!el || !el.isConnected) return false;
+  const s = getComputedStyle(el);
+  return s.display !== 'none' && s.visibility !== 'hidden' && s.opacity !== '0';
 }
 // 由上而下關閉一層；有關到東西回傳 true
 function _handleBackLayer(){
@@ -395,16 +403,34 @@ function _handleBackLayer(){
 
 function _initBackHandler(){
   _pushBackGuard();
+
   window.addEventListener('popstate', ()=>{
+    // 有可關閉的層級 → 關掉它，並補回緩衝
     if(_handleBackLayer()){ _pushBackGuard(); return; }
-    // 首頁：先補回緩衝（避免詢問期間再按一次就直接退出），再詢問
-    _pushBackGuard();
-    cfm('要離開 Y.C. 平台嗎？', '目前進度都已自動保存，隨時可以回來繼續。', ()=>{
-      // 退兩層（緩衝 + 起始頁）→ 系統關閉 App
-      try{ history.go(-2); }catch(e){}
-    });
-    // 「取消」時不需額外處理：緩衝已補回，返回鍵仍可正常攔截
+
+    // 已在首頁：此刻位於「起始頁」且緩衝已被消耗。
+    // 這裡刻意不預先補回緩衝——確認離開時才能靠 history.back() 退出起始頁，
+    // 讓系統真正關閉 App（先補回會導致要退兩層，而 go(-2) 會被瀏覽器夾住而失效）。
+    cfm('要離開 Y.C. 平台嗎？', '目前進度都已自動保存，隨時可以回來繼續。',
+      ()=>{ try{ history.back(); }catch(e){} }   // 起始頁之前已無紀錄 → 系統關閉 App
+    );
+    // 「取消」→ 補回緩衝，讓返回鍵繼續受攔截
+    const cn = document.getElementById('cfm-cn');
+    if(cn){
+      const prev = cn.onclick;
+      cn.onclick = ()=>{ prev?.(); _pushBackGuard(); };
+    }
   });
+
+  // 從背景/bfcache 回來時，緩衝可能已不存在 → 自我修復
+  // （離開確認顯示中不補，否則會多墊一層害 history.back() 退不出去）
+  const _healGuard = ()=>{
+    const c = document.getElementById('cfm-ov');
+    if(c && c.classList.contains('on')) return;
+    _pushBackGuard();
+  };
+  window.addEventListener('pageshow', _healGuard);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _healGuard(); });
 }
 
 async function init(){  try{
@@ -422,7 +448,7 @@ async function init(){  try{
     document.body.appendChild(errDiv);
     document.getElementById('init-reload-btn')?.addEventListener('click', ()=>location.reload());
     // 仍嘗試顯示首頁框架
-    try{ _initFabDelegation(); goPage('home', null); }catch(_){}
+    try{ _initFabDelegation(); goPage('home', null); _initBackHandler(); }catch(_){}
     // 即使出錯也要關閉 splash
     if(typeof window._splashDismiss==='function') window._splashDismiss();
   }

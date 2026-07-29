@@ -324,5 +324,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '3.9.0';     // ①返回鍵原生化:攔截popstate逐層關閉(確認框→FAB→選單→閱讀器→播放器→彈窗→法條檢視→答題→非首頁回首頁)，首頁再按顯示離開確認；②修電子書字級完全無效—主題註冊的font-size帶!important會壓過themes.fontSize()(epub.js該API不帶important)，移除後生效，並校正初始標籤與真實字級一致(原顯示17px實際19px，按+反而變小)且記憶使用者設定
+const APP_VERSION  = '3.9.1';     // 修返回鍵離開確認只出現一次:原用history.go(-2)但目標索引為-1會被瀏覽器夾住→App沒關掉且緩衝被吃光，之後按返回直接離開不再詢問；改為詢問前不預推緩衝、確認時history.back()退出起始頁讓系統關閉App，取消才補回；緩衝改為檢查history.state冪等並於pageshow/visibilitychange自我修復 ②修_isShown用offsetParent判斷—position:fixed元素恆為null會誤判播放器未顯示而關不掉，改用computedStyle ③修調整字級導致閱讀位置跳頁:記錄調整前CFI、連按防抖後還原，重排期間不存書籤
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
