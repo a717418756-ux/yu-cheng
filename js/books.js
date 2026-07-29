@@ -1291,7 +1291,7 @@ async function _initEpubReader(url, savedCfi, bookId){
         'background': '#111 !important',
         'color': '#e8e8e8 !important',
         'font-family': "'Noto Serif TC', 'Noto Serif SC', Georgia, serif !important",
-        'font-size': _baseFontSize+'px !important',
+        'font-size': _baseFontSize+'px',   // 不加 !important：否則會壓過 themes.fontSize()（epub.js 的字級調整不帶 important），使用者放大縮小將完全無效
         'line-height': '1.85 !important',
         'padding': '0 !important',    // paginated 模式不能設水平 padding（會被 overflow:hidden 裁切）
         'margin': '0 !important',
@@ -1305,7 +1305,7 @@ async function _initEpubReader(url, savedCfi, bookId){
         'background': '#2d2416 !important',
         'color': '#d4b896 !important',
         'font-family': "'Noto Serif TC', Georgia, serif !important",
-        'font-size': '17px !important',
+        'font-size': '17px',
         'line-height': '1.85 !important',
         'padding': '0 !important',
         'margin': '0 !important',
@@ -1317,7 +1317,7 @@ async function _initEpubReader(url, savedCfi, bookId){
         'background': '#f5f5f0 !important',
         'color': '#222 !important',
         'font-family': "'Noto Serif TC', Georgia, serif !important",
-        'font-size': '17px !important',
+        'font-size': '17px',
         'line-height': '1.85 !important',
         'padding': '0 !important',
         'margin': '0 !important',
@@ -1336,7 +1336,7 @@ async function _initEpubReader(url, savedCfi, bookId){
         'background': '#ffffff !important',
         'color': '#000000 !important',
         'font-family': "'Noto Serif TC', 'Noto Serif SC', '標楷體', 'DFKai-SB', Georgia, serif !important",
-        'font-size': _einkFontSize+'px !important',
+        'font-size': _einkFontSize+'px',   // 同上：留 !important 會鎖死字級
         'font-weight': '500 !important',
         'line-height': '1.95 !important',
         'padding': '0 !important',
@@ -1351,6 +1351,21 @@ async function _initEpubReader(url, savedCfi, bookId){
     // 依目前主題自動選用：eink 模式 → eink 主題，否則 dark
     const _isEink = document.documentElement.getAttribute('data-theme') === 'eink';
     rendition.themes.select(_isEink ? 'eink' : 'dark');
+
+    // ── 字級狀態同步 ────────────────────────────────────────────
+    // 主題實際套用的字級是依裝置算出的 _baseFontSize / _einkFontSize，
+    // 但 _readerFontSz 預設寫死 17，兩者不一致會導致：
+    // 標籤顯示 17px、實際卻是 19px，按「+」變成 18px 反而字變小。
+    // 這裡把狀態與標籤都校正成真正生效的值；若使用者先前調整過則沿用。
+    const _themeFontSz = _isEink ? _einkFontSize : _baseFontSize;
+    try{
+      const saved = parseInt(await getSetting('reader_font_size', 0), 10);
+      _readerFontSz = (saved >= 12 && saved <= 28) ? saved : _themeFontSz;
+    }catch(e){ _readerFontSz = _themeFontSz; }
+    const _fsLbl = document.getElementById('reader-fs-lbl');
+    if(_fsLbl) _fsLbl.textContent = _readerFontSz + 'px';
+    // 沿用先前設定時，主題預設值需被覆蓋（themes.fontSize 為 inline，優先於樣式表）
+    if(_readerFontSz !== _themeFontSz) rendition.themes.fontSize(_readerFontSz + 'px');
 
     // 建立章節對照表（供進度列顯示章節名，背景進行不阻塞）
     _epubChapterMap = null;
@@ -1567,6 +1582,8 @@ function _readerFontSize(delta){
   if(window._epubRendition){
     window._epubRendition.themes.fontSize(_readerFontSz+'px');
   }
+  // 記住設定，下次開書沿用
+  setSetting('reader_font_size', _readerFontSz).catch(()=>{});
 }
 
 function _readerTheme(theme){

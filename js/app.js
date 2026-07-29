@@ -303,11 +303,116 @@ function _applyTheme(theme){
 // ════════════════════════════════════════════════════════════
 // 【App 啟動初始化】
 // ════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════
+   返回鍵處理（讓 PWA 的返回行為接近原生 App）
+   原本按返回會直接離開回桌面；改為由上而下逐層關閉：
+     彈窗 → 閱讀器/播放器 → 法條檢視 → 答題 → 非首頁回首頁 → 首頁詢問離開
+   作法：啟動時在歷史堆疊墊一筆「緩衝」，返回時攔截 popstate 自行處理，
+        處理完再補一筆緩衝，維持可持續攔截。
+   ══════════════════════════════════════════════════════════════ */
+// 補一筆歷史緩衝（讓下一次返回鍵能被攔截）
+function _pushBackGuard(){
+  try{ history.pushState({ ycGuard: true }, ''); }catch(e){}
+}
+// 安全呼叫：函式不存在就跳過，避免模組差異造成錯誤
+function _callIf(name){
+  const fn = window[name];
+  if(typeof fn === 'function'){ fn(); return true; }
+  return false;
+}
+// 元素是否可見
+function _isShown(el){
+  return !!el && el.offsetParent !== null;
+}
+// 由上而下關閉一層；有關到東西回傳 true
+function _handleBackLayer(){
+  // 1) 確認對話框
+  const cfmOv = document.getElementById('cfm-ov');
+  if(cfmOv && cfmOv.classList.contains('on')){ _callIf('closeCfm'); return true; }
+
+  // 2) FAB 展開中
+  const fabOv = document.getElementById('fab-overlay');
+  if(fabOv && fabOv.classList.contains('open')){ _callIf('closeFab'); return true; }
+
+  // 3) 加號下拉選單
+  for(const [id, fn] of [['add-q-menu','closeAddQMenu'], ['add-law-menu','closeAddLawMenu']]){
+    const m = document.getElementById(id);
+    if(m && m.style.display !== 'none' && m.style.display !== ''){ _callIf(fn); return true; }
+  }
+
+  // 4) 電子書 / PDF 閱讀器
+  if(document.documentElement.classList.contains('reader-active')){
+    if(_callIf('closeBookReader')) return true;
+  }
+
+  // 5) 動態全螢幕覆蓋層（黑膠播放器、影片播放器、影音詳情）
+  //    這些是動態插入的節點，App 內部本來就用 remove() 關閉
+  for(const [id, fn] of [
+    ['vinyl-player-ov','closeVinylPlayer'],
+    ['video-player-ov','closeVideoPlayer'],
+    ['media-detail-ov', null],            // 無對應函式，直接移除（與 App 內部作法一致）
+  ]){
+    const el = document.getElementById(id);
+    if(_isShown(el)){
+      if(!(fn && _callIf(fn))) el.remove();
+      return true;
+    }
+  }
+
+  // 6) 一般彈窗（取最上層那個）
+  const ovMap = {
+    'heatmap-ov':'closeHeatmapOv', 'bulk-ov':'closeBulkQ',
+    'add-ov':'closeAdd', 'law-ov':'closeLawSh', 'blaw-ov':'closeBulkLaw',
+  };
+  const opened = [...document.querySelectorAll('.ov.on')];
+  if(opened.length){
+    const top = opened[opened.length - 1];
+    if(!_callIf(ovMap[top.id])) top.classList.remove('on');   // 無對應函式則直接關
+    return true;
+  }
+
+  // 7) 法條檢視（#lv 以 display:flex 顯示，關閉函式為 exitLaw）
+  const lv = document.getElementById('lv');
+  if(lv && lv.style.display === 'flex'){
+    if(!_callIf('exitLaw')) lv.style.display = 'none';
+    return true;
+  }
+
+  // 8) 答題中 → 離開答題（答題畫面是 #qv 覆蓋層，不是獨立 page）
+  const qv = document.getElementById('qv');
+  if(qv && qv.style.display !== 'none' && qv.style.display !== ''){
+    if(!_callIf('exitQ')) qv.style.display = 'none';
+    return true;
+  }
+
+  // 9) 非首頁 → 回首頁
+  if(S.page && S.page !== 'home'){
+    goPage('home', document.querySelector('.nb'));
+    return true;
+  }
+  return false;   // 已在首頁，交給呼叫端詢問是否離開
+}
+
+function _initBackHandler(){
+  _pushBackGuard();
+  window.addEventListener('popstate', ()=>{
+    if(_handleBackLayer()){ _pushBackGuard(); return; }
+    // 首頁：先補回緩衝（避免詢問期間再按一次就直接退出），再詢問
+    _pushBackGuard();
+    cfm('要離開 Y.C. 平台嗎？', '目前進度都已自動保存，隨時可以回來繼續。', ()=>{
+      // 退兩層（緩衝 + 起始頁）→ 系統關閉 App
+      try{ history.go(-2); }catch(e){}
+    });
+    // 「取消」時不需額外處理：緩衝已補回，返回鍵仍可正常攔截
+  });
+}
+
 async function init(){  try{
   await initDB();
   await initTheme();
   _initFabDelegation();
   goPage('home', document.querySelector('.nb'));
+  _initBackHandler();
   }catch(e){
     logError('init', e);
     // 顯示錯誤提示但不讓畫面全黑，仍顯示 FAB
