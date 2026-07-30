@@ -324,5 +324,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '3.9.1';     // 修返回鍵離開確認只出現一次:原用history.go(-2)但目標索引為-1會被瀏覽器夾住→App沒關掉且緩衝被吃光，之後按返回直接離開不再詢問；改為詢問前不預推緩衝、確認時history.back()退出起始頁讓系統關閉App，取消才補回；緩衝改為檢查history.state冪等並於pageshow/visibilitychange自我修復 ②修_isShown用offsetParent判斷—position:fixed元素恆為null會誤判播放器未顯示而關不掉，改用computedStyle ③修調整字級導致閱讀位置跳頁:記錄調整前CFI、連按防抖後還原，重排期間不存書籤
+const APP_VERSION  = '3.9.2';     // 重做返回鍵離開機制(前版仍會第2次直接關閉):改為「緩衝永遠保留」+兩段式退出—詢問前先補回緩衝確保攔截能力不中斷，確認離開時設旗標並history.back()，該次popstate由旗標攔下再退一層才真正退出起始頁關閉App；popstate全程try/catch，任何例外都補回緩衝，避免一次失誤就永久失去攔截；移除脆弱的cfm取消鈕包裝與healGuard特例，邏輯更精簡
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
