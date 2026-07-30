@@ -306,7 +306,8 @@ function _applyTheme(theme){
 /* ══════════════════════════════════════════════════════════════
    返回鍵處理（讓 PWA 的返回行為接近原生 App）
    原本按返回會直接離開回桌面；改為由上而下逐層關閉：
-     彈窗 → 閱讀器/播放器 → 法條檢視 → 答題 → 非首頁回首頁 → 首頁詢問離開
+     彈窗 → 閱讀器/播放器 → 法條檢視 → 答題 → 非首頁回首頁
+   已在首頁且無任何層級可關時，才讓返回鍵離開 App。
    作法：啟動時在歷史堆疊墊一筆「緩衝」，返回時攔截 popstate 自行處理，
         處理完再補一筆緩衝，維持可持續攔截。
    ══════════════════════════════════════════════════════════════ */
@@ -401,44 +402,23 @@ function _handleBackLayer(){
   return false;   // 已在首頁，交給呼叫端詢問是否離開
 }
 
-let _exitConfirmed = false;   // 已確認離開：下一次 popstate 直接放行退出
-
-function _askExit(){
-  const done = ()=>{
-    // 兩段式退出：先退掉緩衝（會再觸發一次 popstate），
-    // 該次由 _exitConfirmed 攔下並再退一層 → 退出起始頁 → 系統關閉 App
-    _exitConfirmed = true;
-    try{ history.back(); }catch(e){}
-  };
-  if(typeof cfm === 'function'){
-    cfm('要離開 Y.C. 平台嗎？', '目前進度都已自動保存，隨時可以回來繼續。', done);
-  }else if(window.confirm('要離開 Y.C. 平台嗎？')){
-    done();   // 極端情況下的保底（cfm 尚未載入）
-  }
-}
-
 function _initBackHandler(){
   _pushBackGuard();
-
   window.addEventListener('popstate', ()=>{
     try{
-      // 已確認離開 → 再退一層（起始頁之前已無紀錄 → 系統關閉 App）
-      if(_exitConfirmed){
-        _exitConfirmed = false;
-        setTimeout(()=>{ try{ history.back(); }catch(e){} }, 0);
-        return;
-      }
-      // 有可關閉的層級 → 關掉它
+      // 有可關閉的層級（彈窗／閱讀器／播放器／非首頁）→ 關掉它，並補回緩衝
       if(_handleBackLayer()){ _pushBackGuard(); return; }
-      // 已在首頁 → 先補回緩衝（確保攔截能力不會斷），再詢問
-      _pushBackGuard();
-      _askExit();
+      // 已在首頁且無任何層級可關 → 不再補緩衝，直接離開 App
+      // （此刻位於起始頁，其之前已無紀錄，退出即由系統關閉）
+      setTimeout(()=>{ try{ history.back(); }catch(e){} }, 0);
     }catch(e){
-      _pushBackGuard();   // 任何例外都不能失去攔截，否則下一次返回就直接退出
+      _pushBackGuard();   // 例外時補回緩衝，避免 App 內的返回功能失效
     }
   });
 
-  // 從背景/bfcache 回來時緩衝可能已不存在 → 自我修復（冪等，不會重複堆疊）
+  // 從背景/bfcache 回來時緩衝可能已不存在 → 自我修復
+  // （少了緩衝，App 內第一次按返回會直接離開而非關閉當前層級）
+  // _pushBackGuard 會檢查 history.state，已存在就不重複推入
   window.addEventListener('pageshow', _pushBackGuard);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _pushBackGuard(); });
 }
