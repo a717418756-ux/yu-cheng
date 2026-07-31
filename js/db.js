@@ -324,5 +324,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '3.9.3';     // 返回鍵定案(簡化):App內逐層關閉—確認框→FAB→選單→閱讀器→播放器→彈窗→法條檢視→答題→非首頁回首頁；首頁按返回直接離開App(不再詢問，移除確認機制相關程式碼不留死碼)；popstate全程try/catch且例外時補回緩衝，pageshow/切回前景時自我修復緩衝(冪等)；_isShown改用computedStyle(position:fixed元素offsetParent恆為null會誤判播放器關不掉)
+const APP_VERSION  = '3.9.4';     // 修「功能內返回兩次就離開」:①攔截成功後改為強制重新武裝緩衝(_pushBackGuard(true))—原本用history.state判斷冪等，某些情況下未推入緩衝，導致下一次返回無可攔截而直接關閉App ②S.page為異常值(undefined/空)時一律導回首頁，不再因狀態不明就離開 ③例外處理同樣強制武裝；pageshow改用箭頭函式避免事件物件被當成force參數
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

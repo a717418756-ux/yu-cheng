@@ -311,10 +311,12 @@ function _applyTheme(theme){
    作法：啟動時在歷史堆疊墊一筆「緩衝」，返回時攔截 popstate 自行處理，
         處理完再補一筆緩衝，維持可持續攔截。
    ══════════════════════════════════════════════════════════════ */
-// 確保歷史堆疊上有一筆「緩衝」可供攔截；已存在就不重複推入
-function _pushBackGuard(){
+// 補一筆歷史緩衝供攔截用
+//   force=true：攔截後重新武裝，一律推入（不可略過，否則下一次返回就直接離開 App）
+//   force=false：背景返回時的自我修復，已有緩衝就不重複堆疊
+function _pushBackGuard(force){
   try{
-    if(!history.state || !history.state.ycGuard){
+    if(force === true || !history.state || !history.state.ycGuard){
       history.pushState({ ycGuard: true }, '');
     }
   }catch(e){}
@@ -395,7 +397,9 @@ function _handleBackLayer(){
   }
 
   // 9) 非首頁 → 回首頁
-  if(S.page && S.page !== 'home'){
+  // 注意：S.page 若為異常值（undefined/空）也一律導回首頁，
+  //       絕不因狀態不明就直接離開 App
+  if(S.page !== 'home'){
     goPage('home', document.querySelector('.nb'));
     return true;
   }
@@ -407,19 +411,19 @@ function _initBackHandler(){
   window.addEventListener('popstate', ()=>{
     try{
       // 有可關閉的層級（彈窗／閱讀器／播放器／非首頁）→ 關掉它，並補回緩衝
-      if(_handleBackLayer()){ _pushBackGuard(); return; }
+      if(_handleBackLayer()){ _pushBackGuard(true); return; }   // 強制重新武裝
       // 已在首頁且無任何層級可關 → 不再補緩衝，直接離開 App
       // （此刻位於起始頁，其之前已無紀錄，退出即由系統關閉）
       setTimeout(()=>{ try{ history.back(); }catch(e){} }, 0);
     }catch(e){
-      _pushBackGuard();   // 例外時補回緩衝，避免 App 內的返回功能失效
+      _pushBackGuard(true);   // 例外時也要重新武裝，避免 App 內的返回功能失效
     }
   });
 
   // 從背景/bfcache 回來時緩衝可能已不存在 → 自我修復
   // （少了緩衝，App 內第一次按返回會直接離開而非關閉當前層級）
   // _pushBackGuard 會檢查 history.state，已存在就不重複推入
-  window.addEventListener('pageshow', _pushBackGuard);
+  window.addEventListener('pageshow', ()=> _pushBackGuard());   // 不傳事件物件進去，避免誤判 force
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _pushBackGuard(); });
 }
 
