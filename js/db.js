@@ -196,24 +196,49 @@ function getDangerLevel(q, recentAts) {
   return '🟢';
 }
 
-async function getPriorityPool(mode = 'all') { try {
+async function getPriorityPool(mode = 'all', subjects = null) { try {
   const [qs, ats] = await Promise.all([da('questions'), da('attempts')]);
   if (!qs.length) return [];
   const now = Date.now();
-  const mcQs = qs.filter(q => q.type === 'mc');
+  // 科目篩選（subjects 為陣列且非空時才套用；null/空 = 全部科目）
+  const subjSet = (Array.isArray(subjects) && subjects.length) ? new Set(subjects) : null;
+  const bySubj  = q => !subjSet || subjSet.has(q.subject || '');
+  const mcQs = qs.filter(q => q.type === 'mc' && bySubj(q));
   let pool = mcQs;
   if      (mode === 'wrong')  { const ws = getWrong(qs, ats); pool = mcQs.filter(q => ws.has(q.id)); }
   else if (mode === 'star')   { pool = mcQs.filter(q => q.starred); }
   else if (mode === 'review') { pool = mcQs.filter(q => (q.nextReview || 0) <= now); }
   else if (mode === 'new')    { pool = mcQs.filter(q => !q.reviewLevel && q.reviewLevel !== 0); }
+  // 加強複習：錯誤率高（危險題）∪ 收藏題，去重
+  else if (mode === 'focus')  {
+    const ws = getWrong(qs, ats);
+    pool = mcQs.filter(q => ws.has(q.id) || q.starred);
+  }
+  // 申論練習：只取申論題（不受 mc 篩選限制，需另行取用）
+  else if (mode === 'essay')  {
+    pool = qs.filter(q => q.type === 'es' && bySubj(q));
+    return pool;   // 申論不套用危險度排序
+  }
   const levelOrder = { '🔴': 0, '🟠': 1, '🟡': 2, '🟢': 3 };
   pool.sort((a, b) => {
     const da_ = getDangerLevel(a, ats);
     const db_ = getDangerLevel(b, ats);
-    return (levelOrder[da_] || 3) - (levelOrder[db_] || 3);
+    return (levelOrder[da_] ?? 3) - (levelOrder[db_] ?? 3);
   });
   return pool;
 } catch(e) { logError('getPriorityPool', e); return []; } }
+
+// 取得題庫中所有科目（依題數多寡排序，供科目多選用）
+async function getSubjectList(type) { try {
+  const qs = await da('questions');
+  const cnt = {};
+  qs.forEach(q => {
+    if (type && q.type !== type) return;
+    const s = q.subject || '未分類';
+    cnt[s] = (cnt[s] || 0) + 1;
+  });
+  return Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([name, n]) => ({ name, n }));
+} catch(e) { logError('getSubjectList', e); return []; } }
 
 // ════════════════════════════════════════════════════════════════
 // settings / countdowns helpers（介面完全不變）
@@ -324,5 +349,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '3.9.4';     // 修「功能內返回兩次就離開」:①攔截成功後改為強制重新武裝緩衝(_pushBackGuard(true))—原本用history.state判斷冪等，某些情況下未推入緩衝，導致下一次返回無可攔截而直接關閉App ②S.page為異常值(undefined/空)時一律導回首頁，不再因狀態不明就離開 ③例外處理同樣強制武裝；pageshow改用箭頭函式避免事件物件被當成force參數
+const APP_VERSION  = '4.0.0';     // 測驗系統重整:①今日複習改為選擇題專用+科目多選(記住上次選擇)、不限題數、不主動打斷，底部常駐結束鈕可隨時看統計 ②移除快刷5題/模擬考/隨機刷題(含examTimer等狀態，無殘留) ③危險題+收藏題合併為「加強複習」(取聯集去重) ④新增申論練習獨立區(type=es) ⑤公布解答後可寫筆記—打字存note(進搜尋索引)、可切手寫canvas存noteImg(壓縮jpeg、空白不存、不進索引)；另修危險度排序表誤用高中低字串(實際為emoji)導致排序失效，並清除index.html重複7次的toast死元素
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

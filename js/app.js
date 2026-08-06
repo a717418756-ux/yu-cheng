@@ -238,6 +238,9 @@ function goPage(pg, btn){
   const el = document.getElementById('pg-'+pg); if(el) el.classList.remove('hide');
   if(btn) btn.classList.add('on');
   S.page = pg;
+  // 切換頁面時順便確保返回緩衝存在（冪等，已有就不重複推入）。
+  // 保險用途：萬一某次重新武裝被瀏覽器吞掉，只要有任何導覽就會自動補回。
+  if(typeof _pushBackGuard === 'function') _pushBackGuard();
   ({
     home:()=>{
       // 回首頁：完整收合所有展開區塊，恢復三區未展開狀態
@@ -311,12 +314,10 @@ function _applyTheme(theme){
    作法：啟動時在歷史堆疊墊一筆「緩衝」，返回時攔截 popstate 自行處理，
         處理完再補一筆緩衝，維持可持續攔截。
    ══════════════════════════════════════════════════════════════ */
-// 補一筆歷史緩衝供攔截用
-//   force=true：攔截後重新武裝，一律推入（不可略過，否則下一次返回就直接離開 App）
-//   force=false：背景返回時的自我修復，已有緩衝就不重複堆疊
-function _pushBackGuard(force){
+// 確保歷史堆疊上有一筆「緩衝」可供攔截返回鍵；已有就不重複推入
+function _pushBackGuard(){
   try{
-    if(force === true || !history.state || !history.state.ycGuard){
+    if(!history.state || !history.state.ycGuard){
       history.pushState({ ycGuard: true }, '');
     }
   }catch(e){}
@@ -408,22 +409,28 @@ function _handleBackLayer(){
 
 function _initBackHandler(){
   _pushBackGuard();
+  // 重新武裝緩衝
+  // ★ 必須延到下一個事件迴圈：在 popstate 處理中「同步」呼叫 pushState，
+  //   瀏覽器可能仍在處理該次返回導覽而把它吞掉 —— 結果就是只有第一次返回有效，
+  //   之後沒有緩衝可攔截，按返回就直接關閉 App。
+  const _rearm = ()=> setTimeout(_pushBackGuard, 0);
+
   window.addEventListener('popstate', ()=>{
     try{
       // 有可關閉的層級（彈窗／閱讀器／播放器／非首頁）→ 關掉它，並補回緩衝
-      if(_handleBackLayer()){ _pushBackGuard(true); return; }   // 強制重新武裝
+      if(_handleBackLayer()){ _rearm(); return; }   // 強制重新武裝
       // 已在首頁且無任何層級可關 → 不再補緩衝，直接離開 App
       // （此刻位於起始頁，其之前已無紀錄，退出即由系統關閉）
       setTimeout(()=>{ try{ history.back(); }catch(e){} }, 0);
     }catch(e){
-      _pushBackGuard(true);   // 例外時也要重新武裝，避免 App 內的返回功能失效
+      _rearm();   // 例外時也要重新武裝，避免 App 內的返回功能失效
     }
   });
 
   // 從背景/bfcache 回來時緩衝可能已不存在 → 自我修復
   // （少了緩衝，App 內第一次按返回會直接離開而非關閉當前層級）
   // _pushBackGuard 會檢查 history.state，已存在就不重複推入
-  window.addEventListener('pageshow', ()=> _pushBackGuard());   // 不傳事件物件進去，避免誤判 force
+  window.addEventListener('pageshow', _pushBackGuard);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _pushBackGuard(); });
 }
 

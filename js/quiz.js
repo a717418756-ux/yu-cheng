@@ -91,6 +91,7 @@ function renderQCard(){
 
   // 下一題按鈕
   document.getElementById('qnxt').classList.add('hide');
+  document.getElementById('qnote-btn')?.classList.add('hide');
 
   if(qu.type === 'mc'){
     document.getElementById('qes').style.display = 'none';
@@ -214,6 +215,8 @@ async function ansQ(sel){  try{
     noteEl.textContent = qu.note ? ('📝 '+qu.note) : '🖍 已標記';
   }
   document.getElementById('qnxt').classList.remove('hide');
+  document.getElementById('qnote-btn')?.classList.remove('hide');
+  _updateNoteBtn();
 
   S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
   }catch(e){ logError('ansQ', e); }}
@@ -239,6 +242,8 @@ function revealES(){
 
   document.getElementById('qrevbtn').disabled = true;
   document.getElementById('qnxt').classList.remove('hide');
+  document.getElementById('qnote-btn')?.classList.remove('hide');
+  _updateNoteBtn();
 
   const responseTime = Date.now() - _qStart;
   dp('attempts', {qid:qu.id, correct:null, date:today(), responseTime, hesitationFlag:responseTime>40000});
@@ -323,36 +328,216 @@ function replayQuiz(){
 }
 
 // ════════ 模擬考模式 ════════
-// ════════════════════════════════════════════════════════════
-// 【答題：模擬考/快刷】
-// ════════════════════════════════════════════════════════════
-async function startExam(totalQ=50, timeLimitMin=50){  try{
-  const pool = await getPriorityPool('all');
-  if(pool.length < 5){ toast('題目不足，請先匯入題目'); return; }
-  const selected = pool.slice(0, Math.min(totalQ, pool.length));
-  S.examTimeLimit = timeLimitMin*60*1000;
-  S.examStart = Date.now();
-  startQWithPool(selected, 'exam');
-  // 計時器
-  if(S._examTimer) clearInterval(S._examTimer);
-  S._examTimer = setInterval(()=>{
-    const left = S.examTimeLimit - (Date.now()-S.examStart);
-    if(left <= 0){ clearInterval(S._examTimer); toast('時間到！'); showQDone(); return; }
-    const m = Math.floor(left/60000), s = Math.floor((left%60000)/1000);
-    const el = document.getElementById('qct');
-    if(el) el.textContent = `⏱${m}:${s.toString().padStart(2,'0')} · ${S.quiz.idx+1}/${selected.length}`;
-  }, 1000);
-  }catch(e){ logError('startExam', e); }}
 
-// ════════ 快刷模式（5題/3分鐘）════════
-async function startQuick(){  try{
-  const pool = await getPriorityPool('all');
-  if(!pool.length){ toast('沒有題目'); return; }
-  // 優先危險題，取5題
-  const selected = pool.filter(q=>q._danger==='🔴'||q._danger==='🟠').slice(0,3)
-    .concat(pool.slice(0,5)).slice(0,5);
-  startQWithPool([...new Set(selected)], 'quick');
-  }catch(e){ logError('startQuick', e); }}
+// ════════════════════════════════════════════════════════════
+// 【科目多選 → 開始測驗】
+//   startQPick(mode)：先讓使用者挑科目（記住上次選擇），再開始
+// ════════════════════════════════════════════════════════════
+let _pickMode = 'review';
+let _pickSel  = new Set();
+
+async function startQPick(mode){  try{
+  _pickMode = mode || 'review';
+  const isEssay = _pickMode === 'essay';
+  const list = await getSubjectList(isEssay ? 'es' : 'mc');
+  if(!list.length){
+    toast(isEssay ? '目前沒有申論題' : '目前沒有選擇題');
+    return;
+  }
+  // 沿用上次選擇（僅保留仍存在的科目）
+  const saved = await getSetting('quiz_subjects_' + _pickMode, []);
+  const names = new Set(list.map(x => x.name));
+  _pickSel = new Set((Array.isArray(saved) ? saved : []).filter(n => names.has(n)));
+
+  const sub = document.getElementById('subj-sub');
+  if(sub) sub.textContent = isEssay ? '申論練習・可複選，不選則測全部'
+                                    : '選擇題・可複選，不選則測全部';
+  const box = document.getElementById('subj-list');
+  if(box){
+    box.innerHTML = list.map(x => {
+      const on = _pickSel.has(x.name) ? ' on' : '';
+      return `<button class="subj-item${on}" data-n="${esc(x.name)}" onclick="toggleSubj(this)">
+                <span class="subj-name">${esc(x.name)}</span>
+                <span class="subj-cnt">${x.n}</span>
+              </button>`;
+    }).join('');
+  }
+  document.getElementById('subj-ov')?.classList.add('on');
+  }catch(e){ logError('startQPick', e); }}
+
+function toggleSubj(btn){
+  const n = btn.dataset.n;
+  if(_pickSel.has(n)){ _pickSel.delete(n); btn.classList.remove('on'); }
+  else { _pickSel.add(n); btn.classList.add('on'); }
+}
+
+function closeSubjPick(){ document.getElementById('subj-ov')?.classList.remove('on'); }
+
+async function confirmSubjPick(){  try{
+  const subjects = [...(_pickSel || [])];
+  setSetting('quiz_subjects_' + _pickMode, subjects).catch(()=>{});
+  closeSubjPick();
+  const pool = await getPriorityPool(_pickMode, subjects);
+  if(!pool.length){
+    toast(_pickMode === 'review' ? '今日沒有到期的題目'
+        : _pickMode === 'focus'  ? '沒有危險題或收藏題'
+        : _pickMode === 'essay'  ? '沒有符合的申論題' : '沒有題目');
+    return;
+  }
+  startQWithPool(pool, _pickMode);
+  }catch(e){ logError('confirmSubjPick', e); }}
+
+// ════════════════════════════════════════════════════════════
+// 【題目筆記】打字為主，可切換手寫；手寫圖不進搜尋索引
+// ════════════════════════════════════════════════════════════
+let _noteQ = null;          // 目前編輯的題目
+let _noteStrokes = [];      // 手寫筆畫（供復原）
+let _noteDrawInit = false;
+
+async function openQNote(){  try{
+  const qu = S.quiz.q[S.quiz.idx];
+  if(!qu) return;
+  _noteQ = qu;
+  const stemEl = document.getElementById('qnote-stem');
+  if(stemEl) stemEl.textContent = (qu.stem || '').slice(0, 120);
+  const ta = document.getElementById('qnote-text');
+  if(ta) ta.value = qu.note || '';
+  _noteStrokes = [];
+  qnoteTab('text');
+  document.getElementById('qnote-ov')?.classList.add('on');
+  // 有既有手寫圖就載入
+  if(qu.noteImg) setTimeout(()=> _qnoteLoadImg(qu.noteImg), 50);
+  }catch(e){ logError('openQNote', e); }}
+
+function closeQNote(){ document.getElementById('qnote-ov')?.classList.remove('on'); }
+
+function qnoteTab(which){
+  const isText = which === 'text';
+  document.getElementById('qnote-pane-text').style.display = isText ? '' : 'none';
+  document.getElementById('qnote-pane-draw').style.display = isText ? 'none' : '';
+  document.getElementById('qnote-tab-text')?.classList.toggle('on', isText);
+  document.getElementById('qnote-tab-draw')?.classList.toggle('on', !isText);
+  if(!isText) _qnoteInitCanvas();
+}
+
+function _qnoteInitCanvas(){
+  const cv = document.getElementById('qnote-canvas');
+  if(!cv) return;
+  // 依實際顯示尺寸設定解析度（限制上限，避免圖檔過大）
+  const w = Math.min(cv.clientWidth || 320, 720);
+  const h = 260;
+  if(cv.width !== w || cv.height !== h){
+    const prev = (cv.width && cv.height) ? cv.toDataURL() : null;
+    cv.width = w; cv.height = h;
+    const c = cv.getContext('2d');
+    c.fillStyle = '#fff'; c.fillRect(0, 0, w, h);
+    if(prev) _qnoteLoadImg(prev);
+  }
+  if(_noteDrawInit) return;
+  _noteDrawInit = true;
+  const ctx = cv.getContext('2d');
+  ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+  let drawing = false;
+  const pos = e => {
+    const r = cv.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return { x: (p.clientX - r.left) * (cv.width / r.width),
+             y: (p.clientY - r.top)  * (cv.height / r.height) };
+  };
+  const start = e => { e.preventDefault(); drawing = true;
+    _noteStrokes.push(cv.toDataURL('image/png'));      // 存下筆前狀態供復原
+    if(_noteStrokes.length > 12) _noteStrokes.shift(); // 限制復原步數，控制記憶體
+    const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+  const move  = e => { if(!drawing) return; e.preventDefault();
+    const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
+  const end   = () => { drawing = false; };
+  cv.addEventListener('pointerdown', start);
+  cv.addEventListener('pointermove', move);
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointerleave', end);
+}
+
+function _qnoteLoadImg(src){
+  const cv = document.getElementById('qnote-canvas');
+  if(!cv || !src) return;
+  const img = new Image();
+  img.onload = ()=>{
+    const c = cv.getContext('2d');
+    c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
+    c.drawImage(img, 0, 0, cv.width, cv.height);
+  };
+  img.src = src;
+}
+
+function qnoteUndo(){
+  if(!_noteStrokes.length){ toast('沒有可復原的筆畫'); return; }
+  _qnoteLoadImg(_noteStrokes.pop());
+}
+
+function qnoteClearDraw(){
+  const cv = document.getElementById('qnote-canvas');
+  if(!cv) return;
+  const c = cv.getContext('2d');
+  _noteStrokes.push(cv.toDataURL('image/png'));
+  c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
+}
+
+// 判斷畫布是否為空白（全白）→ 空白就不存圖，避免無謂佔空間
+function _qnoteIsBlank(cv){
+  try{
+    const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+    for(let i = 0; i < d.length; i += 4){
+      if(d[i] < 250 || d[i+1] < 250 || d[i+2] < 250) return false;
+    }
+    return true;
+  }catch(e){ return false; }
+}
+
+async function saveQNote(){  try{
+  if(!_noteQ){ closeQNote(); return; }
+  const ta = document.getElementById('qnote-text');
+  _noteQ.note = (ta?.value || '').trim();
+
+  const cv = document.getElementById('qnote-canvas');
+  if(cv && cv.width && !_qnoteIsBlank(cv)){
+    // 壓成 jpeg 並降低品質，控制備份體積
+    _noteQ.noteImg = cv.toDataURL('image/jpeg', 0.7);
+  }else if(cv && cv.width && _qnoteIsBlank(cv)){
+    delete _noteQ.noteImg;   // 清空了就移除，不留空圖
+  }
+
+  // 重建 searchBlob（手寫圖不進索引）
+  _noteQ.searchBlob = [
+    _noteQ.stem, _noteQ.groupStem || '', _noteQ.subject, _noteQ.year,
+    _noteQ.exam, String(_noteQ.num || ''),
+    (_noteQ.keywords || []).join(' '), _noteQ.note || ''
+  ].join(' ').toLowerCase();
+
+  await dp('questions', _noteQ);
+  closeQNote();
+  toast('筆記已儲存');
+  _updateNoteBtn();
+  }catch(e){ logError('saveQNote', e); toast('儲存失敗'); }}
+
+// 更新「筆記」按鈕外觀（已有筆記時標示）
+function _updateNoteBtn(){
+  const btn = document.getElementById('qnote-btn');
+  if(!btn) return;
+  const qu = S.quiz.q[S.quiz.idx];
+  const has = !!(qu && ((qu.note && qu.note.trim()) || qu.noteImg));
+  btn.textContent = has ? '📝 筆記*' : '📝 筆記';
+  btn.classList.toggle('has-note', has);
+}
+
+
+// 隨時結束測驗（不需答完整份）→ 直接看統計
+function endQuizNow(){  try{
+  if(!S.quiz || !S.quiz.q?.length) { exitQ(); return; }
+  // 統計以 S.quiz.res（實際作答紀錄）為準，不需截斷題目陣列；
+  // 保持 S.quiz.q 完整，結束畫面的「再測一次」才能沿用同一份題目。
+  if(!S.quiz.res.length){ exitQ(); return; }   // 一題都沒作答 → 直接離開，不顯示空統計
+  showQDone();
+  }catch(e){ logError('endQuizNow', e); exitQ(); }}
 
 // ════════ 選項選取 ════════
 // ════════════════════════════════════════════════════════════
@@ -425,6 +610,8 @@ async function ansQMulti(selected, correctStr, qu){  try{
   resEl.textContent = msg;
   if(qu.note || qu.hlColor){ const noteEl=document.getElementById('qnote'); const hlMap={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'}; const hlC=qu.hlColor&&hlMap[qu.hlColor]?hlMap[qu.hlColor]:''; noteEl.style.display='block'; noteEl.style.borderLeft=hlC?('3px solid '+hlC):''; noteEl.textContent=qu.note?('📝 '+qu.note):'🖍 已標記'; }
   document.getElementById('qnxt').classList.remove('hide');
+  document.getElementById('qnote-btn')?.classList.remove('hide');
+  _updateNoteBtn();
 
   // 隱藏確認按鈕
   const cfmBtn = document.getElementById('qmulti-confirm');
@@ -489,7 +676,9 @@ if(document.readyState === 'loading'){
 
 // ════════ 公開 API ════════
 // 新程式碼請使用 Quiz.xxx；window 別名僅供 index.html 既有 onclick 相容
-const Quiz = { startQ, startQWithPool, startExam, startQuick,
+const Quiz = { startQ, startQWithPool, startQPick,
+               toggleSubj, closeSubjPick, confirmSubjPick,
+               openQNote, closeQNote, qnoteTab, qnoteUndo, qnoteClearDraw, saveQNote, endQuizNow,
                submitAnswer, nextQ, exitQ, revealES, toggleQStar };
 window.Quiz = Quiz;
 Object.assign(window, Quiz);
