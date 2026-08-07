@@ -401,20 +401,81 @@
 .qink.on{ pointer-events:auto; }        /* 標註模式才接收觸控 */
 
 /* 標註工具列：只在標註模式顯示 */
+/* 標註工具列：必須 fixed 脫離版面流程。
+   原本用 position:sticky 且排在題目容器最前面，開啟標註模式時會佔掉
+   約 50px 高度把題目整個往下推；按完成後題目移回，筆跡卻留在原位置
+   → 看起來就是「儲存後位移」。改 fixed 後版面完全不受影響。 */
 .qink-tools{
-  display:none; position:sticky; bottom:6px; z-index:6;
-  gap:6px; justify-content:center; padding:6px;
+  display:none; position:fixed; z-index:30;
+  left:50%; transform:translateX(-50%);
+  bottom:calc(72px + env(safe-area-inset-bottom, 0px));
+  gap:6px; padding:6px;
+  background:rgba(22,22,28,0.94);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:14px;
+  box-shadow:0 8px 28px rgba(0,0,0,0.55);
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
 }
 .qink.on ~ .qink-tools{ display:flex; }
-.qink-tools .btn{ padding:6px 14px; font-size:12px; }
+.qink-tools .btn{
+  padding:7px 16px; font-size:12.5px; font-weight:600;
+  border-radius:9px; min-width:64px;
+}
+[data-theme="eink"] .qink-tools{
+  background:#fff; border:1.5px solid #000; box-shadow:none;
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
 
-/* 標註／備註按鈕 */
-.qfb.qink-btn, .qfb.qnote{ font-size:16px; padding:0 12px; }
-.qfb.qink-btn.on{ background:var(--acc); color:#fff; }
-.qfb.qink-btn.has-note, .qfb.qnote.has-note{ color:var(--acc); font-weight:700; }
-[data-theme="eink"] .qfb.qink-btn.on{ background:#000; color:#fff; }
+/* ══ 答題底列：統一為線性圖示，取代 emoji ══════════════════ */
+.qfoot .qfb{
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  height:42px; border-radius:11px;
+  border:1px solid rgba(255,255,255,0.10);
+  background:rgba(255,255,255,0.045);
+  color:var(--t1);
+  transition:background .14s ease, color .14s ease, transform .1s ease;
+}
+.qfoot .qfb:active{ transform:scale(.96); }
+.qfoot .qfb svg{ width:19px; height:19px; flex-shrink:0; }
+
+/* 圖示鈕（正方形）*/
+.qfb.qstar, .qfb.qink-btn, .qfb.qnote{ width:42px; padding:0; }
+
+/* 已標星／已有內容 → 用填色與強調色表示狀態 */
+.qfb.qstar.on{ color:var(--acc); background:rgba(110,168,254,0.14);
+  border-color:rgba(110,168,254,0.35); }
+.qfb.qstar.on svg{ fill:currentColor; }
+.qfb.qink-btn.has-note, .qfb.qnote.has-note{
+  color:var(--acc); border-color:rgba(110,168,254,0.30);
+}
+/* 標註模式啟用中 */
+.qfb.qink-btn.on{
+  background:var(--acc); color:#fff; border-color:var(--acc);
+}
+
+/* 下一題：主要動作，佔滿剩餘寬度 */
+.qfb.qnxt{
+  flex:1; padding:0 14px; font-size:14px; font-weight:600;
+  background:var(--acc); color:#fff; border-color:var(--acc);
+}
+/* 結束：次要動作，低調 */
+.qfb.qend{
+  padding:0 14px; font-size:13px; color:var(--t2);
+  background:transparent; border-color:rgba(255,255,255,0.10);
+}
+.qfb.qend:active{ color:var(--t0); }
+
+/* e-ink：純黑白高對比，不用半透明 */
+[data-theme="eink"] .qfoot .qfb{
+  background:#fff; border:1.5px solid #000; color:#000;
+}
+[data-theme="eink"] .qfb.qink-btn.on,
+[data-theme="eink"] .qfb.qnxt{ background:#000; color:#fff; border-color:#000; }
+[data-theme="eink"] .qfb.qstar.on,
 [data-theme="eink"] .qfb.qink-btn.has-note,
-[data-theme="eink"] .qfb.qnote.has-note{ color:#000; text-decoration:underline; }
+[data-theme="eink"] .qfb.qnote.has-note{
+  background:#fff; color:#000; border-width:2.5px;
+}
 
 /* ══ e-ink：熱力圖用邊框層次取代顏色深淺 ══════════════════════ */
 [data-theme="eink"] .hm-cell{
