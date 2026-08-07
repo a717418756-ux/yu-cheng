@@ -91,6 +91,14 @@ function renderQCard(){
 
   // 下一題按鈕
   document.getElementById('qnxt').classList.add('hide');
+  // 新題目未作答 → 收起筆記與標註入口，並確保退出標註模式
+  document.getElementById('qink-btn')?.classList.add('hide');
+  document.getElementById('qnote-btn')?.classList.add('hide');
+  if(_inkOn){
+    _inkOn = false;
+    document.getElementById('qink')?.classList.remove('on');
+    document.getElementById('qink-btn')?.classList.remove('on');
+  }
 
   if(qu.type === 'mc'){
     document.getElementById('qes').style.display = 'none';
@@ -235,6 +243,9 @@ async function ansQ(sel){  try{
     noteEl.textContent = qu.note ? ('📝 '+qu.note) : '🖍 已標記';
   }
   document.getElementById('qnxt').classList.remove('hide');
+  // 作答後才開放筆記與標註（作答前不干擾判斷）
+  document.getElementById('qink-btn')?.classList.remove('hide');
+  document.getElementById('qnote-btn')?.classList.remove('hide');
   _updateNoteBtn();
 
   S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
@@ -261,6 +272,9 @@ function revealES(){
 
   document.getElementById('qrevbtn').disabled = true;
   document.getElementById('qnxt').classList.remove('hide');
+  // 作答後才開放筆記與標註（作答前不干擾判斷）
+  document.getElementById('qink-btn')?.classList.remove('hide');
+  document.getElementById('qnote-btn')?.classList.remove('hide');
   _updateNoteBtn();
 
   const responseTime = Date.now() - _qStart;
@@ -424,19 +438,21 @@ let _inkDirty   = false;   // 有未儲存的筆跡
 let _inkPrevQ   = null;    // 上一題（換題時要把筆跡存回它）
 
 // 依題目容器大小設定畫布，並載入該題既有標註
+// 畫布使用固定內部解析度，與版面高度脫鉤。
+// 若跟著 scrollHeight 走，公布解答後版面變高會使畫布重設尺寸，
+// 舊筆跡被拉伸重繪 → 位移。固定解析度 + CSS 等比對應即可完全避免。
+const INK_W = 800, INK_H = 1200;
+
 function _inkSync(){
   const cv = document.getElementById('qink');
-  const body = document.getElementById('qbody');
-  if(!cv || !body) return;
-  const w = Math.min(body.clientWidth || 320, 900);
-  const h = body.scrollHeight || body.clientHeight || 400;
-  if(cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+  if(!cv) return;
+  if(cv.width !== INK_W || cv.height !== INK_H){ cv.width = INK_W; cv.height = INK_H; }
   const c = cv.getContext('2d');
-  c.clearRect(0, 0, cv.width, cv.height);          // 透明底：看得到底下題目
+  c.clearRect(0, 0, INK_W, INK_H);                 // 透明底：看得到底下題目
   const qu = S.quiz.q[S.quiz.idx];
   if(qu?.inkImg){
     const img = new Image();
-    img.onload = ()=> c.drawImage(img, 0, 0, cv.width, cv.height);
+    img.onload = ()=> c.drawImage(img, 0, 0, INK_W, INK_H);
     img.src = qu.inkImg;
   }
   _inkStrokes = [];
@@ -656,6 +672,9 @@ async function ansQMulti(selected, correctStr, qu){  try{
   resEl.textContent = msg;
   if(qu.note || qu.hlColor){ const noteEl=document.getElementById('qnote'); const hlMap={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'}; const hlC=qu.hlColor&&hlMap[qu.hlColor]?hlMap[qu.hlColor]:''; noteEl.style.display='block'; noteEl.style.borderLeft=hlC?('3px solid '+hlC):''; noteEl.textContent=qu.note?('📝 '+qu.note):'🖍 已標記'; }
   document.getElementById('qnxt').classList.remove('hide');
+  // 作答後才開放筆記與標註（作答前不干擾判斷）
+  document.getElementById('qink-btn')?.classList.remove('hide');
+  document.getElementById('qnote-btn')?.classList.remove('hide');
   _updateNoteBtn();
 
   // 隱藏確認按鈕
