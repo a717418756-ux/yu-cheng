@@ -386,13 +386,32 @@
 [data-theme="eink"] .subj-item.on{ background:#000; color:#fff; }
 
 /* ══ 筆記／結束測驗按鈕 ═════════════════════════════════════ */
-.qfb.qnote{ font-size:13px; padding:0 10px; white-space:nowrap; }
-.qfb.qnote.has-note{ color:var(--acc); font-weight:700; }
 .qfb.qend{ font-size:13px; padding:0 12px; color:var(--t2); }
 .qfb.qend:active{ color:var(--t0); }
 [data-theme="eink"] .qfb.qnote.has-note{ color:#000; text-decoration:underline; }
 
-/* 筆記分頁鈕 */
-.qnote-tab{ flex:1; font-size:13px; padding:7px 0; }
-.qnote-tab.on{ background:var(--acc); color:#fff; font-weight:600; }
-[data-theme="eink"] .qnote-tab.on{ background:#000; color:#fff; }
+
+/* ══ 題目標註畫布（疊在題幹／選項上方）══════════════════════ */
+.qbody{ position:relative; }
+.qink{
+  position:absolute; inset:0; width:100%; height:100%;
+  z-index:5; pointer-events:none;      /* 預設不擋操作，可正常作答 */
+  touch-action:none;
+}
+.qink.on{ pointer-events:auto; }        /* 標註模式才接收觸控 */
+
+/* 標註工具列：只在標註模式顯示 */
+.qink-tools{
+  display:none; position:sticky; bottom:6px; z-index:6;
+  gap:6px; justify-content:center; padding:6px;
+}
+.qink.on ~ .qink-tools{ display:flex; }
+.qink-tools .btn{ padding:6px 14px; font-size:12px; }
+
+/* 標註／備註按鈕 */
+.qfb.qink-btn, .qfb.qnote{ font-size:16px; padding:0 12px; }
+.qfb.qink-btn.on{ background:var(--acc); color:#fff; }
+.qfb.qink-btn.has-note, .qfb.qnote.has-note{ color:var(--acc); font-weight:700; }
+[data-theme="eink"] .qfb.qink-btn.on{ background:#000; color:#fff; }
+[data-theme="eink"] .qfb.qink-btn.has-note,
+[data-theme="eink"] .qfb.qnote.has-note{ color:#000; text-decoration:underline; }
