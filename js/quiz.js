@@ -296,6 +296,7 @@ function nextQ(){
 }
 
 function exitQ(){
+  _inkTeardown();
   document.getElementById('qv').style.display = 'none';
   S.quiz = {q:[], idx:0, ans:false, res:[], mode:''};
   if(S.page === 'home') renderHome();
@@ -332,6 +333,7 @@ function showQDone(){
   // 隱藏題目相關元素，顯示完成區塊（不覆蓋 qbody，保留所有子元素）
   ['qbadge','qmeta','q-type-hint','qstem','qopts','qres','qnote','qes','qlaw']
     .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  _inkTeardown();   // 結束畫面不該殘留上一題的手寫筆跡
 
   const doneArea = document.getElementById('qdone-area');
   if(doneArea){
@@ -451,6 +453,7 @@ const INK_W = 800, INK_H = 1200;
 function _inkSync(){
   const cv = document.getElementById('qink');
   if(!cv) return;
+  cv.style.display = '';   // 由結束畫面返回題目時要恢復顯示
   if(cv.width !== INK_W || cv.height !== INK_H){ cv.width = INK_W; cv.height = INK_H; }
   const c = cv.getContext('2d');
   c.clearRect(0, 0, INK_W, INK_H);                 // 透明底：看得到底下題目
@@ -536,6 +539,21 @@ async function _inkSave(){  try{
   _inkDirty = false;
   _updateNoteBtn();
   }catch(e){ logError('_inkSave', e); }}
+
+// 收起標註：清空畫布、退出標註模式、隱藏畫布
+// （結束測驗與離開測驗都要呼叫，否則筆跡會殘留在統計畫面上）
+function _inkTeardown(){
+  const cv = document.getElementById('qink');
+  if(cv){
+    try{ cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); }catch(e){}
+    cv.classList.remove('on');
+    cv.style.display = 'none';
+  }
+  _inkOn = false;
+  _inkStrokes = [];
+  _inkDirty = false;
+  document.getElementById('qink-btn')?.classList.remove('on');
+}
 
 function inkUndo(){
   const cv = document.getElementById('qink');
