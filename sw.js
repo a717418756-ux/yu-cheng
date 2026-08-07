@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.0.0';
+const APP_VERSION = '4.0.2';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
@@ -92,17 +92,28 @@ self.addEventListener('fetch', e => {
 
   // 頁面導覽（index.html）→ Network First，並更新快取副本
   if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request)
-        .then(res => {
-          if (res && res.status === 200) {
-            const clone = res.clone();
-            caches.open(CACHE_NAME).then(c => c.put('./index.html', clone));
-          }
-          return res;
-        })
-        .catch(() => caches.match('./index.html'))
-    );
+    // 網路優先 + 逾時保底：
+    //   網路正常 → 跟原本一樣拿最新版（更新機制不變）
+    //   網路慢   → 2.5 秒內改用快取直接開，避免長時間白畫面；
+    //              背景的 fetch 仍會完成並更新快取，下次開啟就是新版
+    //   離線     → fetch 立即失敗 → 用快取
+    const fetchPromise = fetch(e.request).then(res => {
+      if (res && res.status === 200) {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put('./index.html', clone));
+      }
+      return res;
+    });
+    e.respondWith((async () => {
+      try {
+        return await Promise.race([
+          fetchPromise,
+          new Promise((_, rej) => setTimeout(rej, 2500, 'timeout'))
+        ]);
+      } catch (err) {
+        return (await caches.match('./index.html')) || fetchPromise;
+      }
+    })());
     return;
   }
 

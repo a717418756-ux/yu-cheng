@@ -935,7 +935,11 @@
   <div class="cbox" style="max-width:420px">
     <div class="cbt">選擇科目</div>
     <div class="cbs" id="subj-sub">可複選，不選則測全部</div>
-    <div id="subj-list" style="max-height:46vh;overflow:auto;margin:10px 0;text-align:left"></div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button class="btn br bw" style="flex:1;padding:6px;font-size:12px" onclick="subjSelAll(true)">全選</button>
+      <button class="btn br bw" style="flex:1;padding:6px;font-size:12px" onclick="subjSelAll(false)">清除</button>
+    </div>
+    <div id="subj-list" style="max-height:42vh;overflow:auto;margin:8px 0 10px;text-align:left;overscroll-behavior:contain"></div>
     <div class="cbn">
       <button class="btn br bw" onclick="closeSubjPick()">取消</button>
       <button class="btn br bw" onclick="confirmSubjPick()">開始測驗</button>
