@@ -208,19 +208,16 @@
         <span class="zpanel-main-icon">🏆</span>
         <div class="zpanel-main-text">
           <div class="t">測驗專區</div>
-          <div class="s">今日複習・隨機刷題・模擬考…</div>
+          <div class="s">今日複習・加強複習・申論練習</div>
         </div>
         <span class="zpanel-main-arrow" id="zone-quiz-arrow">›</span>
       </button>
       <!-- 測驗子選單 -->
       <div class="zpanel-quiz" id="zone-quiz-menu">
-        <button class="zqb" onclick="startQ('review')"><span class="zqb-icon">📅</span><div class="zqb-label">今日複習</div><div class="zqb-desc">遺忘曲線到期</div></button>
-        <button class="zqb" onclick="startQ('all')"><span class="zqb-icon">🎯</span><div class="zqb-label">隨機刷題</div><div class="zqb-desc">全部題目隨機</div></button>
-        <button class="zqb" onclick="startQ('wrong')"><span class="zqb-icon">🔴</span><div class="zqb-label">危險題</div><div class="zqb-desc">錯誤率高</div></button>
-        <button class="zqb" onclick="startQ('star')"><span class="zqb-icon">⭐</span><div class="zqb-label">收藏題目</div><div class="zqb-desc">已星號題目</div></button>
-        <button class="zqb" onclick="startQuick()"><span class="zqb-icon">⚡</span><div class="zqb-label">快刷5題</div><div class="zqb-desc">優先危險題</div></button>
-        <button class="zqb" onclick="startExam()"><span class="zqb-icon">📝</span><div class="zqb-label">模擬考</div><div class="zqb-desc">50題限時</div></button>
-        <button class="zqb" onclick="startNumberMode()" style="grid-column:1/-1"><span class="zqb-icon">🔢</span><div class="zqb-label">數字魔鬼</div><div class="zqb-desc">快速數字記憶訓練</div></button>
+        <button class="zqb" onclick="startQPick('review')"><span class="zqb-icon">📅</span><div class="zqb-label">今日複習</div><div class="zqb-desc">選擇題・可選科目</div></button>
+        <button class="zqb" onclick="startQPick('focus')"><span class="zqb-icon">🔥</span><div class="zqb-label">加強複習</div><div class="zqb-desc">危險題＋收藏題</div></button>
+        <button class="zqb" onclick="startQPick('essay')"><span class="zqb-icon">✍️</span><div class="zqb-label">申論練習</div><div class="zqb-desc">申論題專區</div></button>
+        <button class="zqb" onclick="startNumberMode()"><span class="zqb-icon">🔢</span><div class="zqb-label">數字魔鬼</div><div class="zqb-desc">數字記憶訓練</div></button>
       </div>
       <!-- 題庫（原題目管理） -->
       <button class="zpanel-row" onclick="fabGo('list')">
@@ -699,8 +696,10 @@
   </div>
   <div class="qfoot" id="qfoot">
     <button class="qfb qstar" id="qstar" onclick="toggleQStar()" aria-label="星標此題">☆</button>
+    <button class="qfb qnote hide" id="qnote-btn" onclick="openQNote()" aria-label="本題筆記">📝 筆記</button>
     <button id="qmulti-confirm" class="btn bp bw hide" style="flex:1;padding:11px;font-size:14px;font-weight:600" onclick="submitAnswer()">✓ 確認答案</button>
     <button class="qfb qnxt hide" id="qnxt" onclick="nextQ()" style="flex:1;padding:11px;font-size:14px">下一題 →</button>
+    <button class="qfb qend" id="qend" onclick="endQuizNow()" aria-label="結束測驗">結束</button>
   </div>
 </div>
 <!-- LAW READER -->
@@ -931,12 +930,50 @@
     <div class="cbn"><button class="btn br bw" id="cfm-cn">取消</button><button class="btn br bw" id="cfm-ok">確認</button></div>
   </div>
 </div>
-<div class="toast" id="toast"></div>
-<div class="toast" id="toast"></div>
-<div class="toast" id="toast"></div>
-<div class="toast" id="toast"></div>
-<div class="toast" id="toast"></div>
-<div class="toast" id="toast"></div>
+<!-- 科目多選（開始測驗前） -->
+<div class="cov" id="subj-ov">
+  <div class="cbox" style="max-width:420px">
+    <div class="cbt">選擇科目</div>
+    <div class="cbs" id="subj-sub">可複選，不選則測全部</div>
+    <div id="subj-list" style="max-height:46vh;overflow:auto;margin:10px 0;text-align:left"></div>
+    <div class="cbn">
+      <button class="btn br bw" onclick="closeSubjPick()">取消</button>
+      <button class="btn br bw" onclick="confirmSubjPick()">開始測驗</button>
+    </div>
+  </div>
+</div>
+
+<!-- 題目筆記（打字 + 可選手寫） -->
+<div class="cov" id="qnote-ov">
+  <div class="cbox" style="max-width:460px">
+    <div class="cbt">本題筆記</div>
+    <div class="cbs" id="qnote-stem" style="max-height:5.6em;overflow:auto"></div>
+    <div class="qnote-tabs" style="display:flex;gap:6px;margin:10px 0 8px">
+      <button class="btn br bw qnote-tab on" id="qnote-tab-text" onclick="qnoteTab('text')">打字</button>
+      <button class="btn br bw qnote-tab" id="qnote-tab-draw" onclick="qnoteTab('draw')">手寫</button>
+    </div>
+    <div id="qnote-pane-text">
+      <textarea id="qnote-text" rows="6" placeholder="寫下本題重點、易混淆處、法條依據…"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;
+               background:var(--bg2);border:1px solid var(--bd);color:var(--t0);
+               font-size:14px;line-height:1.7;resize:vertical"></textarea>
+    </div>
+    <div id="qnote-pane-draw" style="display:none">
+      <canvas id="qnote-canvas" style="width:100%;height:260px;border-radius:10px;
+        background:#fff;border:1px solid var(--bd);touch-action:none;display:block"></canvas>
+      <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+        <button class="btn br bw" onclick="qnoteUndo()">復原</button>
+        <button class="btn br bw" onclick="qnoteClearDraw()">清除</button>
+        <span style="font-size:11px;color:var(--t2);margin-left:auto">手寫圖不進搜尋索引</span>
+      </div>
+    </div>
+    <div class="cbn">
+      <button class="btn br bw" onclick="closeQNote()">取消</button>
+      <button class="btn br bw" onclick="saveQNote()">儲存</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Dexie（必須在 db.js 之前載入）-->
