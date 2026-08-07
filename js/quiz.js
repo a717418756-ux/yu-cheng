@@ -91,7 +91,6 @@ function renderQCard(){
 
   // 下一題按鈕
   document.getElementById('qnxt').classList.add('hide');
-  document.getElementById('qnote-btn')?.classList.add('hide');
 
   if(qu.type === 'mc'){
     document.getElementById('qes').style.display = 'none';
@@ -125,6 +124,27 @@ function renderQCard(){
     if(cfmBtnEs) cfmBtnEs.classList.add('hide');
     showQLawLinks(qu);
   }
+  // 換題：先存起上一題未存的標註，再載入本題的標註
+  _inkFlushAndSync();
+  _updateNoteBtn();
+}
+
+// 換題時：把上一題的筆跡存好，再同步成本題的
+function _inkFlushAndSync(){
+  const cv = document.getElementById('qink');
+  if(!cv) return;
+  const pending = _inkDirty ? _inkPrevQ : null;
+  if(pending){
+    try{
+      if(_inkIsBlank(cv)) delete pending.inkImg;
+      else pending.inkImg = cv.toDataURL('image/png');
+      dp('questions', pending).catch(()=>{});
+    }catch(e){}
+    _inkDirty = false;
+  }
+  _inkPrevQ = S.quiz.q[S.quiz.idx] || null;
+  // 版面可能尚未完成排版，延後一拍再量測尺寸
+  setTimeout(_inkSync, 60);
 }
 
 function showQLawLinks(qu){
@@ -215,7 +235,6 @@ async function ansQ(sel){  try{
     noteEl.textContent = qu.note ? ('📝 '+qu.note) : '🖍 已標記';
   }
   document.getElementById('qnxt').classList.remove('hide');
-  document.getElementById('qnote-btn')?.classList.remove('hide');
   _updateNoteBtn();
 
   S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
@@ -242,7 +261,6 @@ function revealES(){
 
   document.getElementById('qrevbtn').disabled = true;
   document.getElementById('qnxt').classList.remove('hide');
-  document.getElementById('qnote-btn')?.classList.remove('hide');
   _updateNoteBtn();
 
   const responseTime = Date.now() - _qStart;
@@ -396,162 +414,167 @@ async function confirmSubjPick(){  try{
   }catch(e){ logError('confirmSubjPick', e); }}
 
 // ════════════════════════════════════════════════════════════
-// 【題目筆記】打字為主，可切換手寫；手寫圖不進搜尋索引
+// 【題目標註】直接畫在題目上（如紙本圈畫），存入 inkImg
+// 【文字備註】與題庫「備註／詳解」共用同一個 note 欄位，雙向同步
 // ════════════════════════════════════════════════════════════
-let _noteQ = null;          // 目前編輯的題目
-let _noteStrokes = [];      // 手寫筆畫（供復原）
-let _noteDrawInit = false;
+let _inkOn      = false;   // 標註模式開關
+let _inkStrokes = [];      // 復原快照
+let _inkBound   = false;   // 事件是否已綁定
+let _inkDirty   = false;   // 有未儲存的筆跡
+let _inkPrevQ   = null;    // 上一題（換題時要把筆跡存回它）
+
+// 依題目容器大小設定畫布，並載入該題既有標註
+function _inkSync(){
+  const cv = document.getElementById('qink');
+  const body = document.getElementById('qbody');
+  if(!cv || !body) return;
+  const w = Math.min(body.clientWidth || 320, 900);
+  const h = body.scrollHeight || body.clientHeight || 400;
+  if(cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+  const c = cv.getContext('2d');
+  c.clearRect(0, 0, cv.width, cv.height);          // 透明底：看得到底下題目
+  const qu = S.quiz.q[S.quiz.idx];
+  if(qu?.inkImg){
+    const img = new Image();
+    img.onload = ()=> c.drawImage(img, 0, 0, cv.width, cv.height);
+    img.src = qu.inkImg;
+  }
+  _inkStrokes = [];
+  _inkDirty = false;
+}
+
+function _inkBind(){
+  if(_inkBound) return;
+  const cv = document.getElementById('qink');
+  if(!cv) return;
+  _inkBound = true;
+  const ctx = cv.getContext('2d');
+  let drawing = false;
+  const pos = e => {
+    const r = cv.getBoundingClientRect();
+    return { x:(e.clientX - r.left) * (cv.width / r.width),
+             y:(e.clientY - r.top)  * (cv.height / r.height) };
+  };
+  cv.addEventListener('pointerdown', e => {
+    if(!_inkOn) return;
+    e.preventDefault(); drawing = true;
+    // 快照用 ImageData（免 PNG 編碼，下筆不頓）
+    try{ _inkStrokes.push(ctx.getImageData(0, 0, cv.width, cv.height)); }catch(err){}
+    if(_inkStrokes.length > 8) _inkStrokes.shift();
+    ctx.strokeStyle = '#ff5a5a'; ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y);
+  });
+  cv.addEventListener('pointermove', e => {
+    if(!_inkOn || !drawing) return;
+    e.preventDefault();
+    const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
+    _inkDirty = true;
+  });
+  const end = ()=>{ drawing = false; };
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointerleave', end);
+}
+
+// 切換標註模式：開啟時畫布接收觸控，關閉時自動存檔
+async function toggleInk(){  try{
+  const cv = document.getElementById('qink');
+  if(!cv) return;
+  _inkOn = !_inkOn;
+  if(_inkOn){
+    _inkSync(); _inkBind();
+    cv.classList.add('on');
+    document.getElementById('qink-btn')?.classList.add('on');
+    toast('標註模式：直接在題目上圈畫');
+  }else{
+    cv.classList.remove('on');
+    document.getElementById('qink-btn')?.classList.remove('on');
+    await _inkSave();
+  }
+  }catch(e){ logError('toggleInk', e); }}
+
+// 判斷畫布是否全透明（沒有任何筆跡）
+function _inkIsBlank(cv){
+  try{
+    const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+    for(let i = 3; i < d.length; i += 4) if(d[i] !== 0) return false;
+    return true;
+  }catch(e){ return false; }
+}
+
+async function _inkSave(){  try{
+  if(!_inkDirty) return;
+  const cv = document.getElementById('qink');
+  const qu = S.quiz.q[S.quiz.idx];
+  if(!cv || !qu) return;
+  if(_inkIsBlank(cv)) delete qu.inkImg;              // 擦掉全部就移除，不留空圖
+  else qu.inkImg = cv.toDataURL('image/png');        // 透明背景需用 PNG
+  await dp('questions', qu);
+  _inkDirty = false;
+  _updateNoteBtn();
+  }catch(e){ logError('_inkSave', e); }}
+
+function inkUndo(){
+  const cv = document.getElementById('qink');
+  if(!cv || !_inkStrokes.length){ toast('沒有可復原的筆畫'); return; }
+  try{ cv.getContext('2d').putImageData(_inkStrokes.pop(), 0, 0); _inkDirty = true; }catch(e){}
+}
+
+function inkClear(){
+  const cv = document.getElementById('qink');
+  if(!cv) return;
+  const c = cv.getContext('2d');
+  try{ _inkStrokes.push(c.getImageData(0, 0, cv.width, cv.height)); }catch(e){}
+  c.clearRect(0, 0, cv.width, cv.height);
+  _inkDirty = true;
+}
+
+// ── 文字備註：與題庫的 note 欄位共用 ──────────────────────────
+let _noteQ = null;
 
 async function openQNote(){  try{
   const qu = S.quiz.q[S.quiz.idx];
   if(!qu) return;
   _noteQ = qu;
-  const stemEl = document.getElementById('qnote-stem');
-  if(stemEl) stemEl.textContent = (qu.stem || '').slice(0, 120);
+  // 從資料庫取最新值，確保與題庫編輯的內容同步
+  let latest = qu;
+  try{ latest = (await dg('questions', qu.id)) || qu; }catch(e){}
   const ta = document.getElementById('qnote-text');
-  if(ta) ta.value = qu.note || '';
-  _noteStrokes = [];
-  // ★ 換題必清畫布：否則上一題殘留的筆跡會被存進這一題
-  const cv = document.getElementById('qnote-canvas');
-  if(cv && cv.width){
-    const c = cv.getContext('2d');
-    c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
-  }
-  qnoteTab('text');
+  if(ta) ta.value = latest.note || '';
   document.getElementById('qnote-ov')?.classList.add('on');
-  // 有既有手寫圖就載入
-  if(qu.noteImg) setTimeout(()=> _qnoteLoadImg(qu.noteImg), 50);
   }catch(e){ logError('openQNote', e); }}
 
-function closeQNote(){
-  document.getElementById('qnote-ov')?.classList.remove('on');
-  _noteStrokes = [];   // 釋放復原快照（ImageData 每張約數百KB）
-}
-
-function qnoteTab(which){
-  const isText = which === 'text';
-  document.getElementById('qnote-pane-text').style.display = isText ? '' : 'none';
-  document.getElementById('qnote-pane-draw').style.display = isText ? 'none' : '';
-  document.getElementById('qnote-tab-text')?.classList.toggle('on', isText);
-  document.getElementById('qnote-tab-draw')?.classList.toggle('on', !isText);
-  if(!isText) _qnoteInitCanvas();
-}
-
-function _qnoteInitCanvas(){
-  const cv = document.getElementById('qnote-canvas');
-  if(!cv) return;
-  // 依實際顯示尺寸設定解析度（限制上限，避免圖檔過大）
-  const w = Math.min(cv.clientWidth || 320, 720);
-  const h = 260;
-  if(cv.width !== w || cv.height !== h){
-    const prev = (cv.width && cv.height) ? cv.toDataURL() : null;
-    cv.width = w; cv.height = h;
-    const c = cv.getContext('2d');
-    c.fillStyle = '#fff'; c.fillRect(0, 0, w, h);
-    if(prev) _qnoteLoadImg(prev);
-  }
-  if(_noteDrawInit) return;
-  _noteDrawInit = true;
-  const ctx = cv.getContext('2d');
-  ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
-  let drawing = false;
-  const pos = e => {
-    const r = cv.getBoundingClientRect();
-    const p = e.touches ? e.touches[0] : e;
-    return { x: (p.clientX - r.left) * (cv.width / r.width),
-             y: (p.clientY - r.top)  * (cv.height / r.height) };
-  };
-  const start = e => { e.preventDefault(); drawing = true;
-    // 復原快照用 ImageData：toDataURL 的 PNG 編碼是同步且慢（手機 10-50ms），
-    // 每次下筆都會明顯頓一下；getImageData 免編碼，下筆即時
-    try{ _noteStrokes.push(ctx.getImageData(0, 0, cv.width, cv.height)); }catch(err){}
-    if(_noteStrokes.length > 8) _noteStrokes.shift();   // 限制步數，控制記憶體
-    const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
-  const move  = e => { if(!drawing) return; e.preventDefault();
-    const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
-  const end   = () => { drawing = false; };
-  cv.addEventListener('pointerdown', start);
-  cv.addEventListener('pointermove', move);
-  cv.addEventListener('pointerup', end);
-  cv.addEventListener('pointerleave', end);
-}
-
-function _qnoteLoadImg(src){
-  const cv = document.getElementById('qnote-canvas');
-  if(!cv || !src) return;
-  const img = new Image();
-  img.onload = ()=>{
-    const c = cv.getContext('2d');
-    c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
-    c.drawImage(img, 0, 0, cv.width, cv.height);
-  };
-  img.src = src;
-}
-
-function qnoteUndo(){
-  if(!_noteStrokes.length){ toast('沒有可復原的筆畫'); return; }
-  const cv = document.getElementById('qnote-canvas');
-  if(!cv) return;
-  try{ cv.getContext('2d').putImageData(_noteStrokes.pop(), 0, 0); }catch(e){}
-}
-
-function qnoteClearDraw(){
-  const cv = document.getElementById('qnote-canvas');
-  if(!cv) return;
-  const c = cv.getContext('2d');
-  try{ _noteStrokes.push(c.getImageData(0, 0, cv.width, cv.height)); }catch(e){}
-  if(_noteStrokes.length > 8) _noteStrokes.shift();
-  c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
-}
-
-// 判斷畫布是否為空白（全白）→ 空白就不存圖，避免無謂佔空間
-function _qnoteIsBlank(cv){
-  try{
-    const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
-    for(let i = 0; i < d.length; i += 4){
-      if(d[i] < 250 || d[i+1] < 250 || d[i+2] < 250) return false;
-    }
-    return true;
-  }catch(e){ return false; }
-}
+function closeQNote(){ document.getElementById('qnote-ov')?.classList.remove('on'); }
 
 async function saveQNote(){  try{
   if(!_noteQ){ closeQNote(); return; }
   const ta = document.getElementById('qnote-text');
-  _noteQ.note = (ta?.value || '').trim();
-
-  const cv = document.getElementById('qnote-canvas');
-  if(cv && cv.width && !_qnoteIsBlank(cv)){
-    // 壓成 jpeg 並降低品質，控制備份體積
-    _noteQ.noteImg = cv.toDataURL('image/jpeg', 0.7);
-  }else if(cv && cv.width && _qnoteIsBlank(cv)){
-    delete _noteQ.noteImg;   // 清空了就移除，不留空圖
-  }
-
-  // 重建 searchBlob：公式與 data.js 的 saveQ 保持一致（不含 note、不含手寫圖），
-  // 否則在題庫編輯同一題後索引會被重算成不同內容，造成搜尋結果前後不一致。
-  _noteQ.searchBlob = [
-    _noteQ.stem || '', _noteQ.groupStem || '', _noteQ.subject || '',
-    _noteQ.year || '', _noteQ.exam || '', String(_noteQ.num || ''),
-    (_noteQ.keywords || []).join(' ')
+  // 取資料庫最新版再寫回，避免覆蓋題庫端剛改過的其他欄位
+  let target = _noteQ;
+  try{ target = (await dg('questions', _noteQ.id)) || _noteQ; }catch(e){}
+  target.note = (ta?.value || '').trim();
+  // searchBlob 公式與 data.js 的 saveQ 完全一致（不含 note）
+  target.searchBlob = [
+    target.stem || '', target.groupStem || '', target.subject || '',
+    target.year || '', target.exam || '', String(target.num || ''),
+    (target.keywords || []).join(' ')
   ].join(' ').toLowerCase();
-
-  await dp('questions', _noteQ);
+  await dp('questions', target);
+  // 同步回目前這份，畫面才會即時反映
+  _noteQ.note = target.note;
   closeQNote();
-  toast('筆記已儲存');
+  toast('備註已儲存');
   _updateNoteBtn();
   }catch(e){ logError('saveQNote', e); toast('儲存失敗'); }}
 
-// 更新「筆記」按鈕外觀（已有筆記時標示）
+// 更新按鈕標示（有備註或標註時highlight）
 function _updateNoteBtn(){
-  const btn = document.getElementById('qnote-btn');
-  if(!btn) return;
   const qu = S.quiz.q[S.quiz.idx];
-  const has = !!(qu && ((qu.note && qu.note.trim()) || qu.noteImg));
-  btn.textContent = has ? '📝 筆記*' : '📝 筆記';
-  btn.classList.toggle('has-note', has);
+  const nb = document.getElementById('qnote-btn');
+  const ib = document.getElementById('qink-btn');
+  if(nb) nb.classList.toggle('has-note', !!(qu && qu.note && qu.note.trim()));
+  if(ib) ib.classList.toggle('has-note', !!(qu && qu.inkImg));
 }
-
 
 // 隨時結束測驗（不需答完整份）→ 直接看統計
 function endQuizNow(){  try{
@@ -633,7 +656,6 @@ async function ansQMulti(selected, correctStr, qu){  try{
   resEl.textContent = msg;
   if(qu.note || qu.hlColor){ const noteEl=document.getElementById('qnote'); const hlMap={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'}; const hlC=qu.hlColor&&hlMap[qu.hlColor]?hlMap[qu.hlColor]:''; noteEl.style.display='block'; noteEl.style.borderLeft=hlC?('3px solid '+hlC):''; noteEl.textContent=qu.note?('📝 '+qu.note):'🖍 已標記'; }
   document.getElementById('qnxt').classList.remove('hide');
-  document.getElementById('qnote-btn')?.classList.remove('hide');
   _updateNoteBtn();
 
   // 隱藏確認按鈕
@@ -701,7 +723,8 @@ if(document.readyState === 'loading'){
 // 新程式碼請使用 Quiz.xxx；window 別名僅供 index.html 既有 onclick 相容
 const Quiz = { startQ, startQWithPool, startQPick,
                toggleSubj, subjSelAll, closeSubjPick, confirmSubjPick,
-               openQNote, closeQNote, qnoteTab, qnoteUndo, qnoteClearDraw, saveQNote, endQuizNow,
+               toggleInk, inkUndo, inkClear,
+               openQNote, closeQNote, saveQNote, endQuizNow,
                submitAnswer, nextQ, exitQ, revealES, toggleQStar };
 window.Quiz = Quiz;
 Object.assign(window, Quiz);
