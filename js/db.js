@@ -202,7 +202,9 @@ async function getPriorityPool(mode = 'all', subjects = null) { try {
   const now = Date.now();
   // 科目篩選（subjects 為陣列且非空時才套用；null/空 = 全部科目）
   const subjSet = (Array.isArray(subjects) && subjects.length) ? new Set(subjects) : null;
-  const bySubj  = q => !subjSet || subjSet.has(q.subject || '');
+  // 空科目一律正規化為「未分類」，與 getSubjectList 顯示的名稱一致，
+  // 否則使用者勾選「未分類」會比對不到（傳入'未分類'但題目是''）而查無題目
+  const bySubj  = q => !subjSet || subjSet.has(q.subject || '未分類');
   const mcQs = qs.filter(q => q.type === 'mc' && bySubj(q));
   let pool = mcQs;
   if      (mode === 'wrong')  { const ws = getWrong(qs, ats); pool = mcQs.filter(q => ws.has(q.id)); }
@@ -349,5 +351,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.0.0';     // 測驗系統重整:①今日複習改為選擇題專用+科目多選(記住上次選擇)、不限題數、不主動打斷，底部常駐結束鈕可隨時看統計 ②移除快刷5題/模擬考/隨機刷題(含examTimer等狀態，無殘留) ③危險題+收藏題合併為「加強複習」(取聯集去重) ④新增申論練習獨立區(type=es) ⑤公布解答後可寫筆記—打字存note(進搜尋索引)、可切手寫canvas存noteImg(壓縮jpeg、空白不存、不進索引)；另修危險度排序表誤用高中低字串(實際為emoji)導致排序失效，並清除index.html重複7次的toast死元素
+const APP_VERSION  = '4.0.2';     // 流暢度優化:①手寫下筆快照由toDataURL(PNG同步編碼10-50ms致每筆頓挫)改getImageData即時免編碼，復原用putImageData，關閉時釋放快照記憶體 ②修換題殘影bug—開新題筆記未清畫布會把上一題筆跡存進本題 ③SW導覽改網路優先+2.5秒逾時保底—網路慢時用快取即開避免白畫面，背景仍更新快取，更新機制不變 ④科目多選加全選/清除、清單防捲動穿透 ⑤書庫封面decoding=async解碼不佔主執行緒
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

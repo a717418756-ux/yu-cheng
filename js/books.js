@@ -211,7 +211,7 @@ function _mkRecentSection(books){
     const cover = document.createElement('div');
     cover.className = 'shelf-recent-cover';
     if(b.coverThumb){
-      cover.innerHTML=`<img src="${b.coverThumb}" loading="lazy" alt="">`;
+      cover.innerHTML=`<img src="${b.coverThumb}" loading="lazy" decoding="async" alt="">`;
     } else if(b.id){
       // _B.allBooks 不含縮圖，非同步填充
       _fillThumb(cover, b.id, 'cover');
