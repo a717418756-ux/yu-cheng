@@ -476,39 +476,36 @@ textarea{resize:vertical;line-height:1.7}
 }
 .heatmap-wrap{
   margin:10px 14px 6px;
-  background:rgba(255,255,255,0.03);
-  border:1px solid rgba(255,255,255,0.07);
-  border-radius:14px;
-  padding:12px 14px 10px;
-  overflow-x:auto;          /* 讓 heatmap-grid 橫向捲動在 wrap 內完成（page 有 overflow-x:hidden）*/
-  -webkit-overflow-scrolling:touch;
+  background:linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;
+  padding:14px 14px 12px;
 }
 .heatmap-header{
   display:flex;align-items:baseline;gap:8px;margin-bottom:8px;
 }
-.heatmap-title{font-size:12px;font-weight:700;color:var(--t1);letter-spacing:.04em}
-.heatmap-sub{font-size:10px;color:var(--t2)}
+.heatmap-title{font-size:12.5px;font-weight:700;color:var(--t0);letter-spacing:.05em}
+.heatmap-sub{font-size:10.5px;color:var(--t2);font-variant-numeric:tabular-nums}
 .heatmap-grid{
   display:grid;
-  grid-template-columns:repeat(35,minmax(32px,1fr));
-  gap:4px;
-  margin-bottom:6px;
-  /* 橫向可滑動，格子固定最小 32px 確保好按 */
-  overflow-x:auto;
-  -webkit-overflow-scrolling:touch;
-  padding-bottom:4px;
+  /* 5 週 × 7 天：一個畫面完整呈現。原本 repeat(35, minmax(32px,1fr))
+     總寬 1120px 遠超手機螢幕，被迫左右滑動且格子鬆散，視覺笨重 */
+  grid-template-columns:repeat(7,1fr);
+  grid-auto-rows:1fr;
+  gap:5px;
+  margin-bottom:8px;
+  padding-bottom:2px;
 }
 .hm-cell{
   aspect-ratio:1;
-  min-width:32px;
-  min-height:32px;
-  border-radius:5px;
+  border-radius:6px;
   background:var(--hm0);
   cursor:pointer;
-  transition:transform .12s,filter .12s;
+  transition:transform .12s ease;
   position:relative;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,0.05);
 }
-.hm-cell:active{transform:scale(1.3);filter:brightness(1.4)}
+.hm-cell:active{transform:scale(.92)}
 .hm-cell.hm-today{
   box-shadow:0 0 0 1.5px var(--acc);
 }
@@ -516,7 +513,7 @@ textarea{resize:vertical;line-height:1.7}
   display:flex;align-items:center;gap:4px;justify-content:flex-end;
 }
 .heatmap-legend-l{font-size:10px;color:var(--t2)}
-.heatmap-dot{width:10px;height:10px;border-radius:2px}
+.heatmap-dot{width:11px;height:11px;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.06)}
 
 /* 熱力圖視窗內容 */
 

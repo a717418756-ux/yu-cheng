@@ -415,3 +415,12 @@
 [data-theme="eink"] .qfb.qink-btn.on{ background:#000; color:#fff; }
 [data-theme="eink"] .qfb.qink-btn.has-note,
 [data-theme="eink"] .qfb.qnote.has-note{ color:#000; text-decoration:underline; }
+
+/* ══ e-ink：熱力圖用邊框層次取代顏色深淺 ══════════════════════ */
+[data-theme="eink"] .hm-cell{
+  box-shadow:inset 0 0 0 1px #999;
+  border-radius:4px;
+}
+[data-theme="eink"] .heatmap-wrap{
+  background:none; border:1.5px solid #000;
+}
