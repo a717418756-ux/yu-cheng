@@ -682,6 +682,13 @@
     <div style="font-size:12px;color:var(--t2);white-space:nowrap" id="qct">0/0</div>
   </div>
   <div class="qbody" id="qbody">
+    <!-- 題目標註畫布：疊在題幹／選項上方，可直接圈畫重點（如紙本刷題） -->
+    <canvas id="qink" class="qink"></canvas>
+    <div class="qink-tools" id="qink-tools">
+      <button class="btn br bw" onclick="inkUndo()">復原</button>
+      <button class="btn br bw" onclick="inkClear()">清除</button>
+      <button class="btn br bw" onclick="toggleInk()">完成</button>
+    </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span id="qbadge" class="badge"></span><span id="qmeta" style="font-size:11px;color:var(--t2)"></span></div>
     <div id="q-type-hint" style="font-size:12px;color:var(--acc);margin-bottom:7px;font-weight:600;min-height:18px"></div>
     <!-- 題組共同題幹（有 groupStem 才顯示） -->
@@ -696,7 +703,8 @@
   </div>
   <div class="qfoot" id="qfoot">
     <button class="qfb qstar" id="qstar" onclick="toggleQStar()" aria-label="星標此題">☆</button>
-    <button class="qfb qnote hide" id="qnote-btn" onclick="openQNote()" aria-label="本題筆記">📝 筆記</button>
+    <button class="qfb qink-btn" id="qink-btn" onclick="toggleInk()" aria-label="手寫標註">✏️</button>
+    <button class="qfb qnote" id="qnote-btn" onclick="openQNote()" aria-label="文字備註">📝</button>
     <button id="qmulti-confirm" class="btn bp bw hide" style="flex:1;padding:11px;font-size:14px;font-weight:600" onclick="submitAnswer()">✓ 確認答案</button>
     <button class="qfb qnxt hide" id="qnxt" onclick="nextQ()" style="flex:1;padding:11px;font-size:14px">下一題 →</button>
     <button class="qfb qend" id="qend" onclick="endQuizNow()" aria-label="結束測驗">結束</button>
@@ -947,30 +955,15 @@
   </div>
 </div>
 
-<!-- 題目筆記（打字 + 可選手寫） -->
+<!-- 文字備註（與題庫的「備註／詳解」同一欄位，雙向同步） -->
 <div class="cov" id="qnote-ov">
   <div class="cbox" style="max-width:460px">
-    <div class="cbt">本題筆記</div>
-    <div class="cbs" id="qnote-stem" style="max-height:5.6em;overflow:auto"></div>
-    <div class="qnote-tabs" style="display:flex;gap:6px;margin:10px 0 8px">
-      <button class="btn br bw qnote-tab on" id="qnote-tab-text" onclick="qnoteTab('text')">打字</button>
-      <button class="btn br bw qnote-tab" id="qnote-tab-draw" onclick="qnoteTab('draw')">手寫</button>
-    </div>
-    <div id="qnote-pane-text">
-      <textarea id="qnote-text" rows="6" placeholder="寫下本題重點、易混淆處、法條依據…"
-        style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;
-               background:var(--bg2);border:1px solid var(--bd);color:var(--t0);
-               font-size:14px;line-height:1.7;resize:vertical"></textarea>
-    </div>
-    <div id="qnote-pane-draw" style="display:none">
-      <canvas id="qnote-canvas" style="width:100%;height:260px;border-radius:10px;
-        background:#fff;border:1px solid var(--bd);touch-action:none;display:block"></canvas>
-      <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
-        <button class="btn br bw" onclick="qnoteUndo()">復原</button>
-        <button class="btn br bw" onclick="qnoteClearDraw()">清除</button>
-        <span style="font-size:11px;color:var(--t2);margin-left:auto">手寫圖不進搜尋索引</span>
-      </div>
-    </div>
+    <div class="cbt">備註</div>
+    <div class="cbs">與題庫編輯的「備註／詳解」為同一欄位</div>
+    <textarea id="qnote-text" rows="7" placeholder="寫下本題重點、易混淆處、法條依據…"
+      style="width:100%;box-sizing:border-box;padding:10px;margin-top:10px;border-radius:10px;
+             background:var(--bg2);border:1px solid var(--bd);color:var(--t0);
+             font-size:14px;line-height:1.7;resize:vertical"></textarea>
     <div class="cbn">
       <button class="btn br bw" onclick="closeQNote()">取消</button>
       <button class="btn br bw" onclick="saveQNote()">儲存</button>
