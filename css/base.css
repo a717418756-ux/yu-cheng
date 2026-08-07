@@ -1609,3 +1609,13 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* ══ 按壓回饋一致化（v4.1.3）══════════════════════════════════
+   讓題庫／資料庫／法條的按鈕與答題底列有相同的觸感回饋。
+   純新增，不改動既有樣式。 */
+.chip:active, .hd-btn:active, .zqb:active{ transform:scale(.96); }
+.chip, .hd-btn, .zqb{ -webkit-tap-highlight-color:transparent; }
+/* e-ink 不做縮放（電子紙重繪昂貴，改用邊框強調） */
+[data-theme="eink"] .chip:active,
+[data-theme="eink"] .hd-btn:active,
+[data-theme="eink"] .zqb:active{ transform:none; outline:2px solid #000; outline-offset:-2px; }

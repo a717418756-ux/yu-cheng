@@ -427,6 +427,10 @@
 }
 
 /* ══ 答題底列：統一為線性圖示，取代 emoji ══════════════════ */
+/* 容器：明確排版，避免各鈕互相擠壓導致文字折行 */
+.qfoot{
+  display:flex; align-items:center; gap:8px; flex-wrap:nowrap;
+}
 .qfoot .qfb{
   display:inline-flex; align-items:center; justify-content:center; gap:6px;
   height:42px; border-radius:11px;
@@ -438,8 +442,8 @@
 .qfoot .qfb:active{ transform:scale(.96); }
 .qfoot .qfb svg{ width:19px; height:19px; flex-shrink:0; }
 
-/* 圖示鈕（正方形）*/
-.qfb.qstar, .qfb.qink-btn, .qfb.qnote{ width:42px; padding:0; }
+/* 圖示鈕（正方形，固定寬度不被壓縮）*/
+.qfb.qstar, .qfb.qink-btn, .qfb.qnote{ flex:0 0 42px; width:42px; padding:0; }
 
 /* 已標星／已有內容 → 用填色與強調色表示狀態 */
 .qfb.qstar.on{ color:var(--acc); background:rgba(110,168,254,0.14);
@@ -453,14 +457,22 @@
   background:var(--acc); color:#fff; border-color:var(--acc);
 }
 
-/* 下一題：主要動作，佔滿剩餘寬度 */
+/* 下一題：主要動作，佔滿剩餘寬度
+   必須 nowrap —— 否則寬度被壓縮時「下一題」會被折成兩行（下一/題），
+   箭頭也會被擠到下一行，非常難看 */
 .qfb.qnxt{
-  flex:1; padding:0 14px; font-size:14px; font-weight:600;
+  flex:1 1 auto; min-width:0;
+  padding:0 16px; font-size:14px; font-weight:600;
+  white-space:nowrap;
   background:var(--acc); color:#fff; border-color:var(--acc);
+  box-shadow:0 2px 10px rgba(110,168,254,0.28);
 }
-/* 結束：次要動作，低調 */
+.qfb.qnxt svg{ width:17px; height:17px; }
+/* 結束：次要動作，低調且不被壓縮 */
 .qfb.qend{
+  flex:0 0 auto;
   padding:0 14px; font-size:13px; color:var(--t2);
+  white-space:nowrap;
   background:transparent; border-color:rgba(255,255,255,0.10);
 }
 .qfb.qend:active{ color:var(--t0); }
