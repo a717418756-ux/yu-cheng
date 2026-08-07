@@ -702,11 +702,23 @@
     <div id="qdone-area" style="display:none;flex-direction:column;align-items:center;padding:20px 0;gap:12px"></div>
   </div>
   <div class="qfoot" id="qfoot">
-    <button class="qfb qstar" id="qstar" onclick="toggleQStar()" aria-label="星標此題">☆</button>
-    <button class="qfb qink-btn hide" id="qink-btn" onclick="toggleInk()" aria-label="手寫標註">✏️</button>
-    <button class="qfb qnote hide" id="qnote-btn" onclick="openQNote()" aria-label="文字備註">📝</button>
+    <button class="qfb qstar" id="qstar" onclick="toggleQStar()" aria-label="星標此題">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+        <path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9z"/></svg>
+    </button>
+    <button class="qfb qink-btn hide" id="qink-btn" onclick="toggleInk()" aria-label="手寫標註">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16.5 3.9l3.6 3.6L8.4 19.2l-4.5.9.9-4.5z"/><path d="M14.3 6.1l3.6 3.6"/></svg>
+    </button>
+    <button class="qfb qnote hide" id="qnote-btn" onclick="openQNote()" aria-label="文字備註">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 4.5h9.5L19 9v10.5H5z"/><path d="M14 4.5V9h5"/><path d="M8.5 12.5h7M8.5 15.5h5"/></svg>
+    </button>
     <button id="qmulti-confirm" class="btn bp bw hide" style="flex:1;padding:11px;font-size:14px;font-weight:600" onclick="submitAnswer()">✓ 確認答案</button>
-    <button class="qfb qnxt hide" id="qnxt" onclick="nextQ()" style="flex:1;padding:11px;font-size:14px">下一題 →</button>
+    <button class="qfb qnxt hide" id="qnxt" onclick="nextQ()">下一題
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h13M13 6.5l5.5 5.5L13 17.5"/></svg>
+    </button>
     <button class="qfb qend" id="qend" onclick="endQuizNow()" aria-label="結束測驗">結束</button>
   </div>
 </div>
