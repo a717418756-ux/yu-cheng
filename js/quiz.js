@@ -87,7 +87,7 @@ function renderQCard(){
   // 收藏
   const star = document.getElementById('qstar');
   star.className = 'qfb qstar'+(qu.starred ? ' on' : '');
-  star.textContent = qu.starred ? '★' : '☆';
+  // 狀態由 CSS .qstar.on 呈現，不動內容以保留 SVG 圖示
 
   // 下一題按鈕
   document.getElementById('qnxt').classList.add('hide');
@@ -246,6 +246,8 @@ async function ansQ(sel){  try{
   // 作答後才開放筆記與標註（作答前不干擾判斷）
   document.getElementById('qink-btn')?.classList.remove('hide');
   document.getElementById('qnote-btn')?.classList.remove('hide');
+  // 版面此時會多出解析區，稍候再同步筆跡（此刻才允許顯示）
+  setTimeout(_inkSync, 60);
   _updateNoteBtn();
 
   S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
@@ -275,6 +277,8 @@ function revealES(){
   // 作答後才開放筆記與標註（作答前不干擾判斷）
   document.getElementById('qink-btn')?.classList.remove('hide');
   document.getElementById('qnote-btn')?.classList.remove('hide');
+  // 版面此時會多出解析區，稍候再同步筆跡（此刻才允許顯示）
+  setTimeout(_inkSync, 60);
   _updateNoteBtn();
 
   const responseTime = Date.now() - _qStart;
@@ -304,8 +308,9 @@ async function toggleQStar(){  try{
   await dp('questions', qu);
   const star = document.getElementById('qstar');
   star.className = 'qfb qstar'+(qu.starred ? ' on' : '');
-  star.textContent = qu.starred ? '★' : '☆';
-  toast(qu.starred ? '已收藏 ⭐' : '已取消收藏');
+  // 不可用 textContent：會清掉按鈕內的 SVG 圖示。
+  // 收藏狀態改由 CSS 的 .qstar.on（填色 + 強調色）表示。
+  toast(qu.starred ? '已收藏' : '已取消收藏');
   }catch(e){ logError('toggleQStar', e); }}
 
 // ════════ 完成畫面 ════════
@@ -450,7 +455,9 @@ function _inkSync(){
   const c = cv.getContext('2d');
   c.clearRect(0, 0, INK_W, INK_H);                 // 透明底：看得到底下題目
   const qu = S.quiz.q[S.quiz.idx];
-  if(qu?.inkImg){
+  // ★ 只在「已作答（已公布解答）」時才顯示筆跡：
+  //   否則重測時上次圈的答案會先曝光，等於直接看到提示。
+  if(qu?.inkImg && S.quiz.ans){
     const img = new Image();
     img.onload = ()=> c.drawImage(img, 0, 0, INK_W, INK_H);
     img.src = qu.inkImg;
@@ -675,6 +682,8 @@ async function ansQMulti(selected, correctStr, qu){  try{
   // 作答後才開放筆記與標註（作答前不干擾判斷）
   document.getElementById('qink-btn')?.classList.remove('hide');
   document.getElementById('qnote-btn')?.classList.remove('hide');
+  // 版面此時會多出解析區，稍候再同步筆跡（此刻才允許顯示）
+  setTimeout(_inkSync, 60);
   _updateNoteBtn();
 
   // 隱藏確認按鈕
