@@ -396,9 +396,12 @@
 .qink{
   position:absolute; inset:0; width:100%; height:100%;
   z-index:5; pointer-events:none;      /* 預設不擋操作，可正常作答 */
-  touch-action:none;
 }
-.qink.on{ pointer-events:auto; }        /* 標註模式才接收觸控 */
+/* 標註模式才接收觸控。
+   touch-action:pan-y 讓「單指縱向滑動」仍能捲動長題目，
+   繪製則靠 pointerdown 的筆型判斷（筆/滑鼠直接畫；手指需長按後才畫）。
+   若設 touch-action:none，標註模式下完全無法捲動，長題目只能標註看得到的部分。 */
+.qink.on{ pointer-events:auto; touch-action:pan-y; }
 
 /* 標註工具列：只在標註模式顯示 */
 /* 標註工具列：必須 fixed 脫離版面流程。
