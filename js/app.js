@@ -372,11 +372,14 @@ function _handleBackLayer(){
   }
 
   // 6) 一般彈窗（取最上層那個）
+  //    注意：測驗新增的彈窗用的是 .cov（與 cfm 同類），不是 .ov，
+  //    兩種都要掃，否則按返回會略過它們去關掉更底層的東西。
   const ovMap = {
     'heatmap-ov':'closeHeatmapOv', 'bulk-ov':'closeBulkQ',
     'add-ov':'closeAdd', 'law-ov':'closeLawSh', 'blaw-ov':'closeBulkLaw',
+    'subj-ov':'closeSubjPick', 'qnote-ov':'closeQNote',
   };
-  const opened = [...document.querySelectorAll('.ov.on')];
+  const opened = [...document.querySelectorAll('.ov.on, .cov.on')];
   if(opened.length){
     const top = opened[opened.length - 1];
     if(!_callIf(ovMap[top.id])) top.classList.remove('on');   // 無對應函式則直接關

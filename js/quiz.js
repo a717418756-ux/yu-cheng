@@ -443,6 +443,7 @@ let _inkStrokes = [];      // 復原快照
 let _inkBound   = false;   // 事件是否已綁定
 let _inkDirty   = false;   // 有未儲存的筆跡
 let _inkPrevQ   = null;    // 上一題（換題時要把筆跡存回它）
+let _touchHold  = null;    // 手指長按進入繪製的計時器
 
 // 依題目容器大小設定畫布，並載入該題既有標註
 // 畫布使用固定內部解析度，與版面高度脫鉤。
@@ -483,6 +484,25 @@ function _inkBind(){
   };
   cv.addEventListener('pointerdown', e => {
     if(!_inkOn) return;
+    // 手指：預設保留捲動（不 preventDefault），長按 260ms 後才進入繪製，
+    //       這樣標註模式下仍能單指滑動閱讀長題目。
+    // 筆／滑鼠：直接繪製，不需長按。
+    if(e.pointerType === 'touch'){
+      const sx = e.clientX, sy = e.clientY;
+      _touchHold = setTimeout(()=>{
+        drawing = true;
+        try{ _inkStrokes.push(ctx.getImageData(0, 0, cv.width, cv.height)); }catch(err){}
+        if(_inkStrokes.length > 8) _inkStrokes.shift();
+        ctx.strokeStyle = '#ff5a5a'; ctx.lineWidth = 2.4;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        const r = cv.getBoundingClientRect();
+        ctx.beginPath();
+        ctx.moveTo((sx - r.left) * (cv.width / r.width),
+                   (sy - r.top)  * (cv.height / r.height));
+        try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+      }, 260);
+      return;
+    }
     e.preventDefault(); drawing = true;
     // 快照用 ImageData（免 PNG 編碼，下筆不頓）
     try{ _inkStrokes.push(ctx.getImageData(0, 0, cv.width, cv.height)); }catch(err){}
@@ -492,12 +512,20 @@ function _inkBind(){
     const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y);
   });
   cv.addEventListener('pointermove', e => {
-    if(!_inkOn || !drawing) return;
+    if(!_inkOn) return;
+    if(!drawing){
+      // 尚未進入繪製就移動 → 視為捲動意圖，取消長按
+      if(_touchHold){ clearTimeout(_touchHold); _touchHold = null; }
+      return;
+    }
     e.preventDefault();
     const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
     _inkDirty = true;
   });
-  const end = ()=>{ drawing = false; };
+  const end = ()=>{
+    if(_touchHold){ clearTimeout(_touchHold); _touchHold = null; }
+    drawing = false;
+  };
   cv.addEventListener('pointerup', end);
   cv.addEventListener('pointerleave', end);
 }
@@ -545,6 +573,18 @@ async function _inkSave(){  try{
 function _inkTeardown(){
   const cv = document.getElementById('qink');
   if(cv){
+    // ★ 先存再清：使用者可能畫完沒按「完成」就直接按結束／離開，
+    //   若不先存，這些筆跡會永遠遺失。
+    if(_inkDirty){
+      const qu = S.quiz.q[S.quiz.idx] || _inkPrevQ;
+      if(qu){
+        try{
+          if(_inkIsBlank(cv)) delete qu.inkImg;
+          else qu.inkImg = cv.toDataURL('image/png');
+          dp('questions', qu).catch(()=>{});
+        }catch(e){}
+      }
+    }
     try{ cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); }catch(e){}
     cv.classList.remove('on');
     cv.style.display = 'none';
