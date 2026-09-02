@@ -230,7 +230,7 @@ function fabGo(pg){
 // ════════════════════════════════════════════════════════════
 // 【頁面切換主控】
 // ════════════════════════════════════════════════════════════
-function goPage(pg, btn){
+function goPage(pg, btn, fromBack){
   // bulk 是 overlay，不跳頁，直接開啟後返回
   if(pg==='bulk'){ openBulkQ(); return; }
   document.querySelectorAll('.page').forEach(p=>p.classList.add('hide'));
@@ -241,6 +241,14 @@ function goPage(pg, btn){
   // 切換頁面時順便確保返回緩衝存在（冪等，已有就不重複推入）。
   // 保險用途：萬一某次重新武裝被瀏覽器吞掉，只要有任何導覽就會自動補回。
   if(typeof _pushBackGuard === 'function') _pushBackGuard();
+  // 應用層頁面堆疊：記錄「真正訪問過的頁面順序」，讓返回鍵能逐層回上一頁，
+  // 而不是不管訪問了幾層都直接跳回首頁。
+  //   fromBack=true 代表這次呼叫本身就是返回鍵觸發的回退，不可再往堆疊推入，
+  //   否則會把剛彈出的頁面又推回去，堆疊永遠清不空。
+  if(!fromBack && pg !== _pageStack[_pageStack.length-1]){
+    _pageStack.push(pg);
+    if(_pageStack.length > 30) _pageStack.splice(0, _pageStack.length - 30);  // 防止極端情況無限增長
+  }
   ({
     home:()=>{
       // 回首頁：完整收合所有展開區塊，恢復三區未展開狀態
@@ -315,6 +323,9 @@ function _applyTheme(theme){
         處理完再補一筆緩衝，維持可持續攔截。
    ══════════════════════════════════════════════════════════════ */
 // 確保歷史堆疊上有一筆「緩衝」可供攔截返回鍵；已有就不重複推入
+// 應用層頁面堆疊：紀錄真正訪問過的頁面順序（見 goPage 內的管理邏輯）
+let _pageStack = ['home'];
+
 function _pushBackGuard(){
   try{
     if(!history.state || !history.state.ycGuard){
@@ -407,14 +418,18 @@ function _handleBackLayer(){
     return true;
   }
 
-  // 10) 非首頁 → 回首頁
-  // 注意：S.page 若為異常值（undefined/空）也一律導回首頁，
-  //       絕不因狀態不明就直接離開 App
-  if(S.page !== 'home'){
-    goPage('home', document.querySelector('.nb'));
+  // 10) 逐層回到「上一個真正訪問過的頁面」（而非不管訪問幾層都直接跳首頁）
+  //     堆疊只剩 'home' 時代表已經回到底，交給下一段判斷是否離開 App。
+  //     S.page 若為異常值，視同堆疊已空，直接兜底回首頁。
+  if(_pageStack.length > 1 || S.page !== 'home'){
+    if(_pageStack.length > 1) _pageStack.pop();
+    else _pageStack = ['home'];   // 狀態異常時的兜底，不因不明狀態就直接離開
+    const prevPg = _pageStack[_pageStack.length - 1];
+    const btn = document.querySelector(`.nb[onclick*="'${prevPg}'"]`);
+    goPage(prevPg, btn, true);   // fromBack=true：不可再推回堆疊
     return true;
   }
-  return false;   // 已在首頁，交給呼叫端詢問是否離開
+  return false;   // 已在首頁且堆疊已空，交給呼叫端詢問是否離開
 }
 
 function _initBackHandler(){
