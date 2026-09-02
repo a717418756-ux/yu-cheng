@@ -393,14 +393,21 @@ function _handleBackLayer(){
     return true;
   }
 
-  // 8) 答題中 → 離開答題（答題畫面是 #qv 覆蓋層，不是獨立 page）
+  // 8) 答題中：標註模式優先退出（同一層還有東西要收，不該直接跳出答題畫面）
+  const qink = document.getElementById('qink');
+  if(qink && qink.classList.contains('on')){
+    _callIf('toggleInk');   // toggleInk 內部會自動保存已畫的筆跡
+    return true;
+  }
+
+  // 9) 答題中 → 離開答題（答題畫面是 #qv 覆蓋層，不是獨立 page）
   const qv = document.getElementById('qv');
   if(qv && qv.style.display !== 'none' && qv.style.display !== ''){
     if(!_callIf('exitQ')) qv.style.display = 'none';
     return true;
   }
 
-  // 9) 非首頁 → 回首頁
+  // 10) 非首頁 → 回首頁
   // 注意：S.page 若為異常值（undefined/空）也一律導回首頁，
   //       絕不因狀態不明就直接離開 App
   if(S.page !== 'home'){

@@ -130,7 +130,11 @@ function renderQCard(){
     // 申論題：隱藏「確認答案」，等 revealES 後才顯示「下一題」
     const cfmBtnEs = document.getElementById('qmulti-confirm');
     if(cfmBtnEs) cfmBtnEs.classList.add('hide');
-    showQLawLinks(qu);
+    // ★ 不在此處呼叫 showQLawLinks：這裡是「渲染新題目」時機，
+    //   尚未作答就顯示關聯法條等於提前曝光解題線索。
+    //   法條改由 revealES() 在公布解答時才顯示（與 mc 題一致）。
+    const lawElEs = document.getElementById('qlaw');
+    if(lawElEs) lawElEs.style.display = 'none';
   }
   // 換題：先存起上一題未存的標註，再載入本題的標註
   _inkFlushAndSync();
@@ -249,6 +253,7 @@ async function ansQ(sel){  try{
   // 版面此時會多出解析區，稍候再同步筆跡（此刻才允許顯示）
   setTimeout(_inkSync, 60);
   _updateNoteBtn();
+  showQLawLinks(qu);   // 單選題公布答案時也要顯示關聯法條（原本只有多選/申論路徑有呼叫）
 
   S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
   }catch(e){ logError('ansQ', e); }}
@@ -280,6 +285,7 @@ function revealES(){
   // 版面此時會多出解析區，稍候再同步筆跡（此刻才允許顯示）
   setTimeout(_inkSync, 60);
   _updateNoteBtn();
+  showQLawLinks(qu);   // 單選題公布答案時也要顯示關聯法條（原本只有多選/申論路徑有呼叫）
 
   const responseTime = Date.now() - _qStart;
   dp('attempts', {qid:qu.id, correct:null, date:today(), responseTime, hesitationFlag:responseTime>40000});
