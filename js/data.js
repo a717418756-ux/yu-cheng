@@ -1268,21 +1268,29 @@ function setLC(el, cat){
 async function renderDB(){  try{
   const ls=await da('laws');
   const kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
-  let kwLaw='', kwArt='', kwText=kw;
-  const secM = kw.match(/^(.*)§\s*(\d+)\s*$/);
+  let kwLaw='', kwArtNum=0, kwText=kw;
+  // 支援「法規名§條號」精準搜尋，條號含子條號寫法（§2-1、§2之1）。
+  // 原本只收 (\d+) 收不到子條號，輸入「§2-1」會整個不匹配而退回全文搜尋。
+  const secM = kw.match(/^(.*)§\s*(\d+(?:[-－之]\d+)?)\s*$/);
   if(secM){
-    kwLaw  = secM[1].trim().toLowerCase();
-    kwArt  = secM[2];
-    kwText = '';
+    kwLaw    = secM[1].trim().toLowerCase();
+    // 統一用 art2n() 換算成與資料庫 articleNumber 同一套編碼（主號*1000+子號）。
+    // 原本的比對是 String(l.articleNumber)===kwArt，但 articleNumber 是 2000 這種格式、
+    // kwArt 是 "2"，這個條件永遠不成立，實際上只靠後面的字串 includes 勉強運作；
+    // 而字串比對又會讓「§2」誤匹配到「第2條之1」（因為 article 含「第2條」字樣）。
+    // 組成 art2n 認得的標準寫法：主號放「第X條」，子號接在「條」之後成為「第X條之Y」
+    // （art2n 的子條號規則是 /條之(N)/，寫成「第2之1條」它認不出來）
+    const _mm = secM[2].match(/^(\d+)(?:[-－之](\d+))?$/);
+    kwArtNum = _mm ? art2n('第' + _mm[1] + '條' + (_mm[2] ? '之' + _mm[2] : '')) : 0;
+    kwText   = '';
   }
 
   let fl=ls.filter(l=>{
     if(S.lawCat!=='all'&&l.category!==S.lawCat)return false;
     if(!kw) return true;
-    if(kwArt){
+    if(kwArtNum){
       const nameMatch = !kwLaw || (l.lawName||'').toLowerCase().includes(kwLaw);
-      const artMatch  = String(l.articleNumber||'') === kwArt ||
-                        (l.article||'').replace(/\s/g,'').includes('第'+kwArt+'條');
+      const artMatch  = (l.articleNumber || art2n(l.article||'')) === kwArtNum;
       return nameMatch && artMatch;
     }
     // searchBlob 優先（純文字），沒有才 fallback 到欄位拼接（排除 content 避免 base64 拖慢）
@@ -2405,6 +2413,14 @@ async function importBulkLaw(){  try{
 async function showLawPop(ref){  try{
   if(!ref)return;
   const laws=await da('laws');
+  // 「§」是常見的條號簡寫（§2＝第2條、§2-1＝第2條之1），但 art2n() 與下面的
+  // 「第X條」定位正則都只認得標準寫法，遇到§會完全解析不出條號，導致 artNum
+  // 變成 null、namePart 也切不出法規名稱（整串被當成名稱），結果直接跳整部
+  // 法規、定位不到指定條文。這裡先把§簡寫正規化成標準格式，其餘邏輯不用動，
+  // 沒有§的原格式（如「第11條」「第100條之1」）完全不受影響。
+  ref = ref.replace(/§\s*(\d+)(?:[-－之](\d+))?/, (_, main, sub) =>
+    sub ? '第'+main+'條之'+sub : '第'+main+'條'
+  );
   // 條號解析改用 art2n()（與資料庫 articleNumber 完全同一套公式：主號*1000+子號），
   // 原本自己另寫的正則只抓純數字（如92），但資料庫存的是92000/92004這種格式，
   // 兩者永遠對不上，導致任何帶明確條號的法條連結都找不到資料。
