@@ -654,6 +654,11 @@
     }
     if(_TTS.speaking && !_TTS.paused){
       speechSynthesis.cancel();
+      // ★ 與切換聲音相同的處理：speechSynthesis.cancel() 停不掉 Azure 的 <audio>，
+      //   不手動停會造成「舊速率還在播、新速率又開始」兩軌重疊；
+      //   prefetch 快取是用舊速率合成的，必須丟棄否則下一段仍是舊速率。
+      if(_TTS.audio){ _TTS.audio.pause(); _TTS.audio = null; }
+      _prefetchCache = null;
       setTimeout(()=> _speakNext(), 80);
     }
   };

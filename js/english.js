@@ -15,6 +15,12 @@ let _curMaterial = null;   // 目前開啟的材料
 let _ttsQueue = [];        // 朗讀佇列（句子索引）
 let _ttsIdx = -1;          // 目前朗讀到第幾句
 let _ttsPlaying = false;
+// 程式主動呼叫 speechSynthesis.cancel() 時的抑制旗標。
+//   cancel() 會讓「當前正在唸的 utterance」觸發 onend/onerror，而那兩個回呼寫的是
+//   「若仍在播放就唸下一句」。因此調整語速或點選句子時的 cancel()，會被誤判成
+//   「這句唸完了」而自動前進一句 —— 連續調整語速就會一路衝到最後直接結束
+//   （暫停時 _ttsPlaying 為 false 才不會觸發，這正是「要暫停才能調」的原因）。
+let _ttsSuppressAdvance = false;
 let _ttsRate = 0.9;        // 語速（英語學習稍慢）
 
 // ════════ 句子切分 ════════
@@ -314,11 +320,19 @@ function _speakSentence(idx){
   if(enVoice) u.voice = enVoice;
 
   u.onend = ()=>{
+    if(_ttsSuppressAdvance) return;   // 由程式主動 cancel 造成，非真的唸完
     if(_ttsPlaying) _speakSentence(idx+1);
   };
-  u.onerror = ()=>{ if(_ttsPlaying) _speakSentence(idx+1); };
+  u.onerror = ()=>{
+    if(_ttsSuppressAdvance) return;
+    if(_ttsPlaying) _speakSentence(idx+1);
+  };
+  // 這裡的 cancel 是為了清掉上一句，屬於主動取消 → 抑制自動前進。
+  // 旗標在 speak() 之後才解除，確保 cancel 觸發的回呼都已跑完。
+  _ttsSuppressAdvance = true;
   speechSynthesis.cancel();
   speechSynthesis.speak(u);
+  setTimeout(()=>{ _ttsSuppressAdvance = false; }, 0);
 }
 
 function _highlightSentence(idx){
@@ -356,8 +370,11 @@ function setEngRate(r){
   _ttsRate = r;
   const lbl = document.getElementById('eng-rate-lbl');
   if(lbl) lbl.textContent = r.toFixed(1)+'×';
-  // 若正在朗讀，從當前句以新語速重啟
-  if(_ttsPlaying){ speechSynthesis.cancel(); _speakSentence(_ttsIdx); }
+  // 若正在朗讀，從當前句以新語速重啟。
+  // 直接呼叫 _speakSentence 即可 —— 它內部已用 _ttsSuppressAdvance 包住自己的
+  // cancel()，會清掉舊句且不觸發自動前進。這裡不可再自行 cancel()，
+  // 否則那次 cancel 不在抑制範圍內，仍會讓當前句的 onend 前進一句。
+  if(_ttsPlaying) _speakSentence(_ttsIdx);
 }
 
 // 語速增減（按鈕用，含 0.5~1.5 邊界）

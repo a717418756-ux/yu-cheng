@@ -356,5 +356,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.3.1';     // 備份完整性補完:①本機備份原本只把refbooks/learnmedia的meta寫進JSON，實際檔案blob完全沒備份，還原後學習區參考書與教材影音會變成「有標題但打不開」的空殼；現比照書庫/影音庫寫出獨立資料夾(refbooks/、learnmedia/)含meta與blob，還原端同步補上 ②localRestore補上englishVocab與healthLogs(前一版只補了備份未補還原) ③還原確認訊息補列實際涵蓋項目。現況：純文字9項與blob四類共13個store，備份與還原完全對稱，舊版備份缺資料夾時自動略過不影響其他項目
+const APP_VERSION  = '4.3.3';     // 修成長區朗讀「播放中調語速會跳句甚至直接結束」:根因為 speechSynthesis.cancel() 會觸發當前 utterance 的 onend，而 onend 寫的是「若仍在播放就唸下一句」，因此調語速時的 cancel 被誤判成「這句唸完了」而自動前進—連調3次就跳4句，句數少的教材直接衝到結束(暫停時 _ttsPlaying=false 才不觸發，這正是「要暫停才能調」的原因)。修法為新增 _ttsSuppressAdvance 抑制旗標，程式主動 cancel 期間不執行自動前進；setEngRate 改為直接呼叫 _speakSentence(內部已含受抑制的 cancel)，不可再自行 cancel。同時修正點選句子跳讀的相同問題。已回歸測試：正常唸完自動前進、朗讀完成、點句跳讀均不受影響
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
