@@ -2410,6 +2410,62 @@ async function importBulkLaw(){  try{
   renderDB();
   }catch(e){ logError('importBulkLaw',e); }}
 
+// 以彈窗列出某部法規的條文清單（供「只給法規名稱、沒有條號」的連結使用）
+//   點清單中的任一條 → 直接在同一個彈窗顯示該條內容（不離開目前畫面）
+//   底部保留「在資料庫開啟」，需要完整瀏覽時才跳頁
+function _showLawListPop(lawName, laws, notFound){
+  const el = document.getElementById('lawpop-ov');
+  if(!el) return;
+  const titleEl = document.getElementById('lawpop-title');
+  const bodyEl  = document.getElementById('lawpop-body');
+  const relEl   = document.getElementById('lawpop-related');
+  if(titleEl) titleEl.textContent = lawName;
+
+  if(notFound){
+    if(bodyEl) bodyEl.innerHTML = '<span style="color:var(--t2)">查無「'+esc(lawName)+'」，請先在資料庫新增。</span>';
+    if(relEl)  relEl.innerHTML = '';
+    el.style.display = 'flex';
+    return;
+  }
+
+  // 取出該法規全部條文，依 articleNumber 排序（與資料庫頁一致的排序邏輯）
+  const arts = laws
+    .filter(l => (l.lawName||'') === lawName)
+    .sort((a,b) => (a.articleNumber || art2n(a.article||'')) - (b.articleNumber || art2n(b.article||'')));
+
+  if(!arts.length){
+    if(bodyEl) bodyEl.innerHTML = '<span style="color:var(--t2)">「'+esc(lawName)+'」目前沒有條文內容。</span>';
+    if(relEl)  relEl.innerHTML = '';
+    el.style.display = 'flex';
+    return;
+  }
+
+  const items = arts.map(a => {
+    const label = (a.article||'').trim() || (a.title||'') || '（未標條號）';
+    const hint  = (a.title||'').trim();
+    // 用 article 全文當參數，讓點擊後走既有的 showLawPop 精確定位邏輯
+    const ref   = esc(lawName + (a.article||''));
+    return '<button class="chip" style="display:block;width:100%;text-align:left;font-size:12px;margin-bottom:4px"'
+         + ' onclick="showLawPop(\''+ref+'\')">'
+         + '<b>'+esc(label)+'</b>'
+         + (hint ? '<span style="color:var(--t2);margin-left:6px">'+esc(hint)+'</span>' : '')
+         + '</button>';
+  }).join('');
+
+  if(bodyEl){
+    bodyEl.innerHTML =
+      '<div style="font-size:12px;color:var(--t2);margin-bottom:6px">共 '+arts.length+' 條，點選查看內容：</div>'
+      + '<div style="max-height:52vh;overflow:auto">'+items+'</div>';
+  }
+  if(relEl){
+    relEl.innerHTML =
+      '<div style="margin-top:8px;display:flex;justify-content:flex-end">'
+      + '<button class="chip" style="font-size:11px" onclick="closeLawPop();openLawGroup(\''+esc(lawName)+'\')">在資料庫開啟 ›</button>'
+      + '</div>';
+  }
+  el.style.display = 'flex';
+}
+
 async function showLawPop(ref){  try{
   if(!ref)return;
   const laws=await da('laws');
@@ -2433,7 +2489,9 @@ async function showLawPop(ref){  try{
   const artPosM = ref.match(/第[一二三四五六七八九十百千\d]+條/);
   const namePart = artPosM ? ref.slice(0, artPosM.index).trim() : ref.trim();
 
-  // 只有法規名稱、沒有條號 → 直接跳到法規頁面
+  // 只有法規名稱、沒有條號 → 一樣用彈窗呈現（列出該法規的條文清單），
+  // 不再整頁跳走。原本 openLawGroup() 會離開目前畫面（例如答題中），
+  // 與「點條號跳彈窗」的體驗不一致且會中斷作答，改為就地開窗。
   if(artNum===null&&namePart){
     // 找資料庫裡最接近的法規名稱
     const allNames=[...new Set(laws.map(l=>l.lawName).filter(Boolean))];
@@ -2444,9 +2502,8 @@ async function showLawPop(ref){  try{
       return cs.length>=2&&cs.every(c=>n.includes(c));
     });
     const target=exact||partial||fuzzy;
-    if(target){ openLawGroup(target); return; }
-    // 找不到也跳頁面（讓 openLawGroup 顯示空狀態）
-    openLawGroup(namePart); return;
+    _showLawListPop(target||namePart, laws, !target);
+    return;
   }
   let matched=laws.filter(l=>{
     const ln=l.lawName||'';

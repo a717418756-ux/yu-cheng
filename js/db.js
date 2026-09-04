@@ -177,7 +177,12 @@ function bulkPut(st, items) {
 
 function calcNextReview(level, correct) {
   if (!correct) {
-    return { level: Math.max(0, level - 1), next: Date.now() + 86400000 };
+    // 答錯時大幅降級而非只降一級。
+    //   原本 level 6（180天）答錯只退到 5，隔天再答對就立刻跳回 180 天，
+    //   等於「僥倖答對一次就視為完全熟練」，真正不熟的題目會太早離開複習池。
+    //   改為退回一半（無條件捨去），高等級題目答錯後需要重新累積才會拉長間隔，
+    //   低等級（0/1）行為與原本一致，仍是隔天重考。
+    return { level: Math.max(0, Math.floor(level / 2)), next: Date.now() + 86400000 };
   }
   const newLevel = Math.min(level + 1, REVIEW_INTERVALS.length - 1);
   const days = REVIEW_INTERVALS[newLevel];
@@ -351,5 +356,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.2.0';     // 統一法條連結體驗:原本點「有條號」的連結會開彈窗、點「只有法規名稱」的連結卻用openLawGroup()整頁跳到資料庫，體驗斷裂且會中斷當下作業(例如答題中被迫離開)。改為一律彈窗呈現—新增_showLawListPop()列出該法規全部條文(依articleNumber排序，含子條號如第2條之1)，點清單任一條即在同一彈窗顯示內容(走既有showLawPop精確定位)，底部保留「在資料庫開啟」供需要完整瀏覽時才跳頁。查無資料時同樣以彈窗提示而非跳空白頁。openLawGroup其他8處既有用途完全保留未動，onclick參數經esc()處理無XSS風險
+const APP_VERSION  = '4.3.1';     // 備份完整性補完:①本機備份原本只把refbooks/learnmedia的meta寫進JSON，實際檔案blob完全沒備份，還原後學習區參考書與教材影音會變成「有標題但打不開」的空殼；現比照書庫/影音庫寫出獨立資料夾(refbooks/、learnmedia/)含meta與blob，還原端同步補上 ②localRestore補上englishVocab與healthLogs(前一版只補了備份未補還原) ③還原確認訊息補列實際涵蓋項目。現況：純文字9項與blob四類共13個store，備份與還原完全對稱，舊版備份缺資料夾時自動略過不影響其他項目
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

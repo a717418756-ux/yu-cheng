@@ -184,32 +184,42 @@ async function ansQ(sel){  try{
 
   const normSel = (sel||'').toUpperCase().split('').sort().join('');
   const normAns = (qu.answer||'').toUpperCase().split('').sort().join('');
-  const correct  = normSel === normAns;
+  // ★ 題目未填正確答案時（normAns 為空），不可用相等判斷：
+  //   若使用者也沒選任何選項，'' === '' 會被判定「答對」，
+  //   導致 reviewLevel 升級、nextReview 延後，污染複習排程與統計。
+  //   這種題目一律不計分、不影響遺忘曲線，並提示補答案。
+  const noAnswerKey = !normAns;
+  const correct  = !noAnswerKey && normSel === normAns;
   const hesitant = responseTime > 40000;
+  if(noAnswerKey) toast('本題尚未設定正確答案，不計入複習進度');
 
   // 更新遺忘曲線
-  const curLevel = qu.reviewLevel || 0;
-  const {level:newLevel, next:nextReview} = calcNextReview(curLevel, correct);
-  qu.reviewLevel = newLevel;
-  qu.nextReview  = nextReview;
-  qu.lastReview  = Date.now();
-  qu.wrongCount    = (qu.wrongCount||0) + (correct ? 0 : 1);
-  qu.correctStreak = correct ? (qu.correctStreak||0)+1 : 0;
-  // 難度分數（答錯或猶豫提高）
-  qu.difficultyScore = Math.min(10,
-    (qu.difficultyScore||5) + (correct ? (hesitant ? 0 : -0.5) : 1.5)
-  );
-  await dp('questions', qu);
+  //   缺正確答案的題目完全跳過：不動 reviewLevel/nextReview、不累計錯誤數、
+  //   也不寫入 attempts，避免污染複習排程、危險題判定與正確率統計。
+  if(!noAnswerKey){
+    const curLevel = qu.reviewLevel || 0;
+    const {level:newLevel, next:nextReview} = calcNextReview(curLevel, correct);
+    qu.reviewLevel = newLevel;
+    qu.nextReview  = nextReview;
+    qu.lastReview  = Date.now();
+    qu.wrongCount    = (qu.wrongCount||0) + (correct ? 0 : 1);
+    qu.correctStreak = correct ? (qu.correctStreak||0)+1 : 0;
+    // 難度分數（答錯或猶豫提高）
+    qu.difficultyScore = Math.min(10,
+      (qu.difficultyScore||5) + (correct ? (hesitant ? 0 : -0.5) : 1.5)
+    );
+    await dp('questions', qu);
 
-  // 記錄 attempt（含時間）
-  await dp('attempts', {
-    qid:qu.id, correct,
-    date: today(),
-    responseTime,
-    hesitationFlag: hesitant,
-    confidence: hesitant ? 'low' : 'normal',
-    wrongReason: correct ? '' : '未知'
-  });
+    // 記錄 attempt（含時間）
+    await dp('attempts', {
+      qid:qu.id, correct,
+      date: today(),
+      responseTime,
+      hesitationFlag: hesitant,
+      confidence: hesitant ? 'low' : 'normal',
+      wrongReason: correct ? '' : '未知'
+    });
+  }
 
   // 顯示結果
   const opts = document.querySelectorAll('.qopt');

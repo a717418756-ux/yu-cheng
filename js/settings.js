@@ -56,22 +56,30 @@ async function gdriveBackup(){ try{
   if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
   toast('備份中…');
   // 雲端備份：考試區 + 答題記錄 + 倒數日 + 使用統計 + 設定（不含 blob 類大檔）
-  const [qs, ls, ats, countdowns, usageLogs, settings] = await Promise.all([
+  //   englishVocab（單字本，含自己的遺忘曲線進度）與 healthLogs（健康數據）
+  //   都是純文字、無 blob 欄位，理應納入雲端備份；先前漏掉會導致還原後這兩塊資料消失。
+  const [qs, ls, ats, countdowns, usageLogs, settings, englishVocab, healthLogs, engMats] = await Promise.all([
     da('questions'), da('laws'), da('attempts'),
-    da('countdowns'), da('usageLogs'), da('settings')
+    da('countdowns'), da('usageLogs'), da('settings'),
+    da('englishVocab'), da('healthLogs'), da('englishMaterials')
   ]);
   const payload = {
     password: pwd,
     action:   'backup',
     filename: GAS_BACKUP_FILE,
     data: JSON.stringify({
-      version: 2,
+      version: 3,
       questions: qs,
       laws: ls,
       attempts: ats,
       countdowns: countdowns,
       usageLogs: usageLogs,
-      settings: settings
+      settings: settings,
+      englishVocab: englishVocab,
+      healthLogs: healthLogs,
+      // englishMaterials 存的是切分後的句子陣列（純文字、無 blob），
+      // 資料量遠小於題庫，納入雲端備份不會造成負擔
+      englishMaterials: engMats
     })
   };
   const res  = await fetch(url, {
@@ -128,6 +136,11 @@ async function gdriveRestore(){ try{
       if(bk.attempts?.length){   await dc('attempts');   await bulkPut('attempts', bk.attempts); }
       if(bk.countdowns?.length){ await dc('countdowns'); await bulkPut('countdowns', bk.countdowns); }
       if(bk.usageLogs?.length){  await dc('usageLogs');  await bulkPut('usageLogs', bk.usageLogs); }
+      // 單字本 / 健康數據（v3 備份起納入；舊版備份沒有這兩個欄位時自動略過，
+      // 不會清空現有資料，確保用舊備份還原時不會反而弄丟這兩塊）
+      if(bk.englishVocab?.length){ await dc('englishVocab'); await bulkPut('englishVocab', bk.englishVocab); }
+      if(bk.healthLogs?.length){   await dc('healthLogs');   await bulkPut('healthLogs',   bk.healthLogs); }
+      if(bk.englishMaterials?.length){ await dc('englishMaterials'); await bulkPut('englishMaterials', bk.englishMaterials); }
 
       // 設定（逐筆覆蓋；保留當前 GAS 網址，避免還原後連線設定錯亂）
       if(Array.isArray(bk.settings)){
@@ -324,10 +337,12 @@ async function localBackup(){
     const dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
     toast('備份中…請稍候');
 
-    const [ebooks, media, qs, ls, ats, settings, countdowns, usageLogs, refbooks, learnmedia, engMats] = await Promise.all([
+    const [ebooks, media, qs, ls, ats, settings, countdowns, usageLogs, refbooks, learnmedia, engMats,
+           engVocab, healthLogs] = await Promise.all([
       da('ebooks'), da('leisuremedia'), da('questions'), da('laws'),
       da('attempts'), da('settings'), da('countdowns'), da('usageLogs'),
-      da('refbooks'), da('learnmedia'), da('englishMaterials')
+      da('refbooks'), da('learnmedia'), da('englishMaterials'),
+      da('englishVocab'), da('healthLogs')
     ]);
 
     let count = 0;
@@ -347,7 +362,10 @@ async function localBackup(){
       usageLogs: usageLogs,
       refbooks: refbooks,
       learnmedia: learnmedia,
-      englishMaterials: engMats
+      englishMaterials: engMats,
+      // 單字本與健康數據：純文字無 blob，先前漏備份會導致還原後資料消失
+      englishVocab: engVocab,
+      healthLogs: healthLogs
     }));
     await examWriter.close();
     count++;  // exam_data.json 計入項目數
@@ -409,6 +427,53 @@ async function localBackup(){
       count++;
     }
 
+    // ── 學習區備份（refbooks 參考書 / learnmedia 教材影音）──
+    //   先前只把 meta 寫進 exam_data.json，實際檔案 blob 完全沒備份，
+    //   還原後會變成「有標題但打不開」的空殼。這裡比照書庫／影音庫寫出檔案。
+    const refDir = await dirHandle.getDirectoryHandle('refbooks', { create:true });
+    for(const rb of refbooks){
+      const { blob:_b, coverBlob:_cb, ...meta } = rb;
+      const metaOut = { ...meta };
+      if(meta.coverThumb instanceof Blob){
+        metaOut.coverThumb = await _blobToBase64(meta.coverThumb);
+        metaOut._coverThumbIsBase64 = true;
+      }
+      const mh = await refDir.getFileHandle(`${rb.id}.meta.json`, { create:true });
+      const mw = await mh.createWritable();
+      await mw.write(JSON.stringify(metaOut));
+      await mw.close();
+      if(rb.blob){
+        const ext = rb.fileType || 'bin';
+        const fh = await refDir.getFileHandle(`${rb.id}.${ext}`, { create:true });
+        const w  = await fh.createWritable();
+        await w.write(rb.blob);
+        await w.close();
+      }
+      count++;
+    }
+
+    const lmDir = await dirHandle.getDirectoryHandle('learnmedia', { create:true });
+    for(const lm of learnmedia){
+      const { blob:_b, ...meta } = lm;
+      const metaOut = { ...meta };
+      if(meta.thumbnail instanceof Blob){
+        metaOut.thumbnail = await _blobToBase64(meta.thumbnail);
+        metaOut._thumbnailIsBase64 = true;
+      }
+      const mh = await lmDir.getFileHandle(`${lm.id}.meta.json`, { create:true });
+      const mw = await mh.createWritable();
+      await mw.write(JSON.stringify(metaOut));
+      await mw.close();
+      if(lm.blob){
+        const ext = lm.mimeType?.split('/')[1] || lm.mediaType || 'bin';
+        const fh = await lmDir.getFileHandle(`${lm.id}.${ext}`, { create:true });
+        const w  = await fh.createWritable();
+        await w.write(lm.blob);
+        await w.close();
+      }
+      count++;
+    }
+
     toast(`備份完成！共 ${count} 個項目 ✓`);
   }catch(e){
     if(e.name === 'AbortError') return;  // 使用者取消
@@ -423,7 +488,7 @@ async function localRestore(){
     toast('你的瀏覽器不支援資料夾存取，請用 Chrome 或 Edge');
     return;
   }
-  cfm('本地完整還原', '所有資料（題庫、法條、答題記錄、設定、倒數日、統計、書庫、影音、英語庫）將被覆蓋，確定繼續？', async()=>{
+  cfm('本地完整還原', '所有資料（題庫、法條、答題記錄、設定、倒數日、統計、書庫、影音、學習區教材、英語庫、單字本、健康數據）將被覆蓋，確定繼續？', async()=>{
     try{
       const dirHandle = await window.showDirectoryPicker({ mode:'read' });
       toast('還原中…請稍候');
@@ -479,6 +544,18 @@ async function localRestore(){
           await dc('englishMaterials');
           await bulkPut('englishMaterials', examData.englishMaterials);
           count += examData.englishMaterials.length;
+        }
+        // 單字本（含自己的遺忘曲線進度）
+        if(examData.englishVocab?.length){
+          await dc('englishVocab');
+          await bulkPut('englishVocab', examData.englishVocab);
+          count += examData.englishVocab.length;
+        }
+        // 健康數據（主鍵為日期字串，逐日一筆）
+        if(examData.healthLogs?.length){
+          await dc('healthLogs');
+          await bulkPut('healthLogs', examData.healthLogs);
+          count += examData.healthLogs.length;
         }
         // 設定（主鍵為 key，逐筆 put 覆蓋，不清空避免破壞他鍵）
         if(Array.isArray(examData.settings)){
@@ -546,6 +623,48 @@ async function localRestore(){
           count++;
         }
       }catch(e){ /* media 資料夾不存在就跳過 */ }
+
+      // ── 學習區還原（refbooks / learnmedia 的實際檔案）──
+      //   舊版備份沒有這兩個資料夾時會直接跳過，不影響其他還原結果。
+      try{
+        const refDir = await dirHandle.getDirectoryHandle('refbooks');
+        await dc('refbooks');
+        for await(const [name, handle] of refDir.entries()){
+          if(!name.endsWith('.meta.json')) continue;
+          const meta = JSON.parse(await (await handle.getFile()).text());
+          if(meta._coverThumbIsBase64 && meta.coverThumb){
+            meta.coverThumb = await _base64ToBlob(meta.coverThumb, 'image/jpeg');
+            delete meta._coverThumbIsBase64;
+          }
+          const ext = meta.fileType || 'bin';
+          try{
+            const bh = await refDir.getFileHandle(`${meta.id}.${ext}`);
+            meta.blob = await bh.getFile();
+          }catch(e){ meta.blob = null; }
+          await dp('refbooks', meta);
+          count++;
+        }
+      }catch(e){ /* refbooks 資料夾不存在就跳過 */ }
+
+      try{
+        const lmDir = await dirHandle.getDirectoryHandle('learnmedia');
+        await dc('learnmedia');
+        for await(const [name, handle] of lmDir.entries()){
+          if(!name.endsWith('.meta.json')) continue;
+          const meta = JSON.parse(await (await handle.getFile()).text());
+          if(meta._thumbnailIsBase64 && meta.thumbnail){
+            meta.thumbnail = await _base64ToBlob(meta.thumbnail, 'image/jpeg');
+            delete meta._thumbnailIsBase64;
+          }
+          const ext = meta.mimeType?.split('/')[1] || meta.mediaType || 'bin';
+          try{
+            const bh = await lmDir.getFileHandle(`${meta.id}.${ext}`);
+            meta.blob = await bh.getFile();
+          }catch(e){ meta.blob = null; }
+          await dp('learnmedia', meta);
+          count++;
+        }
+      }catch(e){ /* learnmedia 資料夾不存在就跳過 */ }
 
       _cacheInvalidate?.();
       toast(`還原完成！共 ${count} 個項目，重新整理中…`);
