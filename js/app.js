@@ -238,9 +238,6 @@ function goPage(pg, btn, fromBack){
   const el = document.getElementById('pg-'+pg); if(el) el.classList.remove('hide');
   if(btn) btn.classList.add('on');
   S.page = pg;
-  // 切換頁面時順便確保返回緩衝存在（冪等，已有就不重複推入）。
-  // 保險用途：萬一某次重新武裝被瀏覽器吞掉，只要有任何導覽就會自動補回。
-  if(typeof _pushBackGuard === 'function') _pushBackGuard();
   // 應用層頁面堆疊：記錄「真正訪問過的頁面順序」，讓返回鍵能逐層回上一頁，
   // 而不是不管訪問了幾層都直接跳回首頁。
   //   fromBack=true 代表這次呼叫本身就是返回鍵觸發的回退，不可再往堆疊推入，
@@ -326,54 +323,66 @@ function _applyTheme(theme){
 // 應用層頁面堆疊：紀錄真正訪問過的頁面順序（見 goPage 內的管理邏輯）
 let _pageStack = ['home'];
 
+// 返回鍵緩衝改用「預先推入大量筆數」，不再「動態重新推入」。
+//   舊做法：每關閉一層就用 setTimeout 延後補回一筆緩衝。
+//   問題：這個延遲會產生空窗期——如果系統判斷「沒有更多歷史紀錄」的時機
+//         剛好落在這個空窗期內（尤其是原生 Android WebView 對 PWA 的返回鍵
+//         處理，會在 popstate 事件之外自行判斷是否要直接關閉 Activity），
+//         系統可能繞過我們的 JS 邏輯，直接把整個 App 關掉——不管我們的邏輯
+//         想不想關。這正是「有時候連首頁都沒到就直接退出」的成因：不是判斷
+//         錯誤，是系統搶先關閉，JS 根本沒機會處理。
+// 新做法：一次性預先推入 GUARD_COUNT 筆緩衝。之後每次返回鍵消耗掉的紀錄，
+//         全部由瀏覽器原生處理（同步、即時、不需要我們的 JS 介入補回），
+//         我們只需要同步判斷「這一層該做什麼」。徹底消除時序風險。
+const GUARD_COUNT = 60;   // 正常使用不可能疊這麼多層，足夠用一整個 session
+
 function _pushBackGuard(){
-  try{
-    if(!history.state || !history.state.ycGuard){
-      history.pushState({ ycGuard: true }, '');
-    }
-  }catch(e){}
+  for(let i = 0; i < GUARD_COUNT; i++){
+    try{ history.pushState({ ycGuard: true }, ''); }catch(e){ break; }
+  }
 }
-// 安全呼叫：函式不存在就跳過，避免模組差異造成錯誤
+
+//   
 function _callIf(name){
   const fn = window[name];
   if(typeof fn === 'function'){ fn(); return true; }
   return false;
 }
-// 元素是否可見
-// 注意：這些覆蓋層多為 position:fixed，而 fixed 元素的 offsetParent 恆為 null，
-// 不能用 offsetParent 判斷，必須看實際計算後的樣式。
+//   
+//   position:fixed fixed   offsetParent  null
+//   offsetParent  
 function _isShown(el){
   if(!el || !el.isConnected) return false;
   const s = getComputedStyle(el);
   return s.display !== 'none' && s.visibility !== 'hidden' && s.opacity !== '0';
 }
-// 由上而下關閉一層；有關到東西回傳 true
+//   true
 function _handleBackLayer(){
-  // 1) 確認對話框
+  // 1) 
   const cfmOv = document.getElementById('cfm-ov');
   if(cfmOv && cfmOv.classList.contains('on')){ _callIf('closeCfm'); return true; }
 
-  // 2) FAB 展開中
+  // 2) FAB 
   const fabOv = document.getElementById('fab-overlay');
   if(fabOv && fabOv.classList.contains('open')){ _callIf('closeFab'); return true; }
 
-  // 3) 加號下拉選單
+  // 3)  
   for(const [id, fn] of [['add-q-menu','closeAddQMenu'], ['add-law-menu','closeAddLawMenu']]){
     const m = document.getElementById(id);
     if(m && m.style.display !== 'none' && m.style.display !== ''){ _callIf(fn); return true; }
   }
 
-  // 4) 電子書 / PDF 閱讀器
+  // 4)  / PDF 
   if(document.documentElement.classList.contains('reader-active')){
     if(_callIf('closeBookReader')) return true;
   }
 
-  // 5) 動態全螢幕覆蓋層（黑膠播放器、影片播放器、影音詳情）
-  //    這些是動態插入的節點，App 內部本來就用 remove() 關閉
+  // 5)  
+  //      remove() 
   for(const [id, fn] of [
     ['vinyl-player-ov','closeVinylPlayer'],
     ['video-player-ov','closeVideoPlayer'],
-    ['media-detail-ov', null],            // 無對應函式，直接移除（與 App 內部作法一致）
+    ['media-detail-ov', null],            //  App 
   ]){
     const el = document.getElementById(id);
     if(_isShown(el)){
@@ -382,9 +391,9 @@ function _handleBackLayer(){
     }
   }
 
-  // 6) 一般彈窗（取最上層那個）
-  //    注意：測驗新增的彈窗用的是 .cov（與 cfm 同類），不是 .ov，
-  //    兩種都要掃，否則按返回會略過它們去關掉更底層的東西。
+  // 6) 
+  //     .cov cfm  .ov
+  //    
   const ovMap = {
     'heatmap-ov':'closeHeatmapOv', 'bulk-ov':'closeBulkQ',
     'add-ov':'closeAdd', 'law-ov':'closeLawSh', 'blaw-ov':'closeBulkLaw',
@@ -393,70 +402,73 @@ function _handleBackLayer(){
   const opened = [...document.querySelectorAll('.ov.on, .cov.on')];
   if(opened.length){
     const top = opened[opened.length - 1];
-    if(!_callIf(ovMap[top.id])) top.classList.remove('on');   // 無對應函式則直接關
+    if(!_callIf(ovMap[top.id])) top.classList.remove('on');   // 
     return true;
   }
 
-  // 7) 法條檢視（#lv 以 display:flex 顯示，關閉函式為 exitLaw）
+  // 7)   display:flex  exitLaw
   const lv = document.getElementById('lv');
   if(lv && lv.style.display === 'flex'){
     if(!_callIf('exitLaw')) lv.style.display = 'none';
     return true;
   }
 
-  // 8) 答題中：標註模式優先退出（同一層還有東西要收，不該直接跳出答題畫面）
+  // 8) 
   const qink = document.getElementById('qink');
   if(qink && qink.classList.contains('on')){
-    _callIf('toggleInk');   // toggleInk 內部會自動保存已畫的筆跡
+    _callIf('toggleInk');   // toggleInk 
     return true;
   }
 
-  // 9) 答題中 → 離開答題（答題畫面是 #qv 覆蓋層，不是獨立 page）
+  // 9)    #qv  page
   const qv = document.getElementById('qv');
   if(qv && qv.style.display !== 'none' && qv.style.display !== ''){
     if(!_callIf('exitQ')) qv.style.display = 'none';
     return true;
   }
 
-  // 10) 逐層回到「上一個真正訪問過的頁面」（而非不管訪問幾層都直接跳首頁）
-  //     堆疊只剩 'home' 時代表已經回到底，交給下一段判斷是否離開 App。
-  //     S.page 若為異常值，視同堆疊已空，直接兜底回首頁。
+  // 10)   
+  //       'home'  App
+  //     S.page   
   if(_pageStack.length > 1 || S.page !== 'home'){
     if(_pageStack.length > 1) _pageStack.pop();
-    else _pageStack = ['home'];   // 狀態異常時的兜底，不因不明狀態就直接離開
+    else _pageStack = ['home'];   // 
     const prevPg = _pageStack[_pageStack.length - 1];
     const btn = document.querySelector(`.nb[onclick*="'${prevPg}'"]`);
-    goPage(prevPg, btn, true);   // fromBack=true：不可再推回堆疊
+    goPage(prevPg, btn, true);   // fromBack=true
     return true;
   }
-  return false;   // 已在首頁且堆疊已空，交給呼叫端詢問是否離開
+  return false;   //   
 }
 
 function _initBackHandler(){
-  _pushBackGuard();
-  // 重新武裝緩衝
-  // ★ 必須延到下一個事件迴圈：在 popstate 處理中「同步」呼叫 pushState，
-  //   瀏覽器可能仍在處理該次返回導覽而把它吞掉 —— 結果就是只有第一次返回有效，
-  //   之後沒有緩衝可攔截，按返回就直接關閉 App。
-  const _rearm = ()=> setTimeout(_pushBackGuard, 0);
+  _pushBackGuard();   // 一次性推入 60 筆緩衝，之後不再需要動態補回
 
   window.addEventListener('popstate', ()=>{
     try{
-      // 有可關閉的層級（彈窗／閱讀器／播放器／非首頁）→ 關掉它，並補回緩衝
-      if(_handleBackLayer()){ _rearm(); return; }   // 強制重新武裝
-      // 已在首頁且無任何層級可關 → 不再補緩衝，直接離開 App
-      // （此刻位於起始頁，其之前已無紀錄，退出即由系統關閉）
-      setTimeout(()=>{ try{ history.back(); }catch(e){} }, 0);
+      // 有可關閉的層級：交給瀏覽器原生消耗掉這筆歷史紀錄即可，
+      // 不需要我們的 JS 補回任何東西——這是徹底避免時序問題的關鍵。
+      if(_handleBackLayer()) return;
+
+      // 已在首頁且沒有更多層級 → 真正離開 App。
+      // 同步呼叫（不用 setTimeout）：這是延續同一次使用者操作的自然導覽，
+      // 不是「新增歷史紀錄」，不受 popstate 處理中呼叫 pushState 會被
+      // 吞掉的限制（那個限制只針對 pushState，不影響 back/go）。
+      try{ history.back(); }catch(e){}
     }catch(e){
-      _rearm();   // 例外時也要重新武裝，避免 App 內的返回功能失效
+      // 任何例外都不做額外處理：緩衝一次推入 60 筆，單次例外不影響整體攔截能力
     }
   });
 
-  // 從背景/bfcache 回來時緩衝可能已不存在 → 自我修復
-  // （少了緩衝，App 內第一次按返回會直接離開而非關閉當前層級）
-  // _pushBackGuard 會檢查 history.state，已存在就不重複推入
-  window.addEventListener('pageshow', _pushBackGuard);
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _pushBackGuard(); });
+  // 從背景/bfcache 回來時，若緩衝所剩不多（正常使用不會發生，這裡當保險），
+  // 補滿一輪；用「剩餘量檢查」避免每次都無謂地推入。
+  const _healIfLow = ()=>{
+    try{
+      if(!history.state || !history.state.ycGuard) _pushBackGuard();
+    }catch(e){}
+  };
+  window.addEventListener('pageshow', _healIfLow);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) _healIfLow(); });
 }
 
 async function init(){  try{

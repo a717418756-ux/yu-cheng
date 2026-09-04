@@ -2405,9 +2405,17 @@ async function importBulkLaw(){  try{
 async function showLawPop(ref){  try{
   if(!ref)return;
   const laws=await da('laws');
-  const artM=ref.match(/第?(\d+)條?/);
-  const artNum=artM?parseInt(artM[1]):null;
-  const namePart=ref.replace(/第?\d+條?/,'').replace(/§\d+/,'').trim();
+  // 條號解析改用 art2n()（與資料庫 articleNumber 完全同一套公式：主號*1000+子號），
+  // 原本自己另寫的正則只抓純數字（如92），但資料庫存的是92000/92004這種格式，
+  // 兩者永遠對不上，導致任何帶明確條號的法條連結都找不到資料。
+  const artNum = art2n(ref) || null;   // art2n 找不到「第X條」模式時回傳0，這裡轉為null表示無條號
+  // namePart 改用「定位切割」而非到處刪數字的 .replace()：
+  // 找到「第X條」出現的位置，取其之前的文字當作法規名稱。
+  // 若整個 ref 裡根本沒有「第X條」模式（例如「釋字第748號解釋」這類名稱本身含數字、
+  // 用「號」而非「條」的資料），視為沒有條號，把完整 ref 當名稱查，
+  // 而不是像舊邏輯把名稱中的數字誤判為條號、切爛整個名稱。
+  const artPosM = ref.match(/第[一二三四五六七八九十百千\d]+條/);
+  const namePart = artPosM ? ref.slice(0, artPosM.index).trim() : ref.trim();
 
   // 只有法規名稱、沒有條號 → 直接跳到法規頁面
   if(artNum===null&&namePart){
