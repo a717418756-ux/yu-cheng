@@ -1269,21 +1269,9 @@ async function renderDB(){  try{
   const ls=await da('laws');
   const kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
   let kwLaw='', kwArtNum=0, kwText=kw;
-  // 支援「法規名§條號」精準搜尋，條號含子條號寫法（§2-1、§2之1）。
-  // 原本只收 (\d+) 收不到子條號，輸入「§2-1」會整個不匹配而退回全文搜尋。
-  const secM = kw.match(/^(.*)§\s*(\d+(?:[-－之]\d+)?)\s*$/);
-  if(secM){
-    kwLaw    = secM[1].trim().toLowerCase();
-    // 統一用 art2n() 換算成與資料庫 articleNumber 同一套編碼（主號*1000+子號）。
-    // 原本的比對是 String(l.articleNumber)===kwArt，但 articleNumber 是 2000 這種格式、
-    // kwArt 是 "2"，這個條件永遠不成立，實際上只靠後面的字串 includes 勉強運作；
-    // 而字串比對又會讓「§2」誤匹配到「第2條之1」（因為 article 含「第2條」字樣）。
-    // 組成 art2n 認得的標準寫法：主號放「第X條」，子號接在「條」之後成為「第X條之Y」
-    // （art2n 的子條號規則是 /條之(N)/，寫成「第2之1條」它認不出來）
-    const _mm = secM[2].match(/^(\d+)(?:[-－之](\d+))?$/);
-    kwArtNum = _mm ? art2n('第' + _mm[1] + '條' + (_mm[2] ? '之' + _mm[2] : '')) : 0;
-    kwText   = '';
-  }
+  // 「法規名§條號」精準搜尋（規則見 parseSecSearch，與 openLawGroup 共用同一套）
+  const _sec = parseSecSearch(kw);
+  if(_sec){ kwLaw = _sec.lawName; kwArtNum = _sec.artNum; kwText = ''; }
 
   let fl=ls.filter(l=>{
     if(S.lawCat!=='all'&&l.category!==S.lawCat)return false;
@@ -1427,9 +1415,10 @@ async function openLawGroup(lawName){  try{
   const allLaws=await da('laws');
   const _kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
   // §N 精確搜尋
-  let _kwLaw2='',_kwArt2='',_kwText2=_kw;
-  const _sm=_kw.match(/^(.*)§\s*(\d+)\s*$/);
-  if(_sm){_kwLaw2=_sm[1].trim().toLowerCase();_kwArt2=_sm[2];_kwText2='';}
+  // §搜尋：與 renderDB 共用 parseSecSearch，確保兩邊規則永遠一致
+  let _kwLaw2='',_kwArtNum2=0,_kwText2=_kw;
+  const _sec2 = parseSecSearch(_kw);
+  if(_sec2){ _kwLaw2 = _sec2.lawName; _kwArtNum2 = _sec2.artNum; _kwText2 = ''; }
   // ── 排序：純依條號遞增（法律的本質順序）──
   // 法律條文本就是第1條、第2條…依序排列，編章節只是標記，不影響條文順序。
   // 章節標題的「不重複」由渲染層的已渲染集合(_shownC 等)保證，
@@ -1438,9 +1427,8 @@ async function openLawGroup(lawName){  try{
   const laws=allLaws.filter(l=>{
     if(l.lawName!==lawName) return false;
     if(!_kw) return true;
-    if(_kwArt2){
-      const am=String(l.articleNumber||'')===''+_kwArt2;
-      return am;
+    if(_kwArtNum2){
+      return (l.articleNumber || art2n(l.article||'')) === _kwArtNum2;
     }
     const h=((l.article||'')+(l.title||'')+(l.content||'')).toLowerCase();
     return h.includes(_kwText2);
@@ -1805,30 +1793,38 @@ async function rebuildLawIndex(){  try{
   }
 
   // 步驟2：編章節一致性修復（多數決）
-  // 同一法規同一「章」的所有條文，其 part(編) 應該一致。
-  // 統計每章各 part 的出現次數，取最多者統一；清除孤立錯標。
-  // 同理，同一「節」應隸屬同一章。
-  const byLawChap=new Map(); // 'lawName|chapter' -> [items]
-  laws.forEach(l=>{
-    const k=(l.lawName||'')+'|'+(l.chapter||'');
-    if(!byLawChap.has(k)) byLawChap.set(k,[]);
-    byLawChap.get(k).push(l);
-  });
-  byLawChap.forEach((items, k)=>{
-    if(!k.split('|')[1]) return; // 無章者跳過
-    // 統計此章各 part 的票數
-    const votes=new Map();
-    items.forEach(l=>{ const p=l.part||''; votes.set(p,(votes.get(p)||0)+1); });
-    // 取票數最高的 part（平手時取非空者優先）
-    let bestPart='', bestN=-1;
-    votes.forEach((n,p)=>{
-      if(n>bestN || (n===bestN && p && !bestPart)){ bestPart=p; bestN=n; }
+  // 同一法規同一「章」的所有條文，其 part(編) 應該一致；
+  // 同一法規同一「節」的所有條文，其 chapter(章) 也應該一致。
+  // 作法：統計群組內各值的票數，取最多者統一，藉此清除孤立錯標。
+  //   （原本只做了「章→編」，「節→章」漏未實作，導致節層級的錯標無法被修正）
+  const _majorityFix = (groupKeyFn, field, requireKeyPart) => {
+    const groups = new Map();
+    laws.forEach(l => {
+      const k = groupKeyFn(l);
+      if(!requireKeyPart(l)) return;   // 該層級為空者不參與
+      if(!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(l);
     });
-    // 統一：與多數不同者修正
-    items.forEach(l=>{
-      if((l.part||'')!==bestPart){ l.part=bestPart; fixed++; }
+    groups.forEach(items => {
+      const votes = new Map();
+      items.forEach(l => { const v = l[field]||''; votes.set(v, (votes.get(v)||0)+1); });
+      // 取票數最高者（平手時非空優先，避免被空值蓋掉正確的標記）
+      let best='', bestN=-1;
+      votes.forEach((n, v) => {
+        if(n > bestN || (n === bestN && v && !best)){ best = v; bestN = n; }
+      });
+      items.forEach(l => {
+        if((l[field]||'') !== best){ l[field] = best; fixed++; }
+      });
     });
-  });
+  };
+  // 順序：先統一「編」，再由節統一「章」，最後再跑一次「編」。
+  //   第三次不是多餘——節層級修好章之後，原本因章別錯標而落單的條文
+  //   會重新歸入正確的章，此時才能取得該章多數的編。少了這一步，
+  //   那些條文的編會停留在空值或舊的錯誤值。
+  _majorityFix(l => (l.lawName||'')+'|'+(l.chapter||''), 'part',    l => !!(l.chapter||''));
+  _majorityFix(l => (l.lawName||'')+'|'+(l.section||''), 'chapter', l => !!(l.section||''));
+  _majorityFix(l => (l.lawName||'')+'|'+(l.chapter||''), 'part',    l => !!(l.chapter||''));
 
   // 步驟3：重建搜尋索引並寫回
   for(const l of laws){
@@ -2466,6 +2462,31 @@ function _showLawListPop(lawName, laws, notFound){
   el.style.display = 'flex';
 }
 
+// ── §條號寫法的共用解析（renderDB / openLawGroup / showLawPop 共用）──
+//   法律引用常把「第X條」簡寫成「§X」，子條號寫成「§X-Y」或「§X之Y」。
+//   這裡集中定義格式規則，避免同一套正則散落多處：先前就發生過只修了
+//   renderDB、卻漏掉 openLawGroup 的情況（同樣的 bug 修了兩次）。
+const _SEC_RE = /§\s*(\d+)(?:[-－之](\d+))?/;
+
+// 把 §簡寫轉成 art2n() 認得的標準寫法：§2 → 第2條、§2-1 → 第2條之1
+//   注意子號要接在「條」之後（art2n 的子條號規則是 /條之(N)/，
+//   寫成「第2之1條」它解析不出來）。
+function _secToArticle(main, sub){
+  return '第' + main + '條' + (sub ? '之' + sub : '');
+}
+
+// 解析「法規名§條號」→ { lawName, artNum }；不符格式回傳 null。
+//   artNum 已用 art2n() 換算成與資料庫 articleNumber 相同的編碼（主號*1000+子號），
+//   可直接比對，不需再做字串處理。
+function parseSecSearch(kw){
+  const m = String(kw||'').match(new RegExp('^(.*)' + _SEC_RE.source + '\\s*$'));
+  if(!m) return null;
+  return {
+    lawName: (m[1]||'').trim().toLowerCase(),
+    artNum:  art2n(_secToArticle(m[2], m[3])),
+  };
+}
+
 async function showLawPop(ref){  try{
   if(!ref)return;
   const laws=await da('laws');
@@ -2474,9 +2495,7 @@ async function showLawPop(ref){  try{
   // 變成 null、namePart 也切不出法規名稱（整串被當成名稱），結果直接跳整部
   // 法規、定位不到指定條文。這裡先把§簡寫正規化成標準格式，其餘邏輯不用動，
   // 沒有§的原格式（如「第11條」「第100條之1」）完全不受影響。
-  ref = ref.replace(/§\s*(\d+)(?:[-－之](\d+))?/, (_, main, sub) =>
-    sub ? '第'+main+'條之'+sub : '第'+main+'條'
-  );
+  ref = ref.replace(_SEC_RE, (_, main, sub) => _secToArticle(main, sub));
   // 條號解析改用 art2n()（與資料庫 articleNumber 完全同一套公式：主號*1000+子號），
   // 原本自己另寫的正則只抓純數字（如92），但資料庫存的是92000/92004這種格式，
   // 兩者永遠對不上，導致任何帶明確條號的法條連結都找不到資料。
@@ -2513,7 +2532,10 @@ async function showLawPop(ref){  try{
       if(cs.length>=2)nm=cs.every(c=>ln.includes(c));
     }
     if(!nm)return false;
-    return artNum===null||l.articleNumber===artNum;
+    // 與 renderDB／openLawGroup 一致：articleNumber 尚未建立時（例如剛匯入、
+    // 還沒按過「重建條號索引」的資料）改用 art2n(l.article) 即時換算，
+    // 否則這些條文的法條連結會查無資料。
+    return artNum===null||(l.articleNumber||art2n(l.article||''))===artNum;
   });
   if(matched.length>1){const ex=matched.filter(l=>(l.lawName||'').includes(namePart));if(ex.length)matched=ex;}
   const el=document.getElementById('lawpop-ov');if(!el)return;

@@ -177,7 +177,15 @@
       _updatePanelState();
       _speakNext();
     };
-    utter.onerror = ()=>{ _TTS.idx++; _speakNext(); };
+    utter.onerror = (e)=>{
+      // 與另一條系統語音路徑一致的防護：
+      //   interrupted/canceled 代表是程式主動 cancel（停止、切換聲音、調語速），
+      //   不是真的播放失敗，此時不可前進，否則會憑空跳過一段。
+      if(e && (e.error === 'interrupted' || e.error === 'canceled')) return;
+      if(!_TTS.speaking) return;   // 已停止朗讀就不再推進
+      _TTS.idx++;
+      _speakNext();
+    };
     if(!_keepaliveTimer) _startKeepalive();
     speechSynthesis.speak(utter);
   }
@@ -269,7 +277,8 @@
       _speakNext();
     };
     utter.onerror = (e)=>{
-      if(e.error === 'interrupted' || e.error === 'canceled') return;
+      if(e && (e.error === 'interrupted' || e.error === 'canceled')) return;
+      if(!_TTS.speaking) return;   // 已停止朗讀就不再推進（與 onend 的判斷一致）
       _TTS.idx++;
       _speakNext();
     };
