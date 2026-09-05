@@ -15,12 +15,14 @@ let _curMaterial = null;   // 目前開啟的材料
 let _ttsQueue = [];        // 朗讀佇列（句子索引）
 let _ttsIdx = -1;          // 目前朗讀到第幾句
 let _ttsPlaying = false;
-// 程式主動呼叫 speechSynthesis.cancel() 時的抑制旗標。
-//   cancel() 會讓「當前正在唸的 utterance」觸發 onend/onerror，而那兩個回呼寫的是
-//   「若仍在播放就唸下一句」。因此調整語速或點選句子時的 cancel()，會被誤判成
-//   「這句唸完了」而自動前進一句 —— 連續調整語速就會一路衝到最後直接結束
-//   （暫停時 _ttsPlaying 為 false 才不會觸發，這正是「要暫停才能調」的原因）。
-let _ttsSuppressAdvance = false;
+// 朗讀世代序號：每次啟動新句子就 +1。
+//   speechSynthesis.cancel() 會讓「當前正在唸的 utterance」觸發 onend/onerror，
+//   而那兩個回呼寫的是「若仍在播放就唸下一句」。因此調整語速或點選其他句子時的
+//   cancel()，會被誤判成「這句唸完了」而自動前進 —— 連續操作就一路衝到最後結束。
+//   關鍵：cancel() 觸發回呼是「非同步」的，用時序旗標（設 true → cancel → 設回 false）
+//   無法攔截，因為回呼往往在旗標已還原之後才執行。改用世代序號比對即與時序無關：
+//   回呼執行時若序號已被新的朗讀取代，就代表自己是被取代的舊句，直接放棄前進。
+let _ttsSeq = 0;
 let _ttsRate = 0.9;        // 語速（英語學習稍慢）
 
 // ════════ 句子切分 ════════
@@ -319,20 +321,16 @@ function _speakSentence(idx){
   const enVoice = voices.find(v=>/en[-_]US/i.test(v.lang)) || voices.find(v=>/^en/i.test(v.lang));
   if(enVoice) u.voice = enVoice;
 
-  u.onend = ()=>{
-    if(_ttsSuppressAdvance) return;   // 由程式主動 cancel 造成，非真的唸完
+  // 取得本次朗讀的世代序號；之後若又啟動新句子，這個序號就不再是最新的
+  const mySeq = ++_ttsSeq;
+  const advance = ()=>{
+    if(mySeq !== _ttsSeq) return;   // 已被新的朗讀取代（調語速／點別句／停止）→ 不前進
     if(_ttsPlaying) _speakSentence(idx+1);
   };
-  u.onerror = ()=>{
-    if(_ttsSuppressAdvance) return;
-    if(_ttsPlaying) _speakSentence(idx+1);
-  };
-  // 這裡的 cancel 是為了清掉上一句，屬於主動取消 → 抑制自動前進。
-  // 旗標在 speak() 之後才解除，確保 cancel 觸發的回呼都已跑完。
-  _ttsSuppressAdvance = true;
-  speechSynthesis.cancel();
+  u.onend   = advance;
+  u.onerror = advance;
+  speechSynthesis.cancel();   // 清掉上一句；它觸發的舊回呼會因序號不符而自動失效
   speechSynthesis.speak(u);
-  setTimeout(()=>{ _ttsSuppressAdvance = false; }, 0);
 }
 
 function _highlightSentence(idx){
@@ -371,9 +369,8 @@ function setEngRate(r){
   const lbl = document.getElementById('eng-rate-lbl');
   if(lbl) lbl.textContent = r.toFixed(1)+'×';
   // 若正在朗讀，從當前句以新語速重啟。
-  // 直接呼叫 _speakSentence 即可 —— 它內部已用 _ttsSuppressAdvance 包住自己的
-  // cancel()，會清掉舊句且不觸發自動前進。這裡不可再自行 cancel()，
-  // 否則那次 cancel 不在抑制範圍內，仍會讓當前句的 onend 前進一句。
+  // 直接呼叫 _speakSentence 即可 —— 它會遞增世代序號並自行 cancel 舊句，
+  // 舊句的 onend 因序號不符而失效，不會誤前進。這裡不可再自行 cancel()。
   if(_ttsPlaying) _speakSentence(_ttsIdx);
 }
 
