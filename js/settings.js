@@ -705,6 +705,28 @@ async function _renderAzureKey(){
   const key = await getSetting('tts_azure_key','');
   const el  = document.getElementById('tts-azure-key');
   if(el && key) el.value = key;
+  _renderAzureUsage().catch(()=>{});
+}
+
+// Azure 用量估算顯示（免費層 F0 為每月 50 萬字元）
+//   ★ 估算值：SSML 標籤是否計入、失敗重試、跨月時區都可能與微軟後台有出入，
+//     用途是「快用完前有個警覺」，精確數字仍以 Azure 後台為準。
+async function _renderAzureUsage(){
+  const box = document.getElementById('azure-usage');
+  if(!box) return;
+  const u = await getSetting('azure_usage', null);
+  const ym = new Date().toISOString().slice(0, 7);
+  const chars = (u && u.ym === ym) ? (u.chars || 0) : 0;
+  const FREE = 500000;
+  const pct  = Math.min(100, Math.round(chars / FREE * 100));
+  const warn = pct >= 80;
+  box.innerHTML =
+    '本月已用約 <b style="color:' + (warn ? 'var(--org)' : 'var(--t1)') + '">'
+    + chars.toLocaleString() + '</b> 字元 ／ 免費 ' + FREE.toLocaleString()
+    + '（' + pct + '%）'
+    + '<div style="height:5px;border-radius:3px;background:var(--bg2);margin-top:5px;overflow:hidden">'
+    + '<div style="height:100%;width:' + pct + '%;background:' + (warn ? 'var(--org)' : 'var(--acc)') + '"></div></div>'
+    + '<div style="margin-top:4px;opacity:.8">估算值，實際用量以 Azure 後台為準</div>';
 }
 
 // ══ 偵錯面板 ══════════════════════════════════════════════════

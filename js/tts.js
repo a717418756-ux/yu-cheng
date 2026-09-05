@@ -60,6 +60,24 @@
       : raw;
   }
 
+  // ── Azure 用量估算 ──────────────────────────────────────────
+  //   Azure 依「送出的字元數」計費，這裡在每次實際送出請求時累加。
+  //   ★ 這是估算值，不是官方帳單：SSML 標籤是否計入、失敗重試是否重複計算、
+  //     跨月歸零的時區，都可能與微軟後台有出入。用途是「快用完前有個警覺」。
+  //   設計上完全獨立：只做一次 setSetting，即使失敗也不影響朗讀（catch 吞掉）。
+  function _countAzureUsage(text){
+    try{
+      const n = (text || '').length;
+      if(!n) return;
+      const ym = new Date().toISOString().slice(0, 7);   // YYYY-MM
+      getSetting('azure_usage', null).then(u => {
+        const cur = (u && u.ym === ym) ? u : { ym, chars: 0 };   // 跨月自動歸零
+        cur.chars += n;
+        setSetting('azure_usage', cur).catch(()=>{});
+      }).catch(()=>{});
+    }catch(e){ /* 用量統計絕不可影響朗讀 */ }
+  }
+
   // Prefetch：預先 fetch 下一段音訊，減少段落間停頓
   let _prefetchCache = null;  // { idx, promise }
   function _prefetchNext(idx, voiceName){
@@ -73,6 +91,7 @@
       idx: nextIdx,
       promise: _loadAzureConfig().then(({ key:azureKey, url:gasUrl })=>{
         if(!azureKey || !gasUrl) return null;
+        _countAzureUsage(nextText);
         return fetch(gasUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
@@ -110,6 +129,7 @@
         _prefetchCache = null;
       }
       if(!json){
+        _countAzureUsage(text);
         const res = await fetch(gasUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
