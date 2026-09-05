@@ -413,21 +413,29 @@ function _handleBackLayer(){
     return true;
   }
 
-  // 8) 
+  // 8) 英語閱讀器（成長區教材，以 display:flex 顯示的覆蓋層）
+  //    先前未納入攔截，導致朗讀教材時按返回沒有任何反應。
+  const engReader = document.getElementById('eng-reader');
+  if(engReader && engReader.style.display === 'flex'){
+    if(!_callIf('closeMaterial')) engReader.style.display = 'none';
+    return true;
+  }
+
+  // 9) 
   const qink = document.getElementById('qink');
   if(qink && qink.classList.contains('on')){
     _callIf('toggleInk');   // toggleInk 
     return true;
   }
 
-  // 9)    #qv  page
+  // 10)    #qv  page
   const qv = document.getElementById('qv');
   if(qv && qv.style.display !== 'none' && qv.style.display !== ''){
     if(!_callIf('exitQ')) qv.style.display = 'none';
     return true;
   }
 
-  // 10)   
+  // 11)   
   //       'home'  App
   //     S.page   
   if(_pageStack.length > 1 || S.page !== 'home'){
