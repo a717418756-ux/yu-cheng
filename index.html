@@ -701,14 +701,17 @@
           <button class="qink-s"    data-w="4.5" onclick="inkSize(this)" aria-label="粗"><i style="height:7px"></i></button>
         </div>
       </div>
-      <!-- 第二列：筆型 + 動作 -->
+      <!-- 第二列：筆型 -->
       <div class="qink-row">
         <button class="btn br bw qink-mode on" id="qink-m-pen"    onclick="inkMode('pen')">✎ 手繪</button>
         <button class="btn br bw qink-mode"    id="qink-m-line"   onclick="inkMode('line')">╱ 直線</button>
         <button class="btn br bw qink-mode"    id="qink-m-marker" onclick="inkMode('marker')">▭ 螢光</button>
+      </div>
+      <!-- 第三列：動作 -->
+      <div class="qink-row">
         <button class="btn br bw" onclick="inkUndo()">↶ 復原</button>
         <button class="btn br bw" onclick="inkClear()">清除</button>
-        <button class="btn br bw qink-done" onclick="toggleInk()">完成</button>
+        <button class="btn br bw qink-done" onclick="toggleInk()">✓ 完成</button>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span id="qbadge" class="badge"></span><span id="qmeta" style="font-size:11px;color:var(--t2)"></span></div>
