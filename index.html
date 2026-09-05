@@ -636,6 +636,7 @@
       style="width:100%;background:var(--bg2);border:1px solid var(--bd);
       border-radius:var(--r);padding:9px 12px;color:var(--t1);font-size:13px"
       oninput="saveAzureKey(this.value)">
+    <div id="azure-usage" style="margin-top:7px;font-size:11.5px;color:var(--t2);line-height:1.6"></div>
   </div>
 
   <div class="sec">資料維護</div>
@@ -685,9 +686,30 @@
     <!-- 題目標註畫布：疊在題幹／選項上方，可直接圈畫重點（如紙本刷題） -->
     <canvas id="qink" class="qink"></canvas>
     <div class="qink-tools" id="qink-tools">
-      <button class="btn br bw" onclick="inkUndo()">復原</button>
-      <button class="btn br bw" onclick="inkClear()">清除</button>
-      <button class="btn br bw" onclick="toggleInk()">完成</button>
+      <!-- 第一列：顏色 + 粗細 -->
+      <div class="qink-row">
+        <div class="qink-colors" id="qink-colors">
+          <button class="qink-c on" data-c="#ff5a5a" style="--c:#ff5a5a" onclick="inkColor(this)" aria-label="紅"></button>
+          <button class="qink-c"    data-c="#ffd54a" style="--c:#ffd54a" onclick="inkColor(this)" aria-label="黃"></button>
+          <button class="qink-c"    data-c="#4ade80" style="--c:#4ade80" onclick="inkColor(this)" aria-label="綠"></button>
+          <button class="qink-c"    data-c="#6ea8fe" style="--c:#6ea8fe" onclick="inkColor(this)" aria-label="藍"></button>
+          <button class="qink-c"    data-c="#111111" style="--c:#111111" onclick="inkColor(this)" aria-label="黑"></button>
+        </div>
+        <div class="qink-sizes" id="qink-sizes">
+          <button class="qink-s"    data-w="1.6" onclick="inkSize(this)" aria-label="細"><i style="height:2px"></i></button>
+          <button class="qink-s on" data-w="2.6" onclick="inkSize(this)" aria-label="中"><i style="height:4px"></i></button>
+          <button class="qink-s"    data-w="4.5" onclick="inkSize(this)" aria-label="粗"><i style="height:7px"></i></button>
+        </div>
+      </div>
+      <!-- 第二列：筆型 + 動作 -->
+      <div class="qink-row">
+        <button class="btn br bw qink-mode on" id="qink-m-pen"    onclick="inkMode('pen')">✎ 手繪</button>
+        <button class="btn br bw qink-mode"    id="qink-m-line"   onclick="inkMode('line')">╱ 直線</button>
+        <button class="btn br bw qink-mode"    id="qink-m-marker" onclick="inkMode('marker')">▭ 螢光</button>
+        <button class="btn br bw" onclick="inkUndo()">↶ 復原</button>
+        <button class="btn br bw" onclick="inkClear()">清除</button>
+        <button class="btn br bw qink-done" onclick="toggleInk()">完成</button>
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span id="qbadge" class="badge"></span><span id="qmeta" style="font-size:11px;color:var(--t2)"></span></div>
     <div id="q-type-hint" style="font-size:12px;color:var(--acc);margin-bottom:7px;font-weight:600;min-height:18px"></div>
