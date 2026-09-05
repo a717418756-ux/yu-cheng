@@ -398,10 +398,9 @@
   z-index:5; pointer-events:none;      /* 預設不擋操作，可正常作答 */
 }
 /* 標註模式才接收觸控。
-   touch-action:pan-y 讓「單指縱向滑動」仍能捲動長題目，
-   繪製則靠 pointerdown 的筆型判斷（筆/滑鼠直接畫；手指需長按後才畫）。
-   若設 touch-action:none，標註模式下完全無法捲動，長題目只能標註看得到的部分。 */
-.qink.on{ pointer-events:auto; touch-action:pan-y; }
+   必須 touch-action:none —— 否則手指拖曳會被瀏覽器當成捲動手勢而中斷繪製，
+   畫到一半線就斷掉。要捲動長題目時關閉標註模式即可（標註是短暫動作）。 */
+.qink.on{ pointer-events:auto; touch-action:none; }
 
 /* 標註工具列：只在標註模式顯示 */
 /* 標註工具列：必須 fixed 脫離版面流程。
