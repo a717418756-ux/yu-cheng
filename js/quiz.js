@@ -459,6 +459,10 @@ let _inkStrokes = [];      // 復原快照
 let _inkBound   = false;   // 事件是否已綁定
 let _inkDirty   = false;   // 有未儲存的筆跡
 let _inkPrevQ   = null;    // 上一題（換題時要把筆跡存回它）
+// 畫筆設定（顏色／粗細／筆型），在同一次作答期間沿用
+let _inkColor   = '#ff5a5a';
+let _inkWidth   = 2.6;
+let _inkMode    = 'pen';   // pen=手繪 / line=直線 / marker=螢光筆
 
 // 依題目容器大小設定畫布，並載入該題既有標註
 // 畫布使用固定內部解析度，與版面高度脫鉤。
@@ -492,36 +496,87 @@ function _inkBind(){
   _inkBound = true;
   const ctx = cv.getContext('2d');
   let drawing = false;
+  let startPt = null;      // 直線模式的起點
+  let baseSnap = null;     // 直線模式：拖曳過程中反覆還原用的底圖
   const pos = e => {
     const r = cv.getBoundingClientRect();
     return { x:(e.clientX - r.left) * (cv.width / r.width),
              y:(e.clientY - r.top)  * (cv.height / r.height) };
   };
+  // 依目前筆型套用畫筆樣式
+  const applyStyle = ()=>{
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = _inkColor;
+    if(_inkMode === 'marker'){
+      // 螢光筆：半透明、加粗、方頭，疊在文字上仍看得見字
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = _inkWidth * 4;
+      ctx.lineCap = 'butt';
+    }else{
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = _inkWidth;
+    }
+  };
+
   cv.addEventListener('pointerdown', e => {
     if(!_inkOn) return;
     // 標註模式下一律直接繪製（手指／筆／滑鼠皆同）。
-    //   曾經為了「標註時仍能捲動」而改成手指需長按 260ms 才畫，但手指按在
-    //   螢幕上必然有微小抖動，pointermove 一觸發就取消長按，結果永遠畫不出來。
-    //   捲動改由「先關閉標註模式」達成——標註是短暫的圈畫動作，
-    //   不該為了捲動而犧牲「按下就能畫」這個最基本的預期。
+    //   曾經為了「標註時仍能捲動」改成手指需長按才畫，但手指按在螢幕上必然
+    //   有微小抖動，pointermove 一觸發就取消長按，結果永遠畫不出來。
+    //   捲動改由「關閉標註模式」達成。
     e.preventDefault(); drawing = true;
     try{ cv.setPointerCapture(e.pointerId); }catch(err){}
-    // 快照用 ImageData（免 PNG 編碼，下筆不頓）
+    // 下筆前先存快照供復原（ImageData 免 PNG 編碼，不會頓）
     try{ _inkStrokes.push(ctx.getImageData(0, 0, cv.width, cv.height)); }catch(err){}
     if(_inkStrokes.length > 8) _inkStrokes.shift();
-    ctx.strokeStyle = '#ff5a5a'; ctx.lineWidth = 2.4;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y);
+    applyStyle();
+    const p = pos(e);
+    startPt = p;
+    if(_inkMode === 'line'){
+      // 直線：記住拖曳前的畫面，之後每次移動都還原再重畫，才會是「一條線跟著手指」
+      try{ baseSnap = ctx.getImageData(0, 0, cv.width, cv.height); }catch(err){ baseSnap = null; }
+    }else{
+      ctx.beginPath(); ctx.moveTo(p.x, p.y);
+    }
   });
+
   cv.addEventListener('pointermove', e => {
     if(!_inkOn || !drawing) return;
     e.preventDefault();
-    const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
+    const p = pos(e);
+    if(_inkMode === 'line'){
+      if(baseSnap){ try{ ctx.putImageData(baseSnap, 0, 0); }catch(err){} }
+      applyStyle();
+      ctx.beginPath(); ctx.moveTo(startPt.x, startPt.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    }else{
+      ctx.lineTo(p.x, p.y); ctx.stroke();
+    }
     _inkDirty = true;
   });
-  const end = ()=>{ drawing = false; };
+
+  const end = ()=>{
+    if(drawing && _inkMode === 'line') _inkDirty = true;  // 只點一下沒移動也算有畫
+    drawing = false; startPt = null; baseSnap = null;
+    ctx.globalAlpha = 1;   // 還原，避免影響後續繪製與存檔
+  };
   cv.addEventListener('pointerup', end);
   cv.addEventListener('pointerleave', end);
+}
+
+// ── 畫筆設定（顏色／粗細／筆型）────────────────────────────
+function inkColor(btn){
+  _inkColor = btn.dataset.c || '#ff5a5a';
+  document.querySelectorAll('#qink-colors .qink-c').forEach(b=>b.classList.toggle('on', b===btn));
+}
+function inkSize(btn){
+  _inkWidth = parseFloat(btn.dataset.w) || 2.6;
+  document.querySelectorAll('#qink-sizes .qink-s').forEach(b=>b.classList.toggle('on', b===btn));
+}
+function inkMode(m){
+  _inkMode = m;
+  ['pen','line','marker'].forEach(k=>{
+    document.getElementById('qink-m-'+k)?.classList.toggle('on', k===m);
+  });
 }
 
 // 切換標註模式：開啟時畫布接收觸控，關閉時自動存檔
@@ -793,20 +848,26 @@ function _initDelegation(){
     });
   }
 }
-if(document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', _initDelegation);
-} else {
-  _initDelegation();
-}
-
 // ════════ 公開 API ════════
 // 新程式碼請使用 Quiz.xxx；window 別名僅供 index.html 既有 onclick 相容
+// ★ 必須排在任何「立即執行」的初始化之前：
+//   原順序是先跑 _initDelegation() 再匯出，只要初始化在某環境拋出例外，
+//   IIFE 就中斷，整個模組的函式全掛不上 window，畫面上所有 onclick 都會變成
+//   "xxx is not defined"（例如 inkMode is not defined）。
 const Quiz = { startQ, startQWithPool, startQPick,
                toggleSubj, subjSelAll, closeSubjPick, confirmSubjPick,
-               toggleInk, inkUndo, inkClear,
+               toggleInk, inkUndo, inkClear, inkColor, inkSize, inkMode,
                openQNote, closeQNote, saveQNote, endQuizNow,
                submitAnswer, nextQ, exitQ, revealES, toggleQStar };
 window.Quiz = Quiz;
 Object.assign(window, Quiz);
+
+// 事件委派初始化（包 try/catch：失敗也不影響上面已匯出的 API）
+const _safeInitDelegation = ()=>{ try{ _initDelegation(); }catch(e){ logError('_initDelegation', e); } };
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', _safeInitDelegation);
+} else {
+  _safeInitDelegation();
+}
 
 })();

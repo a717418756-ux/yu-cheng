@@ -1038,10 +1038,9 @@ function _initEnglish(){
   _initEngListDelegation();
   _initReaderDelegation();
 }
-if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', _initEnglish);
-else _initEnglish();
-
 // ════════ 公開 API ════════
+// ★ 排在初始化之前：初始化若拋錯會中斷 IIFE，導致整個模組的函式
+//   都掛不上 window，畫面上所有 onclick 變成 "xxx is not defined"。
 const English = {
   renderEnglish, openEngUpload, openMaterial, closeMaterial,
   toggleEngTTS, setEngRate, engRateStep,
@@ -1050,5 +1049,10 @@ const English = {
 };
 window.English = English;
 Object.assign(window, English);
+
+// 初始化（包 try/catch：失敗不影響已匯出的 API）
+const _safeInitEnglish = ()=>{ try{ _initEnglish(); }catch(e){ logError('_initEnglish', e); } };
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', _safeInitEnglish);
+else _safeInitEnglish();
 
 })();
