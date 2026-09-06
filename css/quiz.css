@@ -428,11 +428,26 @@
 /* 顏色選擇 */
 .qink-colors{ display:flex; gap:5px; }
 .qink-c{
-  width:24px; height:24px; border-radius:50%;
-  background:var(--c); border:2px solid rgba(255,255,255,0.25);
+  width:26px; height:26px; min-width:26px; border-radius:50%;
+  /* 用 !important 確保不被全站 button 預設樣式蓋掉（顏色是這顆鈕的唯一意義） */
+  background:var(--c) !important;
+  border:2px solid rgba(255,255,255,0.3);
   cursor:pointer; padding:0; flex-shrink:0;
+  display:inline-block; appearance:none; -webkit-appearance:none;
+  box-sizing:border-box;
 }
 .qink-c.on{ border-color:#fff; box-shadow:0 0 0 2px var(--c); }
+/* 自訂顏色：原生色票選擇器，外觀與其他色鈕一致 */
+.qink-c-custom{
+  width:26px; height:26px; min-width:26px; border-radius:50%;
+  padding:0; border:2px dashed rgba(255,255,255,0.45);
+  background:transparent; cursor:pointer; flex-shrink:0;
+  appearance:none; -webkit-appearance:none; box-sizing:border-box;
+}
+.qink-c-custom::-webkit-color-swatch-wrapper{ padding:0; }
+.qink-c-custom::-webkit-color-swatch{ border:none; border-radius:50%; }
+.qink-c-custom.on{ border-style:solid; border-color:#fff; }
+[data-theme="eink"] .qink-c-custom{ border-color:#000; }
 
 /* 粗細選擇 */
 .qink-sizes{ display:flex; gap:4px; margin-left:4px; }
@@ -533,3 +548,59 @@
 [data-theme="eink"] .heatmap-wrap{
   background:none; border:1.5px solid #000;
 }
+
+/* ══ 申論題：國考答題紙樣式 ═══════════════════════════════════
+   模擬考卷稿紙的橫線版面，段落逐行編號，貼近實際作答視覺。 */
+.es-sheet{
+  margin-top:10px; border:1px solid var(--bd); border-radius:10px;
+  overflow:hidden; background:var(--bg1);
+}
+.es-sheet-hd{
+  padding:7px 12px; font-size:12px; font-weight:700; letter-spacing:.08em;
+  color:var(--t0); background:var(--bg2);
+  border-bottom:1px solid var(--bd);
+}
+.es-sheet-body{ counter-reset:esln; padding:4px 0; }
+/* 每段一「行」，左側編號 + 底部稿紙線 */
+.es-line{
+  counter-increment:esln;
+  position:relative;
+  padding:9px 12px 9px 40px;
+  font-size:14px; line-height:1.95; color:var(--t1);
+  border-bottom:1px dashed rgba(255,255,255,0.10);
+  text-align:justify;
+}
+.es-line:last-child{ border-bottom:none; }
+.es-line::before{
+  content:counter(esln);
+  position:absolute; left:0; top:9px; width:30px;
+  text-align:center; font-size:11px; color:var(--t2);
+  font-variant-numeric:tabular-nums;
+}
+
+/* 關鍵概念檢測 */
+.es-kw{ margin-top:10px; padding:10px 12px; border-radius:10px; background:var(--bg2); }
+.es-kw-hd{ font-size:12px; color:var(--t2); margin-bottom:7px; }
+.es-kw-hd b{ color:var(--acc); font-size:13px; }
+.es-kw-list{ display:flex; flex-wrap:wrap; gap:6px; }
+.es-kw-tag{
+  font-size:12px; padding:4px 9px; border-radius:7px;
+  background:rgba(255,90,90,0.12); color:var(--red);
+  border:1px solid rgba(255,90,90,0.28);
+}
+.es-kw-tag.hit{
+  background:rgba(74,222,128,0.12); color:var(--grn);
+  border-color:rgba(74,222,128,0.3);
+}
+
+/* 作答輸入框：加上稿紙行距感 */
+#qes-input{ line-height:1.95 !important; }
+
+/* e-ink：純黑白高對比 */
+[data-theme="eink"] .es-sheet{ border-color:#000; background:#fff; }
+[data-theme="eink"] .es-sheet-hd{ background:#fff; color:#000; border-bottom:1.5px solid #000; }
+[data-theme="eink"] .es-line{ color:#000; border-bottom-color:#bbb; }
+[data-theme="eink"] .es-line::before{ color:#555; }
+[data-theme="eink"] .es-kw{ background:#fff; border:1.5px solid #000; }
+[data-theme="eink"] .es-kw-tag{ background:#fff; color:#000; border-color:#888; }
+[data-theme="eink"] .es-kw-tag.hit{ background:#000; color:#fff; border-color:#000; }
