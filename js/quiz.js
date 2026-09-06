@@ -274,18 +274,36 @@ function revealES(){
   const ans = qu.answerEs || qu.answer || '';
   const resEl = document.getElementById('qres');
   resEl.className = 'qres on r';
-  resEl.innerHTML = '<b>參考解析：</b><br>'+esc(ans);
+
+  // 以「國考答題紙」樣式呈現參考答案：直書式稿紙底線、分段落編號，
+  // 貼近實際考卷版面，看久了對版面配置與答題結構會有記憶點。
+  //   支援兩種分段：使用者用換行分段，或用「一、二、三…」「(一)(二)」開頭
+  const paras = String(ans).split(/\n+/).map(t=>t.trim()).filter(Boolean);
+  const sheet = paras.length
+    ? paras.map(p=>'<div class="es-line">'+esc(p)+'</div>').join('')
+    : '<div class="es-line" style="color:var(--t2)">（本題尚未填寫參考答案）</div>';
+  let html =
+    '<div class="es-sheet">'
+    + '<div class="es-sheet-hd">參考答案</div>'
+    + '<div class="es-sheet-body">' + sheet + '</div>'
+    + '</div>';
 
   // 申論題關鍵字檢測
   const must = qu.mustKeywords || [];
   if(must.length){
-    resEl.innerHTML += '<br><br><b>關鍵概念檢測：</b><br>';
     const userAns = (document.getElementById('qes-input')?.value || '');
-    must.forEach(kw=>{
-      const hit = userAns.includes(kw);
-      resEl.innerHTML += `<span style="color:${hit?'var(--grn)':'var(--red)'}">${hit?'✓':'✗'} ${esc(kw)}</span>  `;
-    });
+    const hits = must.filter(kw => userAns.includes(kw));
+    html += '<div class="es-kw">'
+         +  '<div class="es-kw-hd">關鍵概念檢測　<b>' + hits.length + ' / ' + must.length + '</b></div>'
+         +  '<div class="es-kw-list">'
+         +  must.map(kw=>{
+              const hit = userAns.includes(kw);
+              return '<span class="es-kw-tag' + (hit ? ' hit' : '') + '">'
+                   + (hit ? '✓' : '✗') + ' ' + esc(kw) + '</span>';
+            }).join('')
+         +  '</div></div>';
   }
+  resEl.innerHTML = html;
 
   document.getElementById('qrevbtn').disabled = true;
   document.getElementById('qnxt').classList.remove('hide');
@@ -567,6 +585,13 @@ function _inkBind(){
 function inkColor(btn){
   _inkColor = btn.dataset.c || '#ff5a5a';
   document.querySelectorAll('#qink-colors .qink-c').forEach(b=>b.classList.toggle('on', b===btn));
+  document.getElementById('qink-c-custom')?.classList.remove('on');
+}
+// 自訂顏色（原生色票，可挑任意色）
+function inkCustomColor(inp){
+  _inkColor = inp.value || '#ff5a5a';
+  document.querySelectorAll('#qink-colors .qink-c').forEach(b=>b.classList.remove('on'));
+  inp.classList.add('on');
 }
 function inkSize(btn){
   _inkWidth = parseFloat(btn.dataset.w) || 2.6;
@@ -856,7 +881,7 @@ function _initDelegation(){
 //   "xxx is not defined"（例如 inkMode is not defined）。
 const Quiz = { startQ, startQWithPool, startQPick,
                toggleSubj, subjSelAll, closeSubjPick, confirmSubjPick,
-               toggleInk, inkUndo, inkClear, inkColor, inkSize, inkMode,
+               toggleInk, inkUndo, inkClear, inkColor, inkCustomColor, inkSize, inkMode,
                openQNote, closeQNote, saveQNote, endQuizNow,
                submitAnswer, nextQ, exitQ, revealES, toggleQStar };
 window.Quiz = Quiz;

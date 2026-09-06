@@ -356,5 +356,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.5.2';     // 修 inkMode is not defined 的結構性根因:quiz.js 與 english.js 都把「公開 API 匯出」排在「立即執行的初始化」之後—只要初始化在某環境拋出例外，IIFE 就中斷，整個模組的函式全都掛不上 window，畫面上所有 onclick 都變成 not defined(連鎖失效)。改為先匯出再初始化，且初始化包 try/catch。已實測:模擬初始化拋錯時 inkMode 仍正確匯出。另修畫筆工具列第二列在360px螢幕會超出50px而擠壓變形，改為三列排版(顏色粗細/筆型/動作)
+const APP_VERSION  = '4.6.0';     // ①修畫筆顏色鈕看不到:background 被全站 button 預設樣式蓋掉，改用 !important 並補上 appearance:none/display:inline-block/box-sizing 確保圓形色塊必定顯示，尺寸加大為26px ②新增自訂顏色—原生色票選擇器(input type=color)，可挑任意顏色，外觀與其他色鈕一致 ③申論題參考答案改為國考答題紙樣式:稿紙橫線版面、段落自動編號、標題列，關鍵概念檢測改為命中數統計＋標籤化呈現(命中綠/未命中紅)，作答輸入框加大行距貼近稿紙手感，含 e-ink 純黑白高對比版
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
