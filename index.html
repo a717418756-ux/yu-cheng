@@ -385,7 +385,7 @@
       </div>
       <div class="fr fg">
         <div><label class="fl">考試別</label><select id="bi-ex"><option value="">選擇考試</option><option>警佐班</option><option>升官等</option><option>警大二技</option><option>三等考試</option><option>其他</option></select></div>
-        <div><label class="fl">答案列（可空）</label><input id="bi-ans" placeholder="DACB 或 1.D 2.A"></div>
+        <div><label class="fl">答案列（可空）</label><input id="bi-ans" placeholder="1.D 2.A 3.C（需帶題號）"></div>
       </div>
       <div class="fg"><label class="fl">貼入考題文字</label>
         <textarea id="bi-text" class="bta" rows="7"
@@ -536,7 +536,7 @@
     <button class="theme-btn" id="theme-btn-eink" onclick="setTheme('eink')">📖<br>電子紙</button>
   </div>
   <div class="sec">題庫管理</div>
-  <div class="srow"><div><div class="slb">匯出完整題庫 JSON</div><div class="ssb" id="exp-info">備份題目與記錄</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expJSON()">匯出</button></div>
+  <div class="srow"><div><div class="slb">匯出題庫 JSON <span style="font-size:10px;color:var(--t2);font-weight:400">給程式處理用</span></div><div class="ssb" id="exp-info">備份題目與記錄</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expJSON()">匯出</button></div>
   <div class="srow"><div><div class="slb">匯入 JSON 題庫</div><div class="ssb">不覆蓋已有題目</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="document.getElementById('imp').click()">匯入</button></div>
   <input type="file" id="imp" accept=".json" style="display:none" onchange="impJSON(event)">
   <div class="srow"><div><div class="slb">匯出錯題 HTML</div><div class="ssb">可列印錯題卷</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expWrong()">匯出</button></div>
@@ -640,7 +640,7 @@
   </div>
 
   <div class="sec">資料維護</div>
-  <div class="srow"><div><div class="slb">重建條號索引</div><div class="ssb" id="reindex-info">修正法條排序 + 重建題目搜尋索引</div></div>
+  <div class="srow"><div><div class="slb">重建條號索引</div><div class="ssb" id="reindex-info">修正法條排序與編章節錯標 + 重建搜尋索引。<b>匯入大量法條後請按一次</b></div></div>
   <button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="rebuildLawIndex()">重建</button></div>
 
   <div class="sec" style="color:var(--red)">危險操作</div>
