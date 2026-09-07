@@ -92,7 +92,12 @@ async function gdriveBackup(){ try{
   if(json.ok){
     const t = new Date().toLocaleString('zh-TW');
     await setSetting('lastBackupTime', t);
-    toast('已備份到 Google Drive ✓');
+    _showDoneDialog('雲端備份完成 ✓', [
+      '已上傳到你的 Google Drive。',
+      '',
+      '時間：' + t,
+      '涵蓋：題庫、法條、答題記錄、設定、倒數日、統計、英語教材、單字本、健康數據',
+    ]);
     renderSet();
   }
   else{ toast('備份失敗：'+(json.error||'未知錯誤')); }
@@ -154,8 +159,12 @@ async function gdriveRestore(){ try{
       _cacheInvalidate();
       const rt = new Date().toLocaleString('zh-TW');
       await setSetting('lastRestoreTime', rt);
-      toast('還原完成，重新整理頁面中…');
-      setTimeout(()=>location.reload(), 1200);
+      _showDoneDialog('雲端還原完成 ✓', [
+        '資料已從 Google Drive 還原。',
+        '',
+        '時間：' + rt,
+        '按「知道了」後會重新整理頁面。',
+      ], ()=> location.reload());
     } catch(innerErr){
       logError('gdriveRestore-inner', innerErr);
       toast('還原失敗：'+innerErr.message);
@@ -474,7 +483,12 @@ async function localBackup(){
       count++;
     }
 
-    toast(`備份完成！共 ${count} 個項目 ✓`);
+    _showDoneDialog('本機備份完成 ✓', [
+      '共 ' + count + ' 個項目已寫入你選的資料夾。',
+      '',
+      '時間：' + new Date().toLocaleString('zh-TW'),
+      '內容：exam_data.json ＋ ebooks／media／refbooks／learnmedia 四個資料夾',
+    ]);
   }catch(e){
     if(e.name === 'AbortError') return;  // 使用者取消
     logError('localBackup', e);
@@ -667,8 +681,12 @@ async function localRestore(){
       }catch(e){ /* learnmedia 資料夾不存在就跳過 */ }
 
       _cacheInvalidate?.();
-      toast(`還原完成！共 ${count} 個項目，重新整理中…`);
-      setTimeout(()=>location.reload(), 1200);
+      _showDoneDialog('本機還原完成 ✓', [
+        '共 ' + count + ' 個項目已還原。',
+        '',
+        '時間：' + new Date().toLocaleString('zh-TW'),
+        '按「知道了」後會重新整理頁面。',
+      ], ()=> location.reload());
     }catch(e){
       if(e.name === 'AbortError') return;
       logError('localRestore', e);
@@ -729,6 +747,32 @@ async function _renderAzureUsage(){
     + '<div style="margin-top:4px;opacity:.8">估算值，實際用量以 Azure 後台為準</div>';
 }
 
+
+// ── 需手動關閉的完成提示 ──────────────────────────────────────
+//   備份是重要操作，用 toast 幾秒就消失，沒注意到就不確定成功了沒。
+//   改用彈窗，必須按「知道了」才關閉，並顯示完成時間供核對。
+//   onClose：關閉後要執行的動作（例如還原完成後重新整理頁面）
+function _showDoneDialog(title, lines, onClose){
+  const ov = document.createElement('div');
+  ov.className = 'ov on';   // 沿用既有說明彈窗的樣式（.ov + .sh），確保外觀一致
+  ov.id = 'done-dialog-ov';
+  const close = ()=>{ ov.remove(); if(typeof onClose === 'function') onClose(); };
+  ov.innerHTML =
+    '<div class="sh" onclick="event.stopPropagation()" style="max-width:420px">'
+    + '<div class="shdl"></div>'
+    + '<div class="sht"><span>' + esc(title) + '</span></div>'
+    + '<div style="padding:2px 18px 8px;font-size:13px;line-height:1.9;color:var(--t1)">'
+    +   lines.map(l => l ? esc(l) : '').join('<br>')
+    + '</div>'
+    + '<div style="padding:6px 18px 22px">'
+    +   '<button class="btn bp bw" id="done-dialog-ok" '
+    +   'style="width:100%;padding:11px;font-size:14px;font-weight:600">知道了</button>'
+    + '</div>'
+    + '</div>';
+  ov.onclick = (e)=>{ if(e.target === ov) close(); };
+  document.body.appendChild(ov);
+  document.getElementById('done-dialog-ok').onclick = close;
+}
 
 // ══ 偵錯面板 ══════════════════════════════════════════════════
 const _debugLogs = [];
