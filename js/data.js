@@ -702,7 +702,11 @@ function showAdd(q){
   S.editId = q?.id || null;
   S.qType = q?.type || 'mc';
   // 初始化答案為 Set（支援多選）
-  S.correct = q?.answer ? new Set([...q.answer]) : new Set(['A']);
+  // ★ 不可預設成 'A'：原本寫 `: new Set(['A'])`，只要題目的 answer 是空的
+  //   （例如題庫本來就沒填答案、或還原後欄位遺失），開啟編輯畫面就會被當成
+  //   選了 A，一按儲存就把 'A' 寫死進資料庫 —— 正確答案被無聲覆蓋。
+  //   改為留空，讓使用者自己選；未選就存檔時另有提示。
+  S.correct = q?.answer ? new Set([...q.answer]) : new Set();
   const title = document.getElementById('add-title');
   if(title) title.textContent = q?.id ? '編輯題目' : '新增題目';
   // 編輯模式隱藏「連續新增」按鈕
@@ -744,7 +748,8 @@ function showAdd(q){
 
 function setQT(type, opts){
   S.qType = type;
-  if(!(S.correct instanceof Set) || S.correct.size===0) S.correct = new Set(['A']);
+  // 只確保型別正確，不補預設答案（補 'A' 會覆蓋掉原本未填答案的狀態）
+  if(!(S.correct instanceof Set)) S.correct = new Set(S.correct ? [...S.correct] : []);
   const mc = document.getElementById('tmc');
   const es = document.getElementById('tes');
   const mcArea = document.getElementById('mc-opts');
@@ -772,15 +777,18 @@ function setAns(k){
   // 多選 toggle：S.correct 改為 Set
   if(!(S.correct instanceof Set)) S.correct = new Set(S.correct ? [...S.correct] : []);
   if(S.correct.has(k)) S.correct.delete(k); else S.correct.add(k);
-  if(S.correct.size===0) S.correct.add('A'); // 至少要有一個答案
+  // 全部取消時保持空白（原本自動補 'A'，會讓使用者以為答案是 A）
   ['A','B','C','D','E'].forEach(l=>{
     const btn = document.getElementById('opt-'+l)?.previousElementSibling;
     if(btn) btn.className = 'btn '+(S.correct.has(l)?'bp':'bg');
   });
 }
 function _getAnswerStr(){
+  // ★ 不可 fallback 成 'A'：未選答案時應如實回傳空字串。
+  //   原本寫 `return S.correct||'A'`，S.correct 為空/未初始化時會憑空產生
+  //   一個 'A' 存進資料庫，把原本正確或空白的答案覆蓋掉。
   if(S.correct instanceof Set) return [...S.correct].sort().join('');
-  return S.correct||'A';
+  return S.correct || '';
 }
 
 function toggleGroupStem(){
@@ -817,6 +825,9 @@ async function saveQ(){
       if(v)options[k]=v;
     });
     if(Object.keys(options).length<2){toast('選擇題至少需要2個選項');return;}
+    // 未選正確答案時提示（仍允許存檔，方便先建題目之後再補）。
+    // 這種題目答題時不計入複習進度與統計，不會污染錯題分析。
+    if(!_getAnswerStr()) toast('提醒：尚未選擇正確答案，此題不會計入複習進度');
   }
   const relStr=document.getElementById('f-laws')?.value.trim()||'';
   const relatedLaws=relStr?relStr.split(/[,，]/).map(s=>({ref:s.trim()})).filter(r=>r.ref):[];
@@ -895,6 +906,9 @@ async function saveQAndContinue(){  try{
       if(v)options[k]=v;
     });
     if(Object.keys(options).length<2){toast('選擇題至少需要2個選項');return;}
+    // 未選正確答案時提示（仍允許存檔，方便先建題目之後再補）。
+    // 這種題目答題時不計入複習進度與統計，不會污染錯題分析。
+    if(!_getAnswerStr()) toast('提醒：尚未選擇正確答案，此題不會計入複習進度');
   }
   const relStr=document.getElementById('f-laws')?.value.trim()||'';
   const relatedLaws=relStr?relStr.split(/[,，]/).map(s=>({ref:s.trim()})).filter(r=>r.ref):[];
@@ -927,8 +941,8 @@ async function saveQAndContinue(){  try{
   const clr=(id)=>{ const el=document.getElementById(id); if(el) el.value=''; };
   clr('f-stem'); clr('f-es'); clr('f-num'); clr('f-note');
   ['A','B','C','D','E'].forEach(k=>clr('opt-'+k));
-  S.correct=new Set(['A']); S.editId=null;
-  // 更新選項 UI 選中狀態（重置為只選A）
+  S.correct=new Set(); S.editId=null;   // 不預設 A，避免誤以為已選答案
+  // 更新選項 UI 選中狀態（全部取消選取）
   ['A','B','C','D','E'].forEach(l=>{
     const btn=document.getElementById('opt-'+l)?.previousElementSibling;
     if(btn) btn.className='btn '+(l==='A'?'bp':'bg');
