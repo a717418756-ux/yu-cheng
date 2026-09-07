@@ -536,7 +536,7 @@
     <button class="theme-btn" id="theme-btn-eink" onclick="setTheme('eink')">📖<br>電子紙</button>
   </div>
   <div class="sec">題庫管理</div>
-  <div class="srow"><div><div class="slb">匯出題庫 JSON <span style="font-size:10px;color:var(--t2);font-weight:400">給程式處理用</span></div><div class="ssb" id="exp-info">備份題目與記錄</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expJSON()">匯出</button></div>
+  <div class="srow"><div><div class="slb">匯出題庫 JSON <span style="font-size:10px;color:var(--t2);font-weight:400">給程式處理用，非完整備份</span></div><div class="ssb" id="exp-info">備份題目與記錄</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expJSON()">匯出</button></div>
   <div class="srow"><div><div class="slb">匯入 JSON 題庫</div><div class="ssb">不覆蓋已有題目</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="document.getElementById('imp').click()">匯入</button></div>
   <input type="file" id="imp" accept=".json" style="display:none" onchange="impJSON(event)">
   <div class="srow"><div><div class="slb">匯出錯題 HTML</div><div class="ssb">可列印錯題卷</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expWrong()">匯出</button></div>
@@ -599,7 +599,8 @@
       </button>
     </div>
     <div style="font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.5">
-      ☁️ 備份範圍：<b>題庫 + 法條</b>（考試區）｜備份檔名：<code style="color:var(--acc)">YC_Platform_backup.json</code>
+      ☁️ 備份範圍：<b>題庫</b>（含手寫標註、複習進度）、<b>法條</b>、<b>答題記錄</b>、<b>設定</b>、<b>倒數日</b>、<b>使用統計</b>、<b>英語教材</b>、<b>單字本</b>、<b>健康數據</b><br>
+      <span style="color:var(--org)">不含</span>電子書、影音、學習教材等大型檔案（請用下方本地完整備份）｜檔名：<code style="color:var(--acc)">YC_Platform_backup.json</code>
     </div>
   </div>
 
@@ -607,7 +608,7 @@
   <div class="sec">本地完整備份（全部資料）</div>
   <div class="scard" style="padding:12px 14px">
     <div style="font-size:12px;color:var(--t2);margin-bottom:10px;line-height:1.6">
-      選擇本機資料夾，一鍵備份或還原所有資料（題庫、法條、書庫、影音庫完整檔案）。<br>
+      選擇本機資料夾，一鍵備份或還原<b>全部資料</b>（含書庫、影音、學習參考書、學習教材的完整檔案）。<br>
       <span style="color:var(--org)">⚠ 需使用 Chrome / Edge 瀏覽器</span>
     </div>
     <div style="display:flex;gap:8px">
@@ -619,7 +620,8 @@
       </button>
     </div>
     <div style="font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.5">
-      備份內容：<code style="color:var(--acc)">exam_data.json</code>（題庫+法條）、<code style="color:var(--acc)">ebooks/</code>（書庫）、<code style="color:var(--acc)">media/</code>（影音庫）
+      備份內容：<code style="color:var(--acc)">exam_data.json</code>（題庫、法條、答題記錄、設定、倒數日、統計、英語教材、單字本、健康數據）<br>
+      ＋ <code style="color:var(--acc)">ebooks/</code>（休閒書庫）、<code style="color:var(--acc)">media/</code>（休閒影音）、<code style="color:var(--acc)">refbooks/</code>（學習參考書）、<code style="color:var(--acc)">learnmedia/</code>（學習教材影音）
     </div>
   </div>
 
