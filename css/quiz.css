@@ -549,34 +549,44 @@
   background:none; border:1.5px solid #000;
 }
 
-/* ══ 申論題：國考答題紙樣式 ═══════════════════════════════════
-   模擬考卷稿紙的橫線版面，段落逐行編號，貼近實際作答視覺。 */
-.es-sheet{
-  margin-top:10px; border:1px solid var(--bd); border-radius:10px;
-  overflow:hidden; background:var(--bg1);
+/* ══ 申論題：國考手寫答案卷 ═══════════════════════════════════
+   模擬真實考卷：米白紙張、藍色格線、手寫體，並依申論標號縮排出層次。
+   目的是讓參考答案的視覺接近考場上真正會寫出來的樣子，幫助記憶架構。 */
+.es-paper{
+  margin-top:12px; border-radius:6px; overflow:hidden;
+  background:#f7f4ea;                    /* 答案卷的米白紙色 */
+  box-shadow:0 3px 14px rgba(0,0,0,.35);
+  border:1px solid #cfc6ad;
 }
-.es-sheet-hd{
-  padding:7px 12px; font-size:12px; font-weight:700; letter-spacing:.08em;
-  color:var(--t0); background:var(--bg2);
-  border-bottom:1px solid var(--bd);
+/* 卷頭：深色橫幅，仿考卷抬頭 */
+.es-paper-hd{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 14px; background:#3b4a5a; color:#f2efe4;
+  font-size:12px; font-weight:700; letter-spacing:.22em;
 }
-.es-sheet-body{ counter-reset:esln; padding:4px 0; }
-/* 每段一「行」，左側編號 + 底部稿紙線 */
-.es-line{
-  counter-increment:esln;
-  position:relative;
-  padding:9px 12px 9px 40px;
-  font-size:14px; line-height:1.95; color:var(--t1);
-  border-bottom:1px dashed rgba(255,255,255,0.10);
-  text-align:justify;
+.es-paper-no{ font-size:11px; letter-spacing:.04em; opacity:.85; font-weight:500; }
+
+/* 內文區：淡藍橫格線（用漸層畫線，行高必須與 line-height 對齊） */
+.es-paper-body{
+  padding:14px 16px 20px;
+  background-image:repeating-linear-gradient(
+    180deg, transparent, transparent 33px, #c3d3e2 33px, #c3d3e2 34px);
+  background-position:0 6px;
 }
-.es-line:last-child{ border-bottom:none; }
-.es-line::before{
-  content:counter(esln);
-  position:absolute; left:0; top:9px; width:30px;
-  text-align:center; font-size:11px; color:var(--t2);
-  font-variant-numeric:tabular-nums;
+/* 每一行：手寫體、深藍墨色 */
+.es-ln{
+  font-family:"Kaiti TC","標楷體","DFKai-SB","BiauKai","Noto Serif TC",serif;
+  font-size:15.5px; line-height:34px;    /* 對齊格線間距 */
+  color:#1f3350;                          /* 藍黑墨水色 */
+  letter-spacing:.03em; text-align:justify;
+  word-break:break-all;
 }
+/* 申論架構縮排：大標頂格 → 次標 → 細目 → 內文 */
+.es-ln.l1{ font-weight:700; margin-top:2px; }
+.es-ln.l2{ padding-left:1.6em; }
+.es-ln.l3{ padding-left:3.2em; }
+.es-ln.tx{ padding-left:3.2em; text-indent:2em; }
+.es-ln.l1:first-child{ margin-top:0; }
 
 /* 關鍵概念檢測 */
 .es-kw{ margin-top:10px; padding:10px 12px; border-radius:10px; background:var(--bg2); }
@@ -597,10 +607,14 @@
 #qes-input{ line-height:1.95 !important; }
 
 /* e-ink：純黑白高對比 */
-[data-theme="eink"] .es-sheet{ border-color:#000; background:#fff; }
-[data-theme="eink"] .es-sheet-hd{ background:#fff; color:#000; border-bottom:1.5px solid #000; }
-[data-theme="eink"] .es-line{ color:#000; border-bottom-color:#bbb; }
-[data-theme="eink"] .es-line::before{ color:#555; }
+/* e-ink：純白紙、黑墨、淺灰格線（電子紙無彩色，米白與藍會變髒灰） */
+[data-theme="eink"] .es-paper{ background:#fff; border:1.5px solid #000; box-shadow:none; }
+[data-theme="eink"] .es-paper-hd{ background:#fff; color:#000; border-bottom:1.5px solid #000; }
+[data-theme="eink"] .es-paper-body{
+  background-image:repeating-linear-gradient(
+    180deg, transparent, transparent 33px, #bbb 33px, #bbb 34px);
+}
+[data-theme="eink"] .es-ln{ color:#000; }
 [data-theme="eink"] .es-kw{ background:#fff; border:1.5px solid #000; }
 [data-theme="eink"] .es-kw-tag{ background:#fff; color:#000; border-color:#888; }
 [data-theme="eink"] .es-kw-tag.hit{ background:#000; color:#fff; border-color:#000; }
