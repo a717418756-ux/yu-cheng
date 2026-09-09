@@ -275,17 +275,28 @@ function revealES(){
   const resEl = document.getElementById('qres');
   resEl.className = 'qres on r';
 
-  // 以「國考答題紙」樣式呈現參考答案：直書式稿紙底線、分段落編號，
-  // 貼近實際考卷版面，看久了對版面配置與答題結構會有記憶點。
-  //   支援兩種分段：使用者用換行分段，或用「一、二、三…」「(一)(二)」開頭
+  // 以「國考手寫答案卷」樣式呈現參考答案：米白紙張、格線、手寫體，
+  // 並依申論慣用的標號自動縮排出層次，貼近考場上真正會寫出來的版面，
+  // 靠視覺記憶幫助考試時回想架構。
+  //   一、二、三…        → 大標（頂格）
+  //   (一)(二)、（一）…   → 次標（縮一層）
+  //   1. 2. 3.           → 細目（縮兩層）
+  //   其他                → 內文（縮兩層，首行再縮兩字元）
+  const lvOf = (t)=>{
+    if(/^[一二三四五六七八九十]+[、．.]/.test(t))      return 'l1';
+    if(/^[（(][一二三四五六七八九十]+[)）]/.test(t))    return 'l2';
+    if(/^\d+[、．.]/.test(t) || /^[（(]\d+[)）]/.test(t)) return 'l3';
+    return 'tx';
+  };
   const paras = String(ans).split(/\n+/).map(t=>t.trim()).filter(Boolean);
   const sheet = paras.length
-    ? paras.map(p=>'<div class="es-line">'+esc(p)+'</div>').join('')
-    : '<div class="es-line" style="color:var(--t2)">（本題尚未填寫參考答案）</div>';
+    ? paras.map(p=>'<div class="es-ln ' + lvOf(p) + '">' + esc(p) + '</div>').join('')
+    : '<div class="es-ln tx" style="opacity:.55">（本題尚未填寫參考答案）</div>';
   let html =
-    '<div class="es-sheet">'
-    + '<div class="es-sheet-hd">參考答案</div>'
-    + '<div class="es-sheet-body">' + sheet + '</div>'
+    '<div class="es-paper">'
+    + '<div class="es-paper-hd"><span>參 考 答 案</span><span class="es-paper-no">'
+    +   esc((qu.subject||'') + (qu.num ? '　第' + qu.num + '題' : '')) + '</span></div>'
+    + '<div class="es-paper-body">' + sheet + '</div>'
     + '</div>';
 
   // 申論題關鍵字檢測
