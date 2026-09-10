@@ -622,9 +622,18 @@ async function openExamGroup(year, subject){  try{
   const ws=getWrong(qs,ats);
 
   // 該年度+考科下的題目
-  const scoped = qs.filter(q=>
-    (q.year||'未知年度')===year && (q.subject||'未分類')===subject
-  );
+  // ★ 必須與上一層（openYearGroup）套用相同的類型篩選，否則選了「申論題」，
+  //   考試別的題數仍會把選擇題算進去，數字與實際點進去看到的不符。
+  const f = S.filter || 'all';
+  const scoped = qs.filter(q=>{
+    if((q.year||'未知年度')!==year) return false;
+    if((q.subject||'未分類')!==subject) return false;
+    if(f==='mc'    && q.type!=='mc')   return false;
+    if(f==='es'    && q.type!=='es')   return false;
+    if(f==='wrong' && !ws.has(q.id))   return false;
+    if(f==='star'  && !q.starred)      return false;
+    return true;
+  });
 
   // 依考試別分組
   const byExam={};
