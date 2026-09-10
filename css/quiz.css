@@ -568,10 +568,15 @@
 
 /* 內文區：淡藍橫格線（用漸層畫線，行高必須與 line-height 對齊） */
 .es-paper-body{
-  padding:14px 16px 20px;
+  /* ★ 格線對齊的關鍵：
+     ①padding-top 必須等於 background-position 的 Y 偏移，否則第一行就錯開；
+       這裡兩者都用 0，讓格線與文字從同一個基準開始。
+     ②格線間距必須「完全等於」行高（34px），少 1px 就會逐行累積偏移。 */
+  padding:0 16px 20px;
   background-image:repeating-linear-gradient(
-    180deg, transparent, transparent 33px, #c3d3e2 33px, #c3d3e2 34px);
-  background-position:0 6px;
+    180deg, transparent 0, transparent 33px, #c3d3e2 33px, #c3d3e2 34px);
+  background-position:0 0;
+  background-repeat:repeat-y;
 }
 /* 每一行：手寫體、深藍墨色 */
 .es-ln{
@@ -582,11 +587,13 @@
   word-break:break-all;
 }
 /* 申論架構縮排：大標頂格 → 次標 → 細目 → 內文 */
-.es-ln.l1{ font-weight:700; margin-top:2px; }
+/* ★ 不可用 margin-top：任何額外間距都會讓後續行與格線逐行錯開（越來越偏）。
+   需要視覺區隔就靠字重，不動高度。 */
+.es-ln.l1{ font-weight:700; }
 .es-ln.l2{ padding-left:1.6em; }
 .es-ln.l3{ padding-left:3.2em; }
 .es-ln.tx{ padding-left:3.2em; text-indent:2em; }
-.es-ln.l1:first-child{ margin-top:0; }
+
 
 /* 關鍵概念檢測 */
 .es-kw{ margin-top:10px; padding:10px 12px; border-radius:10px; background:var(--bg2); }
@@ -612,7 +619,7 @@
 [data-theme="eink"] .es-paper-hd{ background:#fff; color:#000; border-bottom:1.5px solid #000; }
 [data-theme="eink"] .es-paper-body{
   background-image:repeating-linear-gradient(
-    180deg, transparent, transparent 33px, #bbb 33px, #bbb 34px);
+    180deg, transparent 0, transparent 33px, #bbb 33px, #bbb 34px);
 }
 [data-theme="eink"] .es-ln{ color:#000; }
 [data-theme="eink"] .es-kw{ background:#fff; border:1.5px solid #000; }

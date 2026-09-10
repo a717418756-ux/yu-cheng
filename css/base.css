@@ -1619,3 +1619,18 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 [data-theme="eink"] .chip:active,
 [data-theme="eink"] .hd-btn:active,
 [data-theme="eink"] .zqb:active{ transform:none; outline:2px solid #000; outline-offset:-2px; }
+
+/* ══ 篩選標籤：0 題時反灰停用 ═══════════════════════════════ */
+.chip.chip-off{
+  opacity:.38;
+  color:var(--t2);
+  background:var(--bg2);
+  border-color:var(--bd);
+  cursor:not-allowed;
+  pointer-events:none;      /* 徹底擋住點擊，含觸控 */
+}
+.chip.chip-off:active{ transform:none; }
+[data-theme="eink"] .chip.chip-off{
+  opacity:1; color:#999; background:#fff;
+  border-style:dashed; border-color:#bbb;
+}
