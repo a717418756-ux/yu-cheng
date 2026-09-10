@@ -373,6 +373,17 @@ function showSearchHelp(){
   document.body.appendChild(ov);
 }
 
+// 分組卡片的掌握度視覺化：以「錯題佔比」呈現，一眼看出哪個年度／科目最弱。
+//   綠=穩、黃=待加強、紅=弱項；無作答紀錄則不顯示（避免把「還沒做」誤判成「很穩」）
+function _mkMasteryBar(total, wrong, answered){
+  if(!answered) return '<div class="mst-none">尚未作答</div>';
+  const pct = Math.round(wrong / answered * 100);
+  const lv  = pct >= 40 ? 'bad' : pct >= 15 ? 'mid' : 'good';
+  return '<div class="mst"><div class="mst-bar"><div class="mst-fill ' + lv + '" style="width:'
+       + Math.max(pct, 3) + '%"></div></div>'
+       + '<span class="mst-txt ' + lv + '">錯誤率 ' + pct + '%</span></div>';
+}
+
 async function renderList(){  try{
   const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const kw=(document.getElementById('si')?.value||'').toLowerCase().trim();
@@ -417,8 +428,9 @@ async function renderList(){  try{
     if(!m) return;
     const key=m[1], n=typeCount[key]||0;
     // 標籤文字只設一次，之後只更新數字（避免重複附加）
+    // 標籤只顯示名稱，不加題數（題數在下方分組列表呈現即可）
     if(!btn.dataset.label) btn.dataset.label=btn.textContent.trim();
-    btn.textContent=btn.dataset.label+' '+n;
+    btn.textContent=btn.dataset.label;
     // 0 題 → 停用（目前選中的類型即使為 0 也保持可按，否則會卡住無法切回）
     const off = n===0 && key!==f;
     btn.classList.toggle('chip-off', off);
@@ -446,7 +458,7 @@ async function renderList(){  try{
       const b=document.createElement('button');
       const off = n===0 && !((name==='all'&&sf==='all')||(name!=='all'&&sf===name));
       b.className='chip'+(((name==='all'&&sf==='all')||(name!=='all'&&sf===name))?' on':'')+(off?' chip-off':'');
-      b.textContent=(name==='all'?'全部科目':name)+' '+n;
+      b.textContent=(name==='all'?'全部科目':name);
       b.disabled=off;
       if(!off) b.onclick=()=>{ S.subF=name; renderList(); };
       schips.appendChild(b);
@@ -526,7 +538,8 @@ async function renderList(){  try{
         '<span style="margin-left:auto;font-size:12px;color:var(--t2)">'+qs.length+' 題'+(wrong?' · <span style="color:var(--red)">'+wrong+' 錯</span>':'')+'</span>'+
         '<span style="color:var(--t2);margin-left:6px">›</span>'+
       '</div>'+
-      '<div style="font-size:11px;color:var(--t2);margin-top:4px">'+subjects.slice(0,4).map(s=>esc(s)).join('・')+(subjects.length>4?'…':'')+'</div>';
+      '<div style="font-size:11px;color:var(--t2);margin-top:4px">'+subjects.slice(0,4).map(s=>esc(s)).join('・')+(subjects.length>4?'…':'')+'</div>'+
+      _mkMasteryBar(qs.length, wrong, qs.filter(q=>(q.reviewLevel||0)>0||q.wrongCount).length);
     div.dataset.selkey = 'yr:'+yr;
     div.onclick=()=>{ if(_listSelMode) return; openYearGroup(yr); };
     el.appendChild(div);
@@ -586,7 +599,8 @@ async function openYearGroup(year){  try{
         '<span class="tag">'+esc(sub)+'</span>'+
         '<span style="margin-left:auto;font-size:12px;color:var(--t2)">'+sqs.length+' 題'+(wrong?' · <span style="color:var(--red)">'+wrong+' 錯</span>':'')+'</span>'+
         '<span style="color:var(--t2);margin-left:6px">›</span>'+
-      '</div>';
+      '</div>'+
+      _mkMasteryBar(sqs.length, wrong, sqs.filter(q=>(q.reviewLevel||0)>0||q.wrongCount).length);
     div.dataset.selkey = 'sub:'+year+':'+sub;
     div.onclick=()=>{
       if(_listSelMode){ return; }
@@ -653,10 +667,11 @@ async function openExamGroup(year, subject){  try{
       '<div class="qch">'+
         '<span class="tag">'+esc(ex)+'</span>'+
         '<span style="margin-left:auto;font-size:12px;color:var(--t2)">'+
-          (has ? eqs.length+' 題'+(wrong?' · <span style="color:var(--red)">'+wrong+' 錯</span>':'') : '<span style="font-style:italic">尚未新增</span>')+
+          (has ? eqs.length+' 題'+(wrong?' · <span style="color:var(--red)">'+wrong+' 錯</span>':'') : '0 題')+
         '</span>'+
         (has?'<span style="color:var(--t2);margin-left:6px">›</span>':'')+
-      '</div>';
+      '</div>'+
+      (has ? _mkMasteryBar(eqs.length, wrong, eqs.filter(q=>(q.reviewLevel||0)>0||q.wrongCount).length) : '');
     if(has){
       div.onclick=()=>openQGroup(year, subject, ex);
     }
