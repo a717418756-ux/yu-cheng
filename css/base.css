@@ -1634,3 +1634,33 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
   opacity:1; color:#999; background:#fff;
   border-style:dashed; border-color:#bbb;
 }
+
+/* ══ 題庫分組卡片：掌握度視覺化 ═══════════════════════════════
+   以錯題佔比呈現，一眼看出哪個年度／科目最需要加強。 */
+.mst{ display:flex; align-items:center; gap:7px; margin-top:7px; }
+.mst-bar{
+  flex:1; height:4px; border-radius:2px;
+  background:rgba(255,255,255,0.08); overflow:hidden;
+}
+.mst-fill{ height:100%; border-radius:2px; }
+.mst-fill.good{ background:var(--grn); }
+.mst-fill.mid { background:var(--org); }
+.mst-fill.bad { background:var(--red); }
+.mst-txt{
+  font-size:10.5px; font-variant-numeric:tabular-nums;
+  flex-shrink:0; letter-spacing:.02em;
+}
+.mst-txt.good{ color:var(--grn); }
+.mst-txt.mid { color:var(--org); }
+.mst-txt.bad { color:var(--red); }
+.mst-none{ font-size:10.5px; color:var(--t2); margin-top:7px; opacity:.75; }
+
+/* e-ink：無彩色，改用填滿比例與粗細區分 */
+[data-theme="eink"] .mst-bar{ background:#e0e0e0; border:1px solid #999; }
+[data-theme="eink"] .mst-fill.good,
+[data-theme="eink"] .mst-fill.mid,
+[data-theme="eink"] .mst-fill.bad{ background:#000; }
+[data-theme="eink"] .mst-txt.good,
+[data-theme="eink"] .mst-txt.mid,
+[data-theme="eink"] .mst-txt.bad{ color:#000; }
+[data-theme="eink"] .mst-txt.bad{ font-weight:700; text-decoration:underline; }
