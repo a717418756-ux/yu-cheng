@@ -397,6 +397,34 @@ async function renderList(){  try{
   const lcEl=document.getElementById('lc');
   if(lcEl) lcEl.textContent='共 '+fl.length+' 題';
 
+  // ── 各篩選標籤顯示題數；0 題者反灰並停用 ──────────────────
+  //   題數以「目前科目 + 關鍵字」為前提計算，切換類型才有實際意義。
+  const matchKw=(q)=>{
+    if(!kw) return true;
+    const h=(q.searchBlob||(q.stem||'')+(q.subject||'')+(q.keywords||[]).join(' ')).toLowerCase();
+    return kw.split(/\s+/).filter(Boolean).every(t=>h.includes(t));
+  };
+  const baseForType=qs.filter(q=>(sf==='all'||q.subject===sf)&&matchKw(q));
+  const typeCount={
+    all:   baseForType.length,
+    mc:    baseForType.filter(q=>q.type==='mc').length,
+    es:    baseForType.filter(q=>q.type==='es').length,
+    wrong: baseForType.filter(q=>ws.has(q.id)).length,
+    star:  baseForType.filter(q=>q.starred).length,
+  };
+  document.querySelectorAll('#fchips .chip').forEach(btn=>{
+    const m=(btn.getAttribute('onclick')||'').match(/setF\(this,'(\w+)'\)/);
+    if(!m) return;
+    const key=m[1], n=typeCount[key]||0;
+    // 標籤文字只設一次，之後只更新數字（避免重複附加）
+    if(!btn.dataset.label) btn.dataset.label=btn.textContent.trim();
+    btn.textContent=btn.dataset.label+' '+n;
+    // 0 題 → 停用（目前選中的類型即使為 0 也保持可按，否則會卡住無法切回）
+    const off = n===0 && key!==f;
+    btn.classList.toggle('chip-off', off);
+    btn.disabled = off;
+  });
+
   // 更新科目 chip
   // 科目 chip 只顯示目前篩選結果內的科目（不含關鍵字搜尋，以保留切換科目的意義）
   const subsBase=f==='all'&&!kw ? qs : fl;
@@ -404,11 +432,23 @@ async function renderList(){  try{
   const schips=document.getElementById('schips');
   if(schips){
     schips.innerHTML='';
-    ['all',...subs].forEach(s=>{
+    // 科目題數以「目前類型 + 關鍵字」為前提
+    const baseForSub=qs.filter(q=>{
+      if(f==='mc'&&q.type!=='mc')return false;
+      if(f==='es'&&q.type!=='es')return false;
+      if(f==='wrong'&&!ws.has(q.id))return false;
+      if(f==='star'&&!q.starred)return false;
+      return matchKw(q);
+    });
+    ['all',...subs].forEach(name=>{
+      const n = name==='all' ? baseForSub.length
+                             : baseForSub.filter(q=>q.subject===name).length;
       const b=document.createElement('button');
-      b.className='chip'+(((s==='all'&&sf==='all')||(s!=='all'&&sf===s))?' on':'');
-      b.textContent=s==='all'?'全部科目':s;
-      b.onclick=()=>{ S.subF=s; renderList(); };
+      const off = n===0 && !((name==='all'&&sf==='all')||(name!=='all'&&sf===name));
+      b.className='chip'+(((name==='all'&&sf==='all')||(name!=='all'&&sf===name))?' on':'')+(off?' chip-off':'');
+      b.textContent=(name==='all'?'全部科目':name)+' '+n;
+      b.disabled=off;
+      if(!off) b.onclick=()=>{ S.subF=name; renderList(); };
       schips.appendChild(b);
     });
   }
