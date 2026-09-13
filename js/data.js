@@ -1508,7 +1508,15 @@ async function openLawGroup(lawName){  try{
     if(_kwArtNum2){
       return (l.articleNumber || art2n(l.article||'')) === _kwArtNum2;
     }
-    const h=((l.article||'')+(l.title||'')+(l.content||'')).toLowerCase();
+    // ★ 必須與 renderDB 的搜尋採同一套比對來源（searchBlob 優先）。
+    //   原本只比對 article+title+content，但圖片類法條（SOP／補充資料／函釋）
+    //   的 content 是 base64，searchBlob 刻意排除它而改收 lawName/keywords；
+    //   於是「搜尋找得到、點進去卻篩成 0 筆」→ 下方 if(!laws.length) return
+    //   直接返回，畫面完全沒反應。
+    const _c = (l.content||'').startsWith('data:') ? '' : (l.content||'');
+    const h = (l.searchBlob ||
+               ((l.lawName||'')+(l.article||'')+(l.title||'')+
+                (l.keywords||[]).join(' ')+_c)).toLowerCase();
     return h.includes(_kwText2);
   }).sort((a,b)=>{
     const na=(a.articleNumber||art2n(a.article||''))||0;
@@ -1516,7 +1524,16 @@ async function openLawGroup(lawName){  try{
     if(na!==nb) return na-nb;
     return (a.id||0)-(b.id||0); // 同條號(或都無條號)：依輸入順序
   });
-  if(!laws.length)return;
+  if(!laws.length){
+    // 保底：關鍵字在此法規內篩不到任何條文時，改為顯示整部法規，
+    // 而不是無聲返回讓使用者以為當掉（這是先前圖片類法條點不進去的表徵）。
+    const all = allLaws.filter(l=>l.lawName===lawName)
+                       .sort((a,b)=>((a.articleNumber||art2n(a.article||''))||0)
+                                   -((b.articleNumber||art2n(b.article||''))||0)
+                                   || (a.id||0)-(b.id||0));
+    if(!all.length){ toast('查無「'+lawName+'」的條文'); return; }
+    laws.push(...all);
+  }
   const others=[...new Set(allLaws.map(l=>l.lawName).filter(Boolean))].filter(n=>n!==lawName).slice(0,8);
   const cat=laws[0].category||'statute';
   const icon=cat==='sop'?'📋':cat==='supplement'?'📄':'⚖';
