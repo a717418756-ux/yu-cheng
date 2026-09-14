@@ -1664,3 +1664,5 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 [data-theme="eink"] .mst-txt.mid,
 [data-theme="eink"] .mst-txt.bad{ color:#000; }
 [data-theme="eink"] .mst-txt.bad{ font-weight:700; text-decoration:underline; }
+.mst-sub{ color:var(--t2); font-weight:400; margin-left:4px; opacity:.85; }
+[data-theme="eink"] .mst-sub{ color:#666; }
