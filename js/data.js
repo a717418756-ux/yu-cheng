@@ -375,13 +375,18 @@ function showSearchHelp(){
 
 // 分組卡片的掌握度視覺化：以「錯題佔比」呈現，一眼看出哪個年度／科目最弱。
 //   綠=穩、黃=待加強、紅=弱項；無作答紀錄則不顯示（避免把「還沒做」誤判成「很穩」）
-function _mkMasteryBar(total, wrong, answered){
+function _mkMasteryBar(total, danger, answered){
   if(!answered) return '<div class="mst-none">尚未作答</div>';
-  const pct = Math.round(wrong / answered * 100);
+  // 分子是 getWrong 判定的「危險題」（最近3次全錯，或錯誤率>50%），
+  // 不是單純的答錯次數 —— 因此標示為「危險題佔比」而非「錯誤率」，
+  // 避免把「答錯過但已練熟」的題目也算進去而誤導判讀。
+  const pct = Math.round(danger / answered * 100);
   const lv  = pct >= 40 ? 'bad' : pct >= 15 ? 'mid' : 'good';
+  const txt = pct === 0 ? '已掌握' : '危險題 ' + pct + '%';
   return '<div class="mst"><div class="mst-bar"><div class="mst-fill ' + lv + '" style="width:'
        + Math.max(pct, 3) + '%"></div></div>'
-       + '<span class="mst-txt ' + lv + '">錯誤率 ' + pct + '%</span></div>';
+       + '<span class="mst-txt ' + lv + '">' + txt
+       + '<span class="mst-sub">（' + answered + '/' + total + ' 題已練）</span></span></div>';
 }
 
 async function renderList(){  try{
@@ -397,7 +402,8 @@ async function renderList(){  try{
     if(f==='star'&&!q.starred)return false;
     if(sf!=='all'&&q.subject!==sf)return false;
     if(kw){
-      const h=(q.searchBlob||(q.stem||'')+(q.subject||'')+(q.keywords||[]).join(' ')).toLowerCase();
+      const h=(q.searchBlob||((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+
+        (q.year||'')+' '+(q.exam||'')+' '+(q.num||'')+' '+(q.keywords||[]).join(' '))).toLowerCase();
       // 多關鍵字 AND：空格分隔的每個詞都要出現（可跨欄位，順序不限）
       const terms=kw.split(/\s+/).filter(Boolean);
       if(!terms.every(t=>h.includes(t))) return false;
@@ -412,7 +418,8 @@ async function renderList(){  try{
   //   題數以「目前科目 + 關鍵字」為前提計算，切換類型才有實際意義。
   const matchKw=(q)=>{
     if(!kw) return true;
-    const h=(q.searchBlob||(q.stem||'')+(q.subject||'')+(q.keywords||[]).join(' ')).toLowerCase();
+    const h=(q.searchBlob||((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+
+        (q.year||'')+' '+(q.exam||'')+' '+(q.num||'')+' '+(q.keywords||[]).join(' '))).toLowerCase();
     return kw.split(/\s+/).filter(Boolean).every(t=>h.includes(t));
   };
   const baseForType=qs.filter(q=>(sf==='all'||q.subject===sf)&&matchKw(q));
@@ -1756,7 +1763,7 @@ async function toggleLvFav(){
   if(!name) return;
   const all = await da('laws');
   const laws = all.filter(l => l.lawName === name);
-  if(!laws.length) return;
+  if(!laws.length){ toast('找不到「'+name+'」的條文，無法收藏'); return; }
   const nf = laws.some(l => l.favorite);
   for(const l of laws){ l.favorite = !nf; await dp('laws', l); }
   toast(nf ? '已取消收藏' : '已收藏');

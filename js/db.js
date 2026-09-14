@@ -356,5 +356,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.9.2';     // 修資料庫搜尋圖片類法條(SOP/補充資料/函釋)點了無法跳轉:renderDB 搜尋比對 searchBlob(圖片類的 searchBlob 刻意排除 base64 內容，改收 lawName/keywords)，但點進去後 openLawGroup 卻只比對 article+title+content —— base64 比對不到關鍵字，於是篩成0筆觸發 if(!laws.length) return 無聲返回，畫面完全沒反應。改為與 renderDB 採同一套比對來源(searchBlob 優先、圖片內容排除)；另加保底:即使篩不到也改為顯示整部法規而非無聲返回，法規完全不存在時給明確提示
+const APP_VERSION  = '4.9.3';     // 主動掃描找出的三項改善:①題目搜尋的 fallback 只含 stem/subject/keywords，與 saveQ 產生的 searchBlob(含 groupStem/year/exam/num)不一致—舊資料若無 searchBlob，用年度、考試別、題號搜尋會找不到，已補齊為相同欄位 ②toggleLvFav 找不到條文時無聲失敗，改為明確提示(同類的「按了沒反應」問題；另兩處 !batch.length 是虛擬捲動的分頁終止，屬正確行為不需改) ③掌握度標示語意修正—分子是 getWrong 判定的危險題(最近3次全錯或錯誤率>50%)，標成「錯誤率」會誤導，改為「危險題 X%」，0% 顯示「已掌握」，並補上「已練 N/M 題」讓練習進度與弱項比例同時可見(原本 total 參數傳了卻沒用到)
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
