@@ -625,3 +625,34 @@
 [data-theme="eink"] .es-kw{ background:#fff; border:1.5px solid #000; }
 [data-theme="eink"] .es-kw-tag{ background:#fff; color:#000; border-color:#888; }
 [data-theme="eink"] .es-kw-tag.hit{ background:#000; color:#fff; border-color:#000; }
+
+/* ══ 限時模擬考：倒數計時器 ═══════════════════════════════════ */
+.mock-timer{
+  position:fixed; z-index:40;
+  top:calc(8px + env(safe-area-inset-top, 0px));
+  left:50%; transform:translateX(-50%);
+  padding:5px 14px; border-radius:20px;
+  background:rgba(22,22,28,0.92);
+  border:1px solid rgba(255,255,255,0.14);
+  color:var(--t0); font-size:13px; font-weight:700;
+  font-variant-numeric:tabular-nums; letter-spacing:.04em;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  pointer-events:none;              /* 純顯示，不擋操作 */
+}
+/* 剩 5 分鐘：轉警示色並緩慢呼吸，提醒但不干擾作答 */
+.mock-timer.warn{
+  background:rgba(120,30,30,0.94);
+  border-color:rgba(255,90,90,0.5);
+  color:#ffd9d9;
+  animation:mockPulse 1.6s ease-in-out infinite;
+}
+@keyframes mockPulse{ 0%,100%{opacity:1} 50%{opacity:.62} }
+
+[data-theme="eink"] .mock-timer{
+  background:#fff; border:1.5px solid #000; color:#000;
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
+/* 電子紙不做動畫（殘影＋耗電） */
+[data-theme="eink"] .mock-timer.warn{
+  background:#000; color:#fff; animation:none;
+}
