@@ -24,6 +24,107 @@ async function startQ(mode){  try{
   startQWithPool(pool, mode);
   }catch(e){ logError('startQ', e); }}
 
+// ══ 限時模擬考 ═══════════════════════════════════════════════
+//   只收選擇題（申論重點在架構不在秒數，不適合速度訓練）。
+//   與一般練習的差別：作答時不顯示對錯、有倒數計時、交卷後才一次檢討。
+let _mockTimer = null;      // 倒數計時器
+let _mockEndAt = 0;         // 結束時間戳
+
+function startMockExam(){  try{
+  const ov = document.createElement('div');
+  ov.className = 'ov on';
+  ov.id = 'mock-ov';
+  ov.innerHTML =
+    '<div class="sh" onclick="event.stopPropagation()" style="max-width:420px">'
+    + '<div class="shdl"></div>'
+    + '<div class="sht"><span>限時模擬考</span>'
+    +   '<button class="hd-btn bg" onclick="document.getElementById(\'mock-ov\').remove()">✕</button></div>'
+    + '<div style="padding:4px 18px 20px">'
+    +   '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px">'
+    +     '模擬真實考試：<b>作答時不顯示對錯</b>，交卷後一次檢討。<br>只出選擇題。</div>'
+    +   '<div class="fg"><label class="fl">科目</label>'
+    +     '<select id="mk-sub"><option value="">全部科目</option></select></div>'
+    +   '<div class="fr fg">'
+    +     '<div><label class="fl">題數</label><select id="mk-n">'
+    +       [25,40,50,60].map(n=>'<option'+(n===40?' selected':'')+'>'+n+'</option>').join('')
+    +     '</select></div>'
+    +     '<div><label class="fl">時間（分鐘）</label><select id="mk-t">'
+    +       [30,45,60,90,120].map(n=>'<option'+(n===60?' selected':'')+'>'+n+'</option>').join('')
+    +     '</select></div>'
+    +   '</div>'
+    +   '<div id="mk-hint" style="font-size:11.5px;color:var(--t2);margin:2px 0 12px"></div>'
+    +   '<button class="btn bp bw" style="width:100%;padding:11px;font-size:14px;font-weight:600"'
+    +     ' onclick="beginMockExam()">開始作答</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  // 帶入科目清單與可用題數
+  da('questions').then(qs=>{
+    const mc = qs.filter(q=>q.type==='mc' && (q.answer||'').trim());
+    const subs=[...new Set(mc.map(q=>q.subject).filter(Boolean))].sort();
+    const sel=document.getElementById('mk-sub');
+    if(sel) sel.innerHTML='<option value="">全部科目（'+mc.length+' 題可用）</option>'
+      + subs.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'（'
+        + mc.filter(q=>q.subject===x).length+' 題）</option>').join('');
+    const hint=document.getElementById('mk-hint');
+    if(hint) hint.textContent='※ 只計入已填正確答案的選擇題';
+  }).catch(()=>{});
+  }catch(e){ logError('startMockExam', e); }}
+
+async function beginMockExam(){  try{
+  const sub = document.getElementById('mk-sub')?.value || '';
+  const n   = parseInt(document.getElementById('mk-n')?.value) || 40;
+  const min = parseInt(document.getElementById('mk-t')?.value) || 60;
+
+  const qs = await da('questions');
+  // 只收「選擇題且已填答案」——沒答案的題目無法計分
+  let pool = qs.filter(q=>q.type==='mc' && (q.answer||'').trim());
+  if(sub) pool = pool.filter(q=>q.subject===sub);
+  if(!pool.length){ toast('這個科目沒有可用的選擇題'); return; }
+
+  // 隨機抽題（Fisher-Yates，避免 sort(()=>Math.random()) 的分佈偏差）
+  for(let i=pool.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [pool[i],pool[j]]=[pool[j],pool[i]];
+  }
+  pool = pool.slice(0, Math.min(n, pool.length));
+  if(pool.length < n) toast('可用題目僅 '+pool.length+' 題，已全數出題');
+
+  document.getElementById('mock-ov')?.remove();
+  startQWithPool(pool, 'mock');
+  _startMockTimer(min);
+  }catch(e){ logError('beginMockExam', e); toast('無法開始：'+e.message); }}
+
+function _startMockTimer(min){
+  _stopMockTimer();
+  _mockEndAt = Date.now() + min*60000;
+  let bar = document.getElementById('mock-timer');
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'mock-timer';
+    bar.className = 'mock-timer';
+    document.getElementById('qv')?.appendChild(bar);
+  }
+  const tick = ()=>{
+    const left = _mockEndAt - Date.now();
+    if(left <= 0){
+      _stopMockTimer();
+      toast('時間到，自動交卷');
+      endQuizNow();
+      return;
+    }
+    const m = Math.floor(left/60000), s = Math.floor(left%60000/1000);
+    bar.textContent = '⏱ ' + m + ':' + String(s).padStart(2,'0');
+    bar.classList.toggle('warn', left <= 300000);   // 剩 5 分鐘轉警示色
+  };
+  tick();
+  _mockTimer = setInterval(tick, 1000);
+}
+
+function _stopMockTimer(){
+  if(_mockTimer){ clearInterval(_mockTimer); _mockTimer = null; }
+  document.getElementById('mock-timer')?.remove();
+}
+
 function startQWithPool(pool, mode){
   S.quiz = { q:pool, idx:0, ans:false, res:[], mode:mode||'all', _selected:new Set() };
   // 確保 qfoot 可見（showQDone 會隱藏）
@@ -221,6 +322,19 @@ async function ansQ(sel){  try{
     });
   }
 
+  // ── 模擬考：作答時不揭曉，只標記已選，直接進入下一題 ──
+  //   這是模擬考與一般練習的核心差異：真實考試不會告訴你對錯。
+  if(S.quiz.mode === 'mock'){
+    document.querySelectorAll('.qopt').forEach(o=>{
+      const k = o.querySelector('.qok')?.textContent;
+      o.classList.toggle('selected-opt', k === (sel||'').toUpperCase());
+    });
+    document.getElementById('qmulti-confirm')?.classList.add('hide');
+    document.getElementById('qnxt')?.classList.remove('hide');
+    // 筆記／標註在考試中不開放（考場也不會有）
+    return;
+  }
+
   // 顯示結果
   const opts = document.querySelectorAll('.qopt');
   const correctKeys = (qu.answer||'').toUpperCase().split('');
@@ -341,6 +455,7 @@ function nextQ(){
 }
 
 function exitQ(){
+  _stopMockTimer();   // 中途離開也要停止倒數
   _inkTeardown();
   document.getElementById('qv').style.display = 'none';
   S.quiz = {q:[], idx:0, ans:false, res:[], mode:''};
@@ -364,6 +479,7 @@ async function toggleQStar(){  try{
 // 【答題：完成結算】
 // ════════════════════════════════════════════════════════════
 function showQDone(){
+  _stopMockTimer();   // 交卷後停止倒數，避免計時器殘留繼續跑
   const res = S.quiz.res;
   const total    = res.length;
   const correct  = res.filter(r=>r.correct).length;
@@ -893,6 +1009,7 @@ function _initDelegation(){
 const Quiz = { startQ, startQWithPool, startQPick,
                toggleSubj, subjSelAll, closeSubjPick, confirmSubjPick,
                toggleInk, inkUndo, inkClear, inkColor, inkCustomColor, inkSize, inkMode,
+               startMockExam, beginMockExam,
                openQNote, closeQNote, saveQNote, endQuizNow,
                submitAnswer, nextQ, exitQ, revealES, toggleQStar };
 window.Quiz = Quiz;
