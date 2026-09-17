@@ -29,6 +29,7 @@ async function startQ(mode){  try{
 //   與一般練習的差別：作答時不顯示對錯、有倒數計時、交卷後才一次檢討。
 let _mockTimer = null;      // 倒數計時器
 let _mockEndAt = 0;         // 結束時間戳
+let _mockExitConfirmed = false;   // 已確認放棄，避免確認框遞迴
 
 function startMockExam(){  try{
   const ov = document.createElement('div');
@@ -455,6 +456,14 @@ function nextQ(){
 }
 
 function exitQ(){
+  // 模擬考中途離開 = 整場作廢，誤觸代價太大，先確認。
+  // （一般練習隨時可離開、進度都已存檔，不需要攔）
+  if(S.quiz.mode === 'mock' && S.quiz.res?.length && !_mockExitConfirmed){
+    cfm('放棄模擬考',
+        '已作答 ' + S.quiz.res.length + ' 題，離開後本場成績不會保留。確定放棄？',
+        ()=>{ _mockExitConfirmed = true; exitQ(); _mockExitConfirmed = false; });
+    return;
+  }
   _stopMockTimer();   // 中途離開也要停止倒數
   _inkTeardown();
   document.getElementById('qv').style.display = 'none';
