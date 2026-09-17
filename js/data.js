@@ -1110,6 +1110,72 @@ function _updateListSelCount(){
   if(el) el.textContent = `已選 ${_listSelected.size} 題`;
 }
 
+// ── 批次修改（科目／年度／考試別）─────────────────────────
+//   匯入後常需要整批修正分類，原本只能一題一題編輯。
+//   只填想改的欄位，留空的欄位不動；searchBlob 會一併重建。
+function openBatchEdit(){  try{
+  if(!_listSelected.size){ toast('請先選取題目'); return; }
+  const n = _listSelected.size;
+  const ov = document.createElement('div');
+  ov.className = 'ov on';
+  ov.id = 'batch-edit-ov';
+  ov.innerHTML =
+    '<div class="sh" onclick="event.stopPropagation()" style="max-width:420px">'
+    + '<div class="shdl"></div>'
+    + '<div class="sht"><span>批次修改 ' + n + ' 題</span>'
+    +   '<button class="hd-btn bg" onclick="document.getElementById(\'batch-edit-ov\').remove()">✕</button></div>'
+    + '<div style="padding:4px 18px 20px">'
+    +   '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px">'
+    +     '只填要修改的欄位，<b>留空的欄位不會變動</b>。</div>'
+    +   '<div class="fg"><label class="fl">科目</label>'
+    +     '<input id="be-sub" list="be-subs" placeholder="不修改"><datalist id="be-subs"></datalist></div>'
+    +   '<div class="fg"><label class="fl">年度</label>'
+    +     '<input id="be-yr" placeholder="不修改（例：113）"></div>'
+    +   '<div class="fg"><label class="fl">考試別</label>'
+    +     '<select id="be-ex"><option value="">不修改</option>'
+    +     ['警佐班','升官等','警大二技','三等考試','其他'].map(e=>'<option>'+e+'</option>').join('')
+    +     '</select></div>'
+    +   '<button class="btn bp bw" style="width:100%;padding:11px;font-size:14px;font-weight:600;margin-top:6px"'
+    +     ' onclick="applyBatchEdit()">套用修改</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  // 科目候選清單（沿用題庫既有科目，避免打錯字產生新分類）
+  da('questions').then(qs=>{
+    const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))].sort();
+    const dl=document.getElementById('be-subs');
+    if(dl) dl.innerHTML=subs.map(x=>'<option value="'+esc(x)+'">').join('');
+  }).catch(()=>{});
+  }catch(e){ logError('openBatchEdit', e); }}
+
+async function applyBatchEdit(){  try{
+  const sub = document.getElementById('be-sub')?.value.trim() || '';
+  const yr  = document.getElementById('be-yr')?.value.trim()  || '';
+  const ex  = document.getElementById('be-ex')?.value || '';
+  if(!sub && !yr && !ex){ toast('請至少填寫一個要修改的欄位'); return; }
+
+  const ids=[..._listSelected];
+  let done=0;
+  for(const id of ids){
+    const q = await dg('questions', id);
+    if(!q) continue;
+    if(sub) q.subject = sub;
+    if(yr)  q.year    = yr;
+    if(ex)  q.exam    = ex;
+    // 分類欄位是 searchBlob 的來源，改了就必須重建，否則搜尋結果會對不上
+    q.searchBlob = ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+
+                    (q.year||'')+' '+(q.exam||'')+' '+(q.num||'')+' '+
+                    (q.keywords||[]).join(' ')).toLowerCase();
+    await dp('questions', q);
+    done++;
+  }
+  document.getElementById('batch-edit-ov')?.remove();
+  toast('已修改 ' + done + ' 題');
+  _listSelMode=false; _listSelected.clear();
+  const bar=document.getElementById('list-sel-bar');
+  if(bar) bar.style.display='none';
+  renderList();
+  }catch(e){ logError('applyBatchEdit', e); toast('修改失敗：'+e.message); }}
+
 async function confirmListSelDel(){
   if(!_listSelected.size){ toast('請先選取題目'); return; }
   if(!confirm(`確定刪除選取的 ${_listSelected.size} 題？`)) return;
@@ -2984,7 +3050,7 @@ const DataMod = {
   saveQ,
   saveQAndContinue,
   toggleListSelectMode,
-  confirmListSelDel,
+  confirmListSelDel, openBatchEdit, applyBatchEdit,
   dupAction,
   openLawSortMenu,
   closeLawSortMenu,
