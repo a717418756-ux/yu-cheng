@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.9.3';
+const APP_VERSION = '4.10.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
@@ -67,7 +67,11 @@ self.addEventListener('install', e => {
         OPTIONAL_ASSETS.map(url => cache.add(url).catch(() => {}))
       );
       return Promise.all([corePromise, optionalPromise]);
-    }).then(() => self.skipWaiting())  // 強制立即接管
+    })
+    // ★ 不在這裡呼叫 skipWaiting()：原本一裝好就強制接管，新版會在使用者
+    //   還沒看到「立即更新」橫幅前就自己生效，那顆按鈕形同虛設，
+    //   而且可能在作答或編輯到一半時抽換資源。
+    //   改為停在 waiting 狀態，等使用者按下更新（收到 SKIP_WAITING）才接管。
   );
 });
 
