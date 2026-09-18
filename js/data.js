@@ -1416,10 +1416,19 @@ function setLC(el, cat){
 }
 
 
+// ── 搜尋範圍（由搜尋框旁的下拉選單決定）───────────────────
+//   預設比對全欄位，資料一多就太雜；選定範圍後只比對該欄位。
+function _fieldValue(l, f){
+  if(f === 'keywords') return (l.keywords||[]).join(' ');
+  if(f === 'content')  return (l.content||'').startsWith('data:') ? '' : (l.content||'');
+  return l[f] || '';
+}
+
 async function renderDB(){  try{
   const ls=await da('laws');
   _setLawNames(ls);   // 供 _autoCites 比對用（列表頁也要顯示自動連結）
   const kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
+  const kwField=document.getElementById('lsf')?.value||'all';   // 搜尋範圍
   let kwLaw='', kwArtNum=0, kwText=kw;
   // 「法規名§條號」精準搜尋（規則見 parseSecSearch，與 openLawGroup 共用同一套）
   const _sec = parseSecSearch(kw);
@@ -1433,7 +1442,9 @@ async function renderDB(){  try{
       const artMatch  = (l.articleNumber || art2n(l.article||'')) === kwArtNum;
       return nameMatch && artMatch;
     }
-    // searchBlob 優先（純文字），沒有才 fallback 到欄位拼接（排除 content 避免 base64 拖慢）
+    // 選定範圍 → 只比對該欄位；選「全部」→ 維持原本全欄位比對
+    if(kwField !== 'all') return _fieldValue(l, kwField).toLowerCase().includes(kwText);
+    // searchBlob 優先（純文字），沒有才 fallback（排除 base64 避免拖慢）
     const _c = (l.content||'').startsWith('data:') ? '' : (l.content||'');
     const h = (l.searchBlob || ((l.lawName||'')+(l.article||'')+(l.title||'')+(l.keywords||[]).join(' ')+_c)).toLowerCase();
     return h.includes(kwText);
