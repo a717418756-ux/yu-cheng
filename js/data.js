@@ -1418,6 +1418,7 @@ function setLC(el, cat){
 
 async function renderDB(){  try{
   const ls=await da('laws');
+  _setLawNames(ls);   // 供 _autoCites 比對用（列表頁也要顯示自動連結）
   const kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
   let kwLaw='', kwArtNum=0, kwText=kw;
   // 「法規名§條號」精準搜尋（規則見 parseSecSearch，與 openLawGroup 共用同一套）
@@ -1561,6 +1562,67 @@ async function renderDB(){  try{
 
 // LEVEL_STYLE 移至頂部宣告
 
+// ── 一鍵連到全國法規資料庫 ─────────────────────────────────
+//   官方網址格式：
+//     單條 https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=XXX&flno=N
+//     全部 https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=XXX
+//   pcode 是每部法規的固定代碼，只收「已查證」的，避免猜錯代碼跳到別部法。
+//   表內沒有的法規一律走站內搜尋，寧可多一步也不要跳錯。
+const _LAW_PCODE = {
+  '警察職權行使法':'D0080145', '警察法':'D0080001', '警察法施行細則':'D0080002',
+  '警察勤務條例':'D0080026', '社會秩序維護法':'D0080067',
+  '中華民國刑法':'C0000001', '刑法':'C0000001', '刑事訴訟法':'C0010001',
+};
+function _officialLawUrl(lawName, article){
+  const name = String(lawName||'').trim();
+  if(!name) return '';
+  const pcode = _LAW_PCODE[name];
+  if(!pcode){
+    // 查不到代碼 → 用搜尋，讓使用者自己點進正確的那部
+    return 'https://www.google.com/search?q=' +
+           encodeURIComponent('site:law.moj.gov.tw ' + name);
+  }
+  // 條號取主號即可（官網 flno 不吃「之N」，先到該條再看子條）
+  const n = art2n(article||'');
+  const flno = n ? Math.floor(n/1000) : 0;
+  return flno
+    ? 'https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=' + pcode + '&flno=' + flno
+    : 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=' + pcode;
+}
+function openOfficialLaw(lawName, article){
+  const url = _officialLawUrl(lawName, article);
+  if(!url){ toast('無法組出官網網址'); return; }
+  window.open(url, '_blank', 'noopener');
+}
+
+// ── 從條文內文自動擷取引用（零輸入）───────────────────────
+//   法條原文本就寫明引用關係，例如
+//   「本辦法依警察職權行使法第十二條第四項規定訂定之」。
+//   ★做法：不用正則猜法規名的邊界，而是拿「資料庫裡實際存在的法規名」
+//     去比對「第X條」前面的文字。這樣完全不必處理「及／或／、」——
+//     「兒童及少年福利與權益保障法」本身就是一個已知名稱，不會被切斷。
+//     另一個好處：只會連到你真的有的法規，點了必定有東西看。
+const _ART_RE = /第([一二三四五六七八九十百千\d]+)條(?:之([一二三四五六七八九十\d]+))?/g;
+let _lawNameCache = null;        // 依長度排序的法規名（長名優先，避免短名先命中）
+function _setLawNames(allLaws){
+  _lawNameCache = [...new Set((allLaws||[]).map(l=>(l.lawName||'').trim()).filter(Boolean))]
+                    .sort((a,b)=>b.length-a.length);
+}
+function _autoCites(text){
+  if(!text || text.startsWith('data:') || !_lawNameCache) return [];
+  const out = [];
+  for(const m of String(text).matchAll(_ART_RE)){
+    const before = text.slice(Math.max(0, m.index - 30), m.index);
+    for(const name of _lawNameCache){
+      if(before.endsWith(name)){
+        out.push(name + '第' + m[1] + '條' + (m[2] ? '之' + m[2] : ''));
+        break;                    // 長名優先，命中即停
+      }
+    }
+  }
+  return [...new Set(out)];
+}
+
 // ── 反向連結（被哪些法條引用）───────────────────────────────
 //   設計取捨：不另外儲存反向關係，而是顯示時即時推導。
 //   理由：①不用重複輸入（在 A 填了關聯 B，B 自動看得到 A）
@@ -1575,8 +1637,11 @@ function _findBacklinks(target, allLaws){
   const out = [];
   for(const l of allLaws){
     if(l.id === target.id) continue;
-    for(const r of (l.relatedLaws||[])){
-      let ref = (r.ref || r.lawName || '').trim();
+    // 手動填的關聯 ＋ 從內文自動擷取的引用，兩者都算
+    const refs = [...(l.relatedLaws||[]).map(r=>r.ref||r.lawName||''),
+                  ..._autoCites(l.content||'')];
+    for(const raw of refs){
+      let ref = (raw||'').trim();
       if(!ref) continue;
       // §簡寫正規化後再比對（與 showLawPop 同一套規則）
       ref = ref.replace(_SEC_RE, (_, m2, sub)=>_secToArticle(m2, sub));
@@ -1596,6 +1661,7 @@ function _findBacklinks(target, allLaws){
 async function openLawGroup(lawName){  try{
   if(!document.getElementById('lv')){ return; }  // 防衛：lv 元素不存在時不執行
   const allLaws=await da('laws');
+  _setLawNames(allLaws);   // 供 _autoCites 比對用
   const _kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
   // §N 精確搜尋
   // §搜尋：與 renderDB 共用 parseSecSearch，確保兩邊規則永遠一致
@@ -1676,21 +1742,25 @@ async function openLawGroup(lawName){  try{
     };
     const contentHtml=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px;cursor:zoom-in" onclick="openImgViewer(this.src)" title="點擊放大">':_hl(l.content||'');
     const kwHtml=(l.keywords||[]).length?'<div style="margin-top:8px">'+l.keywords.map(k=>'<span class="tag">'+esc(k)+'</span>').join('')+'</div>':'';
-    const relHtml=(l.relatedLaws||[]).length
+    // 正向關聯 = 手動填的 ＋ 從本條內文自動擷取的（去重）
+    // 關聯法條 = 手動填的 ＋ 本條內文引用到的 ＋ 引用到本條的（三者合一，不分方向）。
+    //   使用者在意的是「這條跟哪些法規有關」，誰引用誰是法制作業的事，
+    //   讀法條時反而多一個區塊要看。反推來源以「法規名稱」呈現並去重，
+    //   避免同一部子法有多條引用時擠出一堆重複標籤。
+    const manualRefs = (l.relatedLaws||[]).map(r=>r.ref||r.lawName||'').filter(Boolean);
+    const autoRefs   = _autoCites(l.content||'');
+    const backRefs   = [...new Set(_findBacklinks(l, allLaws).map(b=>b.law.lawName||''))]
+                         .filter(Boolean);
+    const seen = new Set();
+    const allRefs = [...manualRefs, ...autoRefs, ...backRefs].filter(r=>{
+      if(!r || seen.has(r)) return false;
+      seen.add(r); return true;
+    });
+    const relHtml=allRefs.length
       ?'<div class="law-art-rel-title">🔗 關聯法條：</div>'
-        +l.relatedLaws.map(r=>'<button class="chip law-rel-chip" onclick="showLawPop(\''+esc(r.ref||r.lawName||'')+'\')">⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('')
+        +allRefs.map(ref=>'<button class="chip law-rel-chip'+(manualRefs.includes(ref)?'':' auto')
+          +'" onclick="showLawPop(\''+esc(ref)+'\')">⚖ '+esc(ref)+'</button>').join('')
       :'';
-    // 反向連結：哪些法條引用了「這一條」。即時推導，不需另外建檔。
-    const backs = _findBacklinks(l, allLaws);
-    const backHtml = backs.length
-      ? '<div class="law-art-rel-title back">↩ 被這些引用：</div>'
-        + backs.map(b=>{
-            const ref   = (b.law.lawName||'') + (b.whole ? '' : (b.law.article||''));
-            const label = (b.law.lawName||'') + (b.whole ? '' : ' ' + (b.law.article||''));
-            return '<button class="chip law-rel-chip back" onclick="showLawPop(\''
-                 + esc(ref) + '\')">⚖ ' + esc(label) + '</button>';
-          }).join('')
-      : '';
     // 劃線/筆記顯示（顏色標記 hlColor + 備註 note，整合進編輯表單）
     const hlColors={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'};
     const hlC=l.hlColor&&hlColors[l.hlColor]?hlColors[l.hlColor]:'';
@@ -1706,7 +1776,9 @@ async function openLawGroup(lawName){  try{
         +'</div>'
       +'</div>'
       +'<div class="law-art-body">'+contentHtml+'</div>'
-      +noteHtml+kwHtml+relHtml+backHtml
+      +noteHtml+kwHtml+relHtml
+      +'<div style="margin-top:9px"><button class="chip law-official" onclick="openOfficialLaw(\''
+        +esc(l.lawName||'')+'\',\''+esc(l.article||'')+'\')">🏛 查官網原文</button></div>'
     +'</div>';
   };
 
@@ -3093,7 +3165,7 @@ const DataMod = {
   saveQ,
   saveQAndContinue,
   toggleListSelectMode,
-  confirmListSelDel, openBatchEdit, applyBatchEdit,
+  confirmListSelDel, openBatchEdit, applyBatchEdit, openOfficialLaw,
   dupAction,
   openLawSortMenu,
   closeLawSortMenu,
