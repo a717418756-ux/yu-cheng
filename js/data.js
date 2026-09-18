@@ -1561,6 +1561,38 @@ async function renderDB(){  try{
 
 // LEVEL_STYLE 移至頂部宣告
 
+// ── 反向連結（被哪些法條引用）───────────────────────────────
+//   設計取捨：不另外儲存反向關係，而是顯示時即時推導。
+//   理由：①不用重複輸入（在 A 填了關聯 B，B 自動看得到 A）
+//         ②不會有「改了一邊忘了另一邊」的同步問題
+//         ③既有資料立刻生效，不需要重跑轉檔
+//   比對規則與 showLawPop 一致：先用 art2n 比對條號，
+//   沒有條號時才退回法規名稱比對，避免「§12」誤匹配到「§120」。
+function _findBacklinks(target, allLaws){
+  const tName = (target.lawName||'').trim();
+  const tNum  = target.articleNumber || art2n(target.article||'');
+  if(!tName) return [];
+  const out = [];
+  for(const l of allLaws){
+    if(l.id === target.id) continue;
+    for(const r of (l.relatedLaws||[])){
+      let ref = (r.ref || r.lawName || '').trim();
+      if(!ref) continue;
+      // §簡寫正規化後再比對（與 showLawPop 同一套規則）
+      ref = ref.replace(_SEC_RE, (_, m2, sub)=>_secToArticle(m2, sub));
+      if(!ref.includes(tName)) continue;
+      const rNum = art2n(ref);
+      // 引用有指定條號 → 必須條號相符；沒指定 → 視為指向整部法規
+      if(rNum && tNum && rNum !== tNum) continue;
+      out.push({ law: l, whole: !rNum });
+      break;
+    }
+  }
+  return out.sort((a,b)=>
+    (a.law.lawName||'').localeCompare(b.law.lawName||'','zh-TW') ||
+    ((a.law.articleNumber||0) - (b.law.articleNumber||0)));
+}
+
 async function openLawGroup(lawName){  try{
   if(!document.getElementById('lv')){ return; }  // 防衛：lv 元素不存在時不執行
   const allLaws=await da('laws');
@@ -1648,6 +1680,17 @@ async function openLawGroup(lawName){  try{
       ?'<div class="law-art-rel-title">🔗 關聯法條：</div>'
         +l.relatedLaws.map(r=>'<button class="chip law-rel-chip" onclick="showLawPop(\''+esc(r.ref||r.lawName||'')+'\')">⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('')
       :'';
+    // 反向連結：哪些法條引用了「這一條」。即時推導，不需另外建檔。
+    const backs = _findBacklinks(l, allLaws);
+    const backHtml = backs.length
+      ? '<div class="law-art-rel-title back">↩ 被這些引用：</div>'
+        + backs.map(b=>{
+            const ref   = (b.law.lawName||'') + (b.whole ? '' : (b.law.article||''));
+            const label = (b.law.lawName||'') + (b.whole ? '' : ' ' + (b.law.article||''));
+            return '<button class="chip law-rel-chip back" onclick="showLawPop(\''
+                 + esc(ref) + '\')">⚖ ' + esc(label) + '</button>';
+          }).join('')
+      : '';
     // 劃線/筆記顯示（顏色標記 hlColor + 備註 note，整合進編輯表單）
     const hlColors={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'};
     const hlC=l.hlColor&&hlColors[l.hlColor]?hlColors[l.hlColor]:'';
@@ -1663,7 +1706,7 @@ async function openLawGroup(lawName){  try{
         +'</div>'
       +'</div>'
       +'<div class="law-art-body">'+contentHtml+'</div>'
-      +noteHtml+kwHtml+relHtml
+      +noteHtml+kwHtml+relHtml+backHtml
     +'</div>';
   };
 
