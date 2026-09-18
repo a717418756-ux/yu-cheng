@@ -1621,7 +1621,14 @@ function _autoCites(text){
   if(!text || text.startsWith('data:') || !_lawNameCache) return [];
   const out = [];
   for(const m of String(text).matchAll(_ART_RE)){
-    const before = text.slice(Math.max(0, m.index - 30), m.index);
+    // 法規名與「第X條」之間常夾括號註解，例如
+    //   「本辦法依警察職權行使法（以下簡稱本法）第十二條第四項…」
+    // 先把結尾的括號註解剝掉，否則 endsWith 永遠比不到法規名。
+    let before = text.slice(Math.max(0, m.index - 40), m.index);
+    let prevB;
+    do{ prevB = before;
+        before = before.replace(/[（(][^）)]*[）)]\s*$/, '');
+    }while(before !== prevB);
     for(const name of _lawNameCache){
       if(before.endsWith(name)){
         out.push(name + '第' + m[1] + '條' + (m[2] ? '之' + m[2] : ''));
@@ -1656,8 +1663,12 @@ function _findBacklinks(target, allLaws){
       ref = ref.replace(_SEC_RE, (_, m2, sub)=>_secToArticle(m2, sub));
       if(!ref.includes(tName)) continue;
       const rNum = art2n(ref);
-      // 引用有指定條號 → 必須條號相符；沒指定 → 視為指向整部法規
+      // 引用有指定條號 → 必須條號相符
       if(rNum && tNum && rNum !== tNum) continue;
+      // ★ 沒指定條號（指向整部法規）時，只掛在該法的「第1條」。
+      //   法制邏輯：母法只會有一條授權「由某機關定之」，子法也只會在第1條
+      //   載明授權依據；若每一條都顯示同一個關聯，既不合邏輯也是雜訊。
+      if(!rNum && tNum && tNum >= 2000) continue;
       out.push({ law: l, whole: !rNum });
       break;
     }
@@ -1758,8 +1769,10 @@ async function openLawGroup(lawName){  try{
     //   避免同一部子法有多條引用時擠出一堆重複標籤。
     const manualRefs = (l.relatedLaws||[]).map(r=>r.ref||r.lawName||'').filter(Boolean);
     const autoRefs   = _autoCites(l.content||'');
-    const backRefs   = [...new Set(_findBacklinks(l, allLaws).map(b=>b.law.lawName||''))]
-                         .filter(Boolean);
+    // 反推來源（只取法規名稱並去重）。若正向已經有更精確的「○○法第X條」，
+    // 就不要再重複列出同一部法規的名稱，否則同一條會出現兩個指向同處的標籤。
+    const backRefs = [...new Set(_findBacklinks(l, allLaws).map(b=>b.law.lawName||''))]
+      .filter(n => n && ![...manualRefs, ...autoRefs].some(r => r.startsWith(n)));
     const seen = new Set();
     const allRefs = [...manualRefs, ...autoRefs, ...backRefs].filter(r=>{
       if(!r || seen.has(r)) return false;
