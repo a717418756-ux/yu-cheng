@@ -1512,6 +1512,9 @@ async function renderDB(){  try{
           +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+catLabel+' · '+laws.length+' 條'+(favCount?' · ⭐'+favCount:'')+'</div>'
           +orgLine
         +'</div>'
+        +'<button class="lw-gov" data-lawname="'+esc(name)+'" title="查全國法規資料庫原文"'
+          +' style="background:transparent;border:1px solid var(--bd);border-radius:7px;'
+          +'padding:5px 7px;font-size:13px;line-height:1;flex-shrink:0">🏛</button>'
         +'<span style="color:var(--t2);font-size:18px">›</span>'
         +'<button class="lw-del" data-lawname="'+esc(name)+'" style="background:var(--red2);color:var(--red);border:1px solid var(--red);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;flex-shrink:0">🗑</button>'
       +'</div>';
@@ -1523,6 +1526,11 @@ async function renderDB(){  try{
     div.querySelector('.lw-del').addEventListener('click',function(e){
       e.stopPropagation();
       delLawGroup(this.dataset.lawname);
+    });
+    // 查官網：整部法規（第一層不需要條號），阻止冒泡避免同時進入法規
+    div.querySelector('.lw-gov')?.addEventListener('click',function(e){
+      e.stopPropagation();
+      openOfficialLaw(this.dataset.lawname, '');
     });
     return div;
   };
@@ -1578,9 +1586,9 @@ function _officialLawUrl(lawName, article){
   if(!name) return '';
   const pcode = _LAW_PCODE[name];
   if(!pcode){
-    // 查不到代碼 → 用搜尋，讓使用者自己點進正確的那部
-    return 'https://www.google.com/search?q=' +
-           encodeURIComponent('site:law.moj.gov.tw ' + name);
+    // 查不到代碼 → 走官網自己的搜尋結果頁（不經 Google，少按一次）
+    return 'https://law.moj.gov.tw/Law/LawSearchResult.aspx?ty=LAW&kw=' +
+           encodeURIComponent(name);
   }
   // 條號取主號即可（官網 flno 不吃「之N」，先到該條再看子條）
   const n = art2n(article||'');
@@ -1777,8 +1785,7 @@ async function openLawGroup(lawName){  try{
       +'</div>'
       +'<div class="law-art-body">'+contentHtml+'</div>'
       +noteHtml+kwHtml+relHtml
-      +'<div style="margin-top:9px"><button class="chip law-official" onclick="openOfficialLaw(\''
-        +esc(l.lawName||'')+'\',\''+esc(l.article||'')+'\')">🏛 查官網原文</button></div>'
+
     +'</div>';
   };
 
