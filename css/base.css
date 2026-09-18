@@ -1671,3 +1671,12 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 .chip.law-rel-chip.auto{ border-style:dashed; opacity:.9; }
 /* 一鍵連官方法規資料庫（資料庫第一層每筆一顆） */
 [data-theme="eink"] .lw-gov{ border-color:#000 !important; color:#000; }
+/* 官網原文鈕：放在法規資訊區左下，與右側刪除鈕保持距離避免誤觸 */
+.lw-gov{
+  margin-top:6px; padding:4px 9px; border-radius:7px;
+  background:transparent; border:1px solid var(--bd);
+  color:var(--t2); font-size:11px; line-height:1.4;
+  cursor:pointer; flex-shrink:0;
+}
+.lw-gov:active{ background:rgba(255,255,255,0.06); }
+[data-theme="eink"] .lw-gov{ border-color:#000; color:#000; }
