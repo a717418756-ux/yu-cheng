@@ -349,7 +349,7 @@
       </div>
     </div>
   </div>
-  <div style="display:flex;gap:7px;align-items:center;padding:0 12px">
+  <div class="sb sb-with-sel">
     <select id="lsf" class="lsf-sel" onchange="_debouncedRenderDB()" title="限定搜尋範圍">
       <option value="all">全部</option>
       <option value="lawName">法規名稱</option>
@@ -357,7 +357,8 @@
       <option value="content">條文內容</option>
       <option value="keywords">關鍵概念</option>
     </select>
-    <div class="sb" style="flex:1;padding:0"><span class="ic">🔍</span><input id="lsi" type="search" placeholder="搜尋法規、條號、關鍵概念..." oninput="_debouncedRenderDB()"></div>
+    <span class="ic">🔍</span>
+    <input id="lsi" type="search" placeholder="搜尋法規、條號、關鍵概念..." oninput="_debouncedRenderDB()">
   </div>
   <div class="chips" id="lchips">
     <button class="chip on" onclick="setLC(this,'all')">全部</button>
