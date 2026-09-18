@@ -1511,15 +1511,16 @@ async function renderDB(){  try{
           +'<div style="font-size:15px;font-weight:700;color:var(--t0)">'+esc(name)+'</div>'
           +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+catLabel+' · '+laws.length+' 條'+(favCount?' · ⭐'+favCount:'')+'</div>'
           +orgLine
+          // 官網鈕放左側資訊區，與右側刪除鈕拉開距離，避免誤觸不可逆的刪除
+          +'<button class="lw-gov" data-lawname="'+esc(name)+'" title="查全國法規資料庫原文">'
+            +'🏛 官網原文</button>'
         +'</div>'
-        +'<button class="lw-gov" data-lawname="'+esc(name)+'" title="查全國法規資料庫原文"'
-          +' style="background:transparent;border:1px solid var(--bd);border-radius:7px;'
-          +'padding:5px 7px;font-size:13px;line-height:1;flex-shrink:0">🏛</button>'
-        +'<span style="color:var(--t2);font-size:18px">›</span>'
+        +'<span style="color:var(--t2);font-size:18px;margin-left:2px">›</span>'
         +'<button class="lw-del" data-lawname="'+esc(name)+'" style="background:var(--red2);color:var(--red);border:1px solid var(--red);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;flex-shrink:0">🗑</button>'
       +'</div>';
     div.addEventListener('click',function(e){
-      if(e.target.classList.contains('lw-del'))return;
+      // 卡片內的功能鈕各自處理，不要一併觸發「進入法規」
+      if(e.target.closest('.lw-del, .lw-gov')) return;
       if(_dbSelMode){ e.stopPropagation(); _toggleDbCard(this.dataset.lawname); return; }
       openLawGroup(this.dataset.lawname);
     });
