@@ -1669,9 +1669,5 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 
 /* 自動從內文擷取的引用：虛線框，與手動建立的區隔 */
 .chip.law-rel-chip.auto{ border-style:dashed; opacity:.9; }
-/* 一鍵連官方法規資料庫 */
-.chip.law-official{
-  color:var(--t2); border-color:var(--bd);
-  background:rgba(255,255,255,0.03); font-size:11.5px;
-}
-[data-theme="eink"] .chip.law-official{ color:#000; background:#fff; border:1px solid #000; }
+/* 一鍵連官方法規資料庫（資料庫第一層每筆一顆） */
+[data-theme="eink"] .lw-gov{ border-color:#000 !important; color:#000; }
