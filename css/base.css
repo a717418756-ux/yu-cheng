@@ -1680,3 +1680,15 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 }
 .lw-gov:active{ background:rgba(255,255,255,0.06); }
 [data-theme="eink"] .lw-gov{ border-color:#000; color:#000; }
+
+/* 搜尋範圍下拉：與搜尋框同高，放左側一點就選 */
+.lsf-sel{
+  flex-shrink:0; height:38px; padding:0 8px;
+  border-radius:10px; border:1px solid var(--bd);
+  background:var(--bg2); color:var(--t1);
+  font-size:12.5px; cursor:pointer;
+  appearance:none; -webkit-appearance:none;
+  text-align:center; text-align-last:center;
+}
+.lsf-sel:focus{ outline:none; border-color:var(--acc); }
+[data-theme="eink"] .lsf-sel{ background:#fff; color:#000; border-color:#000; }
