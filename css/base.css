@@ -1667,15 +1667,11 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 .mst-sub{ color:var(--t2); font-weight:400; margin-left:4px; opacity:.85; }
 [data-theme="eink"] .mst-sub{ color:#666; }
 
-/* ══ 法條反向連結（被哪些法條引用）═══════════════════════════
-   與正向「關聯法條」用顏色區隔：正向=紫（我引用誰），反向=青（誰引用我） */
-.law-art-rel-title.back{ color:var(--cyn, #4fc3d9); margin-top:8px; }
-.chip.law-rel-chip.back{
-  color:var(--cyn, #4fc3d9);
-  border-color:rgba(79,195,217,0.32);
-  background:rgba(79,195,217,0.09);
+/* 自動從內文擷取的引用：虛線框，與手動建立的區隔 */
+.chip.law-rel-chip.auto{ border-style:dashed; opacity:.9; }
+/* 一鍵連官方法規資料庫 */
+.chip.law-official{
+  color:var(--t2); border-color:var(--bd);
+  background:rgba(255,255,255,0.03); font-size:11.5px;
 }
-[data-theme="eink"] .law-art-rel-title.back{ color:#000; }
-[data-theme="eink"] .chip.law-rel-chip.back{
-  color:#000; background:#fff; border:1px dashed #000;
-}
+[data-theme="eink"] .chip.law-official{ color:#000; background:#fff; border:1px solid #000; }
