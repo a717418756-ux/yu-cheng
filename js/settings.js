@@ -178,7 +178,6 @@ async function gdriveRestore(){ try{
 // ════════════════════════════════════════════════════════════
 async function renderSet(){  _renderAzureKey().catch(()=>{}); try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
-  document.getElementById('exp-info').textContent=`${qs.length} 題 · ${ls.length} 條法條 · ${ats.length} 筆作答`;
   const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
   document.getElementById('db-info').innerHTML=`總題數：${qs.length}<br>法條數：${ls.length}<br>作答記錄：${ats.length}<br>科目：${esc(subs.join('、'))||'無'}<br>題型：選擇 ${qs.filter(q=>q.type==='mc').length} / 申論 ${qs.filter(q=>q.type==='es').length}`;
   renderSetCountdown();
@@ -217,65 +216,6 @@ async function renderSet(){  _renderAzureKey().catch(()=>{}); try{
 // ════════════════════════════════════════════════════════════
 // 【資料匯出/匯入】
 // ════════════════════════════════════════════════════════════
-async function expJSON(){  try{
-  const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
-  dl(JSON.stringify({version:2,exportedAt:new Date().toISOString(),questions:qs,laws:ls,attempts:ats},null,2),'警察考題庫_'+today()+'.json','application/json');
-  toast('已匯出 JSON');
-  }catch(e){ logError('expJSON',e); }}
-
-async function impJSON(e){
-  const file=e.target.files[0]; if(!file) return;
-  try{
-    // 讀取並解析 JSON
-    let data;
-    try{ data=JSON.parse(await file.text()); }
-    catch(pe){ toast('JSON 格式錯誤，無法解析'); return; }
-
-    // 格式驗證
-    if(typeof data!=='object'||data===null){ toast('匯入失敗：格式不正確'); return; }
-
-    // 支援兩種格式：純陣列（舊版）或 {questions:[...]} 物件（新版）
-    const qs = Array.isArray(data) ? data
-              : Array.isArray(data.questions) ? data.questions
-              : null;
-    if(!qs){ toast('匯入失敗：找不到 questions 欄位'); return; }
-    // questions 可能為 0（只匯入法條也合法）
-    if(qs.length===0){
-      const lawCount = Array.isArray(data.laws) ? data.laws.length : 0;
-      if(lawCount===0){ toast('匯入的題目與法條數量均為 0'); return; }
-      // 有法條就繼續
-    } else {
-      // 有題目時才驗證格式
-      if(typeof qs[0]!=='object'||!qs[0].stem){ toast('匯入失敗：題目格式不正確（缺少 stem）'); return; }
-    }
-
-    // 版本提示（不阻止匯入）
-    if(data.version&&data.version>3) toast('⚠ 此備份版本較新，部分欄位可能不相容');
-
-    // ── 批量寫入（bulkPut 一次 transaction，比逐筆快得多）──────────
-    // 去掉 id，讓 autoIncrement 重新分配
-    const qItems    = qs.map(({id,...r})=>r);
-    const lawItems  = Array.isArray(data.laws)    ? data.laws.map(({id,...r})=>r)    : [];
-    const attItems  = Array.isArray(data.attempts) ? data.attempts.map(({id,...r})=>r) : [];
-
-    await bulkPut('questions', qItems);
-    if(lawItems.length)  await bulkPut('laws',     lawItems);
-    if(attItems.length)  await bulkPut('attempts',  attItems);
-
-    const msg = '已匯入 '+qItems.length+' 題'
-      +(lawItems.length ? '、'+lawItems.length+' 條法條' : '')
-      +(attItems.length ? '、'+attItems.length+' 筆作答記錄' : '')
-      +' ✓';
-    toast(msg);
-    e.target.value='';
-    renderSet();
-
-  }catch(err){
-    logError('impJSON',err);
-    toast('匯入失敗：'+(err&&err.message?err.message:String(err)));
-  }
-}
-
 async function expWrong(){  try{
   const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const wids=getWrong(qs,ats);const wqs=qs.filter(q=>wids.has(q.id));
@@ -878,7 +818,7 @@ function openDebugPanel(){
 // ════════ 公開 API ════════
 const Settings = {
   saveGasConfig, gdriveBackup, gdriveRestore,
-  renderSet, expJSON, impJSON, expWrong, expAll,
+  renderSet, expWrong, expAll,
   clearAts, delAll, toggleGasHelp,
   localBackup, localRestore, saveAzureKey, openDebugPanel
 };

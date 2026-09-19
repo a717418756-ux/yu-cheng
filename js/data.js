@@ -35,7 +35,7 @@ let _dupResolve=null;
 // 【首頁渲染與分區統計】
 // ════════════════════════════════════════════════════════════
 async function renderHome(){  try{
-  const [qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
+  const [qs,ats]=await Promise.all([da('questions'),da('attempts')]);
   const now=Date.now();
   const todayStr=today();
 
@@ -93,10 +93,6 @@ async function renderHome(){  try{
     const el=document.getElementById(id);
     if(el)el.innerHTML=subs.map(s=>`<option value="${esc(s)}">`).join('');
   });
-
-  // 設定頁資訊
-  const expEl=document.getElementById('exp-info');
-  if(expEl)expEl.textContent=`題目 ${qs.length} 筆・法條 ${ls.length} 筆・作答 ${ats.length} 筆`;
 
   // ── 三大區即時資料（儀表板化）─────────────────────────────
   // 混合風格：考試看進度、休閒看最近閱讀、學習看今日時間

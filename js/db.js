@@ -190,7 +190,13 @@ function calcNextReview(level, correct) {
 }
 
 function getDangerLevel(q, recentAts) {
-  const qa = recentAts.filter(a => a.qid === q.id).sort((a, b) => b.date - a.date);
+  // ★ 取「最近」3 次：date 是 'YYYY-MM-DD' 字串，原本 b.date - a.date 得到 NaN，
+  //   排序無效 → 實際取到的是最舊的 3 次，近期已連對的題目仍被判成危險。
+  //   同日多筆以 id（自增＝寫入先後）排序。
+  //   correct 為 null（申論題、無標準答案）不算對錯，排除。
+  const qa = recentAts
+    .filter(a => a.qid === q.id && a.correct !== null && a.correct !== undefined)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.id || 0) - (a.id || 0));
   const last3 = qa.slice(0, 3);
   const wrongStreak = last3.length >= 2 && last3.every(a => !a.correct);
   const lastWrong   = last3.length > 0 && !last3[0].correct;
@@ -356,5 +362,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.16.4';    // 官網連結大多落在搜尋結果頁:原本 pcode 表只有 7 部法規，其餘都只能走官網搜尋。擴充為 38 部考試常用法規(代碼逐一以官網網址查證)，並支援使用者自備代碼—法規「來源」或「備註」欄貼上官網網址(含 pcode=)即以它為準，表內沒有的法規貼一次就能直接開原文。法規名比對前先去空白與全半形正規化；單條網址 flno 改用官網支援的「7-1」格式表示之N
+const APP_VERSION  = '4.17.0';    // 設定與分析頁整理:①移除設定的「匯入 JSON 題庫」(會把每筆當新資料加入造成重複，現改用本機完整還原)與「匯出題庫 JSON」②分析頁新增「考題匯出（出題趨勢）」:依科目/考試別/年度區間/題型/範圍篩選，附分析指令複製給 AI，也可下載 .md/.json(排除手寫標註與內部欄位)，即時顯示題數與字數，過長提醒縮小範圍 ③弱點診斷改寫:各科正確率與近7天對比、距考試天數、危險題附原題與答案、概念錯誤率、不穩題、明確請求指令 ④修三個統計錯誤:各科正確率原本除以題數而非作答數；申論題 correct=null 被算成答錯；getDangerLevel 以字串相減排序無效，實際讀到最舊3次作答，近期已連對的題目仍被判危險(影響複習排序與題庫危險標示)
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
