@@ -1694,3 +1694,17 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 /* 放大鏡維持在輸入框內（與題目管理一致）：下拉寬度+間距後的位置 */
 .sb.sb-with-sel .ic{ left:76px; }
 [data-theme="eink"] .lsf-sel{ background:#fff; color:#000; border-color:#000; }
+
+/* ══ 分析頁：AI 診斷／考題匯出 ═══════════════════════════════ */
+.ai-desc{ font-size:12px; color:var(--t2); line-height:1.65; margin:-2px 0 10px; }
+.ai-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px 10px; }
+.ai-grid label{ display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--t2); min-width:0; }
+.ai-grid select{
+  width:100%; height:34px; padding:0 8px; border-radius:8px;
+  border:1px solid var(--bd); background:var(--bg2); color:var(--t1); font-size:13px;
+}
+.ai-info{ font-size:12px; color:var(--t2); margin-top:9px; line-height:1.6; }
+.ai-info.warn{ color:var(--org); }
+#ai-out .aipv{ max-height:260px; }
+[data-theme="eink"] .ai-grid select{ background:#fff; color:#000; border-color:#000; }
+[data-theme="eink"] .ai-info.warn{ color:#000; font-weight:700; }
