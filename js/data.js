@@ -1589,22 +1589,51 @@ async function renderDB(){  try{
 //   pcode 是每部法規的固定代碼，只收「已查證」的，避免猜錯代碼跳到別部法。
 //   表內沒有的法規一律走站內搜尋，寧可多一步也不要跳錯。
 const _LAW_PCODE = {
+  // 憲法・行政法
+  '中華民國憲法':'A0000001', '憲法':'A0000001', '中華民國憲法增修條文':'A0000002', '憲法增修條文':'A0000002',
+  '行政程序法':'A0030055', '行政罰法':'A0030210', '行政執行法':'A0030023',
+  '訴願法':'A0030020', '行政訴訟法':'A0030154', '國家賠償法':'I0020004',
+  '公務員服務法':'S0020038', '公務員懲戒法':'A0030155', '個人資料保護法':'I0050021',
+  // 警察法規
   '警察職權行使法':'D0080145', '警察法':'D0080001', '警察法施行細則':'D0080002',
-  '警察勤務條例':'D0080026', '社會秩序維護法':'D0080067',
-  '中華民國刑法':'C0000001', '刑法':'C0000001', '刑事訴訟法':'C0010001',
+  '警察勤務條例':'D0080026', '警械使用條例':'D0080042', '警察人員人事條例':'S0020005',
+  '警察遴選第三人蒐集資料辦法':'D0080146', '警察勤務區訪查辦法':'D0080161',
+  '社會秩序維護法':'D0080067', '集會遊行法':'D0080058', '特種勤務條例':'A0030246',
+  '入出國及移民法':'D0080132', '道路交通管理處罰條例':'K0040012',
+  '家庭暴力防治法':'D0050071', '性騷擾防治法':'D0050074', '跟蹤騷擾防制法':'D0080211',
+  '兒童及少年福利與權益保障法':'D0050001',
+  // 刑事法
+  '中華民國刑法':'C0000001', '刑法':'C0000001', '中華民國刑法施行法':'C0000002', '刑法施行法':'C0000002',
+  '刑事訴訟法':'C0010001', '少年事件處理法':'C0010011', '毒品危害防制條例':'C0000008',
+  '槍砲彈藥刀械管制條例':'D0080047', '組織犯罪防制條例':'C0000013', '通訊保障及監察法':'K0060044',
+  // 民事
+  '民法':'B0000001', '民事訴訟法':'B0010001',
 };
+// 使用者自備代碼：法規的「來源」或「備註」欄若貼了官網網址（含 pcode=），
+// 就以它為準。表內沒有的法規，貼一次網址之後就能直接開到原文。
+let _lawPcodeFromData = {};
+function _collectLawPcodes(allLaws){
+  const map = {};
+  for(const l of (allLaws||[])){
+    const name = (l.lawName||'').trim();
+    if(!name || map[name]) continue;
+    const m = ((l.source||'') + ' ' + (l.note||'')).match(/pcode=([A-Za-z]\d{7})/i);
+    if(m) map[name] = m[1].toUpperCase();
+  }
+  _lawPcodeFromData = map;
+}
 function _officialLawUrl(lawName, article){
-  const name = String(lawName||'').trim();
+  const name = String(lawName||'').normalize('NFKC').replace(/\s+/g,'');
   if(!name) return '';
-  const pcode = _LAW_PCODE[name];
+  const pcode = _lawPcodeFromData[name] || _LAW_PCODE[name];
   if(!pcode){
-    // 查不到代碼 → 走官網自己的搜尋結果頁（不經 Google，少按一次）
+    // 查不到代碼 → 走官網自己的搜尋結果頁（不經 Google）
     return 'https://law.moj.gov.tw/Law/LawSearchResult.aspx?ty=LAW&kw=' +
            encodeURIComponent(name);
   }
-  // 條號取主號即可（官網 flno 不吃「之N」，先到該條再看子條）
+  // 官網單條網址 flno 可用「7-1」表示第7條之1
   const n = art2n(article||'');
-  const flno = n ? Math.floor(n/1000) : 0;
+  const flno = n ? Math.floor(n/1000) + (n%1000 ? '-' + (n%1000) : '') : '';
   return flno
     ? 'https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=' + pcode + '&flno=' + flno
     : 'https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=' + pcode;
@@ -1625,6 +1654,7 @@ function openOfficialLaw(lawName, article){
 const _ART_RE = /第([一二三四五六七八九十百千\d]+)條(?:之([一二三四五六七八九十\d]+))?/g;
 let _lawNameCache = null;        // 依長度排序的法規名（長名優先，避免短名先命中）
 function _setLawNames(allLaws){
+  _collectLawPcodes(allLaws);
   _lawNameCache = [...new Set((allLaws||[]).map(l=>(l.lawName||'').trim()).filter(Boolean))]
                     .sort((a,b)=>b.length-a.length);
 }
