@@ -1611,7 +1611,8 @@ let _lawPcodeFromData = {};
 function _collectLawPcodes(allLaws){
   const map = {};
   for(const l of (allLaws||[])){
-    const name = (l.lawName||'').trim();
+    // 與 _officialLawUrl 相同的正規化（全形轉半形、去空白），否則名稱含空白時查不到
+    const name = String(l.lawName||'').normalize('NFKC').replace(/\s+/g,'');
     if(!name || map[name]) continue;
     const m = ((l.source||'') + ' ' + (l.note||'')).match(/pcode=([A-Za-z]\d{7})/i);
     if(m) map[name] = m[1].toUpperCase();

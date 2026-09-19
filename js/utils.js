@@ -5,7 +5,7 @@ const S = {
   editId:null, editLawId:null,
   qType:'mc', correct:'A',
   quiz:{q:[],idx:0,ans:false,res:[],mode:''},
-  curLaw:null, curLawName:'', lawSort:'name', bulkParsed:[], aiMd:'', aiJson:''
+  curLaw:null, curLawName:'', lawSort:'name', bulkParsed:[], aiMd:''
 };
 
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
