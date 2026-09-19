@@ -1681,17 +1681,16 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 .lw-gov:active{ background:rgba(255,255,255,0.06); }
 [data-theme="eink"] .lw-gov{ border-color:#000; color:#000; }
 
-/* 搜尋範圍下拉：放在既有 .sb 容器內，左側一點就選 */
+/* 搜尋範圍下拉：窄版，放在搜尋框左側 */
 .lsf-sel{
-  flex-shrink:0; width:86px; height:36px; padding:0 6px;
+  flex-shrink:0; width:62px; height:36px; padding:0 4px;
   border-radius:9px; border:1px solid var(--bd);
   background:var(--bg2); color:var(--t1);
-  font-size:12px; cursor:pointer;
+  font-size:11.5px; cursor:pointer;
   appearance:none; -webkit-appearance:none;
   text-align:center; text-align-last:center;
 }
 .lsf-sel:focus{ outline:none; border-color:var(--acc); }
-/* ★ 有下拉時，放大鏡與輸入框的縮排要往右讓開，否則圖示會壓在下拉上 */
-.sb.sb-with-sel .ic{ left:auto; margin-left:2px; position:static; transform:none; }
-.sb.sb-with-sel input{ padding-left:10px; }
+/* 放大鏡維持在輸入框內（與題目管理一致）：下拉寬度+間距後的位置 */
+.sb.sb-with-sel .ic{ left:76px; }
 [data-theme="eink"] .lsf-sel{ background:#fff; color:#000; border-color:#000; }
