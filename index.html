@@ -418,25 +418,45 @@
 </div>
 <!-- STATS -->
 <div id="pg-stats" class="page hide">
-  <div class="hd"><div class="hdt">分析 & AI匯出</div><button class="hd-btn blue" onclick="buildAI()">🤖 AI匯出</button></div>
+  <div class="hd"><div class="hdt">分析 & AI 分析</div></div>
   <div class="st3">
     <div class="stb"><div class="n" id="st-q">0</div><div class="l">總題數</div></div>
     <div class="stb"><div class="n" id="st-a" style="color:var(--grn)">0</div><div class="l">總作答</div></div>
     <div class="stb"><div class="n" id="st-r" style="color:var(--org)">—</div><div class="l">正確率</div></div>
   </div>
   <div class="cc"><div class="ct">📊 各科正確率</div><div id="subj-bars"></div></div>
-  <div class="cc"><div class="ct">📅 近7天練習量</div><canvas id="dchart" height="110"></canvas></div>
-  <div class="cc"><div class="ct">🔴 常錯科目</div><div id="wrong-subs"></div></div>
+  <div class="cc"><div class="ct">📅 近30天練習量（左右滑動）</div><canvas id="dchart" height="110"></canvas></div>
+  <div class="cc"><div class="ct">🚦 危險等級分佈</div><div id="wrong-subs"></div></div>
   <div class="cc"><div class="ct">🏷 高頻關鍵概念</div><div id="kw-cloud" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
-  <div id="ai-out" class="hide">
-    <div class="sec">AI 分析結果</div>
-    <div class="aic"><div class="ait">📝 Markdown（貼給 ChatGPT/Claude）</div><div class="aipv" id="ai-md"></div>
-      <div style="display:flex;gap:7px;margin-top:9px"><button class="btn bp" onclick="copyAI('md')">📋 複製</button><button class="btn bg" onclick="dlAI('md')">⬇ 下載</button></div></div>
-    <div class="aic"><div class="ait">📊 JSON 結構化資料</div><div class="aipv" id="ai-json"></div>
-      <div style="display:flex;gap:7px;margin-top:9px"><button class="btn bp" onclick="copyAI('json')">📋 複製</button><button class="btn bg" onclick="dlAI('json')">⬇ 下載</button></div></div>
-    <div style="padding:4px 0 8px"><button class="btn bg" style="width:100%;padding:10px;font-size:13px;color:var(--red)" onclick="clearWrongAts()">🗑 刪除全部作答錯誤記錄</button></div>
-    <div class="card" style="font-size:12px;color:var(--t2);line-height:1.7">💡 複製 Markdown 貼到 ChatGPT，輸入：「根據以上資料，分析我的弱點並給備考建議」</div>
+  <div class="sec">AI 分析</div>
+  <div class="aic">
+    <div class="ait">🩺 弱點診斷</div>
+    <div class="ai-desc">依你的作答紀錄產生報告（各科正確率、近 7 天變化、危險題原題、常錯概念），複製給 ChatGPT／Claude 取得個人化備考建議。</div>
+    <button class="btn bp bw" style="width:100%;padding:10px" onclick="buildAI()">產生診斷報告</button>
+    <div id="ai-out" class="hide" style="margin-top:10px">
+      <div class="aipv" id="ai-md"></div>
+      <div style="display:flex;gap:7px;margin-top:9px"><button class="btn bp" style="flex:1" onclick="copyAI()">📋 複製給 AI</button><button class="btn bg" onclick="dlAI()">⬇ 下載</button></div>
+    </div>
   </div>
+  <div class="aic">
+    <div class="ait">📈 考題匯出（出題趨勢）</div>
+    <div class="ai-desc">依條件篩選考題，連同分析指令一起給 AI，找出重複考點、冷熱變化與可能出題方向。</div>
+    <div class="ai-grid">
+      <label>科目<select id="ax-sub" onchange="updateAIExport()"></select></label>
+      <label>考試別<select id="ax-exam" onchange="updateAIExport()"></select></label>
+      <label>年度從<select id="ax-y1" onchange="updateAIExport()"></select></label>
+      <label>年度到<select id="ax-y2" onchange="updateAIExport()"></select></label>
+      <label>題型<select id="ax-type" onchange="updateAIExport()"><option value="all">全部</option><option value="mc">選擇題</option><option value="es">申論題</option></select></label>
+      <label>範圍<select id="ax-scope" onchange="updateAIExport()"><option value="all">全部題目</option><option value="wrong">只含錯題</option><option value="star">只含收藏</option></select></label>
+    </div>
+    <div id="ax-info" class="ai-info"></div>
+    <div style="display:flex;gap:7px;margin-top:9px">
+      <button class="btn bp" style="flex:1" onclick="exportAI('copy')">📋 複製給 AI</button>
+      <button class="btn bg" onclick="exportAI('md')">⬇ .md</button>
+      <button class="btn bg" onclick="exportAI('json')">⬇ .json</button>
+    </div>
+  </div>
+  <div style="padding:4px 12px 12px"><button class="btn bg" style="width:100%;padding:10px;font-size:13px;color:var(--red)" onclick="clearWrongAts()">🗑 刪除全部作答錯誤記錄</button></div>
 </div>
 
 
@@ -548,9 +568,6 @@
     <button class="theme-btn" id="theme-btn-eink" onclick="setTheme('eink')">📖<br>電子紙</button>
   </div>
   <div class="sec">題庫管理</div>
-  <div class="srow"><div><div class="slb">匯出題庫 JSON <span style="font-size:10px;color:var(--t2);font-weight:400">給程式處理用，非完整備份</span></div><div class="ssb" id="exp-info">備份題目與記錄</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expJSON()">匯出</button></div>
-  <div class="srow"><div><div class="slb">匯入 JSON 題庫</div><div class="ssb">不覆蓋已有題目</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="document.getElementById('imp').click()">匯入</button></div>
-  <input type="file" id="imp" accept=".json" style="display:none" onchange="impJSON(event)">
   <div class="srow"><div><div class="slb">匯出錯題 HTML</div><div class="ssb">可列印錯題卷</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expWrong()">匯出</button></div>
   <div class="srow"><div><div class="slb">匯出全部題目 HTML</div><div class="ssb">適合列印複習</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expAll()">匯出</button></div>
   <div class="sec">偵錯</div>
