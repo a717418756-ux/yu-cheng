@@ -20,6 +20,54 @@
 const GAS_URL_KEY      = 'gasWebAppUrl';
 const GAS_PWD_KEY      = 'gasPassword';
 const GAS_BACKUP_FILE  = 'YC_Platform_backup.json';
+const GAS_SIZE_WARN    = 30 * 1048576;   // Apps Script 上傳約 50MB 上限，30MB 起提醒
+
+// ══ 備份共用規則 ════════════════════════════════════════════════
+// 備份用的設定：清掉 7 天前的每日任務勾選紀錄
+//   dtask_done_日期 每天新增一筆，只有「當天」會被讀取（歷史達成率另存
+//   dtask_history，自己只留 30 天），舊的留著只會讓設定越積越多。
+async function _backupSettings(){
+  const cut = new Date(); cut.setDate(cut.getDate() - 7);
+  const cutKey = 'dtask_done_' + cut.getFullYear() + '-' + String(cut.getMonth()+1).padStart(2,'0')
+               + '-' + String(cut.getDate()).padStart(2,'0');
+  const keep = [];
+  for(const st of await da('settings')){
+    if(/^dtask_done_\d{4}-\d{2}-\d{2}$/.test(st.key) && st.key < cutKey){ await dd('settings', st.key); continue; }
+    keep.push(st);
+  }
+  return keep;
+}
+
+// 搜尋索引 searchBlob 由其他欄位算得，不寫進備份（約省 1/4 容量），還原時重建。
+// ★ 公式必須與 data.js 的 saveQ／saveLaw 完全一致。
+const _noBlob = rows => rows.map(({ searchBlob, ...r }) => r);
+const _blobQ = q => ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+(q.year||'')+' '
+  +(q.exam||'')+' '+(q.num||'')+' '+(q.keywords||[]).join(' ')).toLowerCase();
+const _blobLaw = l => [l.lawName, l.article, String(l.articleNumber||''), l.title,
+  (l.keywords||[]).join(' '), (l.content||'').startsWith('data:') ? '' : (l.content||'')]
+  .filter(Boolean).join(' ').toLowerCase();
+
+// 還原一個資料表：檔案「有這個表」就以檔案為準，空陣列也會清空；
+// 檔案「沒有這個表」（舊版備份、雲端備份沒有學習區）才略過，保留手機現有資料。
+// ★ 原本空陣列也略過：備份時是空的表，還原後手機上的舊資料仍留著，與備份不一致。
+async function _restoreTable(name, rows){
+  if(!Array.isArray(rows)) return 0;
+  if(name === 'questions') rows = rows.map(q => ({ ...q, searchBlob: _blobQ(q) }));
+  if(name === 'laws')      rows = rows.map(l => ({ ...l, searchBlob: _blobLaw(l) }));
+  await dc(name);
+  if(rows.length) await bulkPut(name, rows);
+  return rows.length;
+}
+// 設定逐筆覆蓋、不清空
+async function _restoreSettings(rows){
+  let n = 0;
+  for(const st of (Array.isArray(rows) ? rows : [])){
+    if(!st || st.key == null) continue;
+    await dp('settings', st); n++;
+  }
+  return n;
+}
+const _mb = n => (n / 1048576).toFixed(n < 10485760 ? 2 : 1) + ' MB';
 
 // ════════════════════════════════════════════════════════════
 // 【雲端備份：GAS 設定】
@@ -58,19 +106,17 @@ async function gdriveBackup(){ try{
   // 雲端備份：考試區 + 答題記錄 + 倒數日 + 使用統計 + 設定（不含 blob 類大檔）
   //   englishVocab（單字本，含自己的遺忘曲線進度）與 healthLogs（健康數據）
   //   都是純文字、無 blob 欄位，理應納入雲端備份；先前漏掉會導致還原後這兩塊資料消失。
-  const [qs, ls, ats, countdowns, usageLogs, settings, englishVocab, healthLogs, engMats] = await Promise.all([
+  const [qs, ls, ats, countdowns, usageLogs, englishVocab, healthLogs, engMats] = await Promise.all([
     da('questions'), da('laws'), da('attempts'),
-    da('countdowns'), da('usageLogs'), da('settings'),
+    da('countdowns'), da('usageLogs'),
     da('englishVocab'), da('healthLogs'), da('englishMaterials')
   ]);
-  const payload = {
-    password: pwd,
-    action:   'backup',
-    filename: GAS_BACKUP_FILE,
-    data: JSON.stringify({
+  const settings = await _backupSettings();
+  const body = JSON.stringify({
       version: 3,
-      questions: qs,
-      laws: ls,
+      exportedAt: new Date().toISOString(),
+      questions: _noBlob(qs),
+      laws: _noBlob(ls),
       attempts: ats,
       countdowns: countdowns,
       usageLogs: usageLogs,
@@ -80,8 +126,11 @@ async function gdriveBackup(){ try{
       // englishMaterials 存的是切分後的句子陣列（純文字、無 blob），
       // 資料量遠小於題庫，納入雲端備份不會造成負擔
       englishMaterials: engMats
-    })
-  };
+  });
+  const size = new Blob([body]).size;
+  if(size > GAS_SIZE_WARN && !confirm('雲端備份檔 ' + _mb(size) + '，接近 Google Apps Script 的上傳上限，可能會失敗。\n'
+      + '建議改用「本機完整備份」。仍要上傳？')) return;
+  const payload = { password: pwd, action: 'backup', filename: GAS_BACKUP_FILE, data: body };
   const res  = await fetch(url, {
     method:'POST',
     headers:{'Content-Type':'text/plain'},
@@ -96,6 +145,7 @@ async function gdriveBackup(){ try{
       '已上傳到你的 Google Drive。',
       '',
       '時間：' + t,
+      '大小：' + _mb(size),
       '涵蓋：題庫、法條、答題記錄、設定、倒數日、統計、英語教材、單字本、健康數據',
     ]);
     renderSet();
@@ -126,35 +176,16 @@ async function gdriveRestore(){ try{
         toast('還原失敗：備份資料格式錯誤'); return;
       }
 
-      // 驗證資料有效性（雲端備份只含 questions + laws）
+      // 至少要有題目或法規，避免把空的（或壞掉的）備份蓋回來
       const hasData = (bk.questions?.length || bk.laws?.length);
       if(!hasData){
         toast('還原失敗：備份資料為空，請先備份再還原'); return;
       }
 
-      // 清除並還原 questions + laws
-      await dc('questions'); await dc('laws');
-      if(bk.questions?.length) await bulkPut('questions', bk.questions);
-      if(bk.laws?.length)      await bulkPut('laws',      bk.laws);
-
-      // 答題記錄 / 倒數日 / 使用統計
-      if(bk.attempts?.length){   await dc('attempts');   await bulkPut('attempts', bk.attempts); }
-      if(bk.countdowns?.length){ await dc('countdowns'); await bulkPut('countdowns', bk.countdowns); }
-      if(bk.usageLogs?.length){  await dc('usageLogs');  await bulkPut('usageLogs', bk.usageLogs); }
-      // 單字本 / 健康數據（v3 備份起納入；舊版備份沒有這兩個欄位時自動略過，
-      // 不會清空現有資料，確保用舊備份還原時不會反而弄丟這兩塊）
-      if(bk.englishVocab?.length){ await dc('englishVocab'); await bulkPut('englishVocab', bk.englishVocab); }
-      if(bk.healthLogs?.length){   await dc('healthLogs');   await bulkPut('healthLogs',   bk.healthLogs); }
-      if(bk.englishMaterials?.length){ await dc('englishMaterials'); await bulkPut('englishMaterials', bk.englishMaterials); }
-
-      // 設定（逐筆覆蓋；保留當前 GAS 網址，避免還原後連線設定錯亂）
-      if(Array.isArray(bk.settings)){
-        for(const s of bk.settings){
-          if(!s || s.key == null) continue;
-          if(s.key === 'gasWebAppUrl') continue;  // 不覆蓋當前網址
-          await dp('settings', s);
-        }
-      }
+      for(const t of ['questions','laws','attempts','countdowns','usageLogs',
+                      'englishVocab','healthLogs','englishMaterials'])
+        await _restoreTable(t, bk[t]);
+      await _restoreSettings(bk.settings);
 
       _cacheInvalidate();
       const rt = new Date().toLocaleString('zh-TW');
@@ -286,13 +317,14 @@ async function localBackup(){
     const dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
     toast('備份中…請稍候');
 
-    const [ebooks, media, qs, ls, ats, settings, countdowns, usageLogs, refbooks, learnmedia, engMats,
+    const [ebooks, media, qs, ls, ats, countdowns, usageLogs, refbooks, learnmedia, engMats,
            engVocab, healthLogs] = await Promise.all([
       da('ebooks'), da('leisuremedia'), da('questions'), da('laws'),
-      da('attempts'), da('settings'), da('countdowns'), da('usageLogs'),
+      da('attempts'), da('countdowns'), da('usageLogs'),
       da('refbooks'), da('learnmedia'), da('englishMaterials'),
       da('englishVocab'), da('healthLogs')
     ]);
+    const settings = await _backupSettings();
 
     let count = 0;
 
@@ -300,11 +332,11 @@ async function localBackup(){
     // englishMaterials 可能含大型內容，但無獨立 blob 欄位，一併寫入
     const examHandle = await dirHandle.getFileHandle('exam_data.json', { create:true });
     const examWriter = await examHandle.createWritable();
-    await examWriter.write(JSON.stringify({
+    const examBody = JSON.stringify({
       version: 3,
       exportedAt: new Date().toISOString(),
-      questions: qs,
-      laws: ls,
+      questions: _noBlob(qs),
+      laws: _noBlob(ls),
       attempts: ats,
       settings: settings,
       countdowns: countdowns,
@@ -315,7 +347,8 @@ async function localBackup(){
       // 單字本與健康數據：純文字無 blob，先前漏備份會導致還原後資料消失
       englishVocab: engVocab,
       healthLogs: healthLogs
-    }));
+    });
+    await examWriter.write(examBody);
     await examWriter.close();
     count++;  // exam_data.json 計入項目數
 
@@ -427,7 +460,7 @@ async function localBackup(){
       '共 ' + count + ' 個項目已寫入你選的資料夾。',
       '',
       '時間：' + new Date().toLocaleString('zh-TW'),
-      '內容：exam_data.json ＋ ebooks／media／refbooks／learnmedia 四個資料夾',
+      '內容：exam_data.json（' + _mb(new Blob([examBody]).size) + '）＋ ebooks／media／refbooks／learnmedia 四個資料夾',
     ]);
   }catch(e){
     if(e.name === 'AbortError') return;  // 使用者取消
@@ -454,70 +487,10 @@ async function localRestore(){
         const examHandle = await dirHandle.getFileHandle('exam_data.json');
         const examFile   = await examHandle.getFile();
         const examData   = JSON.parse(await examFile.text());
-        if(examData.questions?.length){
-          await dc('questions');
-          await bulkPut('questions', examData.questions);
-          count += examData.questions.length;
-        }
-        if(examData.laws?.length){
-          await dc('laws');
-          await bulkPut('laws', examData.laws);
-          count += examData.laws.length;
-        }
-        // 答題記錄
-        if(examData.attempts?.length){
-          await dc('attempts');
-          await bulkPut('attempts', examData.attempts);
-          count += examData.attempts.length;
-        }
-        // 倒數日
-        if(examData.countdowns?.length){
-          await dc('countdowns');
-          await bulkPut('countdowns', examData.countdowns);
-          count += examData.countdowns.length;
-        }
-        // 使用統計
-        if(examData.usageLogs?.length){
-          await dc('usageLogs');
-          await bulkPut('usageLogs', examData.usageLogs);
-          count += examData.usageLogs.length;
-        }
-        // 學習區教材 meta（refbooks/learnmedia 的 blob 在各自資料夾，這裡僅還原 meta 清單）
-        if(examData.refbooks?.length){
-          await dc('refbooks');
-          await bulkPut('refbooks', examData.refbooks);
-          count += examData.refbooks.length;
-        }
-        if(examData.learnmedia?.length){
-          await dc('learnmedia');
-          await bulkPut('learnmedia', examData.learnmedia);
-          count += examData.learnmedia.length;
-        }
-        // 英語學習庫
-        if(examData.englishMaterials?.length){
-          await dc('englishMaterials');
-          await bulkPut('englishMaterials', examData.englishMaterials);
-          count += examData.englishMaterials.length;
-        }
-        // 單字本（含自己的遺忘曲線進度）
-        if(examData.englishVocab?.length){
-          await dc('englishVocab');
-          await bulkPut('englishVocab', examData.englishVocab);
-          count += examData.englishVocab.length;
-        }
-        // 健康數據（主鍵為日期字串，逐日一筆）
-        if(examData.healthLogs?.length){
-          await dc('healthLogs');
-          await bulkPut('healthLogs', examData.healthLogs);
-          count += examData.healthLogs.length;
-        }
-        // 設定（主鍵為 key，逐筆 put 覆蓋，不清空避免破壞他鍵）
-        if(Array.isArray(examData.settings)){
-          for(const s of examData.settings){
-            if(s && s.key != null) await dp('settings', s);
-          }
-          count += examData.settings.length;
-        }
+        for(const t of ['questions','laws','attempts','countdowns','usageLogs','refbooks','learnmedia',
+                        'englishMaterials','englishVocab','healthLogs'])
+          count += await _restoreTable(t, examData[t]);
+        count += await _restoreSettings(examData.settings);
       }catch(e){ /* exam_data.json 不存在就跳過 */ }
 
       // ── 書庫還原 ──
