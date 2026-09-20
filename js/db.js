@@ -269,6 +269,16 @@ async function setSetting(key, value) {
   catch(e) { logError('setSetting', e); }
 }
 
+// 條號索引一次性修復：v4.17.2 以前的「批次匯入」只存主號（第12條→12），
+// 其餘各處都用 art2n 的「主號×1000＋子號」（12000），造成條號搜尋、關聯法條、排序出錯。
+async function healLawNums() {
+  if (await getSetting('lawNumHealed')) return;
+  const bad = (await da('laws')).filter(l => { const n = art2n(l.article); return n && l.articleNumber !== n; });
+  bad.forEach(l => { l.articleNumber = art2n(l.article); });
+  if (bad.length) await bulkPut('laws', bad);
+  await setSetting('lawNumHealed', 1);
+}
+
 async function getCountdowns() {
   try { return await da('countdowns'); } catch(e) { return []; }
 }
@@ -362,5 +372,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.18.1';    // 還原 v4.18.0 的①：雲端密碼、GAS 網址、Azure 金鑰照常寫進備份並還原(資料只放本機與自己的雲端，換裝置免重填)。其餘沿用 4.18.0：searchBlob 不寫進備份、還原時重建；檔案有這個表就以檔案為準；備份時清掉7天前的 dtask_done_日期；雲端加 exportedAt、完成顯示大小、超過30MB先提醒
+const APP_VERSION  = '4.18.2';    // 自我檢視:①v4.17.2 以前批次匯入的條號只存主號(第12條→12)，其餘各處用 art2n(12000)，條號搜尋、關聯法條、排序會錯；啟動時一次性校正(healLawNums)，還原時也依 article 重算 ②分層管理的條號範圍(如 1-5)直接比 articleNumber，遇到新格式(×1000)全部不命中；改比主條號
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

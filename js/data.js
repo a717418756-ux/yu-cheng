@@ -2983,7 +2983,7 @@ async function openChapterMgr(lawName){  try{
       else{const n=parseInt(rangeInput);if(!isNaN(n)){startArt=n;endArt=n;}}
     }
     for(const l of targets){
-      const artN=l.articleNumber||0;
+      const artN=Math.floor((l.articleNumber||art2n(l.article||''))/1000);   // 使用者輸入的是主條號
       const apply=rangeInput&&rangeInput.trim()?(artN>=startArt&&artN<=endArt):(!l[level]);
       if(apply){l[level]=newVal;await dp('laws',l);count++;}
     }
@@ -3004,7 +3004,7 @@ async function openChapterMgr(lawName){  try{
         else{const n=parseInt(rangeInput);if(!isNaN(n)){startArt=n;endArt=n;}}
       }
       for(const l of targets){
-        const artN=l.articleNumber||0;
+        const artN=Math.floor((l.articleNumber||art2n(l.article||''))/1000);   // 使用者輸入的是主條號
         const apply=rangeInput&&rangeInput.trim()?(artN>=startArt&&artN<=endArt):(!l[level]);
         if(apply){l[level]=newVal;await dp('laws',l);count++;}
       }
@@ -3023,7 +3023,7 @@ async function openChapterMgr(lawName){  try{
         const rm=sel.match(/(\d+)\s*[-~]\s*(\d+)/);
         const startArt=parseInt(rm[1]),endArt=parseInt(rm[2]);
         for(const l of targets){
-          const artN=l.articleNumber||0;
+          const artN=Math.floor((l.articleNumber||art2n(l.article||''))/1000);   // 使用者輸入的是主條號
           if(artN>=startArt&&artN<=endArt){l[level]=newVal;await dp('laws',l);count++;}
         }
       } else {

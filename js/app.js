@@ -482,6 +482,7 @@ function _initBackHandler(){
 async function init(){  try{
   await initDB();
   await initTheme();
+  healLawNums().catch(e=>logError('healLawNums', e));
   _initFabDelegation();
   goPage('home', document.querySelector('.nb'));
   _initBackHandler();

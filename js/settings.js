@@ -53,7 +53,10 @@ const _blobLaw = l => [l.lawName, l.article, String(l.articleNumber||''), l.titl
 async function _restoreTable(name, rows){
   if(!Array.isArray(rows)) return 0;
   if(name === 'questions') rows = rows.map(q => ({ ...q, searchBlob: _blobQ(q) }));
-  if(name === 'laws')      rows = rows.map(l => ({ ...l, searchBlob: _blobLaw(l) }));
+  if(name === 'laws')      rows = rows.map(l => {   // 條號一律以 art2n 為準（舊備份、桌面版寫回的可能是舊格式）
+    const r = { ...l, articleNumber: art2n(l.article) || l.articleNumber || 0 };
+    r.searchBlob = _blobLaw(r); return r;
+  });
   await dc(name);
   if(rows.length) await bulkPut(name, rows);
   return rows.length;
