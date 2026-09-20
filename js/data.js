@@ -1420,6 +1420,14 @@ function _fieldValue(l, f){
   return l[f] || '';
 }
 
+// 法規層級資訊（制定機關、修正日期）存在每一條條文上。
+// 取該法規「第一個有值」的條文，而不是固定取第 0 條：
+// 舊資料可能有部分條文是空的（先前編輯單條會把這兩欄清空），固定取第 0 條就會顯示不出來。
+function _lawInfo(laws){
+  const pick = f => ((laws||[]).find(l => l && l[f]) || {})[f] || '';
+  return { org: pick('org'), amendDate: pick('amendDate') };
+}
+
 async function renderDB(){  try{
   const ls=await da('laws');
   _setLawNames(ls);   // 供 _autoCites 比對用（列表頁也要顯示自動連結）
@@ -1481,8 +1489,8 @@ async function renderDB(){  try{
         if(rocM)return String(parseInt(rocM[1])+1911)+'-'+rocM[2].padStart(2,'0')+'-'+rocM[3].padStart(2,'0');
         return s;
       };
-      const _da=toDate(a[1][0]?.amendDate)||'0000';
-      const _db=toDate(b[1][0]?.amendDate)||'0000';
+      const _da=toDate(_lawInfo(a[1]).amendDate)||'0000';
+      const _db=toDate(_lawInfo(b[1]).amendDate)||'0000';
       return dir * _db.localeCompare(_da);
     }
     if(sortBy==='count') return dir * (b[1].length-a[1].length);
@@ -1499,11 +1507,12 @@ async function renderDB(){  try{
     const catLabel={'statute':'法規條文','sop':'SOP','supplement':'補充資料','interpretation':'函釋'}[cat]||cat;
     const favCount=laws.filter(l=>l.favorite).length;
     const icon=cat==='sop'?'📋':cat==='supplement'?'📄':'⚖';
-    const orgLine=(laws[0]?.org||laws[0]?.amendDate)
+    const _li=_lawInfo(laws);
+    const orgLine=(_li.org||_li.amendDate)
       ?('<div style="font-size:10px;color:var(--t2);margin-top:1px">'
-        +(laws[0]?.org?'🏛 '+esc(laws[0].org):'')
-        +(laws[0]?.org&&laws[0]?.amendDate?' · ':'')
-        +(laws[0]?.amendDate?'📅 '+esc(laws[0].amendDate):'')
+        +(_li.org?'🏛 '+esc(_li.org):'')
+        +(_li.org&&_li.amendDate?' · ':'')
+        +(_li.amendDate?'📅 '+esc(_li.amendDate):'')
         +'</div>')
       :'';
     const div = document.createElement('div');
@@ -1770,7 +1779,7 @@ async function openLawGroup(lawName){  try{
   // 顯示法規機關/日期資訊
   const lvInfo=document.getElementById('lv-info');
   if(lvInfo){
-    const s=laws[0]||{};
+    const s=_lawInfo(laws);
     lvInfo.textContent=(s.org?'🏛 '+s.org:'')+(s.org&&s.amendDate?' · ':'')+(s.amendDate?'📅 '+s.amendDate:'');
     lvInfo.style.display=(s.org||s.amendDate)?'block':'none';
   }
@@ -2095,6 +2104,12 @@ function parseMinguoDate(s){
   // YYYYMMDD 西元（8位）
   const m8=s.match(/^(\d{4})(\d{2})(\d{2})$/);
   if(m8)return '民國'+(parseInt(m8[1])-1911)+'年'+m8[2]+'月'+m8[3]+'日';
+  // 分隔符號：113.5.9／113-05-09／2024/5/9（西元自動換算）
+  const mSep=s.match(/^(\d{2,4})\s*[./\-]\s*(\d{1,2})\s*[./\-]\s*(\d{1,2})$/);
+  if(mSep){
+    const y=parseInt(mSep[1]); const roc=y>1911?y-1911:y;
+    return '民國'+roc+'年'+mSep[2].padStart(2,'0')+'月'+mSep[3].padStart(2,'0')+'日';
+  }
   // 其他格式原樣儲存
   return s;
 }
@@ -2272,11 +2287,8 @@ async function showAddLaw(l){
   const prev=document.getElementById('l-img-prev');
   if(prev)prev.innerHTML=window._sopImgData?'<img src="'+window._sopImgData+'" style="max-width:100%;border-radius:8px">':'';
   toggleSOPMode();
-  // 載入制定機關 + 同法規既有的編/章/節（下拉選擇用）
+  // 載入同法規既有的編/章/節（下拉選擇用）
   da('laws').then(all=>{
-    const orgs=[...new Set(all.map(x=>x.org).filter(Boolean))];
-    const dl=document.getElementById('l-org-list');
-    if(dl)dl.innerHTML=orgs.map(o=>'<option value="'+esc(o)+'">').join('');
     // 同法規範圍內的編/章/節選項
     const curName=l?.lawName||document.getElementById('l-name').value.trim();
     const sameLaw=curName?all.filter(x=>x.lawName===curName):all;
@@ -2494,13 +2506,14 @@ async function saveLaw(){  try{
     keywords:kwArr(document.getElementById('l-kw').value),
     relatedLaws,
     source:document.getElementById('l-src')?.value.trim()||'',
-    org:document.getElementById('l-org')?.value?.trim()||'',
-    amendDate:document.getElementById('l-amend')?.value?.trim()||'',
     note:document.getElementById('l-note')?.value.trim()||'',
     hlColor:document.querySelector('#l-mark-row .note-mark-dot.sel')?.dataset.color||'',
     favorite:false,createdAt:Date.now()
   };
   if(!data.lawName){toast('請填寫法律名稱');return;}
+  // ★ 制定機關、修正日期由「⚙ 編輯法規資訊」統一設定，編輯表單沒有這兩欄。
+  //   原本從不存在的欄位讀值，每次編輯單條就把這兩欄清成空白。改為沿用同法規既有的值。
+  Object.assign(data, _lawInfo((await da('laws')).filter(l=>l.lawName===data.lawName)));
   if(S.editLawId){
     const ex=await dg('laws',S.editLawId);
     data.id=S.editLawId;
@@ -2515,17 +2528,6 @@ async function saveLaw(){  try{
       data.title, (data.keywords||[]).join(' '), _cnt
     ].filter(Boolean).join(' ').toLowerCase();
     await dp('laws',data);
-    // 更新制定機關 datalist
-    if(data.org){
-      const dl=document.getElementById('l-org-list');
-      if(dl){
-        const existing=[...dl.querySelectorAll('option')].map(o=>o.value);
-        if(!existing.includes(data.org)){
-          const opt=document.createElement('option');
-          opt.value=data.org; dl.appendChild(opt);
-        }
-      }
-    }
     closeLawSh();
     toast(S.editLawId?'法條已更新 ✓':'法條已儲存 ✓');
     // 儲存後刷新畫面
@@ -2574,6 +2576,7 @@ function parseLawText(rawText, lawName, category, source){
   let curChapter = '';  // 章（中層）：第一章 總則
   let curSection = '';  // 節（最下層）：第一節 一般規定
   let curArtNum  = null;
+  let curArtSub  = null;   // 之N（子條號）
   let curTitle   = '';
   let contentLines = [];
 
@@ -2586,7 +2589,8 @@ function parseLawText(rawText, lawName, category, source){
   const sectionRe = new RegExp('^第\\s*'+_numPart+'\\s*節\\s*(.+)?');
   // 條號：支援阿拉伯數字（第1條、第 1 條）和中文數字（第一條）
   const _artNumPart = '(?:([一二三四五六七八九十百千\\d]+)|([\\d]+))';
-  const articleRe = /^第\s*((?:[一二三四五六七八九十百千]+|\d+))\s*條(?:之(\d+))?\s*(?:[（(]([^）)]+)[）)])?(.*)$/;
+  // 條號：「第7條」「第7條之1」「第七條之一」，以及官網複製下來的「第 7-1 條」
+  const articleRe = /^第\s*((?:[一二三四五六七八九十百千]+|\d+))\s*(?:[-－]\s*((?:[一二三四五六七八九十]+|\d+))\s*)?條(?:之\s*((?:[一二三四五六七八九十]+|\d+)))?\s*(?:[（(]([^）)]+)[）)])?(.*)$/;
 
   // 中文數字→阿拉伯數字
   const zh2num = (s) => {
@@ -2622,10 +2626,13 @@ function parseLawText(rawText, lawName, category, source){
       let r=0,t=0; for(const c of String(s)){const v=map[c];if(!v)continue;if(v>=10){r+=(t||1)*v;t=0;}else t=v;} return r+t||parseInt(s,10)||0;
     };
     const artNum = _zh2n(curArtNum);
+    const artSub = curArtSub ? _zh2n(curArtSub) : 0;
     items.push({
       lawName:       lawName||'',
-      article:       '第 '+artNum+' 條',  // 顯示用
-      articleNumber: artNum,               // 數字排序用
+      // ★ 原本丟掉「之N」：第7條之1 被存成第7條（與第7條重複），排序鍵也只存主號。
+      //   排序鍵改與 art2n 同一套：主號×1000＋子號（第7條之1 → 7001）
+      article:       '第 '+artNum+' 條'+(artSub?'之'+artSub:''),
+      articleNumber: artNum*1000+Math.min(artSub,999),
       title:         curTitle||'',
       content:       content||curTitle||'',
       category:      category||'statute',
@@ -2638,7 +2645,7 @@ function parseLawText(rawText, lawName, category, source){
       favorite:      false,
       createdAt:     Date.now(),
     });
-    curArtNum=null; curTitle=''; contentLines=[];
+    curArtNum=null; curArtSub=null; curTitle=''; contentLines=[];
   };
 
   for(const line of lines){
@@ -2658,10 +2665,11 @@ function parseLawText(rawText, lawName, category, source){
     const artM = line.match(articleRe);
     if(artM){
       saveArticle();
-      curArtNum = artM[1];    // 條號（中文或阿拉伯）
-      // artM[2] = 之X，artM[3] = 標題，artM[4] = 條文尾
-      curTitle  = (artM[3]||'').trim();
-      const tail = (artM[4]||'').trim();
+      curArtNum = artM[1];              // 條號（中文或阿拉伯）
+      curArtSub = artM[2] || artM[3] || null;   // 「7-1」或「之1」
+      // artM[4] = 標題，artM[5] = 條文尾
+      curTitle  = (artM[4]||'').trim();
+      const tail = (artM[5]||'').trim();
       if(tail) contentLines.push(tail);
       continue;
     }
@@ -2728,6 +2736,9 @@ async function importBulkLaw(){  try{
   if(!items.length){toast('解析結果為0條，請確認格式（需有「第X條」）');return;}
   // ── 防重複：以法律名稱+類別 判斷是否已存在 ──────────────────
   const existing=await da('laws');
+  // 機關、修正日期是法規層級資訊，覆蓋重匯時沿用，不隨舊條文一起刪掉
+  const keepInfo=_lawInfo(existing.filter(l=>l.lawName===name));
+  items.forEach(l=>Object.assign(l, keepInfo));
   const sameGroup=existing.filter(l=>l.lawName===name&&l.category===cat);
   if(sameGroup.length>0){
     const go=confirm('「'+name+'」（'+cat+'）已有 '+sameGroup.length+' 條資料。\n\n確定 → 覆蓋（刪除舊資料再匯入）\n取消 → 取消匯入');
