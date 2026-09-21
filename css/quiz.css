@@ -574,9 +574,9 @@
      ②格線間距必須「完全等於」行高（34px），少 1px 就會逐行累積偏移。 */
   padding:0 12px 20px 44px;              /* 左側留出題號欄（大標題號寫在這裡） */
   background-image:
-    linear-gradient(90deg, transparent 0 38px, #d3b0a8 38px 39px, transparent 39px),  /* 題號欄直線 */
+    linear-gradient(90deg, transparent 0 38px, #222 38px 39px, transparent 39px),  /* 題號欄直線 */
     repeating-linear-gradient(
-      180deg, transparent 0, transparent 33px, #c3d3e2 33px, #c3d3e2 34px);
+      180deg, transparent 0, transparent 33px, #222 33px, #222 34px);
   background-position:0 0;
   background-repeat:repeat-y;
 }
@@ -593,10 +593,10 @@
 .es-mk{ flex:none; padding-right:.2em; }
 /* 縮排墊片：隱形字元，寬度＝上層標號去掉最後一字，靠字寬自動對齊 */
 .es-pad{ flex:none; visibility:hidden; white-space:pre; }
-/* 大標頂格並加粗 */
+/* 大標：標號寫在題號欄 */
 /* ★ 不可用 margin-top：任何額外間距都會讓後續行與格線逐行錯開（越來越偏）。
    需要視覺區隔就靠字重，不動高度。 */
-.es-ln.l1{ font-weight:700; position:relative; }
+.es-ln.l1{ position:relative; }
 /* 大標的「一、二、」寫在格線左邊的題號欄，內文從格線右側頂格開始 */
 .es-ln.l1 > .es-mk{ position:absolute; left:-42px; width:36px; padding:0; text-align:center; }
 
@@ -625,9 +625,9 @@
 [data-theme="eink"] .es-paper-hd{ background:#fff; color:#000; border-bottom:1.5px solid #000; }
 [data-theme="eink"] .es-paper-body{
   background-image:
-    linear-gradient(90deg, transparent 0 38px, #888 38px 39px, transparent 39px),
+    linear-gradient(90deg, transparent 0 38px, #000 38px 39px, transparent 39px),
     repeating-linear-gradient(
-      180deg, transparent 0, transparent 33px, #bbb 33px, #bbb 34px);
+      180deg, transparent 0, transparent 33px, #000 33px, #000 34px);
 }
 [data-theme="eink"] .es-ln{ color:#000; }
 [data-theme="eink"] .es-kw{ background:#fff; border:1.5px solid #000; }
