@@ -405,10 +405,15 @@ function revealES(){
     /^[（(]\d+[)）]\s*/,
     /^[A-Za-z][、．.]\s*/,
   ];
+  // 結語不是前一層的內文：該行開頭打兩個以上空白（半形或全形），
+  // 就回到與「（一）」同一欄從頭寫起，其後各行也跟著回到這一欄。
+  // ★ 不靠認字（綜上、結論…）：用空白鍵自己決定，不會誤判也不漏判。
+  const TOP = /^[ \u3000\t]{2,}/;
   const stubs = [];   // 各層標號去掉最後一字，用來墊出下一層的縮排
   let txPad = '';     // 無標號的內文：對齊上一個標號的內文起點
   const esPad = p => p ? '<span class="es-pad">' + esc(p) + '</span>' : '';
-  const esLine = (t)=>{
+  const esLine = (raw)=>{
+    const t = raw.trim();
     for(let i = 0; i < MK.length; i++){
       const m = t.match(MK[i]);
       if(!m) continue;
@@ -421,12 +426,14 @@ function revealES(){
            + '<span class="es-mk">' + esc(mk) + '</span>'
            + esc(t.slice(m[0].length)) + '</div>';
     }
+    // 行首打兩個以上空白 → 結語，回到（一）那一欄從頭寫起
+    if(TOP.test(raw)){ stubs.length = 1; txPad = ''; return '<div class="es-ln">' + esc(t) + '</div>'; }
     // 內文：墊到「上一個標號＋其後的字距」，起點與該層內文完全對齊
     return '<div class="es-ln">'
          + (txPad ? '<span class="es-pad es-mk">' + esc(txPad) + '</span>' : '')
          + esc(t) + '</div>';
   };
-  const paras = String(ans).split(/\n+/).map(t=>t.trim()).filter(Boolean);
+  const paras = String(ans).split(/\n+/).filter(t => t.trim());   // 保留行首空白（結語用）
   const sheet = paras.length
     ? paras.map(esLine).join('')
     : '<div class="es-ln" style="opacity:.55">（本題尚未填寫參考答案）</div>';
