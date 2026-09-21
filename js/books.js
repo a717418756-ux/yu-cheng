@@ -1385,7 +1385,7 @@ async function _initEpubReader(url, savedCfi, bookId){
 
     // 顯示（CFI 本身含章節定位資訊，不需等 locations 生成即可跳轉）
     if(savedCfi && typeof savedCfi === 'string' && savedCfi.startsWith('epubcfi')){
-      await rendition.display(savedCfi);
+      await _epubGoto(savedCfi);   // 停在上次那一頁，而不是該段文字的起始頁
     } else {
       await rendition.display();
     }
@@ -1504,27 +1504,30 @@ function _updateEpubProgress(book, loc){
 // 翻頁：電子紙重繪慢，同一次操作若被重複觸發（點擊與滑動同時成立、
 // 觸控板重複回報）就會一次翻兩頁。250ms 內只認第一次。
 let _epubTurnAt = 0;
-async function _epubTurn(dir){
+function _epubTurn(dir){
   const rd = window._epubRendition;
   if(!rd) return;
   const now = Date.now();
-  if(now - _epubTurnAt < 250) return;
+  if(now - _epubTurnAt < 250) return;   // 電子紙重繪慢，同一次操作被重複觸發會翻兩頁
   _epubTurnAt = now;
-  if(dir > 0){ rd.next(); return; }
+  if(dir > 0) rd.next(); else rd.prev();
+}
 
-  // 往前翻：記下目前位置，跨到上一個章節時要確認落點
-  const from = rd.currentLocation()?.start;
-  await rd.prev();
-  // ★ 跨章節往回時，epub.js 偶爾會停在上一章的「開頭」而不是「最後一頁」，
-  //   等於一次倒退整章。用位置索引把它修正到上一章結尾那一頁。
+// 定位到指定位置（CFI）
+// ★ display(CFI) 只保證「該段文字所在的那一頁」：若那一段是從前一頁開始接下來的，
+//   就會停在前一頁，跨章節時更可能差好幾頁——看起來就是位置跑掉、需要重翻。
+//   定位後再比對，若目標還在後面就往後補翻，確定目標真的在畫面上。
+async function _epubGoto(cfi){
+  const rd = window._epubRendition;
+  if(!rd || !cfi) return;
+  await rd.display(cfi);
   try{
-    const to = rd.currentLocation()?.start;
-    const bk = window._epubBook;
-    if(!from || !to || to.href === from.href) return;
-    if(!(to.displayed?.page === 1 && to.displayed?.total > 1)) return;  // 落在最後一頁就是對的
-    if(!bk?.locations?.length()) return;                                // 索引還沒好就不動
-    const idx = bk.locations.locationFromCfi(from.cfi);
-    if(idx > 0) await rd.display(bk.locations.cfiFromLocation(idx - 1));
+    const cmp = new ePub.CFI();
+    for(let i = 0; i < 30; i++){
+      const end = rd.currentLocation()?.end?.cfi;
+      if(!end || cmp.compare(end, cfi) >= 0) break;   // 目標已在這一頁內
+      await rd.next();
+    }
   }catch(e){}
 }
 function _epubNext(){ _epubTurn(1); }
@@ -1626,9 +1629,9 @@ function _readerFontSize(delta){
       // ★ 電子紙等較慢的裝置，260ms 後可能還在重排，這時定位會落在重排途中的版面
       //   （使用者看到的就是位置跑掉）。隔一段時間再定位一次；已經正確時不會移動。
       try{
-        await rd.display(cfi);
+        await _epubGoto(cfi);
         await new Promise(r => setTimeout(r, 400));
-        await rd.display(cfi);
+        await _epubGoto(cfi);   // 慢的裝置此時可能才排完版，再定位一次；已正確則不會移動
       }catch(e){}
       setTimeout(()=>{ _fsReflowing = false; _fsAnchorCfi = null; }, 300);
     }, 260);
