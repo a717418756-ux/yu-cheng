@@ -391,22 +391,45 @@ function revealES(){
   resEl.className = 'qres on r';
 
   // 以「國考手寫答案卷」樣式呈現參考答案：米白紙張、格線、手寫體，
-  // 並依申論慣用的標號自動縮排出層次，貼近考場上真正會寫出來的版面，
-  // 靠視覺記憶幫助考試時回想架構。
-  //   一、二、三…        → 大標（頂格）
-  //   (一)(二)、（一）…   → 次標（縮一層）
-  //   1. 2. 3.           → 細目（縮兩層）
-  //   其他                → 內文（縮兩層，首行再縮兩字元）
-  const lvOf = (t)=>{
-    if(/^[一二三四五六七八九十]+[、．.]/.test(t))      return 'l1';
-    if(/^[（(][一二三四五六七八九十]+[)）]/.test(t))    return 'l2';
-    if(/^\d+[、．.]/.test(t) || /^[（(]\d+[)）]/.test(t)) return 'l3';
-    return 'tx';
+  // 並依申論標號自動分出層次，貼近考場上真正會寫出來的版面。
+  //   一、→（一）→ 1、→（1）→ A、
+  // ★ 縮排與考卷相同：大標「一、」寫在格線左邊的題號欄；（一）頂著格線起寫；
+  //   下一層的標號對齊上一層標號的「最後一個字」——
+  //   1、 對齊（一）的「）」，（1）對齊 1、的「、」，A、對齊（1）的「）」。
+  //   作法是先墊一段「上層標號去掉最後一字」的隱形字元，字寬由瀏覽器算，
+  //   不必寫死 em，換字體或全形半形混用都不會跑掉。
+  const MK = [
+    /^[一二三四五六七八九十百]+[、．.]\s*/,
+    /^[（(][一二三四五六七八九十百]+[)）]\s*/,
+    /^\d+[、．.]\s*/,
+    /^[（(]\d+[)）]\s*/,
+    /^[A-Za-z][、．.]\s*/,
+  ];
+  const stubs = [];   // 各層標號去掉最後一字，用來墊出下一層的縮排
+  let txPad = '';     // 無標號的內文：對齊上一個標號的內文起點
+  const esPad = p => p ? '<span class="es-pad">' + esc(p) + '</span>' : '';
+  const esLine = (t)=>{
+    for(let i = 0; i < MK.length; i++){
+      const m = t.match(MK[i]);
+      if(!m) continue;
+      const mk = m[0].trim();
+      stubs[i] = mk.slice(0, -1);
+      stubs.length = i + 1;                                  // 回到本層，清掉更深層
+      const pad = stubs.slice(1, i).map(x => x || '').join('');  // 第一層標號在題號欄，不佔縮排
+      txPad = pad + mk;
+      return '<div class="es-ln' + (i ? '' : ' l1') + '">' + esPad(pad)
+           + '<span class="es-mk">' + esc(mk) + '</span>'
+           + esc(t.slice(m[0].length)) + '</div>';
+    }
+    // 內文：墊到「上一個標號＋其後的字距」，起點與該層內文完全對齊
+    return '<div class="es-ln">'
+         + (txPad ? '<span class="es-pad es-mk">' + esc(txPad) + '</span>' : '')
+         + esc(t) + '</div>';
   };
   const paras = String(ans).split(/\n+/).map(t=>t.trim()).filter(Boolean);
   const sheet = paras.length
-    ? paras.map(p=>'<div class="es-ln ' + lvOf(p) + '">' + esc(p) + '</div>').join('')
-    : '<div class="es-ln tx" style="opacity:.55">（本題尚未填寫參考答案）</div>';
+    ? paras.map(esLine).join('')
+    : '<div class="es-ln" style="opacity:.55">（本題尚未填寫參考答案）</div>';
   let html =
     '<div class="es-paper">'
     + '<div class="es-paper-hd"><span>參 考 答 案</span><span class="es-paper-no">'
