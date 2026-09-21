@@ -1138,9 +1138,9 @@ async function openBookReader(id){
                 style="height:100%;background:var(--acc);width:0%;transition:width .3s"></div>
             </div>
             <!-- 頁碼提示 -->
-            <div id="epub-page-info" class="hide"
+            <div id="epub-page-info"
               style="text-align:center;font-size:11px;color:rgba(255,255,255,0.3);
-              padding:4px 0 6px;flex-shrink:0;font-variant-numeric:tabular-nums">
+              height:21px;line-height:21px;flex-shrink:0;font-variant-numeric:tabular-nums">
             </div>
             <!-- 章節目錄側欄 -->
             <div id="epub-toc-overlay" class="epub-toc-overlay hide" onclick="_toggleEpubToc()">
@@ -1255,15 +1255,18 @@ async function _initEpubReader(url, savedCfi, bookId){
     window._epubBook = book;
     _epubTocLoaded = false;  // 新書重置目錄載入旗標
 
-    // 取得容器實際高度（epub.js 需要明確像素高度）
+    // 取得容器實際尺寸（epub.js 需要明確像素值）
+    // ★ 原本用「視窗高 - 120」估算，實測比容器真正的高度少 58px，
+    //   等於每頁底部固定空一段、每頁少放兩三行。改量容器本身（量不到才退回估算）。
     const viewerEl = document.getElementById('epub-viewer');
-    const viewerH = window.innerHeight - 120;  // fixed overlay：視窗高扣頂/底列
-    // epub.js paginated 需精確寬度：window.innerWidth 有時多一像素造成截字
+    const viewerH = viewerEl?.clientHeight || (window.innerHeight - 120);
+    const viewerW = viewerEl?.clientWidth  || window.innerWidth;
+    // epub.js paginated 需精確寬度：容器寬有時多一像素造成截字
     // 減去 2px 確保 column 完整顯示在容器內
     // 自動偵測裝置（layout.js 已設定 _epubDeviceSpread）
     const _spread = window._epubDeviceSpread || 'none';
     const rendition = book.renderTo('epub-viewer', {
-      width:  window.innerWidth - 2,
+      width:  viewerW - 2,
       height: Math.max(400, viewerH),
       spread: _spread,
       flow:   'paginated',
@@ -1404,8 +1407,8 @@ async function _initEpubReader(url, savedCfi, bookId){
     rendition.on('touchend',   e=>{
       if(_epubTouchStart === null) return;
       const diff = e.changedTouches[0].clientX - _epubTouchStart;
-      if(diff > 50)       rendition.prev();
-      else if(diff < -50) rendition.next();
+      if(diff > 50)       _epubTurn(-1);
+      else if(diff < -50) _epubTurn(1);
       _epubTouchStart = null;
     });
 
@@ -1491,7 +1494,6 @@ function _updateEpubProgress(book, loc){
         const pctTxt = `${Math.round(pct*100)}%`;
         // 有章節名則顯示「章節 · X%」，否則只顯示 X%
         info.textContent = chapter ? `${chapter} · ${pctTxt}` : pctTxt;
-        info.classList.remove('hide');
       }
     };
     if(result && typeof result.then === 'function') result.then(applyPct).catch(()=>{});
@@ -1499,12 +1501,19 @@ function _updateEpubProgress(book, loc){
   }catch(e){}
 }
 
-function _epubNext(){
-  if(window._epubRendition) window._epubRendition.next();
+// 翻頁：電子紙重繪慢，同一次操作若被重複觸發（點擊與滑動同時成立、
+// 觸控板重複回報）就會一次翻兩頁。250ms 內只認第一次。
+let _epubTurnAt = 0;
+function _epubTurn(dir){
+  const rd = window._epubRendition;
+  if(!rd) return;
+  const now = Date.now();
+  if(now - _epubTurnAt < 250) return;
+  _epubTurnAt = now;
+  if(dir > 0) rd.next(); else rd.prev();
 }
-function _epubPrev(){
-  if(window._epubRendition) window._epubRendition.prev();
-}
+function _epubNext(){ _epubTurn(1); }
+function _epubPrev(){ _epubTurn(-1); }
 
 let _readerFontSz = 17;
 // 調整字級會讓 epub.js 重新分頁，閱讀位置會跑掉 → 記住位置、重排後回到原處
