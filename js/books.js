@@ -1504,13 +1504,28 @@ function _updateEpubProgress(book, loc){
 // 翻頁：電子紙重繪慢，同一次操作若被重複觸發（點擊與滑動同時成立、
 // 觸控板重複回報）就會一次翻兩頁。250ms 內只認第一次。
 let _epubTurnAt = 0;
-function _epubTurn(dir){
+async function _epubTurn(dir){
   const rd = window._epubRendition;
   if(!rd) return;
   const now = Date.now();
   if(now - _epubTurnAt < 250) return;
   _epubTurnAt = now;
-  if(dir > 0) rd.next(); else rd.prev();
+  if(dir > 0){ rd.next(); return; }
+
+  // 往前翻：記下目前位置，跨到上一個章節時要確認落點
+  const from = rd.currentLocation()?.start;
+  await rd.prev();
+  // ★ 跨章節往回時，epub.js 偶爾會停在上一章的「開頭」而不是「最後一頁」，
+  //   等於一次倒退整章。用位置索引把它修正到上一章結尾那一頁。
+  try{
+    const to = rd.currentLocation()?.start;
+    const bk = window._epubBook;
+    if(!from || !to || to.href === from.href) return;
+    if(!(to.displayed?.page === 1 && to.displayed?.total > 1)) return;  // 落在最後一頁就是對的
+    if(!bk?.locations?.length()) return;                                // 索引還沒好就不動
+    const idx = bk.locations.locationFromCfi(from.cfi);
+    if(idx > 0) await rd.display(bk.locations.cfiFromLocation(idx - 1));
+  }catch(e){}
 }
 function _epubNext(){ _epubTurn(1); }
 function _epubPrev(){ _epubTurn(-1); }
@@ -1603,13 +1618,19 @@ function _readerFontSize(delta){
     rd.themes.fontSize(_readerFontSz+'px');
     // 重排需要時間，連按時只在最後一次之後還原一次
     clearTimeout(_fsRestoreTimer);
-    _fsRestoreTimer = setTimeout(()=>{
+    _fsRestoreTimer = setTimeout(async ()=>{
       _fsRestoreTimer = null;
-      if(!_fsAnchorCfi) return;
+      const cfi = _fsAnchorCfi;
+      if(!cfi) return;
       _fsReflowing = true;
-      Promise.resolve(rd.display(_fsAnchorCfi)).catch(()=>{}).then(()=>{
-        setTimeout(()=>{ _fsReflowing = false; _fsAnchorCfi = null; }, 300);
-      });
+      // ★ 電子紙等較慢的裝置，260ms 後可能還在重排，這時定位會落在重排途中的版面
+      //   （使用者看到的就是位置跑掉）。隔一段時間再定位一次；已經正確時不會移動。
+      try{
+        await rd.display(cfi);
+        await new Promise(r => setTimeout(r, 400));
+        await rd.display(cfi);
+      }catch(e){}
+      setTimeout(()=>{ _fsReflowing = false; _fsAnchorCfi = null; }, 300);
     }, 260);
   }
   // 記住設定，下次開書沿用
