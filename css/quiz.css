@@ -589,10 +589,11 @@
   word-break:break-all;
   display:flex;                           /* 標號一欄、內文一欄 */
 }
-/* 標號欄：不壓縮、不換行，內文換行時自動對齊內文起點 */
-.es-mk{ flex:none; padding-right:.2em; }
+/* 標號欄：不壓縮、不換行，內文換行時自動對齊內文起點。
+   標號與內文之間留半個字，標號才不會和內文黏在一起 */
+.es-mk{ flex:none; padding-right:.5em; }
 /* 縮排墊片：隱形字元，寬度＝上層標號去掉最後一字，靠字寬自動對齊 */
-.es-pad{ flex:none; visibility:hidden; white-space:pre; }
+.es-pad{ flex:none; visibility:hidden; white-space:pre; user-select:none; -webkit-user-select:none; }
 /* 大標：標號寫在題號欄 */
 /* ★ 不可用 margin-top：任何額外間距都會讓後續行與格線逐行錯開（越來越偏）。
    需要視覺區隔就靠字重，不動高度。 */
