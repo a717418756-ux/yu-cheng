@@ -1138,10 +1138,16 @@ async function openBookReader(id){
                 style="height:100%;background:var(--acc);width:0%;transition:width .3s"></div>
             </div>
             <!-- 頁碼提示 -->
-            <div id="epub-page-info"
+            <div id="epub-page-info" onclick="_toggleEpubLog()"
               style="text-align:center;font-size:11px;color:rgba(255,255,255,0.3);
               height:21px;line-height:21px;flex-shrink:0;font-variant-numeric:tabular-nums">
             </div>
+            <!-- 翻頁診斷：點頁碼列開關，跳頁時截圖回報用 -->
+            <pre id="epub-log" class="hide"
+              style="position:absolute;left:8px;right:8px;bottom:26px;z-index:9;margin:0;
+              max-height:45%;overflow:auto;padding:8px;border-radius:8px;
+              background:rgba(0,0,0,0.88);color:#9fd0ff;font-size:10px;line-height:1.5;
+              white-space:pre-wrap"></pre>
             <!-- 章節目錄側欄 -->
             <div id="epub-toc-overlay" class="epub-toc-overlay hide" onclick="_toggleEpubToc()">
               <div id="epub-toc-panel" class="epub-toc-panel" onclick="event.stopPropagation()">
@@ -1292,7 +1298,10 @@ async function _initEpubReader(url, savedCfi, bookId){
     try{
       const _mgr = rendition.manager;
       const _counter = _mgr.counter.bind(_mgr);
-      _mgr.counter = delta => { if(_epubNavBusy > 0) _counter(delta); };
+      _mgr.counter = delta => {
+        if(_epubNavBusy > 0){ _counter(delta); _epubLogAdd('  epub.js 補償捲動 ' + JSON.stringify(delta)); }
+        else _epubLogAdd('✋ 擋下非操作中的補償捲動 ' + JSON.stringify(delta));
+      };
     }catch(e){}
 
     // 設定主題（深色預設）
@@ -1397,6 +1406,7 @@ async function _initEpubReader(url, savedCfi, bookId){
 
     // 註冊 relocated（加旗標：還原位置期間不存檔，避免覆蓋 savedCfi）
     let _restoringPos = true;
+    rendition.on('resized', ()=> _epubLogAdd('⟳ epub.js 重新排版'));
     rendition.on('relocated', loc=>{
       _updateEpubProgress(book, loc);
       _epubGuard(loc?.start?.cfi);
@@ -1448,6 +1458,22 @@ async function _initEpubReader(url, savedCfi, bookId){
 }
 
 let _epubTouchStart = null;
+
+// ── 翻頁診斷 ─────────────────────────────────────────────────
+// 點底部頁碼列即可開關。記錄最近 24 筆位置變動與其原因，跳頁時截圖就能看出是誰動的。
+let _epubLog = [];
+function _epubLogAdd(t){
+  _epubLog.push(new Date().toTimeString().slice(3,8) + ' ' + t);
+  if(_epubLog.length > 24) _epubLog.shift();
+  const el = document.getElementById('epub-log');
+  if(el && !el.classList.contains('hide')) el.textContent = _epubLog.join('\n');
+}
+function _toggleEpubLog(){
+  const el = document.getElementById('epub-log');
+  if(!el) return;
+  el.classList.toggle('hide');
+  el.textContent = _epubLog.length ? _epubLog.join('\n') : '（尚無紀錄，翻幾頁後再看）';
+}
 
 // 實體按鍵翻頁（閱讀器開著時才作用）
 function _epubKeyNav(e){
@@ -1548,16 +1574,23 @@ let _epubAnchor  = null;   // 使用者現在應該在的位置
 let _epubNavBusy = 0;      // >0：正在執行使用者的操作，期間的位置變動都接受
 let _epubFixAt   = 0;      // 上次拉回的時間（避免來回拉扯）
 
+// 目前頁碼（診斷用）
+function _epubPg(){
+  const d = window._epubRendition?.currentLocation()?.start;
+  return d ? ((d.href || '').split('/').pop() + ' ' + (d.displayed?.page || '?') + '/' + (d.displayed?.total || '?')) : '?';
+}
 function _epubNavStart(){ _epubNavBusy++; }
 function _epubNavEnd(ms){ setTimeout(()=>{ _epubNavBusy = Math.max(0, _epubNavBusy - 1); }, ms || 600); }
 
 // relocated 時呼叫：判斷這次位置變動要接受還是拉回
 function _epubGuard(cfi){
   if(!cfi) return;
-  if(_epubNavBusy > 0 || !_epubAnchor){ _epubAnchor = cfi; return; }  // 使用者造成的，接受
+  if(_epubNavBusy > 0 || !_epubAnchor){ _epubAnchor = cfi; _epubLogAdd('  → 到 ' + _epubPg()); return; }
   if(cfi === _epubAnchor) return;
-  if(Date.now() - _epubFixAt < 1500) return;                          // 拉不回來就不要一直拉
+  _epubLogAdd('⚠ 位置自己變了 → ' + _epubPg());
+  if(Date.now() - _epubFixAt < 1500){ _epubLogAdd('  （剛拉過，這次不拉）'); return; }
   _epubFixAt = Date.now();
+  _epubLogAdd('  ↩ 拉回原位');
   const back = _epubAnchor;
   _epubNavStart();
   Promise.resolve(_epubGoto(back)).catch(()=>{}).then(()=>{ _epubAnchor = back; _epubNavEnd(); });
@@ -1569,6 +1602,7 @@ function _epubTurn(dir){
   const now = Date.now();
   if(now - _epubTurnAt < 250) return;   // 電子紙重繪慢，同一次操作被重複觸發會翻兩頁
   _epubTurnAt = now;
+  _epubLogAdd(dir > 0 ? '你按了 下一頁' : '你按了 上一頁');
   _epubNavStart();
   // 往前翻要把上一章接回畫面（prepend），排版較久，操作視窗開長一點
   Promise.resolve(dir > 0 ? rd.next() : rd.prev()).catch(()=>{})
