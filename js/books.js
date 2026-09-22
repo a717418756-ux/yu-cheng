@@ -1111,7 +1111,7 @@ async function openBookReader(id){
             style="width:100%;height:100%;border:none;background:#111"></iframe>`
         : ext==='epub'
         ? `<div id="reader-epub-wrap"
-            style="width:100%;height:100%;position:relative;
+            style="width:100%;height:100%;position:relative;overscroll-behavior:none;
             background:var(--reader-bg,#111);display:flex;flex-direction:column">
             <!-- epub.js 渲染區 -->
             <div id="epub-viewer"
@@ -1120,16 +1120,16 @@ async function openBookReader(id){
             <!-- 左右翻頁觸控區 -->
             <div id="epub-prev-zone"
               style="position:absolute;left:0;top:0;width:30%;height:100%;
-              z-index:5;cursor:pointer;-webkit-tap-highlight-color:transparent"
+              z-index:5;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent"
               onclick="_epubPrev()"></div>
             <div id="epub-next-zone"
               style="position:absolute;right:0;top:0;width:30%;height:100%;
-              z-index:5;cursor:pointer;-webkit-tap-highlight-color:transparent"
+              z-index:5;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent"
               onclick="_epubNext()"></div>
             <!-- 中央點擊區：顯示/隱藏頂部工具列（Kindle 式）-->
             <div id="epub-center-zone"
               style="position:absolute;left:30%;top:0;width:40%;height:100%;
-              z-index:4;cursor:pointer;-webkit-tap-highlight-color:transparent"
+              z-index:4;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent"
               onclick="_toggleReaderBars()"></div>
             <!-- 底部進度列 -->
             <div id="epub-progress-bar"
@@ -1254,6 +1254,7 @@ async function _initEpubReader(url, savedCfi, bookId){
     const book = ePub(buf);
     window._epubBook = book;
     _epubTocLoaded = false;  // 新書重置目錄載入旗標
+    _epubAnchor = null; _epubNavBusy = 0;   // 新書重置位置守門員
 
     // 取得容器實際尺寸（epub.js 需要明確像素值）
     // ★ 原本用「視窗高 - 120」估算，實測比容器真正的高度少 58px，
@@ -1273,6 +1274,26 @@ async function _initEpubReader(url, savedCfi, bookId){
       allowScriptedContent: false,
     });
     window._epubRendition = rendition;
+
+    // ── 專業閱讀器的兩個基本功：版面一次算準、算準後不要自己亂動 ──────
+    // ①圖片、表格一律縮進版面內。超出寬度會讓分欄寬度算錯，之後每次重排都可能位移。
+    rendition.hooks.content.register(contents => {
+      try{
+        contents.addStylesheetRules({
+          'img, svg, video': { 'max-width': '100%', 'max-height': '100%', 'height': 'auto' },
+          'table, pre':      { 'max-width': '100%' },
+        });
+      }catch(e){}
+    });
+    // ②epub.js 在「內容尺寸變動」時會自動捲動補償（counter）。跨章往回翻時它靠這個
+    //   把畫面對齊，但圖片載入完、字型換掉、內容慢慢排完都會再觸發一次，
+    //   補償量卻是用舊的尺寸算的 → 畫面就這樣莫名其妙跳掉好幾頁。
+    //   只在使用者正在操作的當下才讓它補償，其餘時間一律忽略（位置由守門員負責）。
+    try{
+      const _mgr = rendition.manager;
+      const _counter = _mgr.counter.bind(_mgr);
+      _mgr.counter = delta => { if(_epubNavBusy > 0) _counter(delta); };
+    }catch(e){}
 
     // 設定主題（深色預設）
     // 依裝置 DPR 和螢幕尺寸自動調整基礎字體
@@ -1378,6 +1399,7 @@ async function _initEpubReader(url, savedCfi, bookId){
     let _restoringPos = true;
     rendition.on('relocated', loc=>{
       _updateEpubProgress(book, loc);
+      _epubGuard(loc?.start?.cfi);
       if(_restoringPos) return;  // 還原期間不存，避免把好的 CFI 覆蓋成開頭
       if(_fsReflowing) return;   // 調字級重排中，位置是暫時的，別存
       if(loc?.start?.cfi && bookId) _saveEpubCfiThrottled(bookId, loc.start.cfi);
@@ -1402,6 +1424,10 @@ async function _initEpubReader(url, savedCfi, bookId){
     // 閱讀模式：直接在 overlay 上設 class（不改 html[data-reading]，避免影響 epub.js 寬度計算）
     document.documentElement.classList.add('reader-active');
 
+    // 實體翻頁鍵：Boox 側鍵、藍牙翻頁器、鍵盤方向鍵都會送出這些鍵。
+    // 沒有接管的話，瀏覽器會用它們捲動外層頁面，畫面就會位移錯亂。
+    document.addEventListener('keydown', _epubKeyNav);
+
     // 觸控滑動翻頁
     rendition.on('touchstart', e=>{ _epubTouchStart = e.touches[0].clientX; });
     rendition.on('touchend',   e=>{
@@ -1422,6 +1448,14 @@ async function _initEpubReader(url, savedCfi, bookId){
 }
 
 let _epubTouchStart = null;
+
+// 實體按鍵翻頁（閱讀器開著時才作用）
+function _epubKeyNav(e){
+  if(!window._epubRendition || !document.getElementById('book-reader-ov')) return;
+  const k = e.key;
+  if(k === 'ArrowRight' || k === 'PageDown' || k === ' '){ e.preventDefault(); _epubTurn(1); }
+  else if(k === 'ArrowLeft' || k === 'PageUp')           { e.preventDefault(); _epubTurn(-1); }
+}
 
 // 即時儲存 epub 閱讀位置（節流：最多每 1.5 秒寫一次 DB）
 let _saveCfiTimer = null;
@@ -1504,13 +1538,41 @@ function _updateEpubProgress(book, loc){
 // 翻頁：電子紙重繪慢，同一次操作若被重複觸發（點擊與滑動同時成立、
 // 觸控板重複回報）就會一次翻兩頁。250ms 內只認第一次。
 let _epubTurnAt = 0;
+
+// ── 閱讀位置守門員 ────────────────────────────────────────────
+// 只有「使用者的操作」可以改變位置：翻頁、點目錄、調字級、開書還原。
+// 其他來源造成的位置變動（圖片載入完成後重排、內容尺寸變動、系統改變視窗大小…）
+// 一律拉回原位——這是「讀著讀著突然跳頁」的根本解法：不必逐一找出每種觸發原因，
+// 只要不是使用者按的，就不算數。
+let _epubAnchor  = null;   // 使用者現在應該在的位置
+let _epubNavBusy = 0;      // >0：正在執行使用者的操作，期間的位置變動都接受
+let _epubFixAt   = 0;      // 上次拉回的時間（避免來回拉扯）
+
+function _epubNavStart(){ _epubNavBusy++; }
+function _epubNavEnd(ms){ setTimeout(()=>{ _epubNavBusy = Math.max(0, _epubNavBusy - 1); }, ms || 600); }
+
+// relocated 時呼叫：判斷這次位置變動要接受還是拉回
+function _epubGuard(cfi){
+  if(!cfi) return;
+  if(_epubNavBusy > 0 || !_epubAnchor){ _epubAnchor = cfi; return; }  // 使用者造成的，接受
+  if(cfi === _epubAnchor) return;
+  if(Date.now() - _epubFixAt < 1500) return;                          // 拉不回來就不要一直拉
+  _epubFixAt = Date.now();
+  const back = _epubAnchor;
+  _epubNavStart();
+  Promise.resolve(_epubGoto(back)).catch(()=>{}).then(()=>{ _epubAnchor = back; _epubNavEnd(); });
+}
+
 function _epubTurn(dir){
   const rd = window._epubRendition;
   if(!rd) return;
   const now = Date.now();
   if(now - _epubTurnAt < 250) return;   // 電子紙重繪慢，同一次操作被重複觸發會翻兩頁
   _epubTurnAt = now;
-  if(dir > 0) rd.next(); else rd.prev();
+  _epubNavStart();
+  // 往前翻要把上一章接回畫面（prepend），排版較久，操作視窗開長一點
+  Promise.resolve(dir > 0 ? rd.next() : rd.prev()).catch(()=>{})
+    .then(()=> _epubNavEnd(dir > 0 ? 600 : 1500));
 }
 
 // 定位到指定位置（CFI）
@@ -1520,8 +1582,9 @@ function _epubTurn(dir){
 async function _epubGoto(cfi){
   const rd = window._epubRendition;
   if(!rd || !cfi) return;
-  await rd.display(cfi);
+  _epubNavStart();
   try{
+    await rd.display(cfi);
     const cmp = new ePub.CFI();
     for(let i = 0; i < 30; i++){
       const end = rd.currentLocation()?.end?.cfi;
@@ -1529,6 +1592,8 @@ async function _epubGoto(cfi){
       await rd.next();
     }
   }catch(e){}
+  _epubAnchor = rd.currentLocation()?.start?.cfi || cfi;
+  _epubNavEnd();
 }
 function _epubNext(){ _epubTurn(1); }
 function _epubPrev(){ _epubTurn(-1); }
@@ -1600,7 +1665,10 @@ async function _epubGotoChapter(href){
   const rendition = window._epubRendition;
   if(!rendition || !href) return;
   try{
+    _epubNavStart();
     await rendition.display(href);
+    _epubAnchor = rendition.currentLocation()?.start?.cfi || null;
+    _epubNavEnd();
     _toggleEpubToc();  // 跳轉後關閉側欄
   }catch(e){ toast('章節跳轉失敗'); }
 }
@@ -1715,6 +1783,7 @@ async function closeBookReader(id){
       if(idx>=0){ _B.allBooks[idx].lastRead=book.lastRead; }
     }
   }catch(_){}
+  document.removeEventListener('keydown', _epubKeyNav);
   // 清理 epub 實例
   if(window._epubBook){
     try{ window._epubBook.destroy(); }catch(_){}
