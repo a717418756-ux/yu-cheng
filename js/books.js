@@ -1117,18 +1117,18 @@ async function openBookReader(id){
             <div id="epub-viewer"
               style="flex:1;overflow:hidden;position:relative;
               height:0;min-height:0"></div>
-            <!-- 左右翻頁觸控區 -->
+            <!-- 左右翻頁觸控區（底部留 23px 給進度列與頁碼列，否則會蓋住點不到） -->
             <div id="epub-prev-zone"
-              style="position:absolute;left:0;top:0;width:30%;height:100%;
+              style="position:absolute;left:0;top:0;width:30%;bottom:23px;
               z-index:5;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent"
               onclick="_epubPrev()"></div>
             <div id="epub-next-zone"
-              style="position:absolute;right:0;top:0;width:30%;height:100%;
+              style="position:absolute;right:0;top:0;width:30%;bottom:23px;
               z-index:5;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent"
               onclick="_epubNext()"></div>
             <!-- 中央點擊區：顯示/隱藏頂部工具列（Kindle 式）-->
             <div id="epub-center-zone"
-              style="position:absolute;left:30%;top:0;width:40%;height:100%;
+              style="position:absolute;left:30%;top:0;width:40%;bottom:23px;
               z-index:4;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent"
               onclick="_toggleReaderBars()"></div>
             <!-- 底部進度列 -->
