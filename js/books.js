@@ -1604,9 +1604,62 @@ function _epubTurn(dir){
   _epubTurnAt = now;
   _epubLogAdd(dir > 0 ? '你按了 下一頁' : '你按了 上一頁');
   _epubNavStart();
-  // 往前翻要把上一章接回畫面（prepend），排版較久，操作視窗開長一點
-  Promise.resolve(dir > 0 ? rd.next() : rd.prev()).catch(()=>{})
-    .then(()=> _epubNavEnd(dir > 0 ? 600 : 1500));
+  _epubPage(dir).catch(()=>{}).then(()=> _epubNavEnd(dir > 0 ? 600 : 1500));
+}
+
+// 翻一頁
+// ★ epub.js 判斷「這一章還有沒有下一頁」是用
+//     scrollLeft + 容器寬 + 每頁寬 <= 總寬
+//   容器寬與每頁寬只要差幾個像素（分欄間距、邊框、裝置四捨五入），就會提早判定到章尾，
+//   於是「跳過該章最後一頁直接換章」；往回翻同理，會在章首空按一次，
+//   換章後又停在上一章的第一頁（等於倒退整章）。
+//   改成用 epub.js 自己算出來的頁碼：章內還有頁就自己捲一頁，真的到章界才換章。
+async function _epubPage(dir){
+  const rd  = window._epubRendition;
+  const mgr = rd && rd.manager;
+  const el  = mgr && mgr.container;
+  const d   = mgr && mgr.layout && mgr.layout.delta;
+  const st  = rd && rd.currentLocation() && rd.currentLocation().start;
+  if(!mgr || !el || !d || !st) return dir > 0 ? rd.next() : rd.prev();
+
+  const page  = st.displayed && st.displayed.page  || 1;
+  const total = st.displayed && st.displayed.total || 1;
+
+  // ① 章節內翻頁：自己捲一頁
+  if((dir > 0 && page < total) || (dir < 0 && page > 1)){
+    const before = el.scrollLeft;
+    mgr.scrollTo(Math.max(0, before + dir * d), 0, true);
+    if(el.scrollLeft !== before){
+      if(mgr.fill) mgr.fill();          // 與 epub.js 相同：順便預載相鄰章節
+      await rd.reportLocation();        // 更新位置並發出 relocated
+      return;
+    }
+    _epubLogAdd('  （章內捲不動，改用換章）');
+  }
+
+  // ② 到章界才換章
+  const fromHref = st.href;
+  await (dir > 0 ? rd.next() : rd.prev());
+  if(dir > 0) return;
+
+  // ③ 往回換章後應該停在「上一章的最後一頁」。epub.js 在版面還沒排完時就定位，
+  //    常常停在第一頁，看起來就是倒退整章。這裡等排完再補到最後一頁。
+  for(let i = 0; i < 3; i++){
+    await new Promise(r => setTimeout(r, 150));
+    const s2 = rd.currentLocation() && rd.currentLocation().start;
+    if(!s2 || s2.href === fromHref) continue;
+    const p2 = s2.displayed && s2.displayed.page  || 1;
+    const t2 = s2.displayed && s2.displayed.total || 1;
+    if(p2 >= t2) return;                       // 已經在最後一頁
+    const target = el.scrollLeft + (t2 - p2) * d;
+    const before = el.scrollLeft;
+    mgr.scrollTo(target, 0, true);
+    if(el.scrollLeft === before) continue;     // 還沒排完，等下一輪
+    if(mgr.fill) mgr.fill();
+    await rd.reportLocation();
+    _epubLogAdd('  ↦ 補到上一章最後一頁');
+    return;
+  }
 }
 
 // 定位到指定位置（CFI）
