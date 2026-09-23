@@ -1261,6 +1261,7 @@ async function _initEpubReader(url, savedCfi, bookId){
     window._epubBook = book;
     _epubTocLoaded = false;  // 新書重置目錄載入旗標
     _epubAnchor = null; _epubNavBusy = 0; _epubPreloaded = '';   // 新書重置位置守門員與預載旗標
+    _epubTurning = false; _epubQueued = 0;                          // 新書重置翻頁佇列
 
     // 取得容器實際尺寸（epub.js 需要明確像素值）
     // ★ 原本用「視窗高 - 120」估算，實測比容器真正的高度少 58px，
@@ -1440,15 +1441,21 @@ async function _initEpubReader(url, savedCfi, bookId){
     // ★ 原本掛在 epub.js 的內容（iframe 內）上，但翻頁觸控區整片蓋在它上面，
     //   事件根本傳不進去，等於沒有作用。改掛在觸控區所在的容器上。
     //   滑動之後緊接著會有一次 click，由 _epubTurn 的 250ms 防連點擋掉，不會翻兩頁。
+    //   ★ 目錄、診斷記錄也在這個容器裡：在裡面上下捲動時不能被當成翻頁，
+    //     只認起點不在面板內、且水平位移大於垂直位移的滑動。
     const wrap = document.getElementById('reader-epub-wrap');
     if(wrap){
-      wrap.addEventListener('touchstart', e=>{ _epubTouchStart = e.touches[0].clientX; }, {passive:true});
-      wrap.addEventListener('touchend',   e=>{
-        if(_epubTouchStart === null) return;
-        const diff = e.changedTouches[0].clientX - _epubTouchStart;
+      wrap.addEventListener('touchstart', e=>{
+        const t = e.touches[0];
+        _epubTouchStart = e.target.closest('#epub-toc-overlay, #epub-log') ? null : { x: t.clientX, y: t.clientY };
+      }, {passive:true});
+      wrap.addEventListener('touchend', e=>{
+        if(!_epubTouchStart) return;
+        const t  = e.changedTouches[0];
+        const dx = t.clientX - _epubTouchStart.x, dy = t.clientY - _epubTouchStart.y;
         _epubTouchStart = null;
-        if(diff > 50)       _epubTurn(-1);
-        else if(diff < -50) _epubTurn(1);
+        if(Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+        _epubTurn(dx > 0 ? -1 : 1);
       }, {passive:true});
     }
 
@@ -1482,6 +1489,9 @@ function _toggleEpubLog(){
 // 實體按鍵翻頁（閱讀器開著時才作用）
 function _epubKeyNav(e){
   if(!window._epubRendition || !document.getElementById('book-reader-ov')) return;
+  // ★ 閱讀器上層若開了有輸入框的視窗，空白鍵、方向鍵要留給打字與移動游標
+  const t = e.target;
+  if(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
   const k = e.key;
   if(k === 'ArrowRight' || k === 'PageDown' || k === ' '){ e.preventDefault(); _epubTurn(1); }
   else if(k === 'ArrowLeft' || k === 'PageUp')           { e.preventDefault(); _epubTurn(-1); }
@@ -1729,7 +1739,8 @@ function _epubPreloadPrev(){
   try{
     const rd = window._epubRendition, bk = window._epubBook;
     const st = rd && rd.currentLocation() && rd.currentLocation().start;
-    if(!st || !bk || (st.displayed && st.displayed.page > 2)) return;
+    const g  = _epubGeom();
+    if(!st || !bk || (g && g.idx > 1)) return;          // 只在章首前兩頁預載
     const sec = bk.spine.get(st.href);
     const prev = sec && sec.prev();
     if(!prev || _epubPreloaded === prev.href) return;
@@ -1773,7 +1784,6 @@ let _readerFontSz = 17;
 let _fsRestoreTimer = null;   // 連按 +/- 的防抖計時器
 let _fsAnchorCfi    = null;   // 這一輪調整前的位置（只在第一次按時記錄）
 let _fsReflowing    = false;  // 重排中：此期間不要把中途位置存成書籤
-let _readerUIVisible = true;
 
 function _toggleReaderUI(){
   const settings=document.getElementById('reader-settings');
