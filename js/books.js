@@ -1602,6 +1602,8 @@ function _epubGuard(cfi){
   Promise.resolve(_epubGoto(back)).catch(()=>{}).then(()=> _epubNavEnd());
 }
 
+let _epubTurning = false;   // 翻頁進行中
+let _epubQueued  = 0;       // 進行中又按了：記下最後一次的方向，做完再翻
 function _epubTurn(dir){
   const rd = window._epubRendition;
   if(!rd) return;
@@ -1609,8 +1611,15 @@ function _epubTurn(dir){
   if(now - _epubTurnAt < 250) return;   // 電子紙重繪慢，同一次操作被重複觸發會翻兩頁
   _epubTurnAt = now;
   _epubLogAdd(dir > 0 ? '你按了 下一頁' : '你按了 上一頁');
+  // ★ 上一次翻頁還沒完成（例如慢裝置正在換章）就再開一個，兩個會同時改捲動位置而跳頁
+  if(_epubTurning){ _epubQueued = dir; _epubLogAdd('  （上一頁還在處理，完成後接著翻）'); return; }
+  _epubTurning = true;
   _epubNavStart();
-  _epubPage(dir).catch(()=>{}).then(()=> _epubNavEnd(dir > 0 ? 600 : 1500));
+  _epubPage(dir).catch(()=>{}).then(()=>{
+    _epubNavEnd(dir > 0 ? 600 : 1500);
+    _epubTurning = false;
+    if(_epubQueued){ const q = _epubQueued; _epubQueued = 0; _epubTurnAt = 0; _epubTurn(q); }
+  });
 }
 
 // 翻一頁
@@ -1637,9 +1646,14 @@ async function _epubPage(dir){
     //   epub.js 的 reportLocation() 是排到下一個畫面影格才更新頁碼，
     //   await 回來時頁碼還是舊的，拿它判斷會誤以為沒翻到而多捲一頁（連跳兩頁）。
     const before = el.scrollLeft;
-    mgr.scrollTo(Math.max(0, before + dir * d), 0, true);
+    const target = Math.max(0, before + dir * d);
+    // 換章剛完成時內容可能還沒撐開（慢裝置可達一秒），目標超出目前寬度就先等它長完
+    if(dir > 0 && target > el.scrollWidth - el.clientWidth) await _epubReady();
+    mgr.scrollTo(target, 0, true);
+    // 診斷：捲動前→目標→實際｜內容寬｜每頁寬（跳頁或沒反應時，看這行就知道卡在哪）
+    _epubLogAdd('  捲 ' + Math.round(before) + '→' + Math.round(target) + '→' + Math.round(el.scrollLeft)
+      + '｜寬' + el.scrollWidth + '｜頁寬' + d + '｜' + page + '/' + total);
     if(el.scrollLeft !== before){
-      if(mgr.fill) mgr.fill();          // 與 epub.js 相同：順便預載相鄰章節
       await rd.reportLocation();        // 更新位置並發出 relocated
       return;
     }
@@ -1663,6 +1677,7 @@ async function _epubPage(dir){
   if(view) view.style.opacity = '0';           // 排好才顯示，不讓使用者看到中途版面
   try{
     await rd.display(tgt.href);
+    await _epubReady();                        // 內容撐開到完整頁數才算換好
     if(dir < 0) await _epubToSectionEnd();     // 往回換章要停在該章最後一頁
   }catch(e){
     _epubLogAdd('  （換章失敗，改用內建翻頁）');
@@ -1672,27 +1687,41 @@ async function _epubPage(dir){
   }
 }
 
-// 定位到目前章節的最後一頁（往回換章用）
-// 版面可能還在排，總頁數要等它穩定；最多等 6 輪（約 0.5 秒）。
+// 定位到目前章節的最後一頁（往回換章用；呼叫前已用 _epubReady 等內容撐開）
 async function _epubToSectionEnd(){
   const rd  = window._epubRendition;
   const mgr = rd && rd.manager;
   const el  = mgr && mgr.container;
   const d   = mgr && mgr.layout && mgr.layout.delta;
+  const st  = rd && rd.currentLocation() && rd.currentLocation().start;
+  if(!el || !d || !st || !st.displayed) return;
+  const total = st.displayed.total || 1;
+  if(total <= 1) return;
+  mgr.scrollTo(Math.min((total - 1) * d, el.scrollWidth - el.clientWidth), 0, true);
+  await rd.reportLocation();
+}
+
+// 等章節內容撐開到 epub.js 算出的總頁數寬度。
+// ★ 章節剛顯示時，epub.js 已經算好總頁數，但內容（圖片、字型）還在載入，實際寬度
+//   會晚一點才長到那麼寬；這段時間內翻頁會捲不過去（按了沒反應），
+//   算最後一頁也會被卡在倒數第二頁。實測慢裝置要 0.1～0.5 秒，最多等 2 秒。
+async function _epubReady(){
+  const rd  = window._epubRendition;
+  const mgr = rd && rd.manager;
+  const el  = mgr && mgr.container;
+  const d   = mgr && mgr.layout && mgr.layout.delta;
   if(!el || !d) return;
-  for(let i = 0; i < 6; i++){
-    await new Promise(r => setTimeout(r, 90));
-    const st = rd.currentLocation() && rd.currentLocation().start;
-    if(!st || !st.displayed) continue;
-    const page = st.displayed.page || 1, total = st.displayed.total || 1;
-    if(page >= total) return;                  // 已在最後一頁
-    const before = el.scrollLeft;
-    mgr.scrollTo(before + (total - page) * d, 0, true);
-    if(el.scrollLeft === before) continue;     // 還沒排完，再等一輪
-    if(mgr.fill) mgr.fill();
-    await rd.reportLocation();
-    return;
+  const t0 = Date.now();
+  let tot = 1;
+  while(Date.now() - t0 < 2000){
+    await _epubFrame();
+    tot = rd.currentLocation()?.start?.displayed?.total || 1;
+    if(el.scrollWidth >= tot * d - 2){
+      _epubLogAdd('  內容撐開 ' + tot + ' 頁，等了 ' + (Date.now() - t0) + 'ms');
+      return;
+    }
   }
+  _epubLogAdd('  （等內容撐開逾時：寬' + el.scrollWidth + '，應有 ' + tot + '×' + d + '）');
 }
 
 // 預先把上一章載進來：讀到章首附近時先備好，往回換章就不必等抓檔與解析。
