@@ -551,6 +551,7 @@
   </div>
   <div class="eng-reader-ctrl">
     <button class="eng-tts-btn" id="eng-tts-btn" onclick="toggleEngTTS()">▶ 逐句朗讀</button>
+    <select id="eng-voice-sel" class="eng-voice-sel" style="display:none" onchange="setEngVoice(this.value)" aria-label="朗讀聲音"></select>
     <div class="eng-rate-box">
       <button onclick="engRateStep(-0.1)" title="慢" aria-label="減慢語速">−</button>
       <span class="eng-rate-lbl" id="eng-rate-lbl">0.9×</span>
