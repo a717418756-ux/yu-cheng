@@ -693,6 +693,12 @@ textarea{resize:vertical;line-height:1.7}
 }
 .tts-handle:hover{ background:rgba(255,255,255,0.32); }
 /* 引擎選單 */
+/* 英文朗讀的聲音選單（控制列內，精簡寬度） */
+.eng-voice-sel{
+  flex:none; width:auto; max-width:128px; padding:8px 6px; font-size:12px;
+  border-radius:8px; background:var(--bg2); border:1px solid var(--bd); color:var(--t1);
+}
+[data-theme="eink"] .eng-voice-sel{ background:#fff; color:#000; border:1.5px solid #000; }
 .tts-voice-sel{
   flex:1;
   background:rgba(255,255,255,0.06);
