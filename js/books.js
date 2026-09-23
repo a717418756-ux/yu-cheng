@@ -1597,7 +1597,9 @@ function _epubGuard(cfi){
   _epubLogAdd('  ↩ 拉回原位');
   const back = _epubAnchor;
   _epubNavStart();
-  Promise.resolve(_epubGoto(back)).catch(()=>{}).then(()=>{ _epubAnchor = back; _epubNavEnd(); });
+  // 錨點不要硬設成 back：display 會停在「包含 back 的那一頁」，頁首位置與 back 不一定相同，
+  // 硬設會讓之後每次位置回報都被當成「自己變了」而反覆拉扯。交給操作視窗內的 relocated 設定。
+  Promise.resolve(_epubGoto(back)).catch(()=>{}).then(()=> _epubNavEnd());
 }
 
 function _epubTurn(dir){
@@ -1631,21 +1633,16 @@ async function _epubPage(dir){
 
   // ① 章節內翻頁：自己捲一頁
   if((dir > 0 && page < total) || (dir < 0 && page > 1)){
-    let moved = false;
-    for(let tryN = 0; tryN < 2; tryN++){
-      const before = el.scrollLeft;
-      mgr.scrollTo(Math.max(0, before + dir * d), 0, true);
-      if(el.scrollLeft === before) break;          // 捲不動
-      moved = true;
-      if(mgr.fill) mgr.fill();                     // 與 epub.js 相同：順便預載相鄰章節
-      await rd.reportLocation();                   // 更新位置並發出 relocated
-      const s3 = rd.currentLocation() && rd.currentLocation().start;
-      if(!s3 || !s3.displayed || s3.displayed.page !== page) return;   // 換頁成功
-      // 換章剛完成時版面還在收斂，偶爾會把剛捲的一頁推回去 → 再捲一次
-      _epubLogAdd('  （頁碼沒變，再捲一次）');
-      await new Promise(r => setTimeout(r, 60));
+    // ★ 以「捲動位置有沒有變」判斷成功與否，不要拿頁碼判斷：
+    //   epub.js 的 reportLocation() 是排到下一個畫面影格才更新頁碼，
+    //   await 回來時頁碼還是舊的，拿它判斷會誤以為沒翻到而多捲一頁（連跳兩頁）。
+    const before = el.scrollLeft;
+    mgr.scrollTo(Math.max(0, before + dir * d), 0, true);
+    if(el.scrollLeft !== before){
+      if(mgr.fill) mgr.fill();          // 與 epub.js 相同：順便預載相鄰章節
+      await rd.reportLocation();        // 更新位置並發出 relocated
+      return;
     }
-    if(moved) return;        // 捲得動只是被推回：不換章，避免跳過本章剩下的頁
     _epubLogAdd('  （章內捲不動，改用換章）');
   }
 
@@ -1723,15 +1720,22 @@ async function _epubGoto(cfi){
   _epubNavStart();
   try{
     await rd.display(cfi);
+    await _epubFrame();
     const cmp = new ePub.CFI();
     for(let i = 0; i < 30; i++){
       const end = rd.currentLocation()?.end?.cfi;
       if(!end || cmp.compare(end, cfi) >= 0) break;   // 目標已在這一頁內
       await rd.next();
+      await _epubFrame();   // ★ 頁碼要等下一個畫面影格才更新，沒等會讀到舊的而多翻
     }
   }catch(e){}
-  _epubAnchor = rd.currentLocation()?.start?.cfi || cfi;
-  _epubNavEnd();
+  _epubNavEnd();            // 錨點由操作視窗內的 relocated 自動設為最終位置
+}
+
+// 等 epub.js 更新完位置：它的 reportLocation() 排在下一個畫面影格才寫入，
+// 等兩個影格確保 currentLocation() 讀到的是新值。
+function _epubFrame(){
+  return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 }
 function _epubNext(){ _epubTurn(1); }
 function _epubPrev(){ _epubTurn(-1); }
@@ -1802,13 +1806,12 @@ async function _loadEpubToc(){
 async function _epubGotoChapter(href){
   const rendition = window._epubRendition;
   if(!rendition || !href) return;
+  _epubNavStart();
   try{
-    _epubNavStart();
     await rendition.display(href);
-    _epubAnchor = rendition.currentLocation()?.start?.cfi || null;
-    _epubNavEnd();
     _toggleEpubToc();  // 跳轉後關閉側欄
   }catch(e){ toast('章節跳轉失敗'); }
+  finally{ _epubNavEnd(); }   // ★ 失敗也要結束操作視窗，否則守門員會永遠停擺
 }
 
 function _readerFontSize(delta){
