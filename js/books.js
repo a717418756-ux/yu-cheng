@@ -1291,17 +1291,13 @@ async function _initEpubReader(url, savedCfi, bookId){
         });
       }catch(e){}
     });
-    // ②epub.js 在「內容尺寸變動」時會自動捲動補償（counter）。跨章往回翻時它靠這個
-    //   把畫面對齊，但圖片載入完、字型換掉、內容慢慢排完都會再觸發一次，
-    //   補償量卻是用舊的尺寸算的 → 畫面就這樣莫名其妙跳掉好幾頁。
-    //   只在使用者正在操作的當下才讓它補償，其餘時間一律忽略（位置由守門員負責）。
+    // ②epub.js 在「內容尺寸變動」時會自動捲動補償（counter）：它原本是換章時用來
+    //   對齊畫面的，但圖片載入完、內容慢慢排完都會再觸發一次，補償量卻是用舊尺寸算的，
+    //   畫面就莫名其妙跳掉幾頁；換章剛完成時它還會把剛翻的那一頁推回去（按了沒反應）。
+    //   換章已改成自己定位，不需要它，整個停用。
     try{
       const _mgr = rendition.manager;
-      const _counter = _mgr.counter.bind(_mgr);
-      _mgr.counter = delta => {
-        if(_epubNavBusy > 0){ _counter(delta); _epubLogAdd('  epub.js 補償捲動 ' + JSON.stringify(delta)); }
-        else _epubLogAdd('✋ 擋下非操作中的補償捲動 ' + JSON.stringify(delta));
-      };
+      _mgr.counter = delta => _epubLogAdd('✋ 擋下補償捲動 ' + JSON.stringify(delta));
     }catch(e){}
 
     // 設定主題（深色預設）
@@ -1635,13 +1631,21 @@ async function _epubPage(dir){
 
   // ① 章節內翻頁：自己捲一頁
   if((dir > 0 && page < total) || (dir < 0 && page > 1)){
-    const before = el.scrollLeft;
-    mgr.scrollTo(Math.max(0, before + dir * d), 0, true);
-    if(el.scrollLeft !== before){
-      if(mgr.fill) mgr.fill();          // 與 epub.js 相同：順便預載相鄰章節
-      await rd.reportLocation();        // 更新位置並發出 relocated
-      return;
+    let moved = false;
+    for(let tryN = 0; tryN < 2; tryN++){
+      const before = el.scrollLeft;
+      mgr.scrollTo(Math.max(0, before + dir * d), 0, true);
+      if(el.scrollLeft === before) break;          // 捲不動
+      moved = true;
+      if(mgr.fill) mgr.fill();                     // 與 epub.js 相同：順便預載相鄰章節
+      await rd.reportLocation();                   // 更新位置並發出 relocated
+      const s3 = rd.currentLocation() && rd.currentLocation().start;
+      if(!s3 || !s3.displayed || s3.displayed.page !== page) return;   // 換頁成功
+      // 換章剛完成時版面還在收斂，偶爾會把剛捲的一頁推回去 → 再捲一次
+      _epubLogAdd('  （頁碼沒變，再捲一次）');
+      await new Promise(r => setTimeout(r, 60));
     }
+    if(moved) return;        // 捲得動只是被推回：不換章，避免跳過本章剩下的頁
     _epubLogAdd('  （章內捲不動，改用換章）');
   }
 
