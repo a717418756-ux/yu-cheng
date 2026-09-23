@@ -1578,10 +1578,11 @@ let _epubAnchor  = null;   // 使用者現在應該在的位置
 let _epubNavBusy = 0;      // >0：正在執行使用者的操作，期間的位置變動都接受
 let _epubFixAt   = 0;      // 上次拉回的時間（避免來回拉扯）
 
-// 目前頁碼（診斷用）
+// 目前頁碼（診斷用）：用自己算的頁碼，與翻頁判斷一致
 function _epubPg(){
   const d = window._epubRendition?.currentLocation()?.start;
-  return d ? ((d.href || '').split('/').pop() + ' ' + (d.displayed?.page || '?') + '/' + (d.displayed?.total || '?')) : '?';
+  const g = _epubGeom();
+  return d ? ((d.href || '').split('/').pop() + ' ' + (g ? (g.idx + 1) + '/' + g.count : '?')) : '?';
 }
 function _epubNavStart(){ _epubNavBusy++; }
 function _epubNavEnd(ms){ setTimeout(()=>{ _epubNavBusy = Math.max(0, _epubNavBusy - 1); }, ms || 600); }
@@ -1630,34 +1631,24 @@ function _epubTurn(dir){
 //   換章後又停在上一章的第一頁（等於倒退整章）。
 //   改成用 epub.js 自己算出來的頁碼：章內還有頁就自己捲一頁，真的到章界才換章。
 async function _epubPage(dir){
-  const rd  = window._epubRendition;
-  const mgr = rd && rd.manager;
-  const el  = mgr && mgr.container;
-  const d   = mgr && mgr.layout && mgr.layout.delta;
-  const st  = rd && rd.currentLocation() && rd.currentLocation().start;
-  if(!mgr || !el || !d || !st) return dir > 0 ? rd.next() : rd.prev();
+  const rd = window._epubRendition;
+  const st = rd && rd.currentLocation() && rd.currentLocation().start;
+  let g = _epubGeom();
+  if(!g || !st) return dir > 0 ? rd.next() : rd.prev();
 
-  const page  = st.displayed && st.displayed.page  || 1;
-  const total = st.displayed && st.displayed.total || 1;
-
-  // ① 章節內翻頁：自己捲一頁
-  if((dir > 0 && page < total) || (dir < 0 && page > 1)){
-    // ★ 以「捲動位置有沒有變」判斷成功與否，不要拿頁碼判斷：
-    //   epub.js 的 reportLocation() 是排到下一個畫面影格才更新頁碼，
-    //   await 回來時頁碼還是舊的，拿它判斷會誤以為沒翻到而多捲一頁（連跳兩頁）。
-    const before = el.scrollLeft;
-    const target = Math.max(0, before + dir * d);
-    // 換章剛完成時內容可能還沒撐開（慢裝置可達一秒），目標超出目前寬度就先等它長完
-    if(dir > 0 && target > el.scrollWidth - el.clientWidth) await _epubReady();
-    mgr.scrollTo(target, 0, true);
-    // 診斷：捲動前→目標→實際｜內容寬｜每頁寬（跳頁或沒反應時，看這行就知道卡在哪）
-    _epubLogAdd('  捲 ' + Math.round(before) + '→' + Math.round(target) + '→' + Math.round(el.scrollLeft)
-      + '｜寬' + el.scrollWidth + '｜頁寬' + d + '｜' + page + '/' + total);
-    if(el.scrollLeft !== before){
-      await rd.reportLocation();        // 更新位置並發出 relocated
-      return;
-    }
-    _epubLogAdd('  （章內捲不動，改用換章）');
+  // ① 章節內翻頁：用自己算的頁碼（四捨五入），不用 epub.js 的 displayed.page
+  // ★ 實測使用者裝置：捲動位置會有 1 像素誤差（1145／1146），epub.js 算頁碼是
+  //   「位置÷頁寬、無條件捨去」，1145÷382＝2.997 → 少算一頁：明明在最後一頁卻說 3/4，
+  //   程式以為後面還有一頁去捲，捲不動＝按了沒反應。改用四捨五入就不受誤差影響。
+  // 已在本章最後一頁、要往後翻時，先確認內容已撐開（換章剛完成時寬度會晚一步）
+  if(dir > 0 && g.idx >= g.count - 1){ await _epubReady(); g = _epubGeom() || g; }
+  const to = g.idx + dir;
+  if(to >= 0 && to < g.count){
+    g.mgr.scrollTo(to * g.d, 0, true);      // 捲到該頁的絕對位置，不累積誤差
+    _epubLogAdd('  頁 ' + (g.idx + 1) + '→' + (to + 1) + '/' + g.count
+      + '｜捲 ' + Math.round(g.el.scrollLeft) + '｜寬' + g.el.scrollWidth + '｜頁寬' + g.d);
+    await rd.reportLocation();              // 更新位置並發出 relocated
+    return;
   }
 
   // ② 到章界：自己換章
@@ -1689,16 +1680,24 @@ async function _epubPage(dir){
 
 // 定位到目前章節的最後一頁（往回換章用；呼叫前已用 _epubReady 等內容撐開）
 async function _epubToSectionEnd(){
+  const g = _epubGeom();
+  if(!g || g.count <= 1) return;
+  g.mgr.scrollTo((g.count - 1) * g.d, 0, true);
+  _epubLogAdd('  到本章最後一頁 ' + g.count + '/' + g.count);
+  await g.rd.reportLocation();
+}
+
+// 目前章節的幾何資訊：每頁寬、總頁數、目前第幾頁（0 起算）
+// 頁碼用「位置÷頁寬、四捨五入」，裝置捲動位置有 1 像素誤差也算得準。
+function _epubGeom(){
   const rd  = window._epubRendition;
   const mgr = rd && rd.manager;
   const el  = mgr && mgr.container;
   const d   = mgr && mgr.layout && mgr.layout.delta;
-  const st  = rd && rd.currentLocation() && rd.currentLocation().start;
-  if(!el || !d || !st || !st.displayed) return;
-  const total = st.displayed.total || 1;
-  if(total <= 1) return;
-  mgr.scrollTo(Math.min((total - 1) * d, el.scrollWidth - el.clientWidth), 0, true);
-  await rd.reportLocation();
+  if(!el || !d) return null;
+  const count = Math.max(1, Math.round(el.scrollWidth / d));
+  const idx   = Math.min(count - 1, Math.max(0, Math.round(el.scrollLeft / d)));
+  return { rd, mgr, el, d, count, idx };
 }
 
 // 等章節內容撐開到 epub.js 算出的總頁數寬度。
@@ -1716,7 +1715,7 @@ async function _epubReady(){
   while(Date.now() - t0 < 2000){
     await _epubFrame();
     tot = rd.currentLocation()?.start?.displayed?.total || 1;
-    if(el.scrollWidth >= tot * d - 2){
+    if(el.scrollWidth >= (tot - 0.5) * d){     // 容許半頁誤差（epub.js 總頁數可能多算一頁）
       _epubLogAdd('  內容撐開 ' + tot + ' 頁，等了 ' + (Date.now() - t0) + 'ms');
       return;
     }
