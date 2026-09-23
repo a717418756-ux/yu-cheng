@@ -1260,7 +1260,7 @@ async function _initEpubReader(url, savedCfi, bookId){
     const book = ePub(buf);
     window._epubBook = book;
     _epubTocLoaded = false;  // 新書重置目錄載入旗標
-    _epubAnchor = null; _epubNavBusy = 0;   // 新書重置位置守門員
+    _epubAnchor = null; _epubNavBusy = 0; _epubPreloaded = '';   // 新書重置位置守門員與預載旗標
 
     // 取得容器實際尺寸（epub.js 需要明確像素值）
     // ★ 原本用「視窗高 - 120」估算，實測比容器真正的高度少 58px，
@@ -1410,6 +1410,7 @@ async function _initEpubReader(url, savedCfi, bookId){
     rendition.on('relocated', loc=>{
       _updateEpubProgress(book, loc);
       _epubGuard(loc?.start?.cfi);
+      _epubPreloadPrev();
       if(_restoringPos) return;  // 還原期間不存，避免把好的 CFI 覆蓋成開頭
       if(_fsReflowing) return;   // 調字級重排中，位置是暫時的，別存
       if(loc?.start?.cfi && bookId) _saveEpubCfiThrottled(bookId, loc.start.cfi);
@@ -1436,17 +1437,24 @@ async function _initEpubReader(url, savedCfi, bookId){
 
     // 實體翻頁鍵：Boox 側鍵、藍牙翻頁器、鍵盤方向鍵都會送出這些鍵。
     // 沒有接管的話，瀏覽器會用它們捲動外層頁面，畫面就會位移錯亂。
+    document.removeEventListener('keydown', _epubKeyNav);   // 先移除，避免重開書掛成兩個
     document.addEventListener('keydown', _epubKeyNav);
 
     // 觸控滑動翻頁
-    rendition.on('touchstart', e=>{ _epubTouchStart = e.touches[0].clientX; });
-    rendition.on('touchend',   e=>{
-      if(_epubTouchStart === null) return;
-      const diff = e.changedTouches[0].clientX - _epubTouchStart;
-      if(diff > 50)       _epubTurn(-1);
-      else if(diff < -50) _epubTurn(1);
-      _epubTouchStart = null;
-    });
+    // ★ 原本掛在 epub.js 的內容（iframe 內）上，但翻頁觸控區整片蓋在它上面，
+    //   事件根本傳不進去，等於沒有作用。改掛在觸控區所在的容器上。
+    //   滑動之後緊接著會有一次 click，由 _epubTurn 的 250ms 防連點擋掉，不會翻兩頁。
+    const wrap = document.getElementById('reader-epub-wrap');
+    if(wrap){
+      wrap.addEventListener('touchstart', e=>{ _epubTouchStart = e.touches[0].clientX; }, {passive:true});
+      wrap.addEventListener('touchend',   e=>{
+        if(_epubTouchStart === null) return;
+        const diff = e.changedTouches[0].clientX - _epubTouchStart;
+        _epubTouchStart = null;
+        if(diff > 50)       _epubTurn(-1);
+        else if(diff < -50) _epubTurn(1);
+      }, {passive:true});
+    }
 
   }catch(err){
     logError('_initEpubReader', err);
@@ -1637,29 +1645,68 @@ async function _epubPage(dir){
     _epubLogAdd('  （章內捲不動，改用換章）');
   }
 
-  // ② 到章界才換章
-  const fromHref = st.href;
-  await (dir > 0 ? rd.next() : rd.prev());
-  if(dir > 0) return;
-
-  // ③ 往回換章後應該停在「上一章的最後一頁」。epub.js 在版面還沒排完時就定位，
-  //    常常停在第一頁，看起來就是倒退整章。這裡等排完再補到最後一頁。
-  for(let i = 0; i < 3; i++){
-    await new Promise(r => setTimeout(r, 150));
-    const s2 = rd.currentLocation() && rd.currentLocation().start;
-    if(!s2 || s2.href === fromHref) continue;
-    const p2 = s2.displayed && s2.displayed.page  || 1;
-    const t2 = s2.displayed && s2.displayed.total || 1;
-    if(p2 >= t2) return;                       // 已經在最後一頁
-    const target = el.scrollLeft + (t2 - p2) * d;
-    const before = el.scrollLeft;
-    mgr.scrollTo(target, 0, true);
-    if(el.scrollLeft === before) continue;     // 還沒排完，等下一輪
-    if(mgr.fill) mgr.fill();
-    await rd.reportLocation();
-    _epubLogAdd('  ↦ 補到上一章最後一頁');
+  // ② 到章界：自己換章
+  // ★ 不用 epub.js 的 next()/prev() 換章。它的作法是把相鄰章節「接」在目前章節前後，
+  //   再靠捲動補償對齊；補償量在版面還沒排完時就算好，於是落點飄移（跳頁）。
+  //   專業閱讀器（Boox、Kindle）是「一章排好才顯示，章與章之間直接切換」，
+  //   這裡改用同樣作法：直接顯示目標章，再定位到該章的第一頁或最後一頁。
+  const bk  = window._epubBook;
+  const sec = bk && bk.spine && bk.spine.get(st.href);
+  const tgt = sec && (dir > 0 ? sec.next() : sec.prev());
+  if(!tgt){                                    // 整本書的頭或尾
+    _epubLogAdd(dir > 0 ? '  （已是最後一頁）' : '  （已是第一頁）');
     return;
   }
+
+  const view = document.getElementById('epub-viewer');
+  if(view) view.style.opacity = '0';           // 排好才顯示，不讓使用者看到中途版面
+  try{
+    await rd.display(tgt.href);
+    if(dir < 0) await _epubToSectionEnd();     // 往回換章要停在該章最後一頁
+  }catch(e){
+    _epubLogAdd('  （換章失敗，改用內建翻頁）');
+    try{ await (dir > 0 ? rd.next() : rd.prev()); }catch(e2){}
+  }finally{
+    if(view) view.style.opacity = '';
+  }
+}
+
+// 定位到目前章節的最後一頁（往回換章用）
+// 版面可能還在排，總頁數要等它穩定；最多等 6 輪（約 0.5 秒）。
+async function _epubToSectionEnd(){
+  const rd  = window._epubRendition;
+  const mgr = rd && rd.manager;
+  const el  = mgr && mgr.container;
+  const d   = mgr && mgr.layout && mgr.layout.delta;
+  if(!el || !d) return;
+  for(let i = 0; i < 6; i++){
+    await new Promise(r => setTimeout(r, 90));
+    const st = rd.currentLocation() && rd.currentLocation().start;
+    if(!st || !st.displayed) continue;
+    const page = st.displayed.page || 1, total = st.displayed.total || 1;
+    if(page >= total) return;                  // 已在最後一頁
+    const before = el.scrollLeft;
+    mgr.scrollTo(before + (total - page) * d, 0, true);
+    if(el.scrollLeft === before) continue;     // 還沒排完，再等一輪
+    if(mgr.fill) mgr.fill();
+    await rd.reportLocation();
+    return;
+  }
+}
+
+// 預先把上一章載進來：讀到章首附近時先備好，往回換章就不必等抓檔與解析。
+let _epubPreloaded = '';
+function _epubPreloadPrev(){
+  try{
+    const rd = window._epubRendition, bk = window._epubBook;
+    const st = rd && rd.currentLocation() && rd.currentLocation().start;
+    if(!st || !bk || (st.displayed && st.displayed.page > 2)) return;
+    const sec = bk.spine.get(st.href);
+    const prev = sec && sec.prev();
+    if(!prev || _epubPreloaded === prev.href) return;
+    _epubPreloaded = prev.href;
+    prev.load(bk.load.bind(bk)).catch(()=>{});
+  }catch(e){}
 }
 
 // 定位到指定位置（CFI）
