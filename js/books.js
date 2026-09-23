@@ -1289,6 +1289,9 @@ async function _initEpubReader(url, savedCfi, bookId){
         contents.addStylesheetRules({
           'img, svg, video': { 'max-width': '100%', 'max-height': '100%', 'height': 'auto' },
           'table, pre':      { 'max-width': '100%' },
+          // 朗讀中的段落標示（電子紙也看得清楚：底色＋左側粗線）
+          '.tts-reading-hl': { 'background': 'rgba(255,210,0,0.28) !important',
+                               'box-shadow': 'inset 3px 0 0 currentColor', 'border-radius': '2px' },
         });
       }catch(e){}
     });
@@ -1708,6 +1711,37 @@ function _epubGeom(){
   const count = Math.max(1, Math.round(el.scrollWidth / d));
   const idx   = Math.min(count - 1, Math.max(0, Math.round(el.scrollLeft / d)));
   return { rd, mgr, el, d, count, idx };
+}
+
+// ── 給朗讀用：翻到本章第 p 頁（0 起算）──────────────────────
+// 包在操作視窗內，守門員才不會把朗讀自動翻頁當成「位置自己變了」拉回去。
+async function _epubShowPage(p){
+  const g = _epubGeom();
+  if(!g || p === g.idx || p < 0 || p >= g.count) return;
+  _epubNavStart();
+  g.mgr.scrollTo(p * g.d, 0, true);
+  await g.rd.reportLocation();
+  _epubNavEnd();
+}
+
+// ── 給朗讀用：換到下一章第 1 頁；已是最後一章回傳 false ──────
+async function _epubNextSection(){
+  const rd = window._epubRendition, bk = window._epubBook;
+  const st = rd && rd.currentLocation() && rd.currentLocation().start;
+  const nx = st && bk && bk.spine.get(st.href)?.next();
+  if(!nx) return false;
+  _epubNavStart();
+  try{ await rd.display(nx.href); await _epubReady(); }
+  finally{ _epubNavEnd(); }
+  return true;
+}
+
+// 段落元素在本章的第幾頁（0 起算）；以段落起點所在的欄計算
+function _epubPageOfEl(el){
+  const g = _epubGeom();
+  const r = el && el.getClientRects && el.getClientRects()[0];
+  if(!g || !r) return -1;
+  return Math.max(0, Math.min(g.count - 1, Math.floor((r.left + 2) / g.d)));
 }
 
 // 等章節內容撐開到 epub.js 算出的總頁數寬度。

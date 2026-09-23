@@ -1,7 +1,7 @@
 // ══ english.js — 英語學習庫（第一階段）═══════════════════════
 // 依賴：db.js(da/dp/dg/dd), utils.js(esc/toast)
 // 功能：三種上傳(貼文字/PDF抽取/圖片OCR) + 閱讀 + TTS逐句高亮朗讀
-// 全離線免費：TTS 用瀏覽器內建 speechSynthesis
+// TTS：預設用瀏覽器內建 speechSynthesis（離線免費）；有設定 Azure Key 時可改用微軟語音（與電子書同一套）
 //
 // 設計：一篇材料 = { title, sourceType, sentences:[...], createdAt }
 //   句子是學習的最小單位，逐句朗讀、逐句高亮、之後逐句跟讀。
@@ -12,7 +12,6 @@
 'use strict';
 
 let _curMaterial = null;   // 目前開啟的材料
-let _ttsQueue = [];        // 朗讀佇列（句子索引）
 let _ttsIdx = -1;          // 目前朗讀到第幾句
 let _ttsPlaying = false;
 // 朗讀世代序號：每次啟動新句子就 +1。
@@ -24,6 +23,14 @@ let _ttsPlaying = false;
 //   回呼執行時若序號已被新的朗讀取代，就代表自己是被取代的舊句，直接放棄前進。
 let _ttsSeq = 0;
 let _ttsRate = 0.9;        // 語速（英語學習稍慢）
+let _engVoice = 'system';  // 'system'＝系統語音；'azure:<聲音名>'＝微軟語音
+let _ttsAudio = null;      // 微軟語音播放中的 <audio>
+let _ttsPre   = null;      // 預抓的下一句 { key, promise }
+let _azureWarned = false;  // 微軟語音失敗的提示只跳一次
+const ENG_AZURE_VOICES = [
+  { id:'azure:en-US-JennyNeural', name:'Azure Jenny（女）' },
+  { id:'azure:en-US-GuyNeural',   name:'Azure Guy（男）' },
+];
 
 // ════════ 句子切分 ════════
 // 把整段英文切成句子陣列（學習的最小單位）
@@ -276,6 +283,7 @@ async function openMaterial(id){
     ov.style.display = 'flex';
     _stopTTS();
     _setupAudio(m);  // 載入該材料的朗讀/詳解音檔
+    _initEngVoiceSel();
   }catch(e){ logError('openMaterial',e); }
 }
 
@@ -299,7 +307,14 @@ function toggleEngTTS(){
 
 function _playTTS(){
   if(!_curMaterial) return;
-  if(!('speechSynthesis' in window)){ toast('此裝置不支援語音朗讀'); return; }
+  if(!('speechSynthesis' in window) && !_engVoice.startsWith('azure:')){ toast('此裝置不支援語音朗讀'); return; }
+  // 微軟語音暫停中 → 從暫停處接著播，不重新合成（省字數也不會從句首重唸）
+  if(_ttsAudio && _ttsAudio.paused && _ttsIdx >= 0){
+    _ttsPlaying = true;
+    _updateTTSBtn();
+    _ttsAudio.play().catch(()=>{});
+    return;
+  }
   // 從目前句或第一句開始
   if(_ttsIdx < 0) _ttsIdx = 0;
   _ttsPlaying = true;
@@ -313,24 +328,97 @@ function _speakSentence(idx){
   _ttsIdx = idx;
   _highlightSentence(idx);
 
-  const u = new SpeechSynthesisUtterance(sents[idx]);
-  u.lang = 'en-US';
-  u.rate = _ttsRate;
-  // 選英語語音
-  const voices = speechSynthesis.getVoices();
-  const enVoice = voices.find(v=>/en[-_]US/i.test(v.lang)) || voices.find(v=>/^en/i.test(v.lang));
-  if(enVoice) u.voice = enVoice;
-
   // 取得本次朗讀的世代序號；之後若又啟動新句子，這個序號就不再是最新的
   const mySeq = ++_ttsSeq;
   const advance = ()=>{
-    if(mySeq !== _ttsSeq) return;   // 已被新的朗讀取代（調語速／點別句／停止）→ 不前進
+    if(mySeq !== _ttsSeq) return;   // 已被新的朗讀取代（調語速／換聲音／點別句／停止）→ 不前進
     if(_ttsPlaying) _speakSentence(idx+1);
   };
+  _silenceTTS();                    // 停掉上一句（系統語音與微軟語音都要停）
+  if(_engVoice.startsWith('azure:')) _speakAzureSent(idx, mySeq, advance);
+  else _speakSystemSent(sents[idx], advance);
+}
+
+// 系統語音唸一句
+function _speakSystemSent(text, advance){
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-US';
+  u.rate = _ttsRate;
+  const voices = speechSynthesis.getVoices();
+  const enVoice = voices.find(v=>/en[-_]US/i.test(v.lang)) || voices.find(v=>/^en/i.test(v.lang));
+  if(enVoice) u.voice = enVoice;
   u.onend   = advance;
   u.onerror = advance;
-  speechSynthesis.cancel();   // 清掉上一句；它觸發的舊回呼會因序號不符而自動失效
   speechSynthesis.speak(u);
+}
+
+// 微軟語音唸一句（與電子書同一套 Azure 引擎）
+async function _speakAzureSent(idx, mySeq, advance){
+  const sents = _curMaterial?.sentences || [];
+  const voice = _engVoice.slice(6);
+  const b64 = await _engAzureAudio(idx, voice);
+  if(mySeq !== _ttsSeq) return;               // 等待合成期間被取代
+  if(!b64){                                    // 合成失敗 → 這句改用系統語音，不中斷朗讀
+    if(!_azureWarned){ toast('微軟語音暫時無法使用，改用系統語音'); _azureWarned = true; }
+    if(_ttsPlaying) _speakSystemSent(sents[idx], advance);
+    return;
+  }
+  const a = new Audio('data:audio/mp3;base64,' + b64);
+  _ttsAudio = a;
+  let done = false;                            // onended／onerror 只結算一次，避免跳句
+  const fin = ()=>{ if(done) return; done = true; if(_ttsAudio === a) _ttsAudio = null; advance(); };
+  a.onended = fin;
+  a.onerror = fin;
+  _engPrefetch(idx + 1, voice);                // 先合成下一句，句間不停頓
+  if(!_ttsPlaying) return;                     // 合成期間按了暫停：先備好，按播放再唸
+  a.play().catch(()=>{                         // 自動播放被擋：這句改用系統語音
+    if(done || mySeq !== _ttsSeq) return;
+    done = true;
+    if(_ttsAudio === a) _ttsAudio = null;
+    _speakSystemSent(sents[idx], advance);
+  });
+}
+
+// 取某一句的微軟語音：有預抓就用預抓的（聲音、語速都要相同才算數）
+function _engAzureAudio(idx, voice){
+  const key = idx + '|' + voice + '|' + _ttsRate;
+  if(_ttsPre && _ttsPre.key === key){ const p = _ttsPre.promise; _ttsPre = null; return p; }
+  const text = (_curMaterial?.sentences || [])[idx];
+  return (text && window.ttsAzureAudio) ? window.ttsAzureAudio(text, voice, _ttsRate) : Promise.resolve(null);
+}
+function _engPrefetch(idx, voice){
+  const text = (_curMaterial?.sentences || [])[idx];
+  if(!text || !window.ttsAzureAudio) return;
+  const key = idx + '|' + voice + '|' + _ttsRate;
+  if(_ttsPre && _ttsPre.key === key) return;
+  _ttsPre = { key, promise: window.ttsAzureAudio(text, voice, _ttsRate) };
+}
+
+// 停掉正在唸的句子（系統語音＋微軟語音）
+function _silenceTTS(){
+  try{ speechSynthesis.cancel(); }catch(e){}
+  if(_ttsAudio){ try{ _ttsAudio.pause(); }catch(e){} _ttsAudio = null; }
+}
+
+// 聲音選單：有設定 Azure Key 才顯示（與電子書相同規則）
+async function _initEngVoiceSel(){
+  const sel = document.getElementById('eng-voice-sel');
+  if(!sel) return;
+  const key   = await getSetting('tts_azure_key','').catch(()=>'');
+  const saved = await getSetting('eng_voice','system').catch(()=>'system');
+  if(!key){ sel.style.display = 'none'; _engVoice = 'system'; return; }
+  sel.innerHTML = '<option value="system">系統語音</option>'
+    + ENG_AZURE_VOICES.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  _engVoice = ENG_AZURE_VOICES.some(v=>v.id===saved) ? saved : 'system';
+  sel.value = _engVoice;
+  sel.style.display = '';
+}
+
+function setEngVoice(v){
+  _engVoice = v;
+  _azureWarned = false;
+  setSetting('eng_voice', v).catch(()=>{});
+  if(_ttsPlaying) _speakSentence(_ttsIdx);   // 正在唸 → 從目前這句用新聲音重唸
 }
 
 function _highlightSentence(idx){
@@ -346,14 +434,17 @@ function _highlightSentence(idx){
 
 function _pauseTTS(){
   _ttsPlaying = false;
-  speechSynthesis.cancel();
+  if(_ttsAudio) _ttsAudio.pause();            // 微軟語音：停在原處，按播放從這裡接著唸
+  else speechSynthesis.cancel();
   _updateTTSBtn();
 }
 
 function _stopTTS(){
   _ttsPlaying = false;
   _ttsIdx = -1;
-  try{ speechSynthesis.cancel(); }catch(e){}
+  _ttsSeq++;                                  // 讓等待中的合成結果作廢
+  _silenceTTS();
+  _ttsPre = null;
   const body = document.getElementById('eng-reader-body');
   if(body) body.querySelectorAll('.eng-sent.reading').forEach(el=>el.classList.remove('reading'));
   _updateTTSBtn();
@@ -1043,7 +1134,7 @@ function _initEnglish(){
 //   都掛不上 window，畫面上所有 onclick 變成 "xxx is not defined"。
 const English = {
   renderEnglish, openEngUpload, openMaterial, closeMaterial,
-  toggleEngTTS, setEngRate, engRateStep,
+  toggleEngTTS, setEngRate, engRateStep, setEngVoice,
   openEngAudioMgr, toggleEngAudio, engAudioSeek,
   startRepeat, retryRepeat,
 };
