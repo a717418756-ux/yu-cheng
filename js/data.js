@@ -1412,6 +1412,42 @@ function setLC(el, cat){
 }
 
 
+// ── 資料庫關鍵字搜尋（renderDB 與 openLawGroup 共用，兩邊結果才會一致）──
+//   以空白分詞，每個詞都要找得到（AND）。
+//   · 法規名稱就含全部的詞 →「法規命中」：只列法規卡片，點進去看整部，不逐條攤開。
+//   · 否則逐條比對：每個詞出現在法規名稱或本條（條號、標題、關鍵概念、內容）→「條文命中」。
+//     例：「刑法 竊盜」＝刑法中提到竊盜的條文；「竊盜」＝各法規中提到竊盜的條文。
+//   · 限定範圍時只比對該欄位（選「法規名稱」就只列法規）。
+// 全形英數轉半形、轉小寫：搜尋「§３」「ＳＯＰ」與半形同結果
+const _kwNorm = s => String(s||'').replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0)-0xFEE0)).toLowerCase().trim();
+const _lawSearchTokens = kw => _kwNorm(kw).split(/\s+/).filter(Boolean);
+// 本條自身的文字（不含法規名稱與排序鍵）：searchBlob 扣掉開頭的「法規名 條號 排序鍵」；
+//   排序鍵（如 3000）不算文字，否則搜「3000元」的「3000」會對到每部法的第3條。
+function _lawArtHay(l){
+  const b = l.searchBlob;
+  if(b){
+    const head = [l.lawName, l.article, String(l.articleNumber||'')].filter(Boolean).join(' ').toLowerCase();
+    if(b.startsWith(head)) return (l.article||'').toLowerCase() + b.slice(head.length);
+  }
+  const c = (l.content||'').startsWith('data:') ? '' : (l.content||'');
+  return [l.article, l.title, (l.keywords||[]).join(' '), c].filter(Boolean).join(' ').toLowerCase();
+}
+// 回傳 'law'（法規命中）、'art'（條文命中）或 ''（不符）
+function _lawHit(l, toks, field){
+  const name = (l.lawName||'').toLowerCase();
+  if(field === 'lawName') return toks.every(t => name.includes(t)) ? 'law' : '';
+  if(field && field !== 'all'){
+    const v = _fieldValue(l, field).toLowerCase();
+    return toks.every(t => v.includes(t)) ? 'art' : '';
+  }
+  const inName = toks.map(t => name.includes(t));
+  if(inName.every(Boolean)) return 'law';
+  const hay = _lawArtHay(l);
+  return toks.every((t, i) => inName[i] || hay.includes(t)) ? 'art' : '';
+}
+// 條號精準搜尋的比對：法規在名單內（或不限）且條號相同
+const _secHit = (l, sec) => (!sec.names || sec.names.includes((l.lawName||'').trim()))
+                         && (l.articleNumber || art2n(l.article||'')) === sec.artNum;
 // ── 搜尋範圍（由搜尋框旁的下拉選單決定）───────────────────
 //   預設比對全欄位，資料一多就太雜；選定範圍後只比對該欄位。
 function _fieldValue(l, f){
@@ -1433,55 +1469,33 @@ const _lawUnit = laws => /點/.test(((laws||[])[0]||{}).article||'') ? '點' : '
 async function renderDB(){  try{
   const ls=await da('laws');
   _setLawNames(ls);   // 供 _autoCites 比對用（列表頁也要顯示自動連結）
-  const kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
+  const kw=_kwNorm(document.getElementById('lsi')?.value);
   const kwField=document.getElementById('lsf')?.value||'all';   // 搜尋範圍
-  let kwLaw='', kwArtNum=0, kwText=kw;
-  // 「法規名§條號」精準搜尋（規則見 parseSecSearch，與 openLawGroup 共用同一套）
-  const _sec = parseSecSearch(kw);
-  if(_sec){ kwLaw = _sec.lawName; kwArtNum = _sec.artNum; kwText = ''; }
-
-  let fl=ls.filter(l=>{
-    if(S.lawCat!=='all'&&l.category!==S.lawCat)return false;
-    if(!kw) return true;
-    if(kwArtNum){
-      const nameMatch = !kwLaw || (l.lawName||'').toLowerCase().includes(kwLaw);
-      const artMatch  = (l.articleNumber || art2n(l.article||'')) === kwArtNum;
-      return nameMatch && artMatch;
-    }
-    // 選定範圍 → 只比對該欄位；選「全部」→ 維持原本全欄位比對
-    if(kwField !== 'all') return _fieldValue(l, kwField).toLowerCase().includes(kwText);
-    // searchBlob 優先（純文字），沒有才 fallback（排除 base64 避免拖慢）
-    const _c = (l.content||'').startsWith('data:') ? '' : (l.content||'');
-    const h = (l.searchBlob || ((l.lawName||'')+(l.article||'')+(l.title||'')+(l.keywords||[]).join(' ')+_c)).toLowerCase();
-    return h.includes(kwText);
-  });
+  // 條號精準搜尋（法規名§N、法規名第N條）；其餘分詞搜尋（規則見 _lawHit）
+  const sec = kw ? parseSecSearch(kw) : null;
+  const toks = sec ? [] : _lawSearchTokens(kw);
+  const byName={}, artHits=[];   // 法規命中（整部列一張卡）／條文命中（逐條列出）
+  for(const l of ls){
+    if(S.lawCat!=='all'&&l.category!==S.lawCat) continue;
+    const hit = !kw ? 'law' : sec ? (_secHit(l, sec) ? 'art' : '') : _lawHit(l, toks, kwField);
+    if(hit==='law'){ const n=l.lawName||'未分類'; (byName[n]||(byName[n]=[])).push(l); }
+    else if(hit==='art') artHits.push(l);
+  }
 
   const el=document.getElementById('llist');
-  if(!fl.length){el.innerHTML='<div class="empty"><span class="ic">🗄</span><span>尚無資料</span></div>';return;}
-
-  // 有關鍵字：直接顯示匹配的條文（不分組）
-  if(kw){
-    el.innerHTML='';
-    fl.forEach(l=>{
-      const isImg = (l.content||'').startsWith('data:');
-      const preview = isImg ? '🖼 圖片內容' : esc((l.content||'').slice(0,80));
-      const div=document.createElement('div');
-      div.className='card law-search-card';
-      div.innerHTML=
-        '<div class="law-search-lawname">'+esc(l.lawName||'')+'</div>'+
-        '<div class="law-search-article">'+esc(l.article||'')+(l.title?' <span class="law-search-title">'+esc(l.title)+'</span>':'')+' </div>'+
-        '<div class="law-search-preview">'+preview+'</div>';
-      div.onclick=()=>openLawGroup(l.lawName);
-      el.appendChild(div);
-    });
+  const lc=document.getElementById('db-lc');
+  if(!artHits.length && !Object.keys(byName).length){
+    el.innerHTML = kw
+      ? '<div class="empty"><span class="ic">🔍</span><span>查無符合的法規或條文</span></div>'
+      : '<div class="empty"><span class="ic">🗄</span><span>尚無資料</span></div>';
+    if(lc) lc.textContent='';
     return;
   }
 
-  // 無關鍵字：依法規名稱分組顯示
-  const byName={};
-  fl.forEach(l=>{const n=l.lawName||'未分類';if(!byName[n])byName[n]=[];byName[n].push(l);});
-
+  // 有關鍵字：法規依相符程度排（同名 → 開頭或結尾相同 → 名稱短者），條文依法規、條號排
+  const _nameRank = n => { n=n.toLowerCase(); return n===kw ? 0 : (n.startsWith(toks[0])||n.endsWith(toks[0])) ? 1 : 2; };
   const sortedEntries=Object.entries(byName).sort((a,b)=>{
+    if(kw) return _nameRank(a[0])-_nameRank(b[0]) || a[0].length-b[0].length || a[0].localeCompare(b[0],'zh-TW');
     const sortBy=S.lawSort||'name';
     const dir=_lawSortState.dir||1;
     if(sortBy==='amend'){
@@ -1503,6 +1517,9 @@ async function renderDB(){  try{
   const PAGE = 50;
   let page = 0;
   el.innerHTML = '';
+  artHits.sort((a,b)=>(a.lawName||'').localeCompare(b.lawName||'','zh-TW')
+    || ((a.articleNumber||art2n(a.article||''))||0)-((b.articleNumber||art2n(b.article||''))||0)
+    || (a.id||0)-(b.id||0));
 
   const _mkCard = ([name, laws]) => {
     const cat=laws[0].category||'statute';
@@ -1554,16 +1571,38 @@ async function renderDB(){  try{
     return div;
   };
 
+  // 條文命中卡：顯示所屬法規與條號，點下去進入該法規（沿用同一組關鍵字篩出相符條文）
+  const _artCard = l => {
+    const isImg = (l.content||'').startsWith('data:');
+    const preview = isImg ? '🖼 圖片內容' : esc((l.content||'').slice(0,80));
+    const div=document.createElement('div');
+    div.className='card law-search-card';
+    div.innerHTML=
+      '<div class="law-search-lawname">'+esc(l.lawName||'')+'</div>'+
+      '<div class="law-search-article">'+esc(l.article||'')+(l.title?' <span class="law-search-title">'+esc(l.title)+'</span>':'')+' </div>'+
+      '<div class="law-search-preview">'+preview+'</div>';
+    div.onclick=()=>openLawGroup(l.lawName);
+    return div;
+  };
+  const _head = t => { const d=document.createElement('div'); d.className='law-search-head'; d.textContent=t; return d; };
+  // 法規卡與條文卡排成同一串，一起分批載入；兩種都有時各加小標題
+  const nLaw = sortedEntries.length, nArt = artHits.length, both = kw && nLaw && nArt;
+  const items = [
+    ...(both ? [() => _head('相符法規 '+nLaw+' 部')] : []),
+    ...sortedEntries.map(e => () => _mkCard(e)),
+    ...(both ? [() => _head('相符條文 '+nArt+' 筆')] : []),
+    ...artHits.map(l => () => _artCard(l)),
+  ];
   const loadMore = () => {
-    const batch = sortedEntries.slice(page*PAGE, (page+1)*PAGE);
+    const batch = items.slice(page*PAGE, (page+1)*PAGE);
     if(!batch.length) return;
-    batch.forEach(entry => el.appendChild(_mkCard(entry)));
+    batch.forEach(mk => el.appendChild(mk()));
     page++;
     // 顯示計數
-    const total = sortedEntries.length;
-    const shown = Math.min(page*PAGE, total);
-    const lc = document.getElementById('db-lc');
-    if(lc) lc.textContent = shown < total ? `顯示 ${shown} / ${total} 筆，繼續滑動載入` : `共 ${total} 筆`;
+    const more = page*PAGE < items.length ? '，繼續滑動載入' : '';
+    if(lc) lc.textContent = kw
+      ? [nLaw ? '法規 '+nLaw+' 部' : '', nArt ? '條文 '+nArt+' 筆' : ''].filter(Boolean).join(' · ') + more
+      : (more ? `顯示 ${Math.min(page*PAGE, nLaw)} / ${nLaw} 筆${more}` : `共 ${nLaw} 筆`);
   };
 
   loadMore();
@@ -1777,16 +1816,17 @@ function _findBacklinks(target, allLaws){
     ((a.law.articleNumber||0) - (b.law.articleNumber||0)));
 }
 
-async function openLawGroup(lawName){  try{
+async function openLawGroup(lawName, full){  try{
   if(!document.getElementById('lv')){ return; }  // 防衛：lv 元素不存在時不執行
   const allLaws=await da('laws');
   _setLawNames(allLaws);   // 供 _autoCites 比對用
-  const _kw=(document.getElementById('lsi')?.value||'').toLowerCase().trim();
-  // §N 精確搜尋
-  // §搜尋：與 renderDB 共用 parseSecSearch，確保兩邊規則永遠一致
-  let _kwLaw2='',_kwArtNum2=0,_kwText2=_kw;
-  const _sec2 = parseSecSearch(_kw);
-  if(_sec2){ _kwLaw2 = _sec2.lawName; _kwArtNum2 = _sec2.artNum; _kwText2 = ''; }
+  // 與 renderDB 共用同一套搜尋規則（parseSecSearch／_lawHit），點進來的結果才會和列表一致：
+  //   法規命中 → 整部；條文命中 → 只列相符條文；條號搜尋 → 只列該條
+  //   full：從連結、其他法規捷徑開啟 → 看整部，不套用資料庫搜尋框裡殘留的關鍵字
+  const _kw=full ? '' : _kwNorm(document.getElementById('lsi')?.value);
+  const _kwField=document.getElementById('lsf')?.value||'all';
+  const _sec2 = _kw ? parseSecSearch(_kw) : null;
+  const _toks2 = _sec2 ? [] : _lawSearchTokens(_kw);
   // ── 排序：純依條號遞增（法律的本質順序）──
   // 法律條文本就是第1條、第2條…依序排列，編章節只是標記，不影響條文順序。
   // 章節標題的「不重複」由渲染層的已渲染集合(_shownC 等)保證，
@@ -1795,19 +1835,7 @@ async function openLawGroup(lawName){  try{
   const laws=allLaws.filter(l=>{
     if(l.lawName!==lawName) return false;
     if(!_kw) return true;
-    if(_kwArtNum2){
-      return (l.articleNumber || art2n(l.article||'')) === _kwArtNum2;
-    }
-    // ★ 必須與 renderDB 的搜尋採同一套比對來源（searchBlob 優先）。
-    //   原本只比對 article+title+content，但圖片類法條（SOP／補充資料／函釋）
-    //   的 content 是 base64，searchBlob 刻意排除它而改收 lawName/keywords；
-    //   於是「搜尋找得到、點進去卻篩成 0 筆」→ 下方 if(!laws.length) return
-    //   直接返回，畫面完全沒反應。
-    const _c = (l.content||'').startsWith('data:') ? '' : (l.content||'');
-    const h = (l.searchBlob ||
-               ((l.lawName||'')+(l.article||'')+(l.title||'')+
-                (l.keywords||[]).join(' ')+_c)).toLowerCase();
-    return h.includes(_kwText2);
+    return _sec2 ? _secHit(l, _sec2) : !!_lawHit(l, _toks2, _kwField);
   }).sort((a,b)=>{
     const na=(a.articleNumber||art2n(a.article||''))||0;
     const nb=(b.articleNumber||art2n(b.article||''))||0;
@@ -1839,18 +1867,18 @@ async function openLawGroup(lawName){  try{
   const favN=laws.filter(l=>l.favorite).length;
   const starItem=document.getElementById('lv-star-item');
   if(starItem) starItem.textContent=favN?'★ 已收藏':'☆ 收藏';
-  const jumpHtml=others.map(n=>'<button class="chip" style="flex-shrink:0;font-size:11px" onclick="openLawGroup(\''+esc(n)+'\')">'+esc(n)+'</button>').join('');
+  const jumpHtml=others.map(n=>'<button class="chip" style="flex-shrink:0;font-size:11px" onclick="openLawGroup(\''+esc(n)+'\',true)">'+esc(n)+'</button>').join('');
 
   // ── 三層分組（編 > 章 > 節）────────────────────────────────
   const parts    = [...new Set(laws.map(l=>l.part   ||''))];
   const chapters = [...new Set(laws.map(l=>l.chapter||''))];
   const sections = [...new Set(laws.map(l=>l.section||''))];
 
+  // 關鍵字反白：每個搜尋詞各自標出（條號搜尋不反白）；長詞優先，避免短詞先吃掉長詞的一部分
+  const _hlRe=_toks2.length?new RegExp('('+[..._toks2].sort((a,b)=>b.length-a.length)
+    .map(t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')','gi'):null;
   const renderArtCard = (l) => {
     const isImg=l.content&&l.content.startsWith('data:image');
-    // 關鍵字反白（搜尋時高亮）
-    const _hlKw=(document.getElementById('lsi')?.value||'').trim();
-    const _hlRe=_hlKw&&!_hlKw.includes('§')?new RegExp('('+_hlKw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'):null;
     // _hl：esc → 插 mark → 換行（三合一，避免二次轉義）
     const _hl=(text)=>{
       const escaped=esc(text||'');
@@ -2119,7 +2147,9 @@ async function addLawInGroup(){
   try{
     const lawName=S.curLawName||window.currentLawName;
     if(!lawName){toast('請先開啟一個法規');return;}
-    showAddLaw({lawName, article:'', category:'statute',
+    // 類別沿用該法規（行政規則、SOP…），否則新增的條文會跑到「法規條文」分類、與原法規分家
+    const cat=((await da('laws')).find(l=>l.lawName===lawName)||{}).category||'statute';
+    showAddLaw({lawName, article:'', category:cat,
       content:'', keywords:[], relatedLaws:[], title:''});
   }catch(e){logError('addLawInGroup',e);}
 }
@@ -2855,7 +2885,7 @@ function _showLawListPop(lawName, laws, notFound){
     // 用 article 全文當參數，讓點擊後走既有的 showLawPop 精確定位邏輯
     const ref   = esc(lawName + (a.article||''));
     return '<button class="chip" style="display:block;width:100%;text-align:left;font-size:12px;margin-bottom:4px"'
-         + ' onclick="showLawPop(\''+ref+'\')">'
+         + ' onclick="_lawPopFromList(\''+esc(lawName)+'\',\''+ref+'\',this)">'
          + '<b>'+esc(label)+'</b>'
          + (hint ? '<span style="color:var(--t2);margin-left:6px">'+esc(hint)+'</span>' : '')
          + '</button>';
@@ -2869,7 +2899,7 @@ function _showLawListPop(lawName, laws, notFound){
   if(relEl){
     relEl.innerHTML =
       '<div style="margin-top:8px;display:flex;justify-content:flex-end">'
-      + '<button class="chip" style="font-size:11px" onclick="closeLawPop();openLawGroup(\''+esc(lawName)+'\')">在資料庫開啟 ›</button>'
+      + '<button class="chip" style="font-size:11px" onclick="closeLawPop();openLawGroup(\''+esc(lawName)+'\',true)">在資料庫開啟 ›</button>'
       + '</div>';
   }
   el.style.display = 'flex';
@@ -2888,20 +2918,45 @@ function _secToArticle(main, sub){
   return '第' + main + '條' + (sub ? '之' + sub : '');
 }
 
-// 解析「法規名§條號」→ { lawName, artNum }；不符格式回傳 null。
-//   artNum 已用 art2n() 換算成與資料庫 articleNumber 相同的編碼（主號*1000+子號），
-//   可直接比對，不需再做字串處理。
+// 解析條號精準搜尋 → { names, artNum }；不符格式回傳 null。
+//   names：要找的法規（全名陣列）；null＝不限法規。
+//   artNum 已用 art2n() 換算成與資料庫 articleNumber 相同的編碼（主號*1000+子號）。
+//   兩種寫法：
+//   · 「法規名§3」「§3-1」：§ 是明確的條號記號，法規名可省略。
+//   · 「法規名第3條」「法規名 第三條之1」「法規名第2點」：必須帶資料庫裡有的法規名，
+//     否則照一般關鍵字搜尋，才不會把內文片語（如「依第3條」）誤判成條號。
+//   法規名的對應見 _pickLawNames：「警察法§3」不會連警察法施行細則的第3條也列出來。
 function parseSecSearch(kw){
-  const m = String(kw||'').match(new RegExp('^(.*)' + _SEC_RE.source + '\\s*$'));
+  const s = _kwNorm(kw);
+  let m = s.match(new RegExp('^(.*)' + _SEC_RE.source + '\\s*$'));
+  if(m){
+    const part = (m[1]||'').trim();
+    return { names: part ? _pickLawNames(part) : null, artNum: art2n(_secToArticle(m[2], m[3])) };
+  }
+  m = s.replace(/\s+/g,'').match(/^(.+?)(第[一二三四五六七八九十百千\d]+(?:[-－][一二三四五六七八九十百千\d]+)?[條點](?:之[一二三四五六七八九十百千\d]+)?)$/);
   if(!m) return null;
-  return {
-    lawName: (m[1]||'').trim().toLowerCase(),
-    artNum:  art2n(_secToArticle(m[2], m[3])),
-  };
+  const names = _pickLawNames(m[1]), artNum = art2n(m[2]);
+  return (names.length && artNum) ? { names, artNum } : null;
+}
+// 名稱對應（條號搜尋與法條連結共用）：依序取最先有結果的一層
+//   ①同名 ②法規名以它結尾（刑法→中華民國刑法）③它以法規名結尾（依警察法→警察法，取最長的一部）
+//   ④法規名包含它。不做「它包含法規名」：「警察法施行細則」不可對到「警察法」。
+//   names 依長度由長到短排序（同 _lawNameCache）；回傳原本的法規名稱
+function _pickLawNames(part, names = _lawNameCache || []){
+  const p = String(part||'').trim().toLowerCase();
+  if(!p) return [];
+  const lc = names.map(n => n.toLowerCase());
+  const tests = [n => n === p, n => n.endsWith(p), n => p.endsWith(n), n => n.includes(p)];
+  for(let t = 0; t < tests.length; t++){
+    const r = names.filter((_, i) => tests[t](lc[i]));
+    if(r.length) return t === 2 ? r.slice(0, 1) : r;
+  }
+  return [];
 }
 
 async function showLawPop(ref){  try{
   if(!ref)return;
+  _lawPopBack = null;   // 開新的彈窗內容：✕ 直接關閉（從清單點進來的由 _lawPopFromList 另外記）
   const laws=await da('laws');
   // 「§」是常見的條號簡寫（§2＝第2條、§2-1＝第2條之1），但 art2n() 與下面的
   // 「第X條」定位正則都只認得標準寫法，遇到§會完全解析不出條號，導致 artNum
@@ -2921,36 +2976,28 @@ async function showLawPop(ref){  try{
   const artPosM = ref.match(/第[一二三四五六七八九十百千\d]+[條點]/);
   const namePart = artPosM ? ref.slice(0, artPosM.index).trim() : ref.trim();
 
+  // 法規名稱對應：與資料庫條號搜尋同一套（_pickLawNames），先去掉括號註解、書名號；
+  //   ★ 原本用「互相包含」且取資料庫裡第一筆，「警察法第3條」可能開成警察法施行細則第3條。
+  //   都對不到才用字元模糊比對（容許少打「法、條例、規則」等字）
+  const allNames = [...new Set(laws.map(l=>(l.lawName||'').trim()).filter(Boolean))].sort((a,b)=>b.length-a.length);
+  let picks = _pickLawNames(_refLawName(namePart) || namePart, allNames);
+  if(!picks.length){
+    const cs = namePart.replace(/[法條例規則]/g,'').split('');
+    if(cs.length >= 2) picks = allNames.filter(n => cs.every(c => n.includes(c))).slice(0, 1);
+  }
+
   // 只有法規名稱、沒有條號 → 一樣用彈窗呈現（列出該法規的條文清單），
   // 不再整頁跳走。原本 openLawGroup() 會離開目前畫面（例如答題中），
   // 與「點條號跳彈窗」的體驗不一致且會中斷作答，改為就地開窗。
   if(artNum===null&&namePart){
-    // 找資料庫裡最接近的法規名稱
-    const allNames=[...new Set(laws.map(l=>l.lawName).filter(Boolean))];
-    const exact=allNames.find(n=>n===namePart||namePart===n);
-    const partial=allNames.find(n=>n.includes(namePart)||namePart.includes(n));
-    const fuzzy=allNames.find(n=>{
-      const cs=namePart.replace(/[法條例規則]/g,'').split('');
-      return cs.length>=2&&cs.every(c=>n.includes(c));
-    });
-    const target=exact||partial||fuzzy;
-    _showLawListPop(target||namePart, laws, !target);
+    _showLawListPop(picks[0]||namePart, laws, !picks.length);
     return;
   }
-  let matched=laws.filter(l=>{
-    const ln=l.lawName||'';
-    let nm=!namePart||ln.includes(namePart)||namePart.includes(ln);
-    if(!nm){
-      const cs=namePart.replace(/[法條例規則]/g,'').split('');
-      if(cs.length>=2)nm=cs.every(c=>ln.includes(c));
-    }
-    if(!nm)return false;
-    // 與 renderDB／openLawGroup 一致：articleNumber 尚未建立時（例如剛匯入、
-    // 還沒按過「重建條號索引」的資料）改用 art2n(l.article) 即時換算，
-    // 否則這些條文的法條連結會查無資料。
-    return artNum===null||(l.articleNumber||art2n(l.article||''))===artNum;
-  });
-  if(matched.length>1){const ex=matched.filter(l=>(l.lawName||'').includes(namePart));if(ex.length)matched=ex;}
+  // 與 renderDB／openLawGroup 一致：articleNumber 尚未建立時改用 art2n(l.article) 即時換算
+  // 依對應順序排（同名優先），取第一筆
+  const matched=laws.filter(l=>(!namePart||picks.includes((l.lawName||'').trim()))
+      && (artNum===null||(l.articleNumber||art2n(l.article||''))===artNum))
+    .sort((a,b)=>picks.indexOf((a.lawName||'').trim())-picks.indexOf((b.lawName||'').trim()));
   const el=document.getElementById('lawpop-ov');if(!el)return;
   if(!matched.length){
     document.getElementById('lawpop-title').textContent=ref;
@@ -2966,7 +3013,24 @@ async function showLawPop(ref){  try{
   document.getElementById('lawpop-related').innerHTML=rl?'<div style="margin-top:8px;font-size:12px;color:var(--t2)">關聯法條：</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">'+rl+'</div>':'';
   el.style.display='flex';
   }catch(e){ logError('showLawPop',e); }}
-function closeLawPop(){ document.getElementById('lawpop-ov').style.display='none'; }
+// 從條文清單點進某一條：記住清單與捲動位置，按 ✕ 先回清單，再按一次才關閉
+let _lawPopBack = null;
+async function _lawPopFromList(lawName, ref, btn){
+  const top = btn?.parentElement?.scrollTop || 0;
+  await showLawPop(ref);
+  _lawPopBack = { lawName, top };
+}
+async function closeLawPop(){
+  const b = _lawPopBack;
+  _lawPopBack = null;
+  if(b){
+    _showLawListPop(b.lawName, await da('laws'));
+    const box = document.querySelector('#lawpop-body > div:last-child');
+    if(box) box.scrollTop = b.top;
+    return;
+  }
+  document.getElementById('lawpop-ov').style.display='none';
+}
 
 // ── Shims ──
 
@@ -3327,6 +3391,7 @@ const DataMod = {
   importBulkLaw,
   showLawPop,
   closeLawPop,
+  _lawPopFromList,
   openChapterMgr,
   startNumberMode,
   parseBulk,

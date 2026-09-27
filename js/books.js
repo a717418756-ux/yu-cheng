@@ -1261,7 +1261,7 @@ async function _initEpubReader(url, savedCfi, bookId){
     window._epubBook = book;
     _epubTocLoaded = false;  // 新書重置目錄載入旗標
     _epubAnchor = null; _epubNavBusy = 0; _epubPreloaded = '';   // 新書重置位置守門員與預載旗標
-    _epubTurning = false; _epubQueued = 0;                          // 新書重置翻頁佇列
+    _epubTurning = false; _epubQueued = 0; _epubLog = [];            // 新書重置翻頁佇列與診斷紀錄
 
     // 取得容器實際尺寸（epub.js 需要明確像素值）
     // ★ 原本用「視窗高 - 120」估算，實測比容器真正的高度少 58px，
@@ -1736,12 +1736,13 @@ async function _epubNextSection(){
   return true;
 }
 
-// 段落元素在本章的第幾頁（0 起算）；以段落起點所在的欄計算
-function _epubPageOfEl(el){
-  const g = _epubGeom();
-  const r = el && el.getClientRects && el.getClientRects()[0];
+// 段落元素在本章的第幾頁（0 起算）；預設看段落起點，end＝true 看段落結尾
+function _epubPageOfEl(el, end){
+  const g  = _epubGeom();
+  const rs = el && el.getClientRects && el.getClientRects();
+  const r  = rs && rs[end ? rs.length - 1 : 0];
   if(!g || !r) return -1;
-  return Math.max(0, Math.min(g.count - 1, Math.floor((r.left + 2) / g.d)));
+  return Math.max(0, Math.min(g.count - 1, Math.floor((end ? r.right - 2 : r.left + 2) / g.d)));
 }
 
 // 等章節內容撐開到 epub.js 算出的總頁數寬度。

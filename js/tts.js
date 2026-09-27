@@ -370,11 +370,11 @@
       .filter(el => !el.querySelector(SEL))
       .map(el => ({ el, text: (el.innerText || el.textContent || '').trim() }))
       .filter(x => x.text.length > 1);
-    // 從目前這一頁開始：跳過起點在這頁之前的段落（跨頁段落從它開頭唸，不漏字）
-    const start = fromPage > 0
-      ? Math.max(0, list.findIndex(x => _epubPageOfEl(x.el) >= fromPage))
-      : 0;
-    const out = start > 0 || fromPage <= 0 ? list.slice(start) : list;
+    // 從目前這一頁開始：跳過在這頁之前就結束的段落；
+    //   從上一頁延續到這頁的段落，從它開頭唸，不漏字
+    //   （這頁之後都沒有文字，例如整頁是圖片 → 回傳空的）
+    const i   = fromPage > 0 ? list.findIndex(x => _epubPageOfEl(x.el, true) >= fromPage) : 0;
+    const out = i < 0 ? [] : list.slice(i);
     _TTS.highlightEls = out.map(x => x.el);
     return out.map(x => x.text);
   }
@@ -416,9 +416,10 @@
     el.classList.add('tts-reading-hl');
     _TTS.hlEl = el;
     if(_TTS.mode === 'epub'){
-      // ★ 電子書是分頁排版，scrollIntoView 會把整個分頁捲亂；改成翻到該段所在的頁
+      // ★ 電子書是分頁排版，scrollIntoView 會把整個分頁捲亂；改成翻到該段所在的頁。
+      //   只往後翻：從上一頁延續過來的段落（開始朗讀的第一段）不要把畫面翻回上一頁
       const p = _epubPageOfEl(el);
-      if(p >= 0) _epubShowPage(p);
+      if(p > (_epubGeom()?.idx ?? p)) _epubShowPage(p);
       return;
     }
     try{ el.scrollIntoView({ behavior:'smooth', block:'center' }); }catch(_){}
@@ -608,10 +609,7 @@
     // 開始朗讀時標示按鈕
     const btn = document.getElementById('tts-epub-btn');
     if(btn){ btn.style.color='var(--acc)'; btn.style.opacity='1'; }
-    const mgr = window._epubRendition?.manager;
-    const d   = mgr?.layout?.delta;
-    const cur = (mgr && d) ? Math.round(mgr.container.scrollLeft / d) : 0;   // 目前這一頁
-    const segments = _epubParas(cur);
+    const segments = _epubParas(_epubGeom()?.idx || 0);   // 從目前這一頁開始
     if(!segments.length){ toast('無法取得頁面文字'); return; }
     _speak(segments, 'epub');
   };

@@ -418,7 +418,14 @@ function setEngVoice(v){
   _engVoice = v;
   _azureWarned = false;
   setSetting('eng_voice', v).catch(()=>{});
-  if(_ttsPlaying) _speakSentence(_ttsIdx);   // 正在唸 → 從目前這句用新聲音重唸
+  _restartSentence();
+}
+
+// 換聲音／語速：正在唸 → 從目前這句重唸；暫停中 → 丟掉已合成的舊音訊（含合成中的），
+//   按播放時才用新設定重新合成，不會接著播舊聲音
+function _restartSentence(){
+  if(_ttsPlaying) _speakSentence(_ttsIdx);
+  else { _ttsSeq++; _silenceTTS(); }
 }
 
 function _highlightSentence(idx){
@@ -459,10 +466,8 @@ function setEngRate(r){
   _ttsRate = r;
   const lbl = document.getElementById('eng-rate-lbl');
   if(lbl) lbl.textContent = r.toFixed(1)+'×';
-  // 若正在朗讀，從當前句以新語速重啟。
-  // 直接呼叫 _speakSentence 即可 —— 它會遞增世代序號並自行 cancel 舊句，
-  // 舊句的 onend 因序號不符而失效，不會誤前進。這裡不可再自行 cancel()。
-  if(_ttsPlaying) _speakSentence(_ttsIdx);
+  // _speakSentence 會遞增世代序號並自行停掉舊句，舊句的 onend 因序號不符而失效，不會誤前進
+  _restartSentence();
 }
 
 // 語速增減（按鈕用，含 0.5~1.5 邊界）
