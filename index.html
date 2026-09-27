@@ -363,6 +363,7 @@
   <div class="chips" id="lchips">
     <button class="chip on" onclick="setLC(this,'all')">全部</button>
     <button class="chip" onclick="setLC(this,'statute')">法規條文</button>
+    <button class="chip" onclick="setLC(this,'admin')">行政規則</button>
     <button class="chip" onclick="setLC(this,'sop')">SOP</button>
     <button class="chip" onclick="setLC(this,'supplement')">補充資料</button>
     <button class="chip" onclick="setLC(this,'interpretation')">函釋</button>
@@ -921,7 +922,7 @@
         <div><label class="fl">標題（可空）</label><input id="l-title" placeholder="臨檢"></div>
       </div>
       <div class="fr fg">
-        <div><label class="fl">類別</label><select id="l-cat" onchange="toggleSOPMode()"><option value="statute">法規條文</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">函釋</option></select></div>
+        <div><label class="fl">類別</label><select id="l-cat" onchange="toggleSOPMode()"><option value="statute">法規條文</option><option value="admin">行政規則</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">函釋</option></select></div>
       </div>
       <div class="fg" id="l-content-wrap"><label class="fl">內容 *</label><textarea id="l-content" rows="6" placeholder="法條文字..."></textarea></div>
       <div id="l-img-toggle-wrap" style="display:none;margin-bottom:8px">
@@ -961,10 +962,10 @@
     <div style="padding:0 0 16px">
       <div class="fr fg">
         <div><label class="fl">法律名稱</label><input id="bl-name" placeholder="警察職權行使法"></div>
-        <div><label class="fl">類別</label><select id="bl-cat"><option value="statute">法規條文</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">函釋</option></select></div>
+        <div><label class="fl">類別</label><select id="bl-cat"><option value="statute">法規條文</option><option value="admin">行政規則</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">函釋</option></select></div>
       </div>
       <div class="fg"><label class="fl">來源</label><input id="bl-src" placeholder="可貼官網網址，🏛 就能直接開原文"></div>
-      <div class="fg"><label class="fl">貼入法條文字（自動分條）</label>
+      <div class="fg"><label class="fl">貼入法條文字（自動分條；行政規則的「一、二、三、」會自動分點）</label>
         <textarea id="bl-text" rows="8" placeholder="第 六 條&#10;警察於公共場所...&#10;&#10;第 七 條&#10;警察依前條規定..."></textarea>
       </div>
       <div id="bl-prev" style="font-size:12px;color:var(--t2);min-height:20px;padding:4px 12px;line-height:1.8"></div>
