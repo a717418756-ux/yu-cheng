@@ -1708,12 +1708,13 @@ function _autoCites(text, law){
 const _WHOLE_END = /^(?:\s*[（(][^）)]*[）)])?\s*(?:規定|訂定|授權|所定|之|及|與|和|或|暨|、|，|。|；|：|」|）|\)|\s|$)/;
 function _wholeLawCites(text, self){
   const t = String(text), used = [], out = [];
+  const me = (self||'').trim();
   for(const name of _lawNameCache){
-    if(name === (self||'').trim()) continue;
     for(let i = t.indexOf(name); i >= 0; i = t.indexOf(name, i + name.length)){
       const j = i + name.length;
       if(used.some(([a, b]) => i < b && j > a)) continue;
-      used.push([i, j]);
+      used.push([i, j]);               // 自己的名稱也要佔位，裡面較短的法規名才不會被比對出來
+      if(name === me) continue;
       const rest = t.slice(j);
       if(/^(?:\s*[（(][^）)]*[）)])?\s*第\s*[一二三四五六七八九十百千\d]+\s*[條點]/.test(rest)) continue;
       if(_WHOLE_END.test(rest)) out.push(name);
@@ -1731,11 +1732,14 @@ function _wholeLawCites(text, self){
 //   沒有條號時才退回法規名稱比對，避免「§12」誤匹配到「§120」。
 // 引用字串的「法規名稱部分」：去掉 §X、第X條、第X點（及之後的項款文字）
 //   「警察職權行使法第十二條第四項」→「警察職權行使法」；「○○要點第3點」→「○○要點」
+//   結尾的括號註解也要去掉：「警察職權行使法（以下簡稱本法）第12條」→「警察職權行使法」
 function _refLawName(ref){
-  return String(ref||'')
+  let s = String(ref||'')
     .replace(/\s*§.*$/, '')
     .replace(/\s*(?:第\s*[一二三四五六七八九十百千\d]+|\d+)\s*[條點].*$/, '')
-    .trim();
+    .trim(), prev;
+  do{ prev = s; s = s.replace(/\s*[（(][^）)]*[）)]\s*$/, ''); }while(s !== prev);
+  return s.replace(/[《》〈〉「」『』"“”]/g, '').trim();   // 「《警察法》第2條」這類書名號也去掉
 }
 
 function _findBacklinks(target, allLaws){
