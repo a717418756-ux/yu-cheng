@@ -1672,7 +1672,11 @@ function _setLawNames(allLaws){
   _lawNameCache = [...new Set((allLaws||[]).map(l=>(l.lawName||'').trim()).filter(Boolean))]
                     .sort((a,b)=>b.length-a.length);
 }
-function _autoCites(text){
+// law：傳入條文物件時，若它是該法規的「第一條／第一點」，另外辨識沒有條號的母法名稱。
+//   法制慣例：子法（施行細則、辦法、要點…）都在第一條／第一點寫授權依據，
+//   行政規則常只寫「依據○○法規定，特訂定本要點」而沒有條號。只在第一條／第一點開放，
+//   其他條文照舊只抓有號碼的引用，避免內文隨口提到法規名稱就變成關聯（雜訊）。
+function _autoCites(text, law){
   if(!text || text.startsWith('data:') || !_lawNameCache) return [];
   const out = [];
   for(const m of String(text).matchAll(_ART_RE)){
@@ -1691,7 +1695,31 @@ function _autoCites(text){
       }
     }
   }
+  if(law && (law.articleNumber || art2n(law.article||'')) === 1000) out.push(..._wholeLawCites(text, law.lawName));
   return [...new Set(out)];
+}
+
+// 沒有條號的母法名稱（只給第一條／第一點用）
+//   ①長名優先、已被長名佔用的位置不再比對：「警察法施行細則」不會同時算成「警察法」
+//   ②名稱後面接「第X條／點」的，上面有號碼的引用已經處理，這裡跳過
+//   ③名稱後面必須是「規定、訂定、授權、之、及、、、標點」等收尾：
+//     「依相關警察法規辦理」的「警察法」後面接「規」，是另一個詞，不算
+//   ④不算自己（第一條常寫「特訂定○○要點」）
+const _WHOLE_END = /^(?:\s*[（(][^）)]*[）)])?\s*(?:規定|訂定|授權|所定|之|及|與|和|或|暨|、|，|。|；|：|」|）|\)|\s|$)/;
+function _wholeLawCites(text, self){
+  const t = String(text), used = [], out = [];
+  for(const name of _lawNameCache){
+    if(name === (self||'').trim()) continue;
+    for(let i = t.indexOf(name); i >= 0; i = t.indexOf(name, i + name.length)){
+      const j = i + name.length;
+      if(used.some(([a, b]) => i < b && j > a)) continue;
+      used.push([i, j]);
+      const rest = t.slice(j);
+      if(/^(?:\s*[（(][^）)]*[）)])?\s*第\s*[一二三四五六七八九十百千\d]+\s*[條點]/.test(rest)) continue;
+      if(_WHOLE_END.test(rest)) out.push(name);
+    }
+  }
+  return out;
 }
 
 // ── 反向連結（被哪些法條引用）───────────────────────────────
@@ -1701,6 +1729,15 @@ function _autoCites(text){
 //         ③既有資料立刻生效，不需要重跑轉檔
 //   比對規則與 showLawPop 一致：先用 art2n 比對條號，
 //   沒有條號時才退回法規名稱比對，避免「§12」誤匹配到「§120」。
+// 引用字串的「法規名稱部分」：去掉 §X、第X條、第X點（及之後的項款文字）
+//   「警察職權行使法第十二條第四項」→「警察職權行使法」；「○○要點第3點」→「○○要點」
+function _refLawName(ref){
+  return String(ref||'')
+    .replace(/\s*§.*$/, '')
+    .replace(/\s*(?:第\s*[一二三四五六七八九十百千\d]+|\d+)\s*[條點].*$/, '')
+    .trim();
+}
+
 function _findBacklinks(target, allLaws){
   const tName = (target.lawName||'').trim();
   const tNum  = target.articleNumber || art2n(target.article||'');
@@ -1710,13 +1747,16 @@ function _findBacklinks(target, allLaws){
     if(l.id === target.id) continue;
     // 手動填的關聯 ＋ 從內文自動擷取的引用，兩者都算
     const refs = [...(l.relatedLaws||[]).map(r=>r.ref||r.lawName||''),
-                  ..._autoCites(l.content||'')];
+                  ..._autoCites(l.content||'', l)];
     for(const raw of refs){
       let ref = (raw||'').trim();
       if(!ref) continue;
       // §簡寫正規化後再比對（與 showLawPop 同一套規則）
       ref = ref.replace(_SEC_RE, (_, m2, sub)=>_secToArticle(m2, sub));
-      if(!ref.includes(tName)) continue;
+      // ★ 原本用「引用文字包含法規名稱」判斷，「警察法施行細則第2條」會被當成引用
+      //   「警察法第2條」。改成：引用的法規名稱部分必須「以目標名稱結尾」，
+      //   仍容許前面有「依」「本辦法依」這類字（手動填寫常見）。
+      if(!_refLawName(ref).endsWith(tName)) continue;
       const rNum = art2n(ref);
       // 引用有指定條號 → 必須條號相符
       if(rNum && tNum && rNum !== tNum) continue;
@@ -1823,7 +1863,7 @@ async function openLawGroup(lawName){  try{
     //   讀法條時反而多一個區塊要看。反推來源以「法規名稱」呈現並去重，
     //   避免同一部子法有多條引用時擠出一堆重複標籤。
     const manualRefs = (l.relatedLaws||[]).map(r=>r.ref||r.lawName||'').filter(Boolean);
-    const autoRefs   = _autoCites(l.content||'');
+    const autoRefs   = _autoCites(l.content||'', l);
     // 反推來源（只取法規名稱並去重）。若正向已經有更精確的「○○法第X條」，
     // 就不要再重複列出同一部法規的名稱，否則同一條會出現兩個指向同處的標籤。
     const backRefs = [...new Set(_findBacklinks(l, allLaws).map(b=>b.law.lawName||''))]
@@ -2232,8 +2272,9 @@ async function quizFromLaw(){  try{
     return rels.some(r=>{
       const ref=(r.ref||r.lawName||'').trim();
       if(!ref) return false;
-      // 取 ref 的法規名稱部分（去掉條號 §X 或 第X條）
-      const refName=ref.replace(/§.*/,'').replace(/第?\d+條.*/,'').trim();
+      // 取 ref 的法規名稱部分（去掉 §X、第X條、第X點；中文數字也要認，
+      //   原本只認「12條」這種阿拉伯數字，「第三條」「第2點」都去不掉而對不到）
+      const refName=_refLawName(ref);
       // 只有完全相等才算匹配，避免「警察法」誤匹配「警察法施行細則」
       return refName===lawName;
     });
