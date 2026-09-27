@@ -1427,6 +1427,8 @@ function _lawInfo(laws){
   const pick = f => ((laws||[]).find(l => l && l[f]) || {})[f] || '';
   return { org: pick('org'), amendDate: pick('amendDate') };
 }
+// 條文的計數單位：行政規則以「點」分（第 3 點），其餘以「條」分
+const _lawUnit = laws => /點/.test(((laws||[])[0]||{}).article||'') ? '點' : '條';
 
 async function renderDB(){  try{
   const ls=await da('laws');
@@ -1504,9 +1506,9 @@ async function renderDB(){  try{
 
   const _mkCard = ([name, laws]) => {
     const cat=laws[0].category||'statute';
-    const catLabel={'statute':'法規條文','sop':'SOP','supplement':'補充資料','interpretation':'函釋'}[cat]||cat;
+    const catLabel={'statute':'法規條文','admin':'行政規則','sop':'SOP','supplement':'補充資料','interpretation':'函釋'}[cat]||cat;
     const favCount=laws.filter(l=>l.favorite).length;
-    const icon=cat==='sop'?'📋':cat==='supplement'?'📄':'⚖';
+    const icon=cat==='sop'?'📋':cat==='supplement'?'📄':cat==='admin'?'📑':'⚖';
     const _li=_lawInfo(laws);
     const orgLine=(_li.org||_li.amendDate)
       ?('<div style="font-size:10px;color:var(--t2);margin-top:1px">'
@@ -1525,7 +1527,7 @@ async function renderDB(){  try{
         +'<span style="font-size:20px">'+icon+'</span>'
         +'<div style="flex:1">'
           +'<div style="font-size:15px;font-weight:700;color:var(--t0)">'+esc(name)+'</div>'
-          +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+catLabel+' · '+laws.length+' 條'+(favCount?' · ⭐'+favCount:'')+'</div>'
+          +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+catLabel+' · '+laws.length+' '+_lawUnit(laws)+(favCount?' · ⭐'+favCount:'')+'</div>'
           +orgLine
           // 官網鈕放左側資訊區，與右側刪除鈕拉開距離，避免誤觸不可逆的刪除
           +'<button class="lw-gov" data-lawname="'+esc(name)+'" title="查全國法規資料庫原文">'
@@ -1617,28 +1619,34 @@ const _LAW_PCODE = {
 // 使用者自備代碼：法規的「來源」或「備註」欄若貼了官網網址（含 pcode=），
 // 就以它為準。表內沒有的法規，貼一次網址之後就能直接開到原文。
 let _lawPcodeFromData = {};
+let _lawSrcUrl = {};             // 法規名 → 來源網址（沒有官網代碼時，🏛 開這個）
 function _collectLawPcodes(allLaws){
-  const map = {};
+  const map = {}, src = {};
   for(const l of (allLaws||[])){
     // 與 _officialLawUrl 相同的正規化（全形轉半形、去空白），否則名稱含空白時查不到
     const name = String(l.lawName||'').normalize('NFKC').replace(/\s+/g,'');
-    if(!name || map[name]) continue;
-    const m = ((l.source||'') + ' ' + (l.note||'')).match(/pcode=([A-Za-z]\d{7})/i);
-    if(m) map[name] = m[1].toUpperCase();
+    if(!name) continue;
+    const text = (l.source||'') + ' ' + (l.note||'');
+    const m = text.match(/pcode=([A-Za-z]\d{7})/i);
+    if(m && !map[name]) map[name] = m[1].toUpperCase();
+    const u = text.match(/https?:\/\/[^\s，、）)]+/);
+    if(u && !src[name]) src[name] = u[0];
   }
   _lawPcodeFromData = map;
+  _lawSrcUrl = src;
 }
 function _officialLawUrl(lawName, article){
   const name = String(lawName||'').normalize('NFKC').replace(/\s+/g,'');
   if(!name) return '';
   const pcode = _lawPcodeFromData[name] || _LAW_PCODE[name];
   if(!pcode){
-    // 查不到代碼 → 走官網自己的搜尋結果頁（不經 Google）
-    return 'https://law.moj.gov.tw/Law/LawSearchResult.aspx?ty=LAW&kw=' +
-           encodeURIComponent(name);
+    // 查不到代碼 → 有來源網址（例如植根法律網、機關網站）就開它；都沒有才走官網搜尋頁
+    // （行政規則多半不在全國法規資料庫，搜尋頁常常查不到）
+    return _lawSrcUrl[name] ||
+      'https://law.moj.gov.tw/Law/LawSearchResult.aspx?ty=LAW&kw=' + encodeURIComponent(name);
   }
   // 官網單條網址 flno 可用「7-1」表示第7條之1
-  const n = art2n(article||'');
+  const n = /點/.test(article||'') ? 0 : art2n(article||'');   // 行政規則的「點」官網沒有單條頁，開全文
   const flno = n ? Math.floor(n/1000) + (n%1000 ? '-' + (n%1000) : '') : '';
   return flno
     ? 'https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=' + pcode + '&flno=' + flno
@@ -1657,7 +1665,7 @@ function openOfficialLaw(lawName, article){
 //     去比對「第X條」前面的文字。這樣完全不必處理「及／或／、」——
 //     「兒童及少年福利與權益保障法」本身就是一個已知名稱，不會被切斷。
 //     另一個好處：只會連到你真的有的法規，點了必定有東西看。
-const _ART_RE = /第([一二三四五六七八九十百千\d]+)條(?:之([一二三四五六七八九十\d]+))?/g;
+const _ART_RE = /第([一二三四五六七八九十百千\d]+)([條點])(?:之([一二三四五六七八九十\d]+))?/g;   // 條＝法律命令，點＝行政規則
 let _lawNameCache = null;        // 依長度排序的法規名（長名優先，避免短名先命中）
 function _setLawNames(allLaws){
   _collectLawPcodes(allLaws);
@@ -1678,7 +1686,7 @@ function _autoCites(text){
     }while(before !== prevB);
     for(const name of _lawNameCache){
       if(before.endsWith(name)){
-        out.push(name + '第' + m[1] + '條' + (m[2] ? '之' + m[2] : ''));
+        out.push(name + '第' + m[1] + m[2] + (m[3] ? '之' + m[3] : ''));
         break;                    // 長名優先，命中即停
       }
     }
@@ -1774,7 +1782,7 @@ async function openLawGroup(lawName){  try{
   }
   const others=[...new Set(allLaws.map(l=>l.lawName).filter(Boolean))].filter(n=>n!==lawName).slice(0,8);
   const cat=laws[0].category||'statute';
-  const icon=cat==='sop'?'📋':cat==='supplement'?'📄':'⚖';
+  const icon=cat==='sop'?'📋':cat==='supplement'?'📄':cat==='admin'?'📑':'⚖';
   const lvName=document.getElementById('lv-name'); if(lvName) lvName.textContent=icon+' '+lawName;
   // 顯示法規機關/日期資訊
   const lvInfo=document.getElementById('lv-info');
@@ -1976,7 +1984,7 @@ async function openLawGroup(lawName){  try{
 
   // 法條數量寫入 header
   const countEl = document.getElementById('lv-count');
-  if(countEl) countEl.textContent = laws.length + ' 條';
+  if(countEl) countEl.textContent = laws.length + ' ' + _lawUnit(laws);
   // 章節 chip 寫入 sticky 列
   const chBarEl = document.getElementById('lv-chapter-bar');
   if(chBarEl){
@@ -2580,62 +2588,48 @@ function parseLawText(rawText, lawName, category, source){
   let curTitle   = '';
   let contentLines = [];
 
-  // 正規表達式：只認「章節編節」行，條號只認阿拉伯數字
   // 數字部分：支援阿拉伯數字、中文數字、及中文數字間有空格（如「十 三」）
-  // 支援「編」（最上層結構）
   const _numPart = '((?:[一二三四五六七八九十百千\\d]+\\s*)+?)';
   const partRe    = new RegExp('^第\\s*'+_numPart+'\\s*[篇編]\\s*(.+)?');
   const chapterRe = new RegExp('^第\\s*'+_numPart+'\\s*章\\s*(.+)?');
   const sectionRe = new RegExp('^第\\s*'+_numPart+'\\s*節\\s*(.+)?');
-  // 條號：支援阿拉伯數字（第1條、第 1 條）和中文數字（第一條）
-  const _artNumPart = '(?:([一二三四五六七八九十百千\\d]+)|([\\d]+))';
   // 條號：「第7條」「第7條之1」「第七條之一」，以及官網複製下來的「第 7-1 條」
   const articleRe = /^第\s*((?:[一二三四五六七八九十百千]+|\d+))\s*(?:[-－]\s*((?:[一二三四五六七八九十]+|\d+))\s*)?條(?:之\s*((?:[一二三四五六七八九十]+|\d+)))?\s*(?:[（(]([^）)]+)[）)])?(.*)$/;
 
-  // 中文數字→阿拉伯數字
-  const zh2num = (s) => {
-    const map={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,
-               '十':10,'百':100,'千':1000};
-    if(/^\d+$/.test(s)) return parseInt(s);
-    let result=0, temp=0;
-    for(const ch of s){
-      const v=map[ch]; if(!v) continue;
-      if(v>=10){result+=(temp||1)*v;temp=0;}else temp=v;
-    }
-    return result+temp;
-  };
+  // ── 行政規則（要點、規定、作業程序）：以「一、二、三、」或「第X點」分點 ──
+  // ★ 全文只要出現任何「第X條」就是法律／命令格式：那裡的「一、二、」是條文中的「款」，
+  //   屬於條文內容，絕不能拿來分割。只有完全沒有「第X條」時才用分點模式。
+  //   分點必須依序（一、之後只認二、），條文內重新從一、起算的列舉不會被誤切。
+  const pointRe   = /^(?:第\s*([一二三四五六七八九十百\d]+)\s*點|([一二三四五六七八九十百]+)\s*[、．.])\s*(.*)$/;
+  const pointMode = !lines.some(l => articleRe.test(l)) && lines.some(l => pointRe.test(l));
+  const unit      = pointMode ? '點' : '條';
+  let lastPoint   = 0;
+
+  // 中文或阿拉伯數字 → 數字（utils.js 的 zh2n 不認阿拉伯數字，這裡補上）
+  const _n = raw => { const s = String(raw).replace(/\s+/g,''); return /^\d+$/.test(s) ? parseInt(s,10) : zh2n(s); };
 
   // 格式化層級名稱（「第N編/章/節 名稱」→ 標準格式）
   const fmtLevel = (type, num, name) => {
-    // 去除中文數字間的空格再轉換（如「十 三」→「十三」→13）
-    const cleanNum = typeof num==='string' ? num.replace(/\s+/g,'') : num;
-    const n = zh2num(cleanNum);
     const s = name ? name.trim() : '';
-    return '第'+n+type+(s?' '+s:'');
+    return '第'+_n(num)+type+(s?' '+s:'');
   };
 
-  // 儲存目前條文
+  // 儲存目前條文（或點）
   const saveArticle = () => {
     if(curArtNum===null) return;
     const content = contentLines.join('\n').trim();
     if(!content && !curTitle) return;
-    // 支援中文數字條號
-    const _zh2n = (s)=>{
-      if(/^\d+$/.test(String(s))) return parseInt(s,10);
-      const map={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000};
-      let r=0,t=0; for(const c of String(s)){const v=map[c];if(!v)continue;if(v>=10){r+=(t||1)*v;t=0;}else t=v;} return r+t||parseInt(s,10)||0;
-    };
-    const artNum = _zh2n(curArtNum);
-    const artSub = curArtSub ? _zh2n(curArtSub) : 0;
+    const artNum = _n(curArtNum);
+    const artSub = curArtSub ? _n(curArtSub) : 0;
     items.push({
       lawName:       lawName||'',
-      // ★ 原本丟掉「之N」：第7條之1 被存成第7條（與第7條重複），排序鍵也只存主號。
-      //   排序鍵改與 art2n 同一套：主號×1000＋子號（第7條之1 → 7001）
-      article:       '第 '+artNum+' 條'+(artSub?'之'+artSub:''),
+      // 排序鍵與 art2n 同一套：主號×1000＋子號（第7條之1 → 7001；第3點 → 3000）
+      article:       '第 '+artNum+' '+unit+(artSub?'之'+artSub:''),
       articleNumber: artNum*1000+Math.min(artSub,999),
       title:         curTitle||'',
       content:       content||curTitle||'',
-      category:      category||'statute',
+      // 分點格式（行政規則）而類別仍是預設的「法規條文」→ 自動歸為行政規則
+      category:      (pointMode && (!category || category==='statute')) ? 'admin' : (category||'statute'),
       part:          curPart||'',          // 編
       chapter:       curChapter||'',       // 章
       section:       curSection||'',       // 節
@@ -2661,8 +2655,24 @@ function parseLawText(rawText, lawName, category, source){
     const secM = line.match(sectionRe);
     if(secM){ saveArticle(); curSection=fmtLevel('節',secM[1],secM[2]); continue; }
 
-    // ── 條號（只認阿拉伯數字）────────────────────────────
-    const artM = line.match(articleRe);
+    // ── 點（行政規則）：只接受「下一個」點號 ───────────────
+    if(pointMode){
+      const ptM = line.match(pointRe);
+      if(ptM && _n(ptM[1] || ptM[2]) === lastPoint + 1){
+        saveArticle();
+        lastPoint = _n(ptM[1] || ptM[2]);
+        curArtNum = String(lastPoint);
+        // 點號後緊接括號＝該點標題，例如「三、（駐在所）」→ 標題「駐在所」（與桌面工具相同）
+        const tm = (ptM[3]||'').trim().match(/^[（(]([^）)]{1,20})[）)]\s*(.*)$/);
+        curTitle = tm ? tm[1].trim() : '';
+        const tail = tm ? tm[2].trim() : (ptM[3]||'').trim();
+        if(tail) contentLines.push(tail);
+        continue;
+      }
+    }
+
+    // ── 條號 ─────────────────────────────────────────────
+    const artM = !pointMode && line.match(articleRe);
     if(artM){
       saveArticle();
       curArtNum = artM[1];              // 條號（中文或阿拉伯）
@@ -2689,7 +2699,7 @@ function prevBulkLaw(){
   const src=document.getElementById('bl-src').value.trim();
   const items=parseLawText(text,name,cat,src);
   const prevEl=document.getElementById('bl-prev');
-  if(!items.length){prevEl.innerHTML='<span style="color:var(--red)">無法解析，請確認格式（需有「第X條」）</span>';return;}
+  if(!items.length){prevEl.innerHTML='<span style="color:var(--red)">無法解析，請確認格式（需有「第X條」，行政規則為「一、」或「第X點」）</span>';return;}
 
   // 三層結構統計
   const parts   =[...new Set(items.map(i=>i.part   ||'').filter(Boolean))];
@@ -2699,7 +2709,7 @@ function prevBulkLaw(){
   // 顏色標籤
   const mkTag=(text,col,bg)=>'<span style="display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600;color:'+col+';background:'+bg+';margin:2px 3px">'+esc(text)+'</span>';
   let html='<div style="font-size:12px;color:var(--t2);padding:6px 0">';
-  html+='<span style="color:var(--t1);font-weight:600">共 '+items.length+' 條</span>　';
+  html+='<span style="color:var(--t1);font-weight:600">共 '+items.length+' '+_lawUnit(items)+(_lawUnit(items)==='點'?'（行政規則格式）':'')+'</span>　';
 
   if(parts.length){
     html+='<br><span style="color:var(--org);font-size:11px">📙 編：</span>';
@@ -2733,15 +2743,20 @@ async function importBulkLaw(){  try{
   const cat=document.getElementById('bl-cat').value;
   const src=document.getElementById('bl-src').value.trim();
   const items=parseLawText(text,name,cat,src);
-  if(!items.length){toast('解析結果為0條，請確認格式（需有「第X條」）');return;}
+  if(!items.length){toast('解析不到條文，請確認格式（需有「第X條」，行政規則為「一、」或「第X點」）');return;}
   // ── 防重複：以法律名稱+類別 判斷是否已存在 ──────────────────
   const existing=await da('laws');
   // 機關、修正日期是法規層級資訊，覆蓋重匯時沿用，不隨舊條文一起刪掉
   const keepInfo=_lawInfo(existing.filter(l=>l.lawName===name));
   items.forEach(l=>Object.assign(l, keepInfo));
-  const sameGroup=existing.filter(l=>l.lawName===name&&l.category===cat);
+  // ★ 法規條文與行政規則算同一群：桌面工具先前把行政規則存成 statute，
+  //   只比對類別會認不出已存在，同一部規則被存成兩份
+  const _lawCat = c => c==='statute' || c==='admin';
+  const realCat = items[0].category;
+  const sameGroup=existing.filter(l=>l.lawName===name &&
+    (l.category===realCat || (_lawCat(l.category) && _lawCat(realCat))));
   if(sameGroup.length>0){
-    const go=confirm('「'+name+'」（'+cat+'）已有 '+sameGroup.length+' 條資料。\n\n確定 → 覆蓋（刪除舊資料再匯入）\n取消 → 取消匯入');
+    const go=confirm('「'+name+'」已有 '+sameGroup.length+' '+_lawUnit(sameGroup)+'資料。\n\n確定 → 覆蓋（刪除舊資料再匯入）\n取消 → 取消匯入');
     if(!go) return;
     // 刪除舊資料
     for(const l of sameGroup) await dd('laws',l.id);
@@ -2754,7 +2769,7 @@ async function importBulkLaw(){  try{
     , (l.content||'').startsWith('data:') ? '' : (l.content||'')].filter(Boolean).join(' ').toLowerCase();
   });
   await bulkPut('laws',items);
-  toast('已匯入 '+items.length+' 條法條 ✓');
+  toast('已匯入 '+items.length+' '+_lawUnit(items)+' ✓');
   closeBulkLaw();
   renderDB();
   }catch(e){ logError('importBulkLaw',e); }}
@@ -2803,7 +2818,7 @@ function _showLawListPop(lawName, laws, notFound){
 
   if(bodyEl){
     bodyEl.innerHTML =
-      '<div style="font-size:12px;color:var(--t2);margin-bottom:6px">共 '+arts.length+' 條，點選查看內容：</div>'
+      '<div style="font-size:12px;color:var(--t2);margin-bottom:6px">共 '+arts.length+' '+_lawUnit(arts)+'，點選查看內容：</div>'
       + '<div style="max-height:52vh;overflow:auto">'+items+'</div>';
   }
   if(relEl){
@@ -2858,7 +2873,7 @@ async function showLawPop(ref){  try{
   // 若整個 ref 裡根本沒有「第X條」模式（例如「釋字第748號解釋」這類名稱本身含數字、
   // 用「號」而非「條」的資料），視為沒有條號，把完整 ref 當名稱查，
   // 而不是像舊邏輯把名稱中的數字誤判為條號、切爛整個名稱。
-  const artPosM = ref.match(/第[一二三四五六七八九十百千\d]+條/);
+  const artPosM = ref.match(/第[一二三四五六七八九十百千\d]+[條點]/);
   const namePart = artPosM ? ref.slice(0, artPosM.index).trim() : ref.trim();
 
   // 只有法規名稱、沒有條號 → 一樣用彈窗呈現（列出該法規的條文清單），

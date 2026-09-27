@@ -86,14 +86,16 @@ function zh2n(s){ let n=0,c=0;for(const ch of s){const v=ZHN[ch];if(v===undefine
 function art2n(art){
   if(!art) return 0;
   art=String(art).normalize('NFKC').replace(/\s+/g,'');  // NFKC轉全形數字+去空白：PDF複製常見「第 11 條」「第１１條」，否則解析失敗變0
-  const m=art.match(/第([一二三四五六七八九十百千\d]+)條/);
+  // 「條」（法律、命令）與「點」（行政規則：要點、規定）用同一套編碼
+  // 官網寫法「第 7-1 條」的「-1」也要能跳過，原本整個比對失敗、回傳 0
+  const m=art.match(/第([一二三四五六七八九十百千\d]+)(?:[-－][一二三四五六七八九十百千\d]+)?[條點]/);
   if(!m) return 0;
   const s=m[1];
   const main=/^\d+$/.test(s)?parseInt(s):zh2n(s);
   // 子條號：「第10條之2」「第10-1條」「第十條之一」都要納入排序
   // 主號 ×1000 + 子號，確保 10、10-1、10-2、11 正確排列
   let sub=0;
-  const mSub=art.match(/條之([一二三四五六七八九十百千\d]+)/) || art.match(/第[一二三四五六七八九十百千\d]+[-－]([一二三四五六七八九十百千\d]+)條/);
+  const mSub=art.match(/[條點]之([一二三四五六七八九十百千\d]+)/) || art.match(/第[一二三四五六七八九十百千\d]+[-－]([一二三四五六七八九十百千\d]+)[條點]/);
   if(mSub){ const ss=mSub[1]; sub=/^\d+$/.test(ss)?parseInt(ss):zh2n(ss); }
   return main*1000 + Math.min(sub,999);
 }

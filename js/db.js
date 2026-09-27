@@ -269,14 +269,15 @@ async function setSetting(key, value) {
   catch(e) { logError('setSetting', e); }
 }
 
-// 條號索引一次性修復：v4.17.2 以前的「批次匯入」只存主號（第12條→12），
-// 其餘各處都用 art2n 的「主號×1000＋子號」（12000），造成條號搜尋、關聯法條、排序出錯。
+// 條號索引一次性修復（版本 2）：
+//   ①v4.17.2 以前的「批次匯入」只存主號（第12條→12），其餘各處都用 art2n 的「主號×1000＋子號」
+//   ②v4.22 起 art2n 認得「第X點」（行政規則）與官網寫法「第 7-1 條」，先前這兩種存成 0
 async function healLawNums() {
-  if (await getSetting('lawNumHealed')) return;
+  if ((+await getSetting('lawNumHealed', 0)) >= 2) return;
   const bad = (await da('laws')).filter(l => { const n = art2n(l.article); return n && l.articleNumber !== n; });
   bad.forEach(l => { l.articleNumber = art2n(l.article); });
   if (bad.length) await bulkPut('laws', bad);
-  await setSetting('lawNumHealed', 1);
+  await setSetting('lawNumHealed', 2);
 }
 
 async function getCountdowns() {
@@ -372,5 +373,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.21.0';    // 朗讀:①電子書朗讀換章原用 epub.js 內建 next()，被位置守門員當成位置自己變了而拉回，唸完一章就停(4.19.3 起的誤傷)，改由閱讀器換章 ②抓段落連外層 div 一起抓，整章會唸兩遍，改只取最內層區塊 ③從目前這一頁開始唸(原本一律從章首) ④畫面跟著唸到的段落翻頁並標示該段 ⑤法條朗讀同步反白從未作用(_speak 開頭的 _stop 清掉對應表)，已修 ⑥英文朗讀新增微軟語音 Jenny/Guy(與電子書同一套，有 Azure Key 才顯示)，暫停可接續、預抓下一句、失敗自動改系統語音 ⑦Azure 請求三處重複的程式合併為一個 ⑧移除從未使用的 _ttsQueue
+const APP_VERSION  = '4.22.1';    // 與桌面工具對齊:①大量新增的重複判斷把法規條文與行政規則視為同一群(桌面工具過去把行政規則存成 statute，只比類別會存成兩份) ②點的標題「三、（駐在所）」→標題「駐在所」，與工具相同 ③🏛 查不到全國法規代碼時先開該法規的來源網址(植根法律網等)，都沒有才走官網搜尋
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）
