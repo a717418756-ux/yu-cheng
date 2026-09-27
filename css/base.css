@@ -692,13 +692,13 @@ textarea{resize:vertical;line-height:1.7}
   cursor:pointer;
 }
 .tts-handle:hover{ background:rgba(255,255,255,0.32); }
-/* 引擎選單 */
 /* 英文朗讀的聲音選單（控制列內，精簡寬度） */
 .eng-voice-sel{
   flex:none; width:auto; max-width:128px; padding:8px 6px; font-size:12px;
   border-radius:8px; background:var(--bg2); border:1px solid var(--bd); color:var(--t1);
 }
 [data-theme="eink"] .eng-voice-sel{ background:#fff; color:#000; border:1.5px solid #000; }
+/* 引擎選單 */
 .tts-voice-sel{
   flex:1;
   background:rgba(255,255,255,0.06);
@@ -1031,6 +1031,7 @@ input:focus, textarea:focus, select:focus{
 
 /* ── 法條搜尋結果卡片（v2.11.35）──────────────────────── */
 .law-search-card{ margin:5px 12px; cursor:pointer; }
+.law-search-head{ font-size:12px; font-weight:700; color:var(--t2); margin:10px 14px 4px; }
 .law-search-lawname{ font-size:11px; color:var(--t2); margin-bottom:4px; }
 .law-search-article{ font-size:13px; font-weight:700; color:var(--acc); margin-bottom:4px; }
 .law-search-article .law-search-title{ font-weight:400; color:var(--t2); }

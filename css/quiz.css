@@ -594,11 +594,9 @@
 .es-mk{ flex:none; padding-right:.5em; }
 /* 縮排墊片：隱形字元，寬度＝上層標號去掉最後一字，靠字寬自動對齊 */
 .es-pad{ flex:none; visibility:hidden; white-space:pre; user-select:none; -webkit-user-select:none; }
-/* 大標：標號寫在題號欄 */
-/* ★ 不可用 margin-top：任何額外間距都會讓後續行與格線逐行錯開（越來越偏）。
-   需要視覺區隔就靠字重，不動高度。 */
-.es-ln.l1{ position:relative; }
+/* ★ 各行不可用 margin-top：任何額外間距都會讓後續行與格線逐行錯開（越來越偏）。 */
 /* 大標的「一、二、」寫在格線左邊的題號欄，內文從格線右側頂格開始 */
+.es-ln.l1{ position:relative; }
 .es-ln.l1 > .es-mk{ position:absolute; left:-42px; width:36px; padding:0; text-align:center; }
 
 
