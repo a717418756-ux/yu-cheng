@@ -2653,6 +2653,12 @@ function parseLawText(rawText, lawName, category, source){
 
   // PDF 複製常出現「康熙部首」字形（⼀⼆⼗，外觀同國字但編碼不同），先轉回一般國字；
   // 換行除了 \n，也認 \r（舊 Mac／部分網頁）與 Unicode 段落分隔符
+  // 行內空白：去掉零寬字元；中文（含全形標點）與中文、數字之間的空白刪掉
+  //   （PDF、網頁複製常見「警 察 職 權」「第 3 條」）；英文單字間的空白保留，只把連續空白縮成一個
+  const CJK = '\\u2E80-\\u9FFF\\uF900-\\uFAFF\\uFF00-\\uFFEF';
+  const _sp = t => t.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/[ \t\u00A0\u3000]+/g, ' ')
+    .replace(new RegExp('([' + CJK + '\\d]) (?=[' + CJK + '])', 'g'), '$1')
+    .replace(new RegExp('([' + CJK + ']) (?=\\d)', 'g'), '$1').trim();
   let lines = rawText.replace(/[\u2E80-\u2FDF]/g, c => c.normalize('NFKC'))
     .split(/\r\n?|[\n\u2028\u2029]/).map(l=>l.trim()).filter(Boolean);
   const items = [];
@@ -2684,6 +2690,7 @@ function parseLawText(rawText, lawName, category, source){
   if(!lines.some(l => articleRe.test(l)))
     lines = lines.flatMap(l => l.replace(/([。；」）\s])\s*(?=第\s*[一二三四五六七八九十百\d]+\s*點|[一二三四五六七八九十百]+\s*[、．])/g, '$1\n')
       .split('\n').map(x => x.trim()).filter(Boolean));
+  lines = lines.map(_sp).filter(Boolean);   // 斷點要看空白，所以清空白放在斷點之後
   const pointMode = !lines.some(l => articleRe.test(l)) && lines.some(l => pointRe.test(l));
   const unit      = pointMode ? '點' : '條';
   let lastPoint   = 0;
@@ -2697,10 +2704,24 @@ function parseLawText(rawText, lawName, category, source){
     return '第'+_n(num)+type+(s?' '+s:'');
   };
 
+  // 條文內的斷行：PDF 或窄版網頁複製時，一句話會在版面寬度處被硬切成好幾行。
+  //   上一行不是以句末標點（。：；！？」）結尾、下一行也不是款目標號（一、（一）1.）開頭 → 接回同一行。
+  //   只用在法規條文與行政規則；SOP、補充資料、函釋常有不加標點的條列，照原樣保留
+  const END  = /[。：:；;！!？?」』）)]$/;
+  const MARK = /^(?:[一二三四五六七八九十百]+[、．.]|[（(][一二三四五六七八九十百\d]+[)）]|\d+[、．.)]|[甲乙丙丁戊己庚辛壬癸][、．.])/;
+  const reflow = !category || category==='statute' || category==='admin';
+  const _join = arr => (reflow ? arr.reduce((out, l) => {
+    const i = out.length - 1;
+    if(i >= 0 && !END.test(out[i]) && !MARK.test(l))
+      out[i] += (/[A-Za-z0-9]$/.test(out[i]) && /^[A-Za-z0-9]/.test(l) ? ' ' : '') + l;
+    else out.push(l);
+    return out;
+  }, []) : arr).join('\n');
+
   // 儲存目前條文（或點）
   const saveArticle = () => {
     if(curArtNum===null) return;
-    const content = contentLines.join('\n').trim();
+    const content = _join(contentLines).trim();
     if(!content && !curTitle) return;
     const artNum = _n(curArtNum);
     const artSub = curArtSub ? _n(curArtSub) : 0;
@@ -2807,8 +2828,8 @@ function prevBulkLaw(){
     sections.forEach(s=>{ html+=mkTag(s,'var(--acc)','rgba(31,111,235,0.15)'); });
   }
 
-  // 前5條預覽
-  html+='<br style="margin:3px 0"><span style="font-size:11px">前5條：</span>';
+  // 前 5 條（點）預覽
+  html+='<br style="margin:3px 0"><span style="font-size:11px">前5'+_lawUnit(items)+'：</span>';
   items.slice(0,5).forEach(i=>{
     const hier=[i.part,i.chapter,i.section].filter(Boolean).pop()||'';
     html+='<span style="color:var(--t1);font-size:11px;margin-right:8px">'+esc(i.article)+(i.title?'（'+esc(i.title)+'）':'')+'</span>';
