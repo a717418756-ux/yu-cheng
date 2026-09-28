@@ -972,6 +972,10 @@ input:focus, textarea:focus, select:focus{
 .law-edit-btn{ background:none; border:none; color:var(--t2); font-size:12px; cursor:pointer; }
 .law-del-btn{ background:none; border:none; color:var(--red); font-size:12px; cursor:pointer; }
 .law-art-body{ font-size:14px; line-height:1.85; color:var(--t1); }
+/* 條文各行：款目標號懸掛，內文換行對齊標號後（內縮量由 _lawBody 依層級給） */
+.law-ln{ display:flex; }
+.law-ln > span:last-child{ flex:1; min-width:0; }
+.law-mk{ flex:none; }
 .law-art-rel-title{ margin-top:9px; font-size:11px; color:var(--t2); }
 .law-rel-chip{ font-size:11px; margin:2px; }
 
