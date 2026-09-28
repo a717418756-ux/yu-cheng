@@ -2651,7 +2651,10 @@ function closeBulkLaw(){ document.getElementById('blaw-ov').classList.remove('on
 function parseLawText(rawText, lawName, category, source){
   if(!rawText||!rawText.trim()) return [];
 
-  const lines = rawText.split('\n').map(l=>l.trim()).filter(Boolean);
+  // PDF 複製常出現「康熙部首」字形（⼀⼆⼗，外觀同國字但編碼不同），先轉回一般國字；
+  // 換行除了 \n，也認 \r（舊 Mac／部分網頁）與 Unicode 段落分隔符
+  let lines = rawText.replace(/[\u2E80-\u2FDF]/g, c => c.normalize('NFKC'))
+    .split(/\r\n?|[\n\u2028\u2029]/).map(l=>l.trim()).filter(Boolean);
   const items = [];
 
   // ── 三層結構狀態 ──────────────────────────────────────────
@@ -2676,6 +2679,11 @@ function parseLawText(rawText, lawName, category, source){
   //   屬於條文內容，絕不能拿來分割。只有完全沒有「第X條」時才用分點模式。
   //   分點必須依序（一、之後只認二、），條文內重新從一、起算的列舉不會被誤切。
   const pointRe   = /^(?:第\s*([一二三四五六七八九十百\d]+)\s*點|([一二三四五六七八九十百]+)\s*[、．.])\s*(.*)$/;
+  // 手機從網頁、LINE 複製時，各點常被併成同一行（「…。二、…。三、…」），只抓得到第一點。
+  //   行政規則格式下，句末（。；」）或空白）後面緊接的點號先斷行；是不是真的下一點，仍由下面的「依序」規則判斷
+  if(!lines.some(l => articleRe.test(l)))
+    lines = lines.flatMap(l => l.replace(/([。；」）\s])\s*(?=第\s*[一二三四五六七八九十百\d]+\s*點|[一二三四五六七八九十百]+\s*[、．])/g, '$1\n')
+      .split('\n').map(x => x.trim()).filter(Boolean));
   const pointMode = !lines.some(l => articleRe.test(l)) && lines.some(l => pointRe.test(l));
   const unit      = pointMode ? '點' : '條';
   let lastPoint   = 0;
