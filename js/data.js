@@ -1750,8 +1750,37 @@ function _autoCites(text, law){
       }
     }
   }
-  if(law && (law.articleNumber || art2n(law.article||'')) === 1000) out.push(..._wholeLawCites(text, law.lawName));
+  if(_isFirstArt(law)) out.push(..._wholeLawCites(text, law.lawName));
   return [...new Set(out)];
+}
+
+// 第一條／第一點（授權依據所在）
+const _isFirstArt = law => !!law && (law.articleNumber || art2n(law.article||'')) === 1000;
+
+// 母法：子法（法律、法規命令）在第一條、行政規則在第一點寫授權依據——
+//   「本細則依警察法第十條規定訂定之」「依據○○法規定，特訂定本要點」「依○○法第X條第Y項授權訂定」。
+//   只認緊接在「依／依據／依照」後面，或同一句有「授權」的引用；
+//   法律第一條立法目的裡「本法未規定者，適用○○法」這類是補充關係，不算母法（仍列為一般關聯）。
+function _parentRefs(law){
+  if(!_isFirstArt(law)) return [];
+  return String(law.content||'').split(/[。；\n]/).flatMap(s => _autoCites(s, law).filter(ref => {
+    const i = s.indexOf(_refLawName(ref));
+    return i >= 0 && (/依(?:據|照)?\s*$/.test(s.slice(0, i)) || s.slice(i).includes('授權'));
+  }));
+}
+
+// 全部法條的引用清單（手動關聯＋內文自動擷取＋哪些是母法），同一份法條資料只算一次。
+//   反推連結每張條文卡都要掃全部法條，原本每張卡都重跑一次內文擷取，條文一多就明顯卡頓
+const _citeCache = new WeakMap();
+function _citeIndex(allLaws){
+  let idx = _citeCache.get(allLaws);
+  if(!idx){
+    idx = allLaws.map(l => ({ l,
+      refs: [...(l.relatedLaws||[]).map(r=>r.ref||r.lawName||''), ..._autoCites(l.content||'', l)],
+      parents: new Set(_parentRefs(l)) }));
+    _citeCache.set(allLaws, idx);
+  }
+  return idx;
 }
 
 // 沒有條號的母法名稱（只給第一條／第一點用）
@@ -1802,11 +1831,9 @@ function _findBacklinks(target, allLaws){
   const tNum  = target.articleNumber || art2n(target.article||'');
   if(!tName) return [];
   const out = [];
-  for(const l of allLaws){
+  // 手動填的關聯 ＋ 從內文自動擷取的引用，兩者都算
+  for(const { l, refs, parents } of _citeIndex(allLaws)){
     if(l.id === target.id) continue;
-    // 手動填的關聯 ＋ 從內文自動擷取的引用，兩者都算
-    const refs = [...(l.relatedLaws||[]).map(r=>r.ref||r.lawName||''),
-                  ..._autoCites(l.content||'', l)];
     for(const raw of refs){
       let ref = (raw||'').trim();
       if(!ref) continue;
@@ -1823,7 +1850,7 @@ function _findBacklinks(target, allLaws){
       //   法制邏輯：母法只會有一條授權「由某機關定之」，子法也只會在第1條
       //   載明授權依據；若每一條都顯示同一個關聯，既不合邏輯也是雜訊。
       if(!rNum && tNum && tNum >= 2000) continue;
-      out.push({ law: l, whole: !rNum });
+      out.push({ law: l, whole: !rNum, child: parents.has(raw) });   // child：對方以本條為授權依據＝子法
       break;
     }
   }
@@ -1911,17 +1938,19 @@ async function openLawGroup(lawName, full){  try{
     const autoRefs   = _autoCites(l.content||'', l);
     // 反推來源（只取法規名稱並去重）。若正向已經有更精確的「○○法第X條」，
     // 就不要再重複列出同一部法規的名稱，否則同一條會出現兩個指向同處的標籤。
-    const backRefs = [...new Set(_findBacklinks(l, allLaws).map(b=>b.law.lawName||''))]
+    const backs    = _findBacklinks(l, allLaws);
+    const backRefs = [...new Set(backs.map(b=>b.law.lawName||''))]
       .filter(n => n && ![...manualRefs, ...autoRefs].some(r => r.startsWith(n)));
-    const seen = new Set();
-    const allRefs = [...manualRefs, ...autoRefs, ...backRefs].filter(r=>{
-      if(!r || seen.has(r)) return false;
-      seen.add(r); return true;
-    });
+    // 母法（本條為第一條／第一點且寫明依據）與子法（對方第一條／第一點依據本條）標明，排在最前
+    const parents  = new Set(_parentRefs(l));
+    const children = new Set(backs.filter(b=>b.child).map(b=>b.law.lawName||''));
+    const rank = r => parents.has(r) ? 0 : children.has(r) ? 1 : 2;
+    const allRefs = [...new Set([...manualRefs, ...autoRefs, ...backRefs])].filter(Boolean)
+      .sort((a,b) => rank(a) - rank(b));
     const relHtml=allRefs.length
       ?'<div class="law-art-rel-title">🔗 關聯法條：</div>'
         +allRefs.map(ref=>'<button class="chip law-rel-chip'+(manualRefs.includes(ref)?'':' auto')
-          +'" onclick="showLawPop(\''+esc(ref)+'\')">⚖ '+esc(ref)+'</button>').join('')
+          +'" onclick="showLawPop(\''+esc(ref)+'\')">'+['⬆ 母法 ','⬇ 子法 ','⚖ '][rank(ref)]+esc(ref)+'</button>').join('')
       :'';
     // 劃線/筆記顯示（顏色標記 hlColor + 備註 note，整合進編輯表單）
     const hlColors={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'};
