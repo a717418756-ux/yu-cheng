@@ -1463,6 +1463,22 @@ function _lawInfo(laws){
   const pick = f => ((laws||[]).find(l => l && l[f]) || {})[f] || '';
   return { org: pick('org'), amendDate: pick('amendDate') };
 }
+// 條文排版：款、目，以及行政規則點內的（一）→ 1. →（1），依層級內縮；
+//   標號懸掛在前，內文換行時對齊標號後的文字，一眼看出層次。
+//   層級依本條中出現的先後決定、不寫死：法律「一、」是第一層，行政規則點內「（一）」是第一層。
+//   沒有標號的行是新的一項（或結語），回到頂格。fmt：文字轉 HTML（含轉義、搜尋反白）
+const _LAW_MK = [/^[一二三四五六七八九十百]+[、．]/, /^[（(][一二三四五六七八九十百]+[)）]/, /^\d+[.．、](?!\d)/, /^[（(]\d+[)）]/];
+function _lawBody(text, fmt){
+  const stack = [];   // 目前各層用的標號種類
+  return String(text||'').split('\n').map(s => s.trim()).filter(Boolean).map(t => {
+    const k = _LAW_MK.findIndex(re => re.test(t));
+    if(k < 0){ stack.length = 0; return '<div class="law-ln"><span>' + fmt(t) + '</span></div>'; }
+    const at = stack.indexOf(k);
+    if(at >= 0) stack.length = at + 1; else stack.push(k);
+    const m = t.match(_LAW_MK[k])[0];
+    return '<div class="law-ln" style="padding-left:' + stack.length + 'em"><span class="law-mk">' + fmt(m) + '</span><span>' + fmt(t.slice(m.length)) + '</span></div>';
+  }).join('');
+}
 // 條文的計數單位：行政規則以「點」分（第 3 點），其餘以「條」分
 const _lawUnit = laws => /點/.test(((laws||[])[0]||{}).article||'') ? '點' : '條';
 
@@ -1877,17 +1893,14 @@ async function openLawGroup(lawName, full){  try{
   // 關鍵字反白：每個搜尋詞各自標出（條號搜尋不反白）；長詞優先，避免短詞先吃掉長詞的一部分
   const _hlRe=_toks2.length?new RegExp('('+[..._toks2].sort((a,b)=>b.length-a.length)
     .map(t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')','gi'):null;
+  // _hl：esc → 插 mark（先轉義再標記，避免二次轉義）
+  const _hl=(text)=>{
+    const escaped=esc(text||'');
+    return _hlRe ? escaped.replace(_hlRe,(m)=>'<mark style="background:#d4a438;color:#121212;border-radius:2px;padding:0 2px">'+m+'</mark>') : escaped;
+  };
   const renderArtCard = (l) => {
     const isImg=l.content&&l.content.startsWith('data:image');
-    // _hl：esc → 插 mark → 換行（三合一，避免二次轉義）
-    const _hl=(text)=>{
-      const escaped=esc(text||'');
-      if(!_hlRe) return escaped.replace(/\n/g,'<br>');
-      return escaped
-        .replace(_hlRe,(m)=>'<mark style="background:#d4a438;color:#121212;border-radius:2px;padding:0 2px">'+m+'</mark>')
-        .replace(/\n/g,'<br>');
-    };
-    const contentHtml=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px;cursor:zoom-in" onclick="openImgViewer(this.src)" title="點擊放大">':_hl(l.content||'');
+    const contentHtml=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px;cursor:zoom-in" onclick="openImgViewer(this.src)" title="點擊放大">':_lawBody(l.content, _hl);
     const kwHtml=(l.keywords||[]).length?'<div style="margin-top:8px">'+l.keywords.map(k=>'<span class="tag">'+esc(k)+'</span>').join('')+'</div>':'';
     // 正向關聯 = 手動填的 ＋ 從本條內文自動擷取的（去重）
     // 關聯法條 = 手動填的 ＋ 本條內文引用到的 ＋ 引用到本條的（三者合一，不分方向）。
@@ -3037,7 +3050,7 @@ async function showLawPop(ref){  try{
   const l=matched[0];
   const isImg=l.content&&l.content.startsWith('data:image');
   document.getElementById('lawpop-title').textContent=(l.lawName||'')+' '+(l.article||'');
-  document.getElementById('lawpop-body').innerHTML=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px">':br(l.content||'');
+  document.getElementById('lawpop-body').innerHTML=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px">':_lawBody(l.content, esc);
   const rl=(l.relatedLaws||[]).map(r=>'<button class="chip" style="font-size:11px" onclick="showLawPop(\''+esc(r.ref||r.lawName||'')+'\')" >⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('');
   document.getElementById('lawpop-related').innerHTML=rl?'<div style="margin-top:8px;font-size:12px;color:var(--t2)">關聯法條：</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">'+rl+'</div>':'';
   el.style.display='flex';
