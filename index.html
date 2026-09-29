@@ -714,6 +714,8 @@
     <button class="btn bg" style="padding:6px 10px;font-size:13px" onclick="exitQ()" aria-label="離開答題">✕</button>
     <div class="qpw"><div class="qpb" id="qpb"></div></div>
     <div style="font-size:12px;color:var(--t2);white-space:nowrap" id="qct">0/0</div>
+    <!-- 編輯題目：作答後才出現，題目已不符現行規定時可當場修正（放頂列，與底部作答工具分開，避免與手寫筆圖示混淆） -->
+    <button class="btn bg hide" id="qedit-btn" style="padding:6px 10px;font-size:13px" onclick="editQInQuiz()" aria-label="編輯題目">✎ 編輯</button>
   </div>
   <div class="qbody" id="qbody">
     <!-- 題目標註畫布：疊在題幹／選項上方，可直接圈畫重點（如紙本刷題） -->
@@ -893,7 +895,9 @@
         </div>
         <textarea id="f-note" rows="2" placeholder="個人筆記..."></textarea></div>
       <div class="fg" style="display:flex;align-items:center;gap:10px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="f-is-number" style="width:18px;height:18px"><span class="fl" style="margin:0">🔢 數字魔鬼題（含重要數字/期限）</span></label></div>
-      <div class="fg"><label class="fl">關聯法條（如：警職法§6）</label><input id="f-laws" placeholder="警職法§6"></div>
+      <div class="fg"><label class="fl">關聯法條（打法規名稱可從資料庫選，接著打條號）</label>
+        <input id="f-laws" placeholder="警察職權行使法§6，刑法§320" autocomplete="off" oninput="_flInput(this)" onfocus="_flInput(this)" onblur="setTimeout(_flHide,150)">
+        <div id="f-laws-sug" class="fl-sug hide"></div></div>
       <div class="fg hide" id="must-kw-wrap"><label class="fl">申論必寫關鍵概念（逗號分隔）</label><input id="f-must-kw" placeholder="比例原則,正當法律程序,釋字535號"></div>
       <div class="fg" style="display:flex;gap:7px">
         <button class="btn bg" style="flex:1;padding:12px" onclick="closeAdd()">取消</button>
