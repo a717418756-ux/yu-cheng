@@ -1573,7 +1573,7 @@ async function renderDB(){  try{
       // 卡片內的功能鈕各自處理，不要一併觸發「進入法規」
       if(e.target.closest('.lw-del, .lw-gov')) return;
       if(_dbSelMode){ e.stopPropagation(); _toggleDbCard(this.dataset.lawname); return; }
-      openLawGroup(this.dataset.lawname);
+      openLawGroup(this.dataset.lawname, false);
     });
     div.querySelector('.lw-del').addEventListener('click',function(e){
       e.stopPropagation();
@@ -1597,7 +1597,7 @@ async function renderDB(){  try{
       '<div class="law-search-lawname">'+esc(l.lawName||'')+'</div>'+
       '<div class="law-search-article">'+esc(l.article||'')+(l.title?' <span class="law-search-title">'+esc(l.title)+'</span>':'')+' </div>'+
       '<div class="law-search-preview">'+preview+'</div>';
-    div.onclick=()=>openLawGroup(l.lawName);
+    div.onclick=()=>openLawGroup(l.lawName, false);
     return div;
   };
   const _head = t => { const d=document.createElement('div'); d.className='law-search-head'; d.textContent=t; return d; };
@@ -1769,15 +1769,13 @@ function _parentRefs(law){
   }));
 }
 
-// 全部法條的引用清單（手動關聯＋內文自動擷取＋哪些是母法），同一份法條資料只算一次。
+// 全部法條的引用（法條 → { auto：內文自動擷取, parents：其中的母法 }），同一份法條資料只算一次。
 //   反推連結每張條文卡都要掃全部法條，原本每張卡都重跑一次內文擷取，條文一多就明顯卡頓
 const _citeCache = new WeakMap();
 function _citeIndex(allLaws){
   let idx = _citeCache.get(allLaws);
   if(!idx){
-    idx = allLaws.map(l => ({ l,
-      refs: [...(l.relatedLaws||[]).map(r=>r.ref||r.lawName||''), ..._autoCites(l.content||'', l)],
-      parents: new Set(_parentRefs(l)) }));
+    idx = new Map(allLaws.map(l => [l, { auto: _autoCites(l.content||'', l), parents: new Set(_parentRefs(l)) }]));
     _citeCache.set(allLaws, idx);
   }
   return idx;
@@ -1831,10 +1829,10 @@ function _findBacklinks(target, allLaws){
   const tNum  = target.articleNumber || art2n(target.article||'');
   if(!tName) return [];
   const out = [];
-  // 手動填的關聯 ＋ 從內文自動擷取的引用，兩者都算
-  for(const { l, refs, parents } of _citeIndex(allLaws)){
+  for(const [l, { auto, parents }] of _citeIndex(allLaws)){
     if(l.id === target.id) continue;
-    for(const raw of refs){
+    // 手動填的關聯 ＋ 從內文自動擷取的引用，兩者都算
+    for(const raw of [...(l.relatedLaws||[]).map(r=>r.ref||r.lawName||''), ...auto]){
       let ref = (raw||'').trim();
       if(!ref) continue;
       // §簡寫正規化後再比對（與 showLawPop 同一套規則）
@@ -1859,8 +1857,13 @@ function _findBacklinks(target, allLaws){
     ((a.law.articleNumber||0) - (b.law.articleNumber||0)));
 }
 
+let _lvFull = false;   // 目前法規頁是否為「整部」模式（從連結開啟）
 async function openLawGroup(lawName, full){  try{
   if(!document.getElementById('lv')){ return; }  // 防衛：lv 元素不存在時不執行
+  // 編輯、儲存後重新整理同一部法規（未指定 full）→ 沿用原本的模式，
+  //   否則從連結開的整部法規，一存檔就被搜尋框殘留的關鍵字篩掉
+  if(full === undefined) full = lawName === S.curLawName && _lvFull;
+  _lvFull = !!full;
   const allLaws=await da('laws');
   _setLawNames(allLaws);   // 供 _autoCites 比對用
   // 與 renderDB 共用同一套搜尋規則（parseSecSearch／_lawHit），點進來的結果才會和列表一致：
@@ -1935,14 +1938,13 @@ async function openLawGroup(lawName, full){  try{
     //   讀法條時反而多一個區塊要看。反推來源以「法規名稱」呈現並去重，
     //   避免同一部子法有多條引用時擠出一堆重複標籤。
     const manualRefs = (l.relatedLaws||[]).map(r=>r.ref||r.lawName||'').filter(Boolean);
-    const autoRefs   = _autoCites(l.content||'', l);
+    const { auto: autoRefs, parents } = _citeIndex(allLaws).get(l);
     // 反推來源（只取法規名稱並去重）。若正向已經有更精確的「○○法第X條」，
     // 就不要再重複列出同一部法規的名稱，否則同一條會出現兩個指向同處的標籤。
     const backs    = _findBacklinks(l, allLaws);
     const backRefs = [...new Set(backs.map(b=>b.law.lawName||''))]
       .filter(n => n && ![...manualRefs, ...autoRefs].some(r => r.startsWith(n)));
     // 母法（本條為第一條／第一點且寫明依據）與子法（對方第一條／第一點依據本條）標明，排在最前
-    const parents  = new Set(_parentRefs(l));
     const children = new Set(backs.filter(b=>b.child).map(b=>b.law.lawName||''));
     const rank = r => parents.has(r) ? 0 : children.has(r) ? 1 : 2;
     const allRefs = [...new Set([...manualRefs, ...autoRefs, ...backRefs])].filter(Boolean)
@@ -2697,10 +2699,9 @@ function parseLawText(rawText, lawName, category, source){
   // 換行除了 \n，也認 \r（舊 Mac／部分網頁）與 Unicode 段落分隔符
   // 行內空白：去掉零寬字元；中文（含全形標點）與中文、數字之間的空白刪掉
   //   （PDF、網頁複製常見「警 察 職 權」「第 3 條」）；英文單字間的空白保留，只把連續空白縮成一個
-  const CJK = '\\u2E80-\\u9FFF\\uF900-\\uFAFF\\uFF00-\\uFFEF';
   const _sp = t => t.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/[ \t\u00A0\u3000]+/g, ' ')
-    .replace(new RegExp('([' + CJK + '\\d]) (?=[' + CJK + '])', 'g'), '$1')
-    .replace(new RegExp('([' + CJK + ']) (?=\\d)', 'g'), '$1').trim();
+    .replace(/([\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF\d]) (?=[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF])/g, '$1')
+    .replace(/([\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]) (?=\d)/g, '$1').trim();
   let lines = rawText.replace(/[\u2E80-\u2FDF]/g, c => c.normalize('NFKC'))
     .split(/\r\n?|[\n\u2028\u2029]/).map(l=>l.trim()).filter(Boolean);
   const items = [];

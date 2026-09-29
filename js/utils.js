@@ -42,7 +42,6 @@ function renderStemMarkup(text){
 // 將字串安全嵌入 onclick="fn('...')" 的單引號 JS 字串中：
 // 先跳脫 JS 層（\ 與 '），再跳脫 HTML 屬性層
 function escJs(s){ return esc((s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
-function br(s){ return esc(s||'').split('\n').join('<br>').split('\r').join(''); }
 function toast(m,d=2200){ const e=document.getElementById('toast');if(!e)return;e.textContent=m;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),d); }
 function today(){ return new Date().toISOString().slice(0,10); }
 function dl(c,fn,t='text/plain'){ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=fn;a.click(); }
