@@ -898,7 +898,7 @@ async function saveQ(){
     // 這種題目答題時不計入複習進度與統計，不會污染錯題分析。
     if(!_getAnswerStr()) toast('提醒：尚未選擇正確答案，此題不會計入複習進度');
   }
-  const relStr=document.getElementById('f-laws')?.value.trim()||'';
+  const relStr=_flNorm(document.getElementById('f-laws')?.value);
   const relatedLaws=relStr?relStr.split(/[,，]/).map(s=>({ref:s.trim()})).filter(r=>r.ref):[];
   const mustStr=document.getElementById('f-must-kw')?.value.trim()||'';
   const mustKeywords=mustStr?mustStr.split(/[,，]/).map(s=>s.trim()).filter(Boolean):autoKeywords(stem);
@@ -965,24 +965,24 @@ async function saveQ(){
   }catch(e){logError('saveQ',e);}}
 
 // ── 關聯法條輸入輔助（題目編輯）────────────────────────────
-//   ①打法規名稱 → 列出資料庫裡相符的法規，點選帶入
-//   ②法規名後直接打數字 → 自動補「§」（警察職權行使法6 → 警察職權行使法§6）
-//   ③條號打完接著打另一部法規的名稱 → 自動補「，」分隔
-//   只在游標位於最後（正在往後打）時自動改寫；在中間修改不干擾
+//   ①打法規名稱 → 列出資料庫裡相符的法規，點選帶入「法規名§」，接著打條號即可
+//   ②條號後直接打下一部法規的名稱，一樣列出建議；點選時自動補「，」分隔
+//   ③離開欄位（或存檔）時整理：手打「法規名6」補成「法規名§6」、條號後接的法規名前補「，」
+// ★ 打字過程中絕不改寫輸入框內容：手機注音、拼音輸入法打數字時也在「組字」，
+//   程式一改內容，輸入法會把組字中的字再送一次，數字就重複了（「§3」變「§33」）。
 let _flNames = [], _flList = [];
+// 這段文字是不是一部法規的開頭：打到一半（法規名以它開頭）或已打完整（它以法規名開頭）
+const _flIsLawStart = t => { t = t.trim(); return !!t && _flNames.some(n => n.startsWith(t) || t.startsWith(n)); };
+// 拆出正在打的最後一段：分隔號之後；若前面已有完整條號、後面接著打的是法規名稱，從那裡開始
+function _flTail(v){
+  const cur = v.split(/[,，]/).pop();
+  const m = cur.match(/^(.*§\d+(?:[-－之]\d+)?)([^\d\-－之].*)$/);
+  const tail = m && _flIsLawStart(m[2]) ? m[2] : cur;
+  return { head: v.slice(0, v.length - tail.length), tail };
+}
 function _flInput(el){
-  const v = el.value;
-  const head = v.slice(0, v.length - v.split(/[,，]/).pop().length);   // 最後一段之前（含分隔號）
-  let cur = v.slice(head.length), pre = head;
-  if(el.selectionStart === v.length){
-    const m = cur.match(/^\s*(.+?)\s*(\d+)$/);
-    if(m && _flNames.includes(m[1])) cur = m[1] + '§' + m[2];
-    const n = cur.match(/^(.+§\d+(?:[-－之]\d+)?)([^\d\-－之].*)$/);
-    if(n && _flNames.some(nm => nm.startsWith(n[2].trim()))){ pre += n[1] + '，'; cur = n[2].trim(); }
-    if(pre + cur !== v){ el.value = pre + cur; el.setSelectionRange(el.value.length, el.value.length); }
-  }
-  // 建議清單：最後一段還沒有條號時，列出名稱包含所打文字的法規（開頭相同、名稱短的優先）
-  const q = cur.trim().toLowerCase();
+  // 建議清單：正在打的那段還沒有條號時，列出名稱包含所打文字的法規（開頭相同、名稱短的優先）
+  const q = _flTail(el.value).tail.trim().toLowerCase();
   _flList = q && !q.includes('§') ? _flNames.filter(n => n.toLowerCase().includes(q))
     .sort((a,b) => (b.toLowerCase().startsWith(q) - a.toLowerCase().startsWith(q)) || a.length - b.length).slice(0, 8) : [];
   if(_flList.length === 1 && _flList[0].toLowerCase() === q) _flList = [];   // 已打完整名稱
@@ -991,12 +991,28 @@ function _flInput(el){
   box.classList.toggle('hide', !_flList.length);
 }
 function _flPick(i){
-  const el = document.getElementById('f-laws'), v = el.value;
-  el.value = v.slice(0, v.length - v.split(/[,，]/).pop().length) + _flList[i];
+  const el = document.getElementById('f-laws');
+  const { head } = _flTail(el.value);
+  el.value = head + (head && !/[,，]\s*$/.test(head) ? '，' : '') + _flList[i] + '§';
   el.focus();
   el.setSelectionRange(el.value.length, el.value.length);
   _flHide();
 }
+// 整理成標準格式（離開欄位、存檔時）
+function _flNorm(v){
+  const out = [];
+  const add = seg => {
+    const m = seg.match(/^(.+?)\s*(\d.*)$/);
+    if(m && !m[1].includes('§') && _flNames.includes(m[1])) seg = m[1] + '§' + m[2];   // 法規名6 → 法規名§6
+    const n = seg.match(/^(.*§\d+(?:[-－之]\d+)?)([^\d\-－之].*)$/);
+    if(n && _flIsLawStart(n[2])){ add(n[1]); add(n[2].trim()); return; }   // 條號後接下一部法規
+    seg = seg.replace(/§$/, '');                                                           // 選了法規沒打條號 → 整部
+    if(seg) out.push(seg);
+  };
+  String(v||'').split(/[,，]/).forEach(s => add(s.trim()));
+  return out.join('，');
+}
+function _flBlur(el){ el.value = _flNorm(el.value); setTimeout(_flHide, 150); }
 function _flHide(){ document.getElementById('f-laws-sug')?.classList.add('hide'); }
 
 async function editQ(id){  try{const q=await dg('questions',id);if(q)showAdd(q);  }catch(e){ logError('editQ',e); }}
@@ -1017,7 +1033,7 @@ async function saveQAndContinue(){  try{
     // 這種題目答題時不計入複習進度與統計，不會污染錯題分析。
     if(!_getAnswerStr()) toast('提醒：尚未選擇正確答案，此題不會計入複習進度');
   }
-  const relStr=document.getElementById('f-laws')?.value.trim()||'';
+  const relStr=_flNorm(document.getElementById('f-laws')?.value);
   const relatedLaws=relStr?relStr.split(/[,，]/).map(s=>({ref:s.trim()})).filter(r=>r.ref):[];
   const mustStr=document.getElementById('f-must-kw')?.value.trim()||'';
   const mustKeywords=mustStr?mustStr.split(/[,，]/).map(s=>s.trim()).filter(Boolean):autoKeywords(stem);
@@ -3528,7 +3544,7 @@ const DataMod = {
   rebuildLawIndex,
   formatYearInput,
   editQ,
-  _flInput, _flPick, _flHide,
+  _flInput, _flPick, _flHide, _flBlur,
   showSearchHelp,
   openYearGroup,
   openExamGroup,
