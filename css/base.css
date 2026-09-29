@@ -972,6 +972,15 @@ input:focus, textarea:focus, select:focus{
 .law-edit-btn{ background:none; border:none; color:var(--t2); font-size:12px; cursor:pointer; }
 .law-del-btn{ background:none; border:none; color:var(--red); font-size:12px; cursor:pointer; }
 .law-art-body{ font-size:14px; line-height:1.85; color:var(--t1); }
+/* 答題中開啟的編輯題目視窗：疊在答題畫面（z-index 400）之上 */
+#add-ov.over-quiz{ z-index:450; }
+/* 題目編輯：關聯法條的法規建議清單（放在輸入框下方、跟著版面走，不會被視窗底部裁掉） */
+.fl-sug{ margin-top:4px; border:1px solid var(--bd); border-radius:8px; background:var(--bg2); max-height:220px; overflow:auto; }
+.fl-sug button{ display:block; width:100%; text-align:left; padding:10px 12px; font-size:13px; color:var(--t1);
+  background:none; border:0; border-bottom:1px solid var(--bd); cursor:pointer; }
+.fl-sug button:last-child{ border-bottom:0; }
+[data-theme="eink"] .fl-sug{ background:#fff; border:1.5px solid #000; }
+[data-theme="eink"] .fl-sug button{ color:#000; border-bottom-color:#000; }
 /* 條文各行：款目標號懸掛，內文換行對齊標號後（內縮量由 _lawBody 依層級給） */
 .law-ln{ display:flex; }
 .law-ln > span:last-child{ flex:1; min-width:0; }
