@@ -895,8 +895,8 @@
         </div>
         <textarea id="f-note" rows="2" placeholder="個人筆記..."></textarea></div>
       <div class="fg" style="display:flex;align-items:center;gap:10px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="f-is-number" style="width:18px;height:18px"><span class="fl" style="margin:0">🔢 數字魔鬼題（含重要數字/期限）</span></label></div>
-      <div class="fg"><label class="fl">關聯法條（打法規名稱可從資料庫選，接著打條號）</label>
-        <input id="f-laws" placeholder="警察職權行使法§6，刑法§320" autocomplete="off" oninput="_flInput(this)" onfocus="_flInput(this)" onblur="setTimeout(_flHide,150)">
+      <div class="fg"><label class="fl">關聯法條（打法規名稱可從資料庫選，選好直接打條號）</label>
+        <input id="f-laws" placeholder="警察職權行使法§6，刑法§320" autocomplete="off" oninput="_flInput(this)" onfocus="_flInput(this)" onblur="_flBlur(this)">
         <div id="f-laws-sug" class="fl-sug hide"></div></div>
       <div class="fg hide" id="must-kw-wrap"><label class="fl">申論必寫關鍵概念（逗號分隔）</label><input id="f-must-kw" placeholder="比例原則,正當法律程序,釋字535號"></div>
       <div class="fg" style="display:flex;gap:7px">
