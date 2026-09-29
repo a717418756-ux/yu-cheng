@@ -757,7 +757,8 @@ async function openQGroup(year, subject, examType){  try{
 
 // ── 題目新增/編輯表單控制 ───────────────────────────────────
 function closeAdd(){
-  document.getElementById('add-ov').classList.remove('on');
+  document.getElementById('add-ov').classList.remove('on','over-quiz');
+  _flHide();
   S.editId = null;
   S.qType = 'mc';
 }
@@ -766,6 +767,7 @@ function closeAdd(){
 // 【新增/編輯題目表單】
 // ════════════════════════════════════════════════════════════
 function showAdd(q){
+  da('laws').then(ls => { _flNames = [...new Set(ls.map(l=>(l.lawName||'').trim()).filter(Boolean))]; });
   S.editId = q?.id || null;
   S.qType = q?.type || 'mc';
   // 初始化答案為 Set（支援多選）
@@ -947,7 +949,10 @@ async function saveQ(){
     // 建立搜尋索引（加速搜尋）
     data.searchBlob=((data.stem||'')+' '+(data.groupStem||'')+' '+(data.subject||'')+' '+(data.year||'')+' '+(data.exam||'')+' '+(data.num||'')+' '+(data.keywords||[]).join(' ')).toLowerCase();
     await dp('questions',data);
-    closeAdd();toast(S.editId?'題目已更新 ✓':'題目已儲存 ✓');
+    // ★ closeAdd 會清掉 S.editId，要先記下是不是編輯（原本一律顯示「已儲存」）
+    const wasEdit=!!S.editId;
+    closeAdd();toast(wasEdit?'題目已更新 ✓':'題目已儲存 ✓');
+    if(wasEdit) _quizRefreshQ(data);   // 答題中編輯的：就地更新答題畫面
   }catch(e){
     logError('saveQ',e);
     toast('儲存失敗，請重試');
@@ -958,6 +963,41 @@ async function saveQ(){
     else renderList();
   } else renderHome();
   }catch(e){logError('saveQ',e);}}
+
+// ── 關聯法條輸入輔助（題目編輯）────────────────────────────
+//   ①打法規名稱 → 列出資料庫裡相符的法規，點選帶入
+//   ②法規名後直接打數字 → 自動補「§」（警察職權行使法6 → 警察職權行使法§6）
+//   ③條號打完接著打另一部法規的名稱 → 自動補「，」分隔
+//   只在游標位於最後（正在往後打）時自動改寫；在中間修改不干擾
+let _flNames = [], _flList = [];
+function _flInput(el){
+  const v = el.value;
+  const head = v.slice(0, v.length - v.split(/[,，]/).pop().length);   // 最後一段之前（含分隔號）
+  let cur = v.slice(head.length), pre = head;
+  if(el.selectionStart === v.length){
+    const m = cur.match(/^\s*(.+?)\s*(\d+)$/);
+    if(m && _flNames.includes(m[1])) cur = m[1] + '§' + m[2];
+    const n = cur.match(/^(.+§\d+(?:[-－之]\d+)?)([^\d\-－之].*)$/);
+    if(n && _flNames.some(nm => nm.startsWith(n[2].trim()))){ pre += n[1] + '，'; cur = n[2].trim(); }
+    if(pre + cur !== v){ el.value = pre + cur; el.setSelectionRange(el.value.length, el.value.length); }
+  }
+  // 建議清單：最後一段還沒有條號時，列出名稱包含所打文字的法規（開頭相同、名稱短的優先）
+  const q = cur.trim().toLowerCase();
+  _flList = q && !q.includes('§') ? _flNames.filter(n => n.toLowerCase().includes(q))
+    .sort((a,b) => (b.toLowerCase().startsWith(q) - a.toLowerCase().startsWith(q)) || a.length - b.length).slice(0, 8) : [];
+  if(_flList.length === 1 && _flList[0].toLowerCase() === q) _flList = [];   // 已打完整名稱
+  const box = document.getElementById('f-laws-sug');
+  box.innerHTML = _flList.map((n, i) => '<button type="button" onmousedown="event.preventDefault()" onclick="_flPick('+i+')">⚖ '+esc(n)+'</button>').join('');
+  box.classList.toggle('hide', !_flList.length);
+}
+function _flPick(i){
+  const el = document.getElementById('f-laws'), v = el.value;
+  el.value = v.slice(0, v.length - v.split(/[,，]/).pop().length) + _flList[i];
+  el.focus();
+  el.setSelectionRange(el.value.length, el.value.length);
+  _flHide();
+}
+function _flHide(){ document.getElementById('f-laws-sug')?.classList.add('hide'); }
 
 async function editQ(id){  try{const q=await dg('questions',id);if(q)showAdd(q);  }catch(e){ logError('editQ',e); }}
 
@@ -3488,6 +3528,7 @@ const DataMod = {
   rebuildLawIndex,
   formatYearInput,
   editQ,
+  _flInput, _flPick, _flHide,
   showSearchHelp,
   openYearGroup,
   openExamGroup,

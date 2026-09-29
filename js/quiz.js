@@ -196,6 +196,7 @@ function renderQCard(){
   // 新題目未作答 → 收起筆記與標註入口，並確保退出標註模式
   document.getElementById('qink-btn')?.classList.add('hide');
   document.getElementById('qnote-btn')?.classList.add('hide');
+  document.getElementById('qedit-btn')?.classList.add('hide');
   if(_inkOn){
     _inkOn = false;
     document.getElementById('qink')?.classList.remove('on');
@@ -350,10 +351,6 @@ async function ansQ(sel){  try{
     else if(isSelected)   o.classList.add('wrong');
     else                  o.classList.add('dim');
   });
-  // 隱藏確認按鈕（不能 remove，下一題還要用）
-  const cfmBtn = document.getElementById('qmulti-confirm');
-  if(cfmBtn) cfmBtn.classList.add('hide');
-
   const resEl = document.getElementById('qres');
   resEl.className = 'qres on '+(correct ? 'c' : 'w');
   haptic(correct ? 'success' : 'error');
@@ -363,32 +360,81 @@ async function ansQ(sel){  try{
   if(hesitant) msg += ' ⚠ 作答超過40秒，列入猶豫題';
   resEl.textContent = msg;
 
-  if(qu.note || qu.hlColor){
-    const noteEl = document.getElementById('qnote');
-    const hlMap={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'};
-    const hlC=qu.hlColor&&hlMap[qu.hlColor]?hlMap[qu.hlColor]:'';
-    noteEl.style.display = 'block';
-    noteEl.style.borderLeft = hlC ? ('3px solid '+hlC) : '';
-    noteEl.textContent = qu.note ? ('📝 '+qu.note) : '🖍 已標記';
-  }
-  document.getElementById('qnxt').classList.remove('hide');
-  // 作答後才開放筆記與標註（作答前不干擾判斷）
-  document.getElementById('qink-btn')?.classList.remove('hide');
-  document.getElementById('qnote-btn')?.classList.remove('hide');
-  // 版面此時會多出解析區，稍候再同步筆跡（此刻才允許顯示）
-  setTimeout(_inkSync, 60);
-  _updateNoteBtn();
-  showQLawLinks(qu);   // 單選題公布答案時也要顯示關聯法條（原本只有多選/申論路徑有呼叫）
+  _showQNote(qu);
+  _afterAnswer(qu);
 
   S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
   }catch(e){ logError('ansQ', e); }}
 
+// 題目筆記／標記顏色（公布答案時顯示）
+function _showQNote(qu){
+  if(!qu.note && !qu.hlColor) return;
+  const noteEl = document.getElementById('qnote');
+  const hlMap={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'};
+  const hlC=qu.hlColor&&hlMap[qu.hlColor]?hlMap[qu.hlColor]:'';
+  noteEl.style.display = 'block';
+  noteEl.style.borderLeft = hlC ? ('3px solid '+hlC) : '';
+  noteEl.textContent = qu.note ? ('📝 '+qu.note) : '🖍 已標記';
+}
+
+// 公布答案後（單選、複選、申論共用）：開放下一題、筆記、標註、編輯題目，並列出關聯法條
+function _afterAnswer(qu){
+  document.getElementById('qmulti-confirm')?.classList.add('hide');
+  document.getElementById('qnxt').classList.remove('hide');
+  // 作答後才開放（作答前不干擾判斷）
+  ['qink-btn','qnote-btn','qedit-btn'].forEach(id => document.getElementById(id)?.classList.remove('hide'));
+  // 版面此時會多出解析區，稍候再同步筆跡（此刻才允許顯示）
+  setTimeout(_inkSync, 60);
+  _updateNoteBtn();
+  showQLawLinks(qu);
+}
+
+// ── 作答後編輯題目：題目已不符現行規定時，當場修正 ─────────────
+//   編輯視窗疊在答題畫面上；存檔後就地更新本題，不重新計分（對錯已在作答時記錄）
+async function editQInQuiz(){  try{
+  const qu = S.quiz?.q?.[S.quiz.idx];
+  const fresh = qu?.id && await dg('questions', qu.id);
+  if(!fresh){ toast('找不到這一題'); return; }
+  showAdd(fresh);
+  document.getElementById('add-ov').classList.add('over-quiz');
+  }catch(e){ logError('editQInQuiz', e); }}
+
+// saveQ 存檔後呼叫：正在作答的就是這一題 → 用新內容重畫，並維持「已公布答案」的狀態
+function _quizRefreshQ(data){
+  const qu = S.quiz?.q?.[S.quiz.idx];
+  if(!qu || qu.id !== data.id || document.getElementById('qv')?.style.display !== 'flex') return;
+  Object.assign(qu, data);
+  renderQCard();                       // 題幹、選項用新內容重畫（S.quiz.ans 仍為已作答，選項點了不會再計分）
+  const resEl = document.getElementById('qres');
+  resEl.className = 'qres on r';
+  if(qu.type === 'mc'){
+    const keys = (qu.answer||'').toUpperCase();
+    document.querySelectorAll('.qopt').forEach(o => o.classList.add(keys.includes(o.dataset.key) ? 'correct' : 'dim'));
+    resEl.textContent = '✎ 題目已更新　正確答案：' + (keys.split('').join('、') || '（未設定）');
+    _showQNote(qu);
+  } else {
+    resEl.innerHTML = _esSheetHtml(qu);
+    document.getElementById('qrevbtn').disabled = true;
+  }
+  _afterAnswer(qu);
+}
+
 // ════════ 申論題解析 ════════
 function revealES(){
   const qu = S.quiz.q[S.quiz.idx];
-  const ans = qu.answerEs || qu.answer || '';
   const resEl = document.getElementById('qres');
   resEl.className = 'qres on r';
+  resEl.innerHTML = _esSheetHtml(qu);
+  document.getElementById('qrevbtn').disabled = true;
+  _afterAnswer(qu);
+
+  const responseTime = Date.now() - _qStart;
+  dp('attempts', {qid:qu.id, correct:null, date:today(), responseTime, hesitationFlag:responseTime>40000});
+}
+
+// 申論參考答案卷＋關鍵概念檢測的 HTML
+function _esSheetHtml(qu){
+  const ans = qu.answerEs || qu.answer || '';
 
   // 以「國考手寫答案卷」樣式呈現參考答案：米白紙張、格線、手寫體，
   // 並依申論標號自動分出層次，貼近考場上真正會寫出來的版面。
@@ -458,20 +504,7 @@ function revealES(){
             }).join('')
          +  '</div></div>';
   }
-  resEl.innerHTML = html;
-
-  document.getElementById('qrevbtn').disabled = true;
-  document.getElementById('qnxt').classList.remove('hide');
-  // 作答後才開放筆記與標註（作答前不干擾判斷）
-  document.getElementById('qink-btn')?.classList.remove('hide');
-  document.getElementById('qnote-btn')?.classList.remove('hide');
-  // 版面此時會多出解析區，稍候再同步筆跡（此刻才允許顯示）
-  setTimeout(_inkSync, 60);
-  _updateNoteBtn();
-  showQLawLinks(qu);   // 單選題公布答案時也要顯示關聯法條（原本只有多選/申論路徑有呼叫）
-
-  const responseTime = Date.now() - _qStart;
-  dp('attempts', {qid:qu.id, correct:null, date:today(), responseTime, hesitationFlag:responseTime>40000});
+  return html;
 }
 
 // ════════ 流程控制 ════════
@@ -974,20 +1007,9 @@ async function ansQMulti(selected, correctStr, qu){  try{
   if(!correct && selected) msg += '（你選：'+selected.split('').join('、')+'）';
   if(hesitant) msg += ' ⚠ 超過40秒';
   resEl.textContent = msg;
-  if(qu.note || qu.hlColor){ const noteEl=document.getElementById('qnote'); const hlMap={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'}; const hlC=qu.hlColor&&hlMap[qu.hlColor]?hlMap[qu.hlColor]:''; noteEl.style.display='block'; noteEl.style.borderLeft=hlC?('3px solid '+hlC):''; noteEl.textContent=qu.note?('📝 '+qu.note):'🖍 已標記'; }
-  document.getElementById('qnxt').classList.remove('hide');
-  // 作答後才開放筆記與標註（作答前不干擾判斷）
-  document.getElementById('qink-btn')?.classList.remove('hide');
-  document.getElementById('qnote-btn')?.classList.remove('hide');
-  // 版面此時會多出解析區，稍候再同步筆跡（此刻才允許顯示）
-  setTimeout(_inkSync, 60);
-  _updateNoteBtn();
-
-  // 隱藏確認按鈕
-  const cfmBtn = document.getElementById('qmulti-confirm');
-  if(cfmBtn) cfmBtn.classList.add('hide');
+  _showQNote(qu);
+  _afterAnswer(qu);
   S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
-  showQLawLinks(qu);
   }catch(e){ logError('ansQMulti', e); }}
 
 function submitAnswer(){
@@ -1049,7 +1071,7 @@ const Quiz = { startQ, startQWithPool, startQPick,
                toggleInk, inkUndo, inkClear, inkColor, inkCustomColor, inkSize, inkMode,
                startMockExam, beginMockExam,
                openQNote, closeQNote, saveQNote, endQuizNow,
-               submitAnswer, nextQ, exitQ, revealES, toggleQStar };
+               submitAnswer, nextQ, exitQ, revealES, toggleQStar, editQInQuiz, _quizRefreshQ };
 window.Quiz = Quiz;
 Object.assign(window, Quiz);
 
