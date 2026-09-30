@@ -767,7 +767,7 @@ function closeAdd(){
 // 【新增/編輯題目表單】
 // ════════════════════════════════════════════════════════════
 function showAdd(q){
-  da('laws').then(ls => { _flNames = [...new Set(ls.map(l=>(l.lawName||'').trim()).filter(Boolean))]; });
+  da('laws').then(ls => { _flNames = [...new Set(ls.map(l=>(l.lawName||'').trim()).filter(Boolean))]; }).catch(()=>{});
   S.editId = q?.id || null;
   S.qType = q?.type || 'mc';
   // 初始化答案為 Set（支援多選）
@@ -944,6 +944,10 @@ async function saveQ(){
     // 編輯時若未勾選題組，保留原 groupId 讓使用者決定（不自動清空）
     data.correctStreak=ex?.correctStreak||0;
     data.difficultyScore=ex?.difficultyScore||5;
+    data.lastReview=ex?.lastReview??null;
+    // ★ 表單沒有的欄位（答題時的手寫標註 inkImg 等）要沿用舊資料；
+    //   原本整筆覆蓋，編輯一次就把標註清掉（答題中按「編輯」更容易踩到）
+    for(const k in ex||{}) if(!(k in data)) data[k]=ex[k];
   }
   try{
     // 建立搜尋索引（加速搜尋）
