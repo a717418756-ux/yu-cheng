@@ -72,6 +72,50 @@ async function _restoreSettings(rows){
 }
 const _mb = n => (n / 1048576).toFixed(n < 10485760 ? 2 : 1) + ' MB';
 
+// 整批還原資料表＋設定：包在同一個資料庫交易裡，全部寫入成功才生效；
+//   中途失敗（空間不足、資料有誤）會整批復原成還原前的樣子。
+//   ★ 原本逐表「先清空再寫入」，寫到一半失敗就留下被清空的表，資料等於消失。
+async function _restoreAll(bk, tables){
+  const names = tables.filter(t => Array.isArray(bk[t]) && _db.tables.some(x => x.name === t));
+  let n = 0;
+  await _db.transaction('rw', [...names, 'settings'].map(t => _db[t]), async () => {
+    for(const t of names) n += await _restoreTable(t, bk[t]);
+    n += await _restoreSettings(bk.settings);
+  });
+  _cacheInvalidate();
+  return n;
+}
+
+// 備份、還原期間保持螢幕常亮：手機關螢幕或切到背景，上傳／下載會被系統中斷（常見的失敗原因）
+async function _keepAwake(fn){
+  let lock = null;
+  try{ lock = await navigator.wakeLock?.request('screen'); }catch(e){}
+  try{ return await fn(); }
+  finally{ lock?.release().catch(()=>{}); }
+}
+
+// 呼叫 Apps Script。網路中斷、Google 端暫時錯誤（5xx、回傳錯誤網頁）自動重試 2 次；
+//   有回 JSON 就交給呼叫端判斷（密碼錯誤等不重試）。錯誤訊息改成看得懂的說明。
+async function _gasCall(url, payload){
+  let err;
+  for(let i = 0; i < 3; i++){
+    if(i){ toast('連線不穩，第 ' + i + ' 次重試…'); await new Promise(r => setTimeout(r, 2000 * i)); }
+    try{
+      const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain'}, body: payload });
+      const txt = await res.text();
+      try{ return JSON.parse(txt); }catch(e){}
+      if(/accounts\.google\.com|ServiceLogin/.test(txt))
+        throw Object.assign(new Error('Apps Script 需要登入：部署時「存取權」要選「任何人」'), { fatal:true });
+      err = new Error(res.ok ? 'Apps Script 沒有回傳資料（可能執行逾時）' : 'HTTP ' + res.status);
+      if(res.status >= 400 && res.status < 500) break;   // 網址錯誤等，重試也沒用
+    }catch(e){
+      if(e.fatal) throw e;
+      err = new Error('網路連線中斷' + (document.hidden ? '（畫面關閉或切到背景時系統會中斷連線）' : ''));
+    }
+  }
+  throw err;
+}
+
 // ════════════════════════════════════════════════════════════
 // 【雲端備份：GAS 設定】
 // ════════════════════════════════════════════════════════════
@@ -105,7 +149,6 @@ async function _gasLoadSavedConfig(){
 async function gdriveBackup(){ try{
   const { url, pwd } = await _gasGetConfig();
   if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
-  toast('備份中…');
   // 雲端備份：考試區 + 答題記錄 + 倒數日 + 使用統計 + 設定（不含 blob 類大檔）
   //   englishVocab（單字本，含自己的遺忘曲線進度）與 healthLogs（健康數據）
   //   都是純文字、無 blob 欄位，理應納入雲端備份；先前漏掉會導致還原後這兩塊資料消失。
@@ -114,63 +157,59 @@ async function gdriveBackup(){ try{
     da('countdowns'), da('usageLogs'),
     da('englishVocab'), da('healthLogs'), da('englishMaterials')
   ]);
-  const settings = await _backupSettings();
-  const body = JSON.stringify({
-      version: 3,
-      exportedAt: new Date().toISOString(),
-      questions: _noBlob(qs),
-      laws: _noBlob(ls),
-      attempts: ats,
-      countdowns: countdowns,
-      usageLogs: usageLogs,
-      settings: settings,
-      englishVocab: englishVocab,
-      healthLogs: healthLogs,
-      // englishMaterials 存的是切分後的句子陣列（純文字、無 blob），
-      // 資料量遠小於題庫，納入雲端備份不會造成負擔
-      englishMaterials: engMats
-  });
-  const size = new Blob([body]).size;
-  if(size > GAS_SIZE_WARN && !confirm('雲端備份檔 ' + _mb(size) + '，接近 Google Apps Script 的上傳上限，可能會失敗。\n'
-      + '建議改用「本機完整備份」。仍要上傳？')) return;
-  const payload = { password: pwd, action: 'backup', filename: GAS_BACKUP_FILE, data: body };
-  const res  = await fetch(url, {
-    method:'POST',
-    headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify(payload)
-  });
-  if(!res.ok){ toast('備份失敗：HTTP '+res.status); return; }
-  const json = await res.json();
-  if(json.ok){
-    const t = new Date().toLocaleString('zh-TW');
-    await setSetting('lastBackupTime', t);
-    _showDoneDialog('雲端備份完成 ✓', [
-      '已上傳到你的 Google Drive。',
-      '',
-      '時間：' + t,
-      '大小：' + _mb(size),
-      '涵蓋：題庫、法條、答題記錄、設定、倒數日、統計、英語教材、單字本、健康數據',
-    ]);
-    renderSet();
-  }
-  else{ toast('備份失敗：'+(json.error||'未知錯誤')); }
+  // 確認視窗：避免誤觸。雲端只有一份，上傳會蓋掉上一次的備份
+  const last = await getSetting('lastBackupTime', '');
+  cfm('備份到雲端', '將以本機資料覆蓋雲端上的備份。\n'
+    + '題目 ' + qs.length + ' 題、法條 ' + ls.length + ' 條\n'
+    + '上次雲端備份：' + (last || '無')
+    + (!qs.length && !ls.length ? '\n\n⚠ 本機沒有題目與法條，上傳會把雲端備份變成空的！' : ''),
+    () => _keepAwake(async () => { try{
+      toast('備份中…請保持畫面開啟');
+      const settings = await _backupSettings();
+      const body = JSON.stringify({
+          version: 3,
+          exportedAt: new Date().toISOString(),
+          questions: _noBlob(qs),
+          laws: _noBlob(ls),
+          attempts: ats,
+          countdowns: countdowns,
+          usageLogs: usageLogs,
+          settings: settings,
+          englishVocab: englishVocab,
+          healthLogs: healthLogs,
+          // englishMaterials 存的是切分後的句子陣列（純文字、無 blob），
+          // 資料量遠小於題庫，納入雲端備份不會造成負擔
+          englishMaterials: engMats
+      });
+      // 大小以實際送出的內容計算（備份字串再包一層，引號會被跳脫，比原檔大）
+      const payload = JSON.stringify({ password: pwd, action: 'backup', filename: GAS_BACKUP_FILE, data: body });
+      const size = new Blob([payload]).size;
+      if(size > GAS_SIZE_WARN && !confirm('雲端備份檔 ' + _mb(size) + '，接近 Google Apps Script 的上傳上限，可能會失敗。\n'
+          + '建議改用「本機完整備份」。仍要上傳？')) return;
+      const json = await _gasCall(url, payload);
+      if(!json.ok){ toast('備份失敗：'+(json.error||'未知錯誤')); return; }
+      const t = new Date().toLocaleString('zh-TW');
+      await setSetting('lastBackupTime', t);
+      _showDoneDialog('雲端備份完成 ✓', [
+        '已上傳到你的 Google Drive。',
+        '',
+        '時間：' + t,
+        '大小：' + _mb(size),
+        '涵蓋：題庫、法條、答題記錄、設定、倒數日、統計、英語教材、單字本、健康數據',
+      ]);
+      renderSet();
+    }catch(e){ logError('gdriveBackup',e); toast('備份失敗：'+e.message); } }));
 }catch(e){ logError('gdriveBackup',e); toast('備份失敗：'+e.message); }}
 
 // ── 還原 ────────────────────────────────────────────────────
 async function gdriveRestore(){ try{
   const { url, pwd } = await _gasGetConfig();
   if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
-  cfm('從雲端還原','現有資料將被覆蓋，確定繼續？', async()=>{
+  cfm('從雲端還原','手機上的題庫、法條、答題記錄、設定等資料，將被雲端備份覆蓋，確定繼續？', () => _keepAwake(async()=>{
     // ── callback 內有獨立的 try-catch（cfm 是非同步，外層 catch 無法攔截）──
     try{
-      toast('還原中…');
-      const res  = await fetch(url, {
-        method:'POST',
-        headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({ password:pwd, action:'restore', filename:GAS_BACKUP_FILE })
-      });
-      if(!res.ok){ toast('還原失敗：HTTP '+res.status); return; }
-      const json = await res.json();
+      toast('還原中…請保持畫面開啟');
+      const json = await _gasCall(url, JSON.stringify({ password:pwd, action:'restore', filename:GAS_BACKUP_FILE }));
       if(!json.ok){ toast('還原失敗：'+(json.error||'未知錯誤')); return; }
 
       // json.data 可能是字串或已解析的物件（依 GAS 實作而定）
@@ -185,12 +224,8 @@ async function gdriveRestore(){ try{
         toast('還原失敗：備份資料為空，請先備份再還原'); return;
       }
 
-      for(const t of ['questions','laws','attempts','countdowns','usageLogs',
-                      'englishVocab','healthLogs','englishMaterials'])
-        await _restoreTable(t, bk[t]);
-      await _restoreSettings(bk.settings);
-
-      _cacheInvalidate();
+      await _restoreAll(bk, ['questions','laws','attempts','countdowns','usageLogs',
+                             'englishVocab','healthLogs','englishMaterials']);
       const rt = new Date().toLocaleString('zh-TW');
       await setSetting('lastRestoreTime', rt);
       _showDoneDialog('雲端還原完成 ✓', [
@@ -201,9 +236,9 @@ async function gdriveRestore(){ try{
       ], ()=> location.reload());
     } catch(innerErr){
       logError('gdriveRestore-inner', innerErr);
-      toast('還原失敗：'+innerErr.message);
+      toast('還原失敗：'+innerErr.message+'（手機資料維持原樣）');
     }
-  });
+  }));
 }catch(e){ logError('gdriveRestore',e); toast('還原失敗：'+e.message); }}
 
 
@@ -316,160 +351,112 @@ async function localBackup(){
     toast('你的瀏覽器不支援資料夾存取，請用 Chrome 或 Edge');
     return;
   }
-  try{
-    const dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
-    toast('備份中…請稍候');
+  // 確認視窗：避免誤觸（資料夾裡舊的備份檔會被覆蓋）
+  cfm('備份到資料夾', '將把全部資料（含書庫、影音、學習教材檔案）寫入你接著選的資料夾，資料夾裡舊的備份會被覆蓋。', async()=>{
+    try{
+      const dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
+      await _keepAwake(async () => {
+        toast('備份中…請保持畫面開啟');
+        const [ebooks, media, qs, ls, ats, countdowns, usageLogs, refbooks, learnmedia, engMats,
+               engVocab, healthLogs] = await Promise.all([
+          da('ebooks'), da('leisuremedia'), da('questions'), da('laws'),
+          da('attempts'), da('countdowns'), da('usageLogs'),
+          da('refbooks'), da('learnmedia'), da('englishMaterials'),
+          da('englishVocab'), da('healthLogs')
+        ]);
+        const settings = await _backupSettings();
 
-    const [ebooks, media, qs, ls, ats, countdowns, usageLogs, refbooks, learnmedia, engMats,
-           engVocab, healthLogs] = await Promise.all([
-      da('ebooks'), da('leisuremedia'), da('questions'), da('laws'),
-      da('attempts'), da('countdowns'), da('usageLogs'),
-      da('refbooks'), da('learnmedia'), da('englishMaterials'),
-      da('englishVocab'), da('healthLogs')
-    ]);
-    const settings = await _backupSettings();
+        // ── 完整資料備份（JSON 單檔，含設定/答題/倒數/統計等非 blob 資料）──
+        const examBody = JSON.stringify({
+          version: 3,
+          exportedAt: new Date().toISOString(),
+          questions: _noBlob(qs),
+          laws: _noBlob(ls),
+          attempts: ats,
+          settings: settings,
+          countdowns: countdowns,
+          usageLogs: usageLogs,
+          refbooks: refbooks,
+          learnmedia: learnmedia,
+          englishMaterials: engMats,
+          // 單字本與健康數據：純文字無 blob，先前漏備份會導致還原後資料消失
+          englishVocab: engVocab,
+          healthLogs: healthLogs
+        });
+        await _writeFile(dirHandle, 'exam_data.json', examBody);
 
-    let count = 0;
+        // ── 書庫、影音、學習區（參考書／教材影音）：每筆一個說明檔＋實際檔案 ──
+        const count = 1
+          + await _backupDir(dirHandle, 'ebooks',     ebooks,     _EXT.ebooks)
+          + await _backupDir(dirHandle, 'media',      media,      _EXT.leisuremedia)
+          + await _backupDir(dirHandle, 'refbooks',   refbooks,   _EXT.refbooks)
+          + await _backupDir(dirHandle, 'learnmedia', learnmedia, _EXT.learnmedia);
 
-    // ── 完整資料備份（JSON 單檔，含設定/答題/倒數/統計等非 blob 資料）──
-    // englishMaterials 可能含大型內容，但無獨立 blob 欄位，一併寫入
-    const examHandle = await dirHandle.getFileHandle('exam_data.json', { create:true });
-    const examWriter = await examHandle.createWritable();
-    const examBody = JSON.stringify({
-      version: 3,
-      exportedAt: new Date().toISOString(),
-      questions: _noBlob(qs),
-      laws: _noBlob(ls),
-      attempts: ats,
-      settings: settings,
-      countdowns: countdowns,
-      usageLogs: usageLogs,
-      refbooks: refbooks,
-      learnmedia: learnmedia,
-      englishMaterials: engMats,
-      // 單字本與健康數據：純文字無 blob，先前漏備份會導致還原後資料消失
-      englishVocab: engVocab,
-      healthLogs: healthLogs
-    });
-    await examWriter.write(examBody);
-    await examWriter.close();
-    count++;  // exam_data.json 計入項目數
-
-    // ── 書庫備份 ──
-    const ebooksDir = await dirHandle.getDirectoryHandle('ebooks', { create:true });
-    for(const book of ebooks){
-      // metadata（不含 blob 欄位）寫成 JSON
-      const { blob:_b, coverBlob:_cb, ...meta } = book;
-      // 縮圖（coverThumb, spineThumb）是 Blob，轉成 base64 存在 meta JSON 裡
-      const metaOut = { ...meta };
-      if(meta.coverThumb instanceof Blob){
-        metaOut.coverThumb = await _blobToBase64(meta.coverThumb);
-        metaOut._coverThumbIsBase64 = true;
-      }
-      if(meta.spineThumb instanceof Blob){
-        metaOut.spineThumb = await _blobToBase64(meta.spineThumb);
-        metaOut._spineThumbIsBase64 = true;
-      }
-      const metaHandle = await ebooksDir.getFileHandle(`${book.id}.meta.json`, { create:true });
-      const metaWriter = await metaHandle.createWritable();
-      await metaWriter.write(JSON.stringify(metaOut));
-      await metaWriter.close();
-
-      // 實際書檔 blob
-      if(book.blob){
-        const ext = book.fileType || 'bin';
-        const fileHandle = await ebooksDir.getFileHandle(`${book.id}.${ext}`, { create:true });
-        const writer = await fileHandle.createWritable();
-        await writer.write(book.blob);
-        await writer.close();
-      }
-      count++;
+        _showDoneDialog('本機備份完成 ✓', [
+          '共 ' + count + ' 個項目已寫入你選的資料夾。',
+          '',
+          '時間：' + new Date().toLocaleString('zh-TW'),
+          '內容：exam_data.json（' + _mb(new Blob([examBody]).size) + '）＋ ebooks／media／refbooks／learnmedia 四個資料夾',
+        ]);
+      });
+    }catch(e){
+      if(e.name === 'AbortError') return;  // 使用者取消
+      logError('localBackup', e);
+      toast('備份失敗：' + e.message);
     }
+  });
+}
 
-    // ── 影音庫備份 ──
-    const mediaDir = await dirHandle.getDirectoryHandle('media', { create:true });
-    for(const m of media){
-      // metadata
-      const { blob:_b, ...meta } = m;
-      const metaOut = { ...meta };
-      if(meta.thumbnail instanceof Blob){
-        metaOut.thumbnail = await _blobToBase64(meta.thumbnail);
-        metaOut._thumbnailIsBase64 = true;
-      }
-      const metaHandle = await mediaDir.getFileHandle(`${m.id}.meta.json`, { create:true });
-      const metaWriter = await metaHandle.createWritable();
-      await metaWriter.write(JSON.stringify(metaOut));
-      await metaWriter.close();
+// 各類檔案的副檔名（備份寫檔、還原找檔用同一套）
+const _EXT = {
+  ebooks:       m => m.fileType || 'bin',
+  refbooks:     m => m.fileType || 'bin',
+  leisuremedia: m => m.mimeType?.split('/')[1] || m.type || 'bin',
+  learnmedia:   m => m.mimeType?.split('/')[1] || m.mediaType || 'bin',
+};
+// 縮圖欄位：Blob 轉 base64 寫進說明檔，並加註「_欄位IsBase64」，還原時轉回 Blob
+const _THUMBS = ['coverThumb', 'spineThumb', 'thumbnail'];
 
-      // 實際媒體 blob
-      if(m.blob){
-        const ext = m.mimeType?.split('/')[1] || m.type || 'bin';
-        const fileHandle = await mediaDir.getFileHandle(`${m.id}.${ext}`, { create:true });
-        const writer = await fileHandle.createWritable();
-        await writer.write(m.blob);
-        await writer.close();
-      }
-      count++;
-    }
+async function _writeFile(dir, name, data){
+  const w = await (await dir.getFileHandle(name, { create:true })).createWritable();
+  await w.write(data);
+  await w.close();
+}
 
-    // ── 學習區備份（refbooks 參考書 / learnmedia 教材影音）──
-    //   先前只把 meta 寫進 exam_data.json，實際檔案 blob 完全沒備份，
-    //   還原後會變成「有標題但打不開」的空殼。這裡比照書庫／影音庫寫出檔案。
-    const refDir = await dirHandle.getDirectoryHandle('refbooks', { create:true });
-    for(const rb of refbooks){
-      const { blob:_b, coverBlob:_cb, ...meta } = rb;
-      const metaOut = { ...meta };
-      if(meta.coverThumb instanceof Blob){
-        metaOut.coverThumb = await _blobToBase64(meta.coverThumb);
-        metaOut._coverThumbIsBase64 = true;
-      }
-      const mh = await refDir.getFileHandle(`${rb.id}.meta.json`, { create:true });
-      const mw = await mh.createWritable();
-      await mw.write(JSON.stringify(metaOut));
-      await mw.close();
-      if(rb.blob){
-        const ext = rb.fileType || 'bin';
-        const fh = await refDir.getFileHandle(`${rb.id}.${ext}`, { create:true });
-        const w  = await fh.createWritable();
-        await w.write(rb.blob);
-        await w.close();
-      }
-      count++;
-    }
-
-    const lmDir = await dirHandle.getDirectoryHandle('learnmedia', { create:true });
-    for(const lm of learnmedia){
-      const { blob:_b, ...meta } = lm;
-      const metaOut = { ...meta };
-      if(meta.thumbnail instanceof Blob){
-        metaOut.thumbnail = await _blobToBase64(meta.thumbnail);
-        metaOut._thumbnailIsBase64 = true;
-      }
-      const mh = await lmDir.getFileHandle(`${lm.id}.meta.json`, { create:true });
-      const mw = await mh.createWritable();
-      await mw.write(JSON.stringify(metaOut));
-      await mw.close();
-      if(lm.blob){
-        const ext = lm.mimeType?.split('/')[1] || lm.mediaType || 'bin';
-        const fh = await lmDir.getFileHandle(`${lm.id}.${ext}`, { create:true });
-        const w  = await fh.createWritable();
-        await w.write(lm.blob);
-        await w.close();
-      }
-      count++;
-    }
-
-    _showDoneDialog('本機備份完成 ✓', [
-      '共 ' + count + ' 個項目已寫入你選的資料夾。',
-      '',
-      '時間：' + new Date().toLocaleString('zh-TW'),
-      '內容：exam_data.json（' + _mb(new Blob([examBody]).size) + '）＋ ebooks／media／refbooks／learnmedia 四個資料夾',
-    ]);
-  }catch(e){
-    if(e.name === 'AbortError') return;  // 使用者取消
-    logError('localBackup', e);
-    toast('備份失敗：' + e.message);
+// 備份一類檔案到子資料夾：{id}.meta.json（不含檔案本體）＋ {id}.{副檔名}（檔案本體）
+async function _backupDir(dirHandle, dirName, rows, extOf){
+  const dir = await dirHandle.getDirectoryHandle(dirName, { create:true });
+  for(const r of rows){
+    const { blob, coverBlob, ...meta } = r;
+    for(const f of _THUMBS)
+      if(meta[f] instanceof Blob){ meta[f] = await _blobToBase64(meta[f]); meta['_' + f + 'IsBase64'] = true; }
+    await _writeFile(dir, r.id + '.meta.json', JSON.stringify(meta));
+    if(blob) await _writeFile(dir, r.id + '.' + extOf(r), blob);
   }
+  return rows.length;
+}
+
+// 從子資料夾還原一類檔案：先把每一筆都讀好，再一次換掉資料表。
+//   ★ 原本先清空資料表再逐筆讀檔寫入，讀到一半出錯，手機上原有的書、影音就沒了。
+async function _restoreDir(dirHandle, dirName, table, extOf){
+  let dir;
+  try{ dir = await dirHandle.getDirectoryHandle(dirName); }
+  catch(e){ if(e.name === 'NotFoundError') return 0; throw e; }   // 舊版備份沒有這個資料夾 → 略過、保留手機現有資料
+  const rows = [];
+  for await(const [name, handle] of dir.entries()){
+    if(!name.endsWith('.meta.json')) continue;
+    const meta = JSON.parse(await (await handle.getFile()).text());
+    for(const f of _THUMBS){
+      const flag = '_' + f + 'IsBase64';
+      if(meta[flag] && meta[f]) meta[f] = await _base64ToBlob(meta[f], 'image/jpeg');
+      delete meta[flag];
+    }
+    try{ meta.blob = await (await dir.getFileHandle(meta.id + '.' + extOf(meta))).getFile(); }
+    catch(e){ meta.blob = null; }
+    rows.push(meta);
+  }
+  await _db.transaction('rw', _db[table], () => _restoreTable(table, rows));
+  return rows.length;
 }
 
 // 還原：選擇備份資料夾，讀取並還原所有項目
@@ -481,128 +468,38 @@ async function localRestore(){
   cfm('本地完整還原', '所有資料（題庫、法條、答題記錄、設定、倒數日、統計、書庫、影音、學習區教材、英語庫、單字本、健康數據）將被覆蓋，確定繼續？', async()=>{
     try{
       const dirHandle = await window.showDirectoryPicker({ mode:'read' });
-      toast('還原中…請稍候');
+      await _keepAwake(async () => {
+        toast('還原中…請保持畫面開啟');
+        let count = 0;
 
-      let count = 0;
-
-      // ── 題庫 + 法條還原 ──
-      try{
-        const examHandle = await dirHandle.getFileHandle('exam_data.json');
-        const examFile   = await examHandle.getFile();
-        const examData   = JSON.parse(await examFile.text());
-        for(const t of ['questions','laws','attempts','countdowns','usageLogs','refbooks','learnmedia',
-                        'englishMaterials','englishVocab','healthLogs'])
-          count += await _restoreTable(t, examData[t]);
-        count += await _restoreSettings(examData.settings);
-      }catch(e){ /* exam_data.json 不存在就跳過 */ }
-
-      // ── 書庫還原 ──
-      try{
-        const ebooksDir = await dirHandle.getDirectoryHandle('ebooks');
-        await dc('ebooks');
-        for await(const [name, handle] of ebooksDir.entries()){
-          if(!name.endsWith('.meta.json')) continue;
-          const file = await handle.getFile();
-          const meta = JSON.parse(await file.text());
-
-          // 還原縮圖 Blob
-          if(meta._coverThumbIsBase64 && meta.coverThumb){
-            meta.coverThumb = await _base64ToBlob(meta.coverThumb, 'image/jpeg');
-            delete meta._coverThumbIsBase64;
-          }
-          if(meta._spineThumbIsBase64 && meta.spineThumb){
-            meta.spineThumb = await _base64ToBlob(meta.spineThumb, 'image/jpeg');
-            delete meta._spineThumbIsBase64;
-          }
-
-          // 讀取書檔 blob
-          const ext = meta.fileType || 'bin';
-          try{
-            const blobHandle = await ebooksDir.getFileHandle(`${meta.id}.${ext}`);
-            meta.blob = await blobHandle.getFile();
-          }catch(e){ meta.blob = null; }
-
-          await dp('ebooks', meta);
-          count++;
+        // ── 題庫、法條等（exam_data.json）──
+        //   ★ 原本任何錯誤都當成「沒有這個檔」略過，檔案壞掉、寫入失敗也顯示「還原完成」。
+        //   現在只有真的沒有這個檔才略過；其他錯誤中止並提示，手機資料維持原樣（整批交易）
+        let examFile = null;
+        try{ examFile = await (await dirHandle.getFileHandle('exam_data.json')).getFile(); }
+        catch(e){ if(e.name !== 'NotFoundError') throw e; }
+        if(examFile){
+          let examData;
+          try{ examData = JSON.parse(await examFile.text()); }
+          catch(e){ throw new Error('exam_data.json 內容損毀，無法讀取'); }
+          count += await _restoreAll(examData, ['questions','laws','attempts','countdowns','usageLogs',
+            'refbooks','learnmedia','englishMaterials','englishVocab','healthLogs']);
         }
-      }catch(e){ /* ebooks 資料夾不存在就跳過 */ }
 
-      // ── 影音庫還原 ──
-      try{
-        const mediaDir = await dirHandle.getDirectoryHandle('media');
-        await dc('leisuremedia');
-        for await(const [name, handle] of mediaDir.entries()){
-          if(!name.endsWith('.meta.json')) continue;
-          const file = await handle.getFile();
-          const meta = JSON.parse(await file.text());
+        // ── 書庫、影音、學習區（實際檔案）──
+        count += await _restoreDir(dirHandle, 'ebooks',     'ebooks',       _EXT.ebooks)
+               + await _restoreDir(dirHandle, 'media',      'leisuremedia', _EXT.leisuremedia)
+               + await _restoreDir(dirHandle, 'refbooks',   'refbooks',     _EXT.refbooks)
+               + await _restoreDir(dirHandle, 'learnmedia', 'learnmedia',   _EXT.learnmedia);
 
-          // 還原縮圖 Blob
-          if(meta._thumbnailIsBase64 && meta.thumbnail){
-            meta.thumbnail = await _base64ToBlob(meta.thumbnail, 'image/jpeg');
-            delete meta._thumbnailIsBase64;
-          }
-
-          // 讀取媒體 blob
-          const ext = meta.mimeType?.split('/')[1] || meta.type || 'bin';
-          try{
-            const blobHandle = await mediaDir.getFileHandle(`${meta.id}.${ext}`);
-            meta.blob = await blobHandle.getFile();
-          }catch(e){ meta.blob = null; }
-
-          await dp('leisuremedia', meta);
-          count++;
-        }
-      }catch(e){ /* media 資料夾不存在就跳過 */ }
-
-      // ── 學習區還原（refbooks / learnmedia 的實際檔案）──
-      //   舊版備份沒有這兩個資料夾時會直接跳過，不影響其他還原結果。
-      try{
-        const refDir = await dirHandle.getDirectoryHandle('refbooks');
-        await dc('refbooks');
-        for await(const [name, handle] of refDir.entries()){
-          if(!name.endsWith('.meta.json')) continue;
-          const meta = JSON.parse(await (await handle.getFile()).text());
-          if(meta._coverThumbIsBase64 && meta.coverThumb){
-            meta.coverThumb = await _base64ToBlob(meta.coverThumb, 'image/jpeg');
-            delete meta._coverThumbIsBase64;
-          }
-          const ext = meta.fileType || 'bin';
-          try{
-            const bh = await refDir.getFileHandle(`${meta.id}.${ext}`);
-            meta.blob = await bh.getFile();
-          }catch(e){ meta.blob = null; }
-          await dp('refbooks', meta);
-          count++;
-        }
-      }catch(e){ /* refbooks 資料夾不存在就跳過 */ }
-
-      try{
-        const lmDir = await dirHandle.getDirectoryHandle('learnmedia');
-        await dc('learnmedia');
-        for await(const [name, handle] of lmDir.entries()){
-          if(!name.endsWith('.meta.json')) continue;
-          const meta = JSON.parse(await (await handle.getFile()).text());
-          if(meta._thumbnailIsBase64 && meta.thumbnail){
-            meta.thumbnail = await _base64ToBlob(meta.thumbnail, 'image/jpeg');
-            delete meta._thumbnailIsBase64;
-          }
-          const ext = meta.mimeType?.split('/')[1] || meta.mediaType || 'bin';
-          try{
-            const bh = await lmDir.getFileHandle(`${meta.id}.${ext}`);
-            meta.blob = await bh.getFile();
-          }catch(e){ meta.blob = null; }
-          await dp('learnmedia', meta);
-          count++;
-        }
-      }catch(e){ /* learnmedia 資料夾不存在就跳過 */ }
-
-      _cacheInvalidate?.();
-      _showDoneDialog('本機還原完成 ✓', [
-        '共 ' + count + ' 個項目已還原。',
-        '',
-        '時間：' + new Date().toLocaleString('zh-TW'),
-        '按「知道了」後會重新整理頁面。',
-      ], ()=> location.reload());
+        _cacheInvalidate();
+        _showDoneDialog('本機還原完成 ✓', [
+          '共 ' + count + ' 個項目已還原。',
+          '',
+          '時間：' + new Date().toLocaleString('zh-TW'),
+          '按「知道了」後會重新整理頁面。',
+        ], ()=> location.reload());
+      });
     }catch(e){
       if(e.name === 'AbortError') return;
       logError('localRestore', e);
