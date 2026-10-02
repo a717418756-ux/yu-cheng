@@ -1599,7 +1599,7 @@ async function renderDB(){  try{
 
   const _mkCard = ([name, laws]) => {
     const cat=laws[0].category||'statute';
-    const catLabel={'statute':'法規條文','admin':'行政規則','sop':'SOP','supplement':'補充資料','interpretation':'函釋'}[cat]||cat;
+    const catLabel={'statute':'法規條文','admin':'行政規則','sop':'SOP','supplement':'補充資料','interpretation':'法律解釋與裁判'}[cat]||cat;
     const favCount=laws.filter(l=>l.favorite).length;
     const icon=cat==='sop'?'📋':cat==='supplement'?'📄':cat==='admin'?'📑':'⚖';
     const _li=_lawInfo(laws);
@@ -2635,7 +2635,7 @@ function toggleSOPMode(){
     if(iw)iw.classList.remove('hide');
     if(tw)tw.style.display='none';
   } else if(cat==='supplement'||cat==='interpretation'){
-    // 補充資料/函釋：可選文字或圖片，預設文字（有圖片資料則預設圖片）
+    // 補充資料／法律解釋與裁判：可選文字或圖片，預設文字（有圖片資料則預設圖片）
     if(tw)tw.style.display='block';
     if(hasImg){
       if(cw)cw.classList.add('hide');
@@ -2652,7 +2652,7 @@ function toggleSOPMode(){
   }
 }
 
-// 切換圖片/文字模式（補充資料/函釋用）
+// 切換圖片/文字模式（補充資料／法律解釋與裁判用）
 function onLawImgSelect(e){ loadSOPImg(e); }
 function loadSOPImg(e){
   const file=e.target.files[0];if(!file)return;
@@ -2809,7 +2809,7 @@ function parseLawText(rawText, lawName, category, source){
 
   // 條文內的斷行：PDF 或窄版網頁複製時，一句話會在版面寬度處被硬切成好幾行。
   //   上一行不是以句末標點（。：；！？」）結尾、下一行也不是款目標號（一、（一）1.）開頭 → 接回同一行。
-  //   只用在法規條文與行政規則；SOP、補充資料、函釋常有不加標點的條列，照原樣保留
+  //   只用在法規條文與行政規則；SOP、補充資料、法律解釋與裁判常有不加標點的條列，照原樣保留
   const END  = /[。：:；;！!？?」』）)]$/;
   const MARK = /^(?:[一二三四五六七八九十百]+[、．.]|[（(][一二三四五六七八九十百\d]+[)）]|\d+[、．.)]|[甲乙丙丁戊己庚辛壬癸][、．.])/;
   const reflow = !category || category==='statute' || category==='admin';

@@ -238,6 +238,16 @@ function renderQCard(){
     //   法條改由 revealES() 在公布解答時才顯示（與 mc 題一致）。
     const lawElEs = document.getElementById('qlaw');
     if(lawElEs) lawElEs.style.display = 'none';
+    // 申論瀏覽：不作答，題目與參考答案卷直接一起顯示（不寫作答紀錄）
+    if(S.quiz.mode === 'esview'){
+      document.getElementById('q-type-hint').textContent = '📖 申論瀏覽';
+      document.getElementById('qes').style.display = 'none';
+      const resEl = document.getElementById('qres');
+      resEl.className = 'qres on r';
+      resEl.innerHTML = _esPaperHtml(qu);
+      S.quiz.ans = true;
+      _afterAnswer(qu);
+    }
   }
   // 換題：先存起上一題未存的標註，再載入本題的標註
   _inkFlushAndSync();
@@ -412,7 +422,7 @@ function _quizRefreshQ(data){
     document.querySelectorAll('.qopt').forEach(o => o.classList.add(keys.includes(o.dataset.key) ? 'correct' : 'dim'));
     resEl.textContent = '✎ 題目已更新　正確答案：' + (keys.split('').join('、') || '（未設定）');
     _showQNote(qu);
-  } else {
+  } else if(S.quiz.mode !== 'esview'){   // 申論瀏覽由 renderQCard 直接顯示答案卷
     resEl.innerHTML = _esSheetHtml(qu);
     document.getElementById('qrevbtn').disabled = true;
   }
@@ -434,6 +444,27 @@ function revealES(){
 
 // 申論參考答案卷＋關鍵概念檢測的 HTML
 function _esSheetHtml(qu){
+  let html = _esPaperHtml(qu);
+  // 申論題關鍵字檢測
+  const must = qu.mustKeywords || [];
+  if(must.length){
+    const userAns = (document.getElementById('qes-input')?.value || '');
+    const hits = must.filter(kw => userAns.includes(kw));
+    html += '<div class="es-kw">'
+         +  '<div class="es-kw-hd">關鍵概念檢測　<b>' + hits.length + ' / ' + must.length + '</b></div>'
+         +  '<div class="es-kw-list">'
+         +  must.map(kw=>{
+              const hit = userAns.includes(kw);
+              return '<span class="es-kw-tag' + (hit ? ' hit' : '') + '">'
+                   + (hit ? '✓' : '✗') + ' ' + esc(kw) + '</span>';
+            }).join('')
+         +  '</div></div>';
+  }
+  return html;
+}
+
+// 參考答案卷本體（答題、申論瀏覽、匯出 HTML 共用）
+function _esPaperHtml(qu){
   const ans = qu.answerEs || qu.answer || '';
 
   // 以「國考手寫答案卷」樣式呈現參考答案：米白紙張、格線、手寫體，
@@ -482,29 +513,11 @@ function _esSheetHtml(qu){
   const sheet = paras.length
     ? paras.map(esLine).join('')
     : '<div class="es-ln" style="opacity:.55">（本題尚未填寫參考答案）</div>';
-  let html =
-    '<div class="es-paper">'
+  return '<div class="es-paper">'
     + '<div class="es-paper-hd"><span>參 考 答 案</span><span class="es-paper-no">'
     +   esc((qu.subject||'') + (qu.num ? '　第' + qu.num + '題' : '')) + '</span></div>'
     + '<div class="es-paper-body">' + sheet + '</div>'
     + '</div>';
-
-  // 申論題關鍵字檢測
-  const must = qu.mustKeywords || [];
-  if(must.length){
-    const userAns = (document.getElementById('qes-input')?.value || '');
-    const hits = must.filter(kw => userAns.includes(kw));
-    html += '<div class="es-kw">'
-         +  '<div class="es-kw-hd">關鍵概念檢測　<b>' + hits.length + ' / ' + must.length + '</b></div>'
-         +  '<div class="es-kw-list">'
-         +  must.map(kw=>{
-              const hit = userAns.includes(kw);
-              return '<span class="es-kw-tag' + (hit ? ' hit' : '') + '">'
-                   + (hit ? '✓' : '✗') + ' ' + esc(kw) + '</span>';
-            }).join('')
-         +  '</div></div>';
-  }
-  return html;
 }
 
 // ════════ 流程控制 ════════
@@ -570,14 +583,17 @@ function showQDone(){
   const doneArea = document.getElementById('qdone-area');
   if(doneArea){
     doneArea.style.display = 'flex';
-    doneArea.innerHTML =
-      '<div style="font-size:48px">'+emoji+'</div>'+
+    doneArea.innerHTML = (_lastMode === 'esview'
+      ? '<div style="font-size:48px">📖</div>'+
+        '<div style="font-size:22px;font-weight:700">瀏覽完畢</div>'+
+        '<div style="font-size:14px;color:var(--t2)">共 '+S.quiz.q.length+' 題申論</div>'
+      : '<div style="font-size:48px">'+emoji+'</div>'+
       '<div style="font-size:22px;font-weight:700">'+correct+'/'+total+' 正確</div>'+
       '<div style="font-size:14px;color:var(--t2)">正確率 '+pct+'%</div>'+
       (hesitant ? '<div style="font-size:13px;color:var(--org)">⚠ '+hesitant+' 題猶豫超過40秒</div>' : '')+
-      '<div style="font-size:13px;color:var(--t2)">平均作答 '+avgTime+' 秒</div>'+
+      '<div style="font-size:13px;color:var(--t2)">平均作答 '+avgTime+' 秒</div>')+
       '<div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;width:100%">'+
-      '<button class="btn bp bw" style="padding:14px;font-size:15px" data-action="replay">🔄 再練習一次</button>'+
+      '<button class="btn bp bw" style="padding:14px;font-size:15px" data-action="replay">🔄 '+(_lastMode === 'esview' ? '再看一次' : '再練習一次')+'</button>'+
       '<button class="btn bg bw" style="padding:12px;font-size:14px" data-action="exit">← 返回首頁</button>'+
       '</div>';
   }
@@ -609,7 +625,7 @@ let _pickSel  = new Set();
 
 async function startQPick(mode){  try{
   _pickMode = mode || 'review';
-  const isEssay = _pickMode === 'essay';
+  const isEssay = _pickMode === 'essay' || _pickMode === 'esview';
   const list = await getSubjectList(isEssay ? 'es' : 'mc');
   if(!list.length){
     toast(isEssay ? '目前沒有申論題' : '目前沒有選擇題');
@@ -621,7 +637,8 @@ async function startQPick(mode){  try{
   _pickSel = new Set((Array.isArray(saved) ? saved : []).filter(n => names.has(n)));
 
   const sub = document.getElementById('subj-sub');
-  if(sub) sub.textContent = isEssay ? '申論練習・可複選，不選則測全部'
+  if(sub) sub.textContent = _pickMode === 'esview' ? '申論瀏覽・可複選，不選則看全部'
+                          : isEssay ? '申論練習・可複選，不選則測全部'
                                     : '選擇題・可複選，不選則測全部';
   const box = document.getElementById('subj-list');
   if(box){
@@ -656,11 +673,11 @@ async function confirmSubjPick(){  try{
   const subjects = [...(_pickSel || [])];
   setSetting('quiz_subjects_' + _pickMode, subjects).catch(()=>{});
   closeSubjPick();
-  const pool = await getPriorityPool(_pickMode, subjects);
+  const pool = await getPriorityPool(_pickMode === 'esview' ? 'essay' : _pickMode, subjects);
   if(!pool.length){
     toast(_pickMode === 'review' ? '今日沒有到期的題目'
         : _pickMode === 'focus'  ? '沒有危險題或收藏題'
-        : _pickMode === 'essay'  ? '沒有符合的申論題' : '沒有題目');
+        : _pickMode.startsWith('es') ? '沒有符合的申論題' : '沒有題目');
     return;
   }
   startQWithPool(pool, _pickMode);
@@ -1071,7 +1088,7 @@ const Quiz = { startQ, startQWithPool, startQPick,
                toggleInk, inkUndo, inkClear, inkColor, inkCustomColor, inkSize, inkMode,
                startMockExam, beginMockExam,
                openQNote, closeQNote, saveQNote, endQuizNow,
-               submitAnswer, nextQ, exitQ, revealES, toggleQStar, editQInQuiz, _quizRefreshQ };
+               submitAnswer, nextQ, exitQ, revealES, toggleQStar, editQInQuiz, _quizRefreshQ, _esPaperHtml };
 window.Quiz = Quiz;
 Object.assign(window, Quiz);
 

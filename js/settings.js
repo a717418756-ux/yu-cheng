@@ -285,30 +285,84 @@ async function renderSet(){  _renderAzureKey().catch(()=>{}); try{
 // ════════════════════════════════════════════════════════════
 // 【資料匯出/匯入】
 // ════════════════════════════════════════════════════════════
-async function expWrong(){  try{
-  const[qs,ats]=await Promise.all([da('questions'),da('attempts')]);
-  const wids=getWrong(qs,ats);const wqs=qs.filter(q=>wids.has(q.id));
-  if(!wqs.length){toast('目前沒有錯題');return;}
-  dl(_buildHTML(wqs,'錯題整理'),'警察考題_錯題_'+today()+'.html','text/html');toast(`匯出 ${wqs.length} 題`);
-  }catch(e){ logError('expWrong',e); }}
+// ── 匯出題目 HTML（一個入口，選題型 → 範圍 → 科目）────────────
+//   選擇題：全部／錯題／科目選擇；申論題：全部／科目選擇（參考答案保留答案卷格式）
+const _exp = { type:'mc', range:'all', subj:new Set(), qs:[], wrong:new Set() };
+const _EXP_RANGE = { mc:[['all','全部'],['wrong','錯題'],['subj','科目選擇']], es:[['all','全部'],['subj','科目選擇']] };
 
-async function expAll(){  try{
-  const qs=await da('questions');if(!qs.length){toast('題庫是空的');return;}
-  dl(_buildHTML(qs,'警察考題庫'),'警察考題庫_'+today()+'.html','text/html');toast(`匯出 ${qs.length} 題`);
-  }catch(e){ logError('expAll',e); }}
+async function openExport(){  try{
+  const [qs, ats] = await Promise.all([da('questions'), da('attempts')]);
+  if(!qs.length){ toast('題庫是空的'); return; }
+  Object.assign(_exp, { type:'mc', range:'all', subj:new Set(), qs, wrong:getWrong(qs, ats) });
+  _expRender();
+  document.getElementById('exp-ov').classList.add('on');
+  }catch(e){ logError('openExport', e); }}
+function closeExportOv(){ document.getElementById('exp-ov')?.classList.remove('on'); }
 
-function _buildHTML(qs,title){
+// 目前條件下的題目；noSubj：不套科目篩選（列科目清單用）
+function _expPool(noSubj){
+  const { type, range, subj, qs, wrong } = _exp;
+  return qs.filter(q => q.type === type
+    && (range !== 'wrong' || wrong.has(q.id))
+    && (noSubj || range === 'all' || !subj.size || subj.has(q.subject || '未分類')));
+}
+function _expSet(k, v){
+  if(_exp[k] === v) return;
+  _exp[k] = v;
+  if(k === 'type') _exp.range = 'all';
+  _exp.subj.clear();
+  _expRender();
+}
+function _expToggleSubj(btn){
+  const n = btn.dataset.n;
+  _exp.subj.has(n) ? _exp.subj.delete(n) : _exp.subj.add(n);
+  btn.classList.toggle('on');
+  _expCount();
+}
+function _expCount(){
+  document.getElementById('exp-count').textContent = '將匯出 ' + _expPool().length + ' 題';
+}
+function _expRender(){
+  const chip = (k, v, label) => '<button class="chip' + (_exp[k] === v ? ' on' : '') + '" onclick="_expSet(\'' + k + '\',\'' + v + '\')">' + label + '</button>';
+  document.getElementById('exp-type').innerHTML = chip('type','mc','選擇題') + chip('type','es','申論題');
+  document.getElementById('exp-range').innerHTML = _EXP_RANGE[_exp.type].map(([v, l]) => chip('range', v, l)).join('');
+  const cnt = {};
+  _expPool(true).forEach(q => { const n = q.subject || '未分類'; cnt[n] = (cnt[n] || 0) + 1; });
+  document.getElementById('exp-subj').innerHTML = Object.entries(cnt).sort((a,b) => b[1]-a[1]).map(([n, c]) =>
+    '<button class="subj-item" data-n="' + esc(n) + '" onclick="_expToggleSubj(this)"><span class="subj-name">' + esc(n)
+    + '</span><span class="subj-cnt">' + c + '</span></button>').join('') || '<div class="cbs">沒有符合的題目</div>';
+  document.getElementById('exp-subj-wrap').style.display = _exp.range === 'all' ? 'none' : '';
+  _expCount();
+}
+function doExport(){  try{
+  const pool = _expPool(), isEs = _exp.type === 'es';
+  if(!pool.length){ toast('沒有符合的題目'); return; }
+  const title = (_exp.range === 'wrong' ? '錯題整理' : '警察考題庫') + '・' + (isEs ? '申論題' : '選擇題')
+    + (_exp.range !== 'all' && _exp.subj.size ? '（' + [..._exp.subj].join('、') + '）' : '');
+  dl(_buildHTML(pool, title, isEs), title.replace(/[（）、・]+/g, '_').replace(/_$/, '') + '_' + today() + '.html', 'text/html');
+  closeExportOv();
+  toast('匯出 ' + pool.length + ' 題');
+  }catch(e){ logError('doExport', e); }}
+
+// 依科目分組輸出可列印的 HTML。申論題的參考答案用與 App 相同的答案卷（樣式從 quiz.css 取出內嵌）
+function _buildHTML(qs, title, isEs){
   const grp={};qs.forEach(q=>{const s=q.subject||'未分類';if(!grp[s])grp[s]=[];grp[s].push(q);});
   const d=new Date().toLocaleDateString('zh-TW');
-  let out='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>'+esc(title)+'</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px;line-height:1.8;color:#111}h1{font-size:22px;border-bottom:2px solid #333;padding-bottom:7px}h2{font-size:17px;color:#1f6feb;margin-top:28px}.q{margin:14px 0;padding:14px;border:1px solid #ddd;border-radius:8px}.qn{font-size:11px;color:#666}.qs{font-size:14px;font-weight:600;margin-bottom:8px}.opt{font-size:13px;margin:3px 0}.ans{margin-top:8px;font-size:12px;color:#1f6feb;font-weight:600}.note{font-size:11px;color:#666}</style></head><body><h1>'+esc(title)+' — '+d+'</h1>';
+  const esCss = isEs ? [...document.styleSheets].flatMap(sh => { try{ return [...sh.cssRules]; }catch(e){ return []; } })
+    .filter(r => /^\.es-(?!kw)/.test(r.selectorText || '')).map(r => r.cssText).join('')
+    + '.es-paper,.es-paper-hd,.es-paper-body{-webkit-print-color-adjust:exact;print-color-adjust:exact}' : '';
+  let out='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(title)+'</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px;line-height:1.8;color:#111}h1{font-size:22px;border-bottom:2px solid #333;padding-bottom:7px}h2{font-size:17px;color:#1f6feb;margin-top:28px}.q{margin:14px 0;padding:14px;border:1px solid #ddd;border-radius:8px}.qn{font-size:11px;color:#666}.qs{font-size:14px;font-weight:600;margin-bottom:8px;white-space:pre-wrap}.opt{font-size:13px;margin:3px 0}.ans{margin-top:8px;font-size:12px;color:#1f6feb;font-weight:600}.note{font-size:11px;color:#666;white-space:pre-wrap}'+esCss+'</style></head><body><h1>'+esc(title)+' — '+d+'</h1>';
   Object.entries(grp).forEach(([sub,sqs])=>{
     out+='<h2>'+esc(sub)+'</h2>';
     sqs.forEach((q,i)=>{
       const meta=[q.year,q.exam,q.num?'第'+q.num+'題':''].filter(Boolean).join(' · ');
-      out+='<div class="q"><div class="qn">'+esc(meta)+' · '+(q.type==='mc'?'選擇題':'申論題')+'</div><div class="qs">'+(i+1)+'. '+esc(q.stem||'')+'</div>';
-      if(q.type==='mc')Object.entries(q.options||{}).forEach(([k,v])=>{out+='<div class="opt">('+esc(k)+') '+esc(v)+'</div>';});
-      if(q.answer)out+='<div class="ans">答案：'+esc(q.answer)+'</div>';
-      if(q.answerEs)out+='<div class="note">解析：'+esc(q.answerEs)+'</div>';
+      out+='<div class="q"><div class="qn">'+esc(meta)+'</div><div class="qs">'+(i+1)+'. '+esc(q.stem||'')+'</div>';
+      if(isEs) out+=window._esPaperHtml(q);
+      else{
+        Object.entries(q.options||{}).forEach(([k,v])=>{out+='<div class="opt">('+esc(k)+') '+esc(v)+'</div>';});
+        if(q.answer)out+='<div class="ans">答案：'+esc(q.answer)+'</div>';
+        if(q.answerEs)out+='<div class="note">解析：'+esc(q.answerEs)+'</div>';
+      }
       if(q.note)out+='<div class="note">備註：'+esc(q.note)+'</div>';
       out+='</div>';
     });
@@ -492,7 +546,6 @@ async function localRestore(){
                + await _restoreDir(dirHandle, 'refbooks',   'refbooks',     _EXT.refbooks)
                + await _restoreDir(dirHandle, 'learnmedia', 'learnmedia',   _EXT.learnmedia);
 
-        _cacheInvalidate();
         _showDoneDialog('本機還原完成 ✓', [
           '共 ' + count + ' 個項目已還原。',
           '',
@@ -691,7 +744,7 @@ function openDebugPanel(){
 // ════════ 公開 API ════════
 const Settings = {
   saveGasConfig, gdriveBackup, gdriveRestore,
-  renderSet, expWrong, expAll,
+  renderSet, openExport, closeExportOv, doExport, _expSet, _expToggleSubj,
   clearAts, delAll, toggleGasHelp,
   localBackup, localRestore, saveAzureKey, openDebugPanel
 };
