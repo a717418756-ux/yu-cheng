@@ -217,6 +217,7 @@
         <button class="zqb" onclick="startQPick('review')"><span class="zqb-icon">📅</span><div class="zqb-label">今日複習</div><div class="zqb-desc">選擇題・可選科目</div></button>
         <button class="zqb" onclick="startQPick('focus')"><span class="zqb-icon">🔥</span><div class="zqb-label">加強複習</div><div class="zqb-desc">危險題＋收藏題</div></button>
         <button class="zqb" onclick="startQPick('essay')"><span class="zqb-icon">✍️</span><div class="zqb-label">申論練習</div><div class="zqb-desc">申論題專區</div></button>
+        <button class="zqb" onclick="startQPick('esview')"><span class="zqb-icon">📖</span><div class="zqb-label">申論瀏覽</div><div class="zqb-desc">題目＋參考答案直接看</div></button>
         <button class="zqb" onclick="startMockExam()"><span class="zqb-icon">🔢</span><div class="zqb-label">限時模擬考</div><div class="zqb-desc">選擇題・計時・交卷後檢討</div></button>
     <button class="zqb" onclick="startNumberMode()"><span class="zqb-icon">🔢</span><div class="zqb-label">數字魔鬼</div><div class="zqb-desc">數字記憶訓練</div></button>
       </div>
@@ -234,7 +235,7 @@
         <span class="zpanel-row-icon">🗃</span>
         <div class="zpanel-row-text">
           <div class="t">資料庫</div>
-          <div class="s">法條・SOP・補充資料・函釋</div>
+          <div class="s">法條・SOP・補充資料・法律解釋與裁判</div>
         </div>
         <span class="zpanel-main-arrow" style="margin-left:auto">›</span>
       </button>
@@ -366,7 +367,7 @@
     <button class="chip" onclick="setLC(this,'admin')">行政規則</button>
     <button class="chip" onclick="setLC(this,'sop')">SOP</button>
     <button class="chip" onclick="setLC(this,'supplement')">補充資料</button>
-    <button class="chip" onclick="setLC(this,'interpretation')">函釋</button>
+    <button class="chip" onclick="setLC(this,'interpretation')">法律解釋與裁判</button>
   </div>
   <div style="font-size:11px;color:var(--t2);padding:4px 12px" id="db-lc"></div>
   <!-- 選擇刪除模式的確認列（平時隱藏）-->
@@ -570,8 +571,7 @@
     <button class="theme-btn" id="theme-btn-eink" onclick="setTheme('eink')">📖<br>電子紙</button>
   </div>
   <div class="sec">題庫管理</div>
-  <div class="srow"><div><div class="slb">匯出錯題 HTML</div><div class="ssb">可列印錯題卷</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expWrong()">匯出</button></div>
-  <div class="srow"><div><div class="slb">匯出全部題目 HTML</div><div class="ssb">適合列印複習</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="expAll()">匯出</button></div>
+  <div class="srow"><div><div class="slb">匯出題目 HTML</div><div class="ssb">選擇題（全部／錯題／科目）、申論題（全部／科目），可列印</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="openExport()">匯出</button></div>
   <div class="sec">偵錯</div>
   <div class="row" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
     <div>
@@ -926,7 +926,7 @@
         <div><label class="fl">標題（可空）</label><input id="l-title" placeholder="臨檢"></div>
       </div>
       <div class="fr fg">
-        <div><label class="fl">類別</label><select id="l-cat" onchange="toggleSOPMode()"><option value="statute">法規條文</option><option value="admin">行政規則</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">函釋</option></select></div>
+        <div><label class="fl">類別</label><select id="l-cat" onchange="toggleSOPMode()"><option value="statute">法規條文</option><option value="admin">行政規則</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">法律解釋與裁判</option></select></div>
       </div>
       <div class="fg" id="l-content-wrap"><label class="fl">內容 *</label><textarea id="l-content" rows="6" placeholder="法條文字..."></textarea></div>
       <div id="l-img-toggle-wrap" style="display:none;margin-bottom:8px">
@@ -966,7 +966,7 @@
     <div style="padding:0 0 16px">
       <div class="fr fg">
         <div><label class="fl">法律名稱</label><input id="bl-name" placeholder="警察職權行使法"></div>
-        <div><label class="fl">類別</label><select id="bl-cat"><option value="statute">法規條文</option><option value="admin">行政規則</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">函釋</option></select></div>
+        <div><label class="fl">類別</label><select id="bl-cat"><option value="statute">法規條文</option><option value="admin">行政規則</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">法律解釋與裁判</option></select></div>
       </div>
       <div class="fg"><label class="fl">來源</label><input id="bl-src" placeholder="可貼官網網址，🏛 就能直接開原文"></div>
       <div class="fg"><label class="fl">貼入法條文字（自動分條；行政規則的「一、二、三、」會自動分點）</label>
@@ -1015,6 +1015,23 @@
   </div>
 </div>
 <!-- 科目多選（開始測驗前） -->
+<!-- 匯出題目 HTML：題型 → 範圍 → 科目 -->
+<div class="cov" id="exp-ov">
+  <div class="cbox" style="max-width:420px">
+    <div class="cbt">匯出題目 HTML</div>
+    <div class="chips" id="exp-type" style="padding:8px 0 2px;justify-content:center"></div>
+    <div class="chips" id="exp-range" style="padding:2px 0 6px;justify-content:center"></div>
+    <div id="exp-subj-wrap">
+      <div class="cbs" style="margin-bottom:6px">科目（可複選，不選＝全部科目）</div>
+      <div id="exp-subj" style="max-height:36vh;overflow:auto;margin-bottom:8px;text-align:left;overscroll-behavior:contain"></div>
+    </div>
+    <div class="cbs" id="exp-count"></div>
+    <div class="cbn">
+      <button class="btn br bw" onclick="closeExportOv()">取消</button>
+      <button class="btn br bw" onclick="doExport()">匯出</button>
+    </div>
+  </div>
+</div>
 <div class="cov" id="subj-ov">
   <div class="cbox" style="max-width:420px">
     <div class="cbt">選擇科目</div>
