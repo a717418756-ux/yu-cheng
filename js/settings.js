@@ -350,8 +350,10 @@ function _buildHTML(qs, title, isEs){
   const d=new Date().toLocaleDateString('zh-TW');
   const esCss = isEs ? [...document.styleSheets].flatMap(sh => { try{ return [...sh.cssRules]; }catch(e){ return []; } })
     .filter(r => /^\.es-(?!kw)/.test(r.selectorText || '')).map(r => r.cssText).join('')
-    + '.es-paper,.es-paper-hd,.es-paper-body{-webkit-print-color-adjust:exact;print-color-adjust:exact}' : '';
-  let out='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(title)+'</title><style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px;line-height:1.8;color:#111}h1{font-size:22px;border-bottom:2px solid #333;padding-bottom:7px}h2{font-size:17px;color:#1f6feb;margin-top:28px}.q{margin:14px 0;padding:14px;border:1px solid #ddd;border-radius:8px}.qn{font-size:11px;color:#666}.qs{font-size:14px;font-weight:600;margin-bottom:8px;white-space:pre-wrap}.opt{font-size:13px;margin:3px 0}.ans{margin-top:8px;font-size:12px;color:#1f6feb;font-weight:600}.note{font-size:11px;color:#666;white-space:pre-wrap}'+esCss+'</style></head><body><h1>'+esc(title)+' — '+d+'</h1>';
+    + '.es-paper,.es-paper-hd,.es-paper-body{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    // 版面與平台答題畫面一致：題目 16px、外框拿掉讓答案卷用滿寬度（原本卡片內距使答案卷變窄、字顯得小）
+    + 'body{padding:14px 12px}.q{border:0;padding:0;margin:0 0 30px}.qs{font-size:16px;line-height:1.85;font-weight:500;margin-bottom:4px}' : '';
+  let out='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(title)+'</title><style>html{-webkit-text-size-adjust:100%;text-size-adjust:100%}body{font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif;max-width:800px;margin:0 auto;padding:24px;line-height:1.8;color:#111}h1{font-size:22px;border-bottom:2px solid #333;padding-bottom:7px}h2{font-size:17px;color:#1f6feb;margin-top:28px}.q{margin:14px 0;padding:14px;border:1px solid #ddd;border-radius:8px}.qn{font-size:11px;color:#666}.qs{font-size:14px;font-weight:600;margin-bottom:8px;white-space:pre-wrap}.opt{font-size:13px;margin:3px 0}.ans{margin-top:8px;font-size:12px;color:#1f6feb;font-weight:600}.note{font-size:11px;color:#666;white-space:pre-wrap}'+esCss+'</style></head><body><h1>'+esc(title)+' — '+d+'</h1>';
   Object.entries(grp).forEach(([sub,sqs])=>{
     out+='<h2>'+esc(sub)+'</h2>';
     sqs.forEach((q,i)=>{
