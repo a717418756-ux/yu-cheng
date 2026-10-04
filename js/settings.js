@@ -516,51 +516,55 @@ async function _restoreDir(dirHandle, dirName, table, extOf){
 }
 
 // 還原：選擇備份資料夾，讀取並還原所有項目
+//   先選資料夾、讀出 exam_data.json，再確認：顯示資料夾名稱、檔案最後修改時間與題目數，
+//   選錯資料夾或讀到舊檔（例如桌面工具存到別處）時，還沒覆蓋前就看得出來
 async function localRestore(){
   if(!window.showDirectoryPicker){
     toast('你的瀏覽器不支援資料夾存取，請用 Chrome 或 Edge');
     return;
   }
-  cfm('本地完整還原', '所有資料（題庫、法條、答題記錄、設定、倒數日、統計、書庫、影音、學習區教材、英語庫、單字本、健康數據）將被覆蓋，確定繼續？', async()=>{
-    try{
-      const dirHandle = await window.showDirectoryPicker({ mode:'read' });
-      await _keepAwake(async () => {
-        toast('還原中…請保持畫面開啟');
-        let count = 0;
+  try{
+    const dirHandle = await window.showDirectoryPicker({ mode:'read' });
 
-        // ── 題庫、法條等（exam_data.json）──
-        //   ★ 原本任何錯誤都當成「沒有這個檔」略過，檔案壞掉、寫入失敗也顯示「還原完成」。
-        //   現在只有真的沒有這個檔才略過；其他錯誤中止並提示，手機資料維持原樣（整批交易）
-        let examFile = null;
-        try{ examFile = await (await dirHandle.getFileHandle('exam_data.json')).getFile(); }
-        catch(e){ if(e.name !== 'NotFoundError') throw e; }
-        if(examFile){
-          let examData;
-          try{ examData = JSON.parse(await examFile.text()); }
-          catch(e){ throw new Error('exam_data.json 內容損毀，無法讀取'); }
-          count += await _restoreAll(examData, ['questions','laws','attempts','countdowns','usageLogs',
-            'refbooks','learnmedia','englishMaterials','englishVocab','healthLogs']);
-        }
-
-        // ── 書庫、影音、學習區（實際檔案）──
-        count += await _restoreDir(dirHandle, 'ebooks',     'ebooks',       _EXT.ebooks)
-               + await _restoreDir(dirHandle, 'media',      'leisuremedia', _EXT.leisuremedia)
-               + await _restoreDir(dirHandle, 'refbooks',   'refbooks',     _EXT.refbooks)
-               + await _restoreDir(dirHandle, 'learnmedia', 'learnmedia',   _EXT.learnmedia);
-
-        _showDoneDialog('本機還原完成 ✓', [
-          '共 ' + count + ' 個項目已還原。',
-          '',
-          '時間：' + new Date().toLocaleString('zh-TW'),
-          '按「知道了」後會重新整理頁面。',
-        ], ()=> location.reload());
-      });
-    }catch(e){
-      if(e.name === 'AbortError') return;
-      logError('localRestore', e);
-      toast('還原失敗：' + e.message);
+    // ── 題庫、法條等（exam_data.json）：只有真的沒有這個檔才略過，損毀則中止 ──
+    let examFile = null, examData = null;
+    try{ examFile = await (await dirHandle.getFileHandle('exam_data.json')).getFile(); }
+    catch(e){ if(e.name !== 'NotFoundError') throw e; }
+    if(examFile){
+      try{ examData = JSON.parse(await examFile.text()); }
+      catch(e){ throw new Error('exam_data.json 內容損毀，無法讀取（' + e.message + '）'); }
     }
-  });
+    if(!confirm('本地完整還原\n\n'
+      + '資料夾：' + dirHandle.name + '\n'
+      + (examFile
+        ? 'exam_data.json 最後修改：' + new Date(examFile.lastModified).toLocaleString('zh-TW', { hour12:false }) + '\n'
+          + '題目 ' + (examData.questions||[]).length + ' 題、法條 ' + (examData.laws||[]).length + ' 條\n'
+        : '（這個資料夾沒有 exam_data.json，只還原書庫、影音等檔案）\n')
+      + '\n手機上的資料（題庫、法條、答題記錄、設定、倒數日、統計、書庫、影音、學習區教材、英語庫、單字本、健康數據）將被這份備份覆蓋，確定繼續？')) return;
+
+    await _keepAwake(async () => {
+      toast('還原中…請保持畫面開啟');
+      let count = examData ? await _restoreAll(examData, ['questions','laws','attempts','countdowns','usageLogs',
+        'refbooks','learnmedia','englishMaterials','englishVocab','healthLogs']) : 0;
+
+      // ── 書庫、影音、學習區（實際檔案）──
+      count += await _restoreDir(dirHandle, 'ebooks',     'ebooks',       _EXT.ebooks)
+             + await _restoreDir(dirHandle, 'media',      'leisuremedia', _EXT.leisuremedia)
+             + await _restoreDir(dirHandle, 'refbooks',   'refbooks',     _EXT.refbooks)
+             + await _restoreDir(dirHandle, 'learnmedia', 'learnmedia',   _EXT.learnmedia);
+
+      _showDoneDialog('本機還原完成 ✓', [
+        '共 ' + count + ' 個項目已還原。',
+        '',
+        '時間：' + new Date().toLocaleString('zh-TW'),
+        '按「知道了」後會重新整理頁面。',
+      ], ()=> location.reload());
+    });
+  }catch(e){
+    if(e.name === 'AbortError') return;
+    logError('localRestore', e);
+    toast('還原失敗：' + e.message);
+  }
 }
 
 // 輔助：Blob → base64 字串
