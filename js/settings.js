@@ -62,10 +62,16 @@ async function _restoreTable(name, rows){
   return rows.length;
 }
 // 設定逐筆覆蓋、不清空
+// 設定逐筆覆蓋、不清空。
+//   ★ 連線設定（雲端網址、密碼、Azure 金鑰）只在手機上「還沒設定」時才從備份補上：
+//   新手機還原一次就能用；但已經設好的不會被舊備份蓋回舊值
+//   （Apps Script 重新部署會換網址，用舊備份還原後網址變回舊的 → 雲端一直 HTTP 404）
+const _CONN_KEYS = [GAS_URL_KEY, GAS_PWD_KEY, 'tts_azure_key'];
 async function _restoreSettings(rows){
   let n = 0;
   for(const st of (Array.isArray(rows) ? rows : [])){
     if(!st || st.key == null) continue;
+    if(_CONN_KEYS.includes(st.key) && String((await dg('settings', st.key))?.value || '').trim()) continue;
     await dp('settings', st); n++;
   }
   return n;
@@ -94,25 +100,32 @@ async function _keepAwake(fn){
   finally{ lock?.release().catch(()=>{}); }
 }
 
-// 呼叫 Apps Script。網路中斷、Google 端暫時錯誤（5xx、回傳錯誤網頁）自動重試 2 次；
+// 呼叫 Apps Script。網路中斷、Google 端暫時錯誤自動重試（共 4 次）；
 //   有回 JSON 就交給呼叫端判斷（密碼錯誤等不重試）。錯誤訊息改成看得懂的說明。
+// ★ HTTP 404 也要重試：Apps Script 回應時會把請求轉到 Google 的暫存網址取結果，
+//   這一步偶爾回 404（回傳資料大的「還原」最常見），重按幾次就成功，網址本身沒壞。
+//   只有每次都 404 才可能是網址失效。
 async function _gasCall(url, payload){
-  let err;
-  for(let i = 0; i < 3; i++){
-    if(i){ toast('連線不穩，第 ' + i + ' 次重試…'); await new Promise(r => setTimeout(r, 2000 * i)); }
+  let err, n404 = 0;
+  const TRIES = 4;
+  for(let i = 0; i < TRIES; i++){
+    if(i){ toast('Google 暫時沒回應，第 ' + i + ' 次重試…'); await new Promise(r => setTimeout(r, 2000 * i)); }
     try{
       const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain'}, body: payload });
       const txt = await res.text();
       try{ return JSON.parse(txt); }catch(e){}
       if(/accounts\.google\.com|ServiceLogin/.test(txt))
         throw Object.assign(new Error('Apps Script 需要登入：部署時「存取權」要選「任何人」'), { fatal:true });
+      if(res.status === 404) n404++;
       err = new Error(res.ok ? 'Apps Script 沒有回傳資料（可能執行逾時）' : 'HTTP ' + res.status);
-      if(res.status >= 400 && res.status < 500) break;   // 網址錯誤等，重試也沒用
+      if([400, 401, 403, 405].includes(res.status)) break;   // 請求或權限錯誤，重試也沒用
     }catch(e){
       if(e.fatal) throw e;
       err = new Error('網路連線中斷' + (document.hidden ? '（畫面關閉或切到背景時系統會中斷連線）' : ''));
     }
   }
+  if(n404 === TRIES) err = new Error('連續 ' + TRIES + ' 次 HTTP 404：可能是 Google 暫時異常，請稍後再試；'
+    + '若一直如此，代表網址已失效（重新部署會換網址），請到 script.google.com → 部署 → 管理部署，複製目前的網址（結尾是 /exec）貼到設定頁後按儲存');
   throw err;
 }
 
