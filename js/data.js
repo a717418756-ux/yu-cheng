@@ -1539,6 +1539,10 @@ function _lawBody(text, fmt){
     return '<div class="law-ln" style="padding-left:' + stack.length + 'em"><span class="law-mk">' + fmt(m) + '</span><span>' + fmt(t.slice(m.length)) + '</span></div>';
   }).join('');
 }
+// 法條搜尋索引（★ 與 settings.js 的 _blobLaw 公式必須一致）；圖片內容（data:）不納入
+const _lawBlob = l => [l.lawName, l.article, String(l.articleNumber||''), l.title,
+  (l.keywords||[]).join(' '), (l.content||'').startsWith('data:') ? '' : (l.content||'')]
+  .filter(Boolean).join(' ').toLowerCase();
 // 法規類別：儲存值 → 畫面名稱（儲存值寫進備份與桌面工具，不可改；名稱可改）
 const _LAW_CAT = { statute:'法規條文', admin:'行政規則', sop:'SOP', supplement:'補充資料', interpretation:'法律解釋與裁判' };
 // 條文的計數單位：行政規則以「點」分（第 3 點），其餘以「條」分
@@ -2260,6 +2264,36 @@ async function addLawInGroup(){
   }catch(e){logError('addLawInGroup',e);}
 }
 
+// ── 批次填條文標題：一行一條，「第 3 條 定義」或「3 定義」，條號後面的文字就是標題 ──
+//   開啟時預先列出全部條號與現有標題，直接在後面補字即可；清空某行的標題＝刪除該條標題
+async function openLawTitles(){  try{
+  const lawName=S.curLawName; if(!lawName) return;
+  const arts=(await da('laws')).filter(l=>l.lawName===lawName)
+    .sort((a,b)=>(a.articleNumber||art2n(a.article||''))-(b.articleNumber||art2n(b.article||'')));
+  document.getElementById('ltt-name').textContent=lawName;
+  document.getElementById('ltt-text').value=arts.map(l=>(l.article||'').replace(/\s+/g,'')+' '+(l.title||'')).join('\n');
+  document.getElementById('ltt-ov').classList.add('on');
+  }catch(e){ logError('openLawTitles',e); }}
+function closeLawTitles(){ document.getElementById('ltt-ov')?.classList.remove('on'); }
+async function saveLawTitles(){  try{
+  const lawName=S.curLawName;
+  const arts=new Map((await da('laws')).filter(l=>l.lawName===lawName).map(l=>[l.articleNumber||art2n(l.article||''), l]));
+  const unit=_lawUnit([...arts.values()]), changed=[];
+  for(const line of document.getElementById('ltt-text').value.split('\n')){
+    const m=line.trim().match(/^(第\s*[一二三四五六七八九十百千\d]+\s*(?:[-－]\s*\d+\s*)?[條點](?:\s*之\s*[一二三四五六七八九十\d]+)?|\d+(?:[-－之]\d+)?)\s*[：:、.．]?\s*(.*)$/);
+    if(!m) continue;
+    const num=art2n(/^\d/.test(m[1]) ? '第'+m[1].replace(/[-－之](\d+)/,unit+'之$1')+(/[-－之]/.test(m[1])?'':unit) : m[1]);
+    const l=arts.get(num), title=m[2].replace(/^[（(](.*)[）)]$/,'$1').trim();
+    if(!l || (l.title||'')===title) continue;
+    l.title=title; l.searchBlob=_lawBlob(l); changed.push(l);
+  }
+  closeLawTitles();
+  if(!changed.length){ toast('標題沒有變動'); return; }
+  await bulkPut('laws',changed);
+  toast('已更新 '+changed.length+' '+unit+'的標題 ✓');
+  openLawGroup(lawName);
+  }catch(e){ logError('saveLawTitles',e); }}
+
 // 變更整部法規的類別（例如匯入時選錯，或從法規條文改為行政規則）
 //   整部一起改，避免同一部法規的條文分散在不同類別
 async function changeLawCat(){  try{
@@ -2396,11 +2430,7 @@ async function rebuildLawIndex(){  try{
   _majorityFix(l => (l.lawName||'')+'|'+(l.chapter||''), 'part',    l => !!(l.chapter||''));
 
   // 步驟3：重建搜尋索引並寫回
-  for(const l of laws){
-    const _cnt=(l.content||'').startsWith('data:')?'':(l.content||'');
-    l.searchBlob=[l.lawName,l.article,String(l.articleNumber||''),l.title,(l.keywords||[]).join(' '),_cnt]
-      .filter(Boolean).join(' ').toLowerCase();
-  }
+  for(const l of laws) l.searchBlob=_lawBlob(l);
   await bulkPut('laws', laws);
 
   // ── 同步重建題目搜尋索引（補入 year/exam/num）──
@@ -2734,12 +2764,7 @@ async function saveLaw(){  try{
     data.createdAt=ex?.createdAt||Date.now();
   }
   try{
-    // 建立純文字搜尋索引（排除 base64 圖片 content，加速搜尋）
-    const _cnt = (data.content||'').startsWith('data:') ? '' : (data.content||'');
-    data.searchBlob = [
-      data.lawName, data.article, String(data.articleNumber||''),
-      data.title, (data.keywords||[]).join(' '), _cnt
-    ].filter(Boolean).join(' ').toLowerCase();
+    data.searchBlob = _lawBlob(data);   // 純文字搜尋索引
     await dp('laws',data);
     closeLawSh();
     toast(S.editLawId?'法條已更新 ✓':'法條已儲存 ✓');
@@ -2988,21 +3013,29 @@ async function importBulkLaw(){  try{
   const realCat = items[0].category;
   const sameGroup=existing.filter(l=>l.lawName===name &&
     (l.category===realCat || (_lawCat(l.category) && _lawCat(realCat))));
+  // ★ 已存在 → 依條號合併更新，不整部覆蓋：條文內容、編章節換成新的，
+  //   你自己加的標題（新文字沒寫標題時）、關鍵概念、關聯、備註、標記、收藏都保留。
+  //   原本是刪掉整部再匯入，辛苦補的標題、筆記會全部消失。
+  let removed=[];
   if(sameGroup.length>0){
-    const go=confirm('「'+name+'」已有 '+sameGroup.length+' '+_lawUnit(sameGroup)+'資料。\n\n確定 → 覆蓋（刪除舊資料再匯入）\n取消 → 取消匯入');
+    const old=new Map(sameGroup.map(l=>[l.articleNumber||art2n(l.article||''), l]));
+    const go=confirm('「'+name+'」已有 '+sameGroup.length+' '+_lawUnit(sameGroup)+'資料。\n\n'
+      +'確定 → 更新（依條號合併：內容換成新的，你加的標題、關鍵概念、備註、標記、收藏都保留）\n取消 → 取消匯入');
     if(!go) return;
-    // 刪除舊資料
-    for(const l of sameGroup) await dd('laws',l.id);
+    items.forEach(l=>{
+      const o=old.get(l.articleNumber); if(!o) return;
+      old.delete(l.articleNumber);
+      for(const k in o) if(!(k in l)) l[k]=o[k];        // 其他欄位（id 等）沿用
+      Object.assign(l,{ id:o.id, title:l.title||o.title||'', keywords:o.keywords||[], relatedLaws:o.relatedLaws||[],
+        note:o.note||'', hlColor:o.hlColor||'', favorite:!!o.favorite, createdAt:o.createdAt||l.createdAt,
+        source:l.source||o.source||'' });
+    });
+    removed=[...old.values()];                           // 新文字裡已沒有的條文
+    for(const l of removed) await dd('laws',l.id);
   }
-  // 批量匯入同步建立 searchBlob
-  items.forEach(l => {
-    l.searchBlob = [
-      l.lawName, l.article, String(l.articleNumber||''),
-      l.title, (l.keywords||[]).join(' ')
-    , (l.content||'').startsWith('data:') ? '' : (l.content||'')].filter(Boolean).join(' ').toLowerCase();
-  });
+  items.forEach(l => { l.searchBlob = _lawBlob(l); });
   await bulkPut('laws',items);
-  toast('已匯入 '+items.length+' '+_lawUnit(items)+' ✓');
+  toast((sameGroup.length?'已更新 ':'已匯入 ')+items.length+' '+_lawUnit(items)+(removed.length?'，移除 '+removed.length+' '+_lawUnit(removed):'')+' ✓');
   closeBulkLaw();
   renderDB();
   }catch(e){ logError('importBulkLaw',e); }}
@@ -3574,7 +3607,7 @@ const DataMod = {
   rebuildLawIndex,
   formatYearInput,
   editQ,
-  changeLawCat, closeLawCat, _setLawCat,
+  changeLawCat, closeLawCat, _setLawCat, openLawTitles, closeLawTitles, saveLawTitles,
   _flInput, _flPick, _flHide, _flBlur,
   showSearchHelp,
   openYearGroup,
