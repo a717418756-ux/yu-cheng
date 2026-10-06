@@ -828,6 +828,7 @@
         <button class="lv-menu-item" id="lv-star-item" onclick="toggleLvFav();closeLvMenu()">☆ 收藏</button>
         <button class="lv-menu-item" onclick="editLawGroupInfo();closeLvMenu()">⚙ 編輯法規資訊</button>
         <button class="lv-menu-item" onclick="changeLawCat();closeLvMenu()">🏷 變更類別</button>
+        <button class="lv-menu-item" onclick="openLawTitles();closeLvMenu()">✏ 批次填標題</button>
         <button class="lv-menu-item" onclick="openChapterMgr();closeLvMenu()">📑 編輯編章節</button>
         <div style="border-top:1px solid var(--bd);margin:4px 0"></div>
         <button class="lv-menu-item" style="color:var(--red)" onclick="delLawGroup();closeLvMenu()">🗑 刪除整部法規</button>
@@ -1016,6 +1017,18 @@
   </div>
 </div>
 <!-- 科目多選（開始測驗前） -->
+<!-- 批次填條文標題 -->
+<div class="cov" id="ltt-ov">
+  <div class="cbox" style="max-width:480px;width:100%">
+    <div class="cbt">批次填標題</div>
+    <div class="cbs"><span id="ltt-name"></span><br>一行一條，在條號後面打標題即可（例：第 3 條 定義）</div>
+    <textarea id="ltt-text" rows="14" style="width:100%;box-sizing:border-box;margin:6px 0 10px;font-size:14px;line-height:1.8"></textarea>
+    <div class="cbn">
+      <button class="btn br bw" onclick="closeLawTitles()">取消</button>
+      <button class="btn br bw" onclick="saveLawTitles()">儲存</button>
+    </div>
+  </div>
+</div>
 <!-- 變更整部法規的類別 -->
 <div class="cov" id="lcat-ov">
   <div class="cbox" style="max-width:360px">
