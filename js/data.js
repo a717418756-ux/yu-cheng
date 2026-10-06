@@ -1539,6 +1539,8 @@ function _lawBody(text, fmt){
     return '<div class="law-ln" style="padding-left:' + stack.length + 'em"><span class="law-mk">' + fmt(m) + '</span><span>' + fmt(t.slice(m.length)) + '</span></div>';
   }).join('');
 }
+// 法規類別：儲存值 → 畫面名稱（儲存值寫進備份與桌面工具，不可改；名稱可改）
+const _LAW_CAT = { statute:'法規條文', admin:'行政規則', sop:'SOP', supplement:'補充資料', interpretation:'法律解釋與裁判' };
 // 條文的計數單位：行政規則以「點」分（第 3 點），其餘以「條」分
 const _lawUnit = laws => /點/.test(((laws||[])[0]||{}).article||'') ? '點' : '條';
 
@@ -1599,7 +1601,7 @@ async function renderDB(){  try{
 
   const _mkCard = ([name, laws]) => {
     const cat=laws[0].category||'statute';
-    const catLabel={'statute':'法規條文','admin':'行政規則','sop':'SOP','supplement':'補充資料','interpretation':'法律解釋與裁判'}[cat]||cat;
+    const catLabel=_LAW_CAT[cat]||cat;
     const favCount=laws.filter(l=>l.favorite).length;
     const icon=cat==='sop'?'📋':cat==='supplement'?'📄':cat==='admin'?'📑':'⚖';
     const _li=_lawInfo(laws);
@@ -2257,6 +2259,30 @@ async function addLawInGroup(){
       content:'', keywords:[], relatedLaws:[], title:''});
   }catch(e){logError('addLawInGroup',e);}
 }
+
+// 變更整部法規的類別（例如匯入時選錯，或從法規條文改為行政規則）
+//   整部一起改，避免同一部法規的條文分散在不同類別
+async function changeLawCat(){  try{
+  const lawName=(S.curLawName||'').trim();
+  if(!lawName){toast('請先開啟法規');return;}
+  const cur=((await da('laws')).find(l=>l.lawName===lawName)||{}).category||'statute';
+  document.getElementById('lcat-name').textContent=lawName;
+  document.getElementById('lcat-list').innerHTML=Object.entries(_LAW_CAT).map(([v,n])=>
+    '<button class="subj-item'+(v===cur?' on':'')+'" onclick="_setLawCat(\''+v+'\')"><span class="subj-name">'+n+'</span>'
+    +(v===cur?'<span class="subj-cnt">目前</span>':'')+'</button>').join('');
+  document.getElementById('lcat-ov').classList.add('on');
+  }catch(e){ logError('changeLawCat',e); }}
+function closeLawCat(){ document.getElementById('lcat-ov')?.classList.remove('on'); }
+async function _setLawCat(cat){  try{
+  const lawName=S.curLawName;
+  const targets=(await da('laws')).filter(l=>l.lawName===lawName && l.category!==cat);
+  closeLawCat();
+  if(!targets.length){ toast('類別沒有變動'); return; }
+  targets.forEach(l=>{ l.category=cat; });
+  await bulkPut('laws',targets);
+  toast('已改為「'+_LAW_CAT[cat]+'」（'+targets.length+' '+_lawUnit(targets)+'）✓');
+  openLawGroup(lawName);
+  }catch(e){ logError('_setLawCat',e); }}
 
 async function editLawGroupInfo(){  try{
   const lawName=(S.curLawName||window.currentLawName||'').trim();
@@ -3548,6 +3574,7 @@ const DataMod = {
   rebuildLawIndex,
   formatYearInput,
   editQ,
+  changeLawCat, closeLawCat, _setLawCat,
   _flInput, _flPick, _flHide, _flBlur,
   showSearchHelp,
   openYearGroup,
