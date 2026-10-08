@@ -522,7 +522,9 @@ if('serviceWorker' in navigator){
       _showUpdateBanner(reg);
     }
     // 定期檢查更新（每 30 分鐘）
-    setInterval(()=> reg.update(), 30 * 60 * 1000);
+    // 檢查更新失敗（網路不穩、GitHub Pages 暫時沒回應）不影響使用，下次再檢查即可；
+    //   沒接 catch 會變成錯誤紀錄裡的「Promise rejected: Failed to update a ServiceWorker」
+    setInterval(()=> reg.update().catch(()=>{}), 30 * 60 * 1000);
     // App 回到前景時也檢查（手機 PWA 最常見的更新時機）
     document.addEventListener('visibilitychange', ()=>{
       if(document.visibilityState === 'visible') reg.update().catch(()=>{});
