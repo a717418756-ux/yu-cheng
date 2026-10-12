@@ -798,6 +798,10 @@
       </div>
       <div id="lv-count" style="font-size:11px;color:var(--t2);flex-shrink:0;white-space:nowrap"></div>
     </div>
+    <!-- 本法搜尋 -->
+    <button class="vpc-btn vpc-sm" onclick="toggleLvFind()" aria-label="在本法搜尋" title="在本法搜尋" style="color:var(--t2)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    </button>
     <!-- 閱讀/編輯模式切換（toggle switch）-->
     <button id="lv-mode-btn" onclick="toggleLvMode()" title="切換閱讀/編輯模式"
       style="background:none;border:none;cursor:pointer;padding:4px 6px;
@@ -834,6 +838,15 @@
         <button class="lv-menu-item" style="color:var(--red)" onclick="delLawGroup();closeLvMenu()">🗑 刪除整部法規</button>
       </div>
     </div>
+  </div>
+  <!-- 本法搜尋列：找字（上下跳）或輸入條號直接跳 -->
+  <div id="lv-find" class="lv-find hide">
+    <input id="lv-find-q" type="search" placeholder="在本法搜尋，或輸入條號（如 15、12-1）" autocomplete="off"
+      oninput="_lvFindInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();lvFindStep(event.shiftKey?-1:1)}">
+    <span id="lv-find-n" class="lv-find-n"></span>
+    <button onclick="lvFindStep(-1)" aria-label="上一個"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg></button>
+    <button onclick="lvFindStep(1)" aria-label="下一個"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+    <button onclick="closeLvFind()" aria-label="關閉搜尋"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <!-- 章節快速定位列（sticky，openLawGroup 渲染後填入）-->
   <div id="lv-chapter-bar" style="display:none;flex-shrink:0;overflow-x:auto;
@@ -1017,6 +1030,22 @@
   </div>
 </div>
 <!-- 科目多選（開始測驗前） -->
+<!-- 編輯法規資訊（制定機關、修正日期）-->
+<div class="cov" id="linfo-ov">
+  <div class="cbox" style="max-width:400px;width:100%;text-align:left">
+    <div class="cbt" style="text-align:center">編輯法規資訊</div>
+    <div class="cbs" id="linfo-name" style="text-align:center"></div>
+    <label class="fl" for="linfo-org">制定機關</label>
+    <input id="linfo-org" placeholder="如：內政部警政署" style="width:100%;box-sizing:border-box;margin-bottom:12px">
+    <label class="fl" for="linfo-date">發布／修正日期</label>
+    <input id="linfo-date" placeholder="如：1130509、113.5.9、2024/5/9" inputmode="numeric" oninput="_linfoPrev()" style="width:100%;box-sizing:border-box">
+    <div id="linfo-prev" style="font-size:12px;color:var(--t2);margin:6px 0 14px;min-height:18px"></div>
+    <div class="cbn">
+      <button class="btn br bw" onclick="closeLawInfo()">取消</button>
+      <button class="btn br bw" onclick="saveLawInfo()">儲存</button>
+    </div>
+  </div>
+</div>
 <!-- 批次填條文標題 -->
 <div class="cov" id="ltt-ov">
   <div class="cbox" style="max-width:480px;width:100%">
