@@ -189,13 +189,28 @@ function calcNextReview(level, correct) {
   return { level: newLevel, next: Date.now() + days * 86400000 };
 }
 
+// 作答紀錄依題目分組（同一份紀錄陣列只分一次，順序與原陣列相同）。
+//   ★ 原本每題都把全部作答紀錄從頭篩一遍，排序時一題又被比對很多次；
+//   2400 題 × 1.5 萬筆紀錄，按「今日複習」光排序就要 1.6 秒（手機更久），而且紀錄越多越慢。
+//   作答紀錄陣列來自 da() 的快取，有新紀錄時快取會換成新陣列，這裡也就自動重新分組。
+const _atsGroups = new WeakMap();
+function _atsOf(ats, qid) {
+  let g = _atsGroups.get(ats);
+  if (!g) {
+    g = new Map();
+    for (const a of ats) { const l = g.get(a.qid); l ? l.push(a) : g.set(a.qid, [a]); }
+    _atsGroups.set(ats, g);
+  }
+  return g.get(qid) || [];
+}
+
 function getDangerLevel(q, recentAts) {
   // ★ 取「最近」3 次：date 是 'YYYY-MM-DD' 字串，原本 b.date - a.date 得到 NaN，
   //   排序無效 → 實際取到的是最舊的 3 次，近期已連對的題目仍被判成危險。
   //   同日多筆以 id（自增＝寫入先後）排序。
   //   correct 為 null（申論題、無標準答案）不算對錯，排除。
-  const qa = recentAts
-    .filter(a => a.qid === q.id && a.correct !== null && a.correct !== undefined)
+  const qa = _atsOf(recentAts, q.id)
+    .filter(a => a.correct !== null && a.correct !== undefined)
     .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.id || 0) - (a.id || 0));
   const last3 = qa.slice(0, 3);
   const wrongStreak = last3.length >= 2 && last3.every(a => !a.correct);
@@ -232,12 +247,10 @@ async function getPriorityPool(mode = 'all', subjects = null) { try {
     pool = qs.filter(q => q.type === 'es' && bySubj(q));
     return pool;   // 申論不套用危險度排序
   }
+  // 危險等級每題只算一次，再排序（原本每次比較都重算）
   const levelOrder = { '🔴': 0, '🟠': 1, '🟡': 2, '🟢': 3 };
-  pool.sort((a, b) => {
-    const da_ = getDangerLevel(a, ats);
-    const db_ = getDangerLevel(b, ats);
-    return (levelOrder[da_] ?? 3) - (levelOrder[db_] ?? 3);
-  });
+  const rank = new Map(pool.map(q => [q, levelOrder[getDangerLevel(q, ats)] ?? 3]));
+  pool.sort((a, b) => rank.get(a) - rank.get(b));
   return pool;
 } catch(e) { logError('getPriorityPool', e); return []; } }
 
@@ -373,5 +386,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.22.27';    // 定時檢查更新（每 30 分鐘）失敗時不再記成錯誤：網路不穩抓不到 sw.js 屬正常，下次再檢查
+const APP_VERSION  = '4.22.29';    // 複查：①大量新增法條合併時類別整部沿用舊的（手動變更過的不被改回）②法條搜尋索引公式只留 data.js 一份（備份還原共用）③題目解析移除會被覆蓋的搜尋索引計算 ④本地備份 exam_data.json 的參考書／教材影音清單不再夾帶空的檔案欄位
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

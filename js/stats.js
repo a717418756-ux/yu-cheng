@@ -140,7 +140,7 @@ async function clearWrongAts(){  try{
   const ats = await da('attempts');
   const wrong = ats.filter(_isWrong);
   if(!wrong.length){ toast('目前無錯誤記錄'); return; }
-  if(!confirm('確定刪除 ' + wrong.length + ' 筆錯誤作答記錄？\n正確作答記錄保留，此操作無法復原。')) return;
+  if(!await askConfirm('清除錯誤記錄','確定刪除 ' + wrong.length + ' 筆錯誤作答記錄？\n正確作答記錄保留，此操作無法復原。','刪除')) return;
   for(const a of wrong) await dd('attempts', a.id);
   toast('已刪除 ' + wrong.length + ' 筆錯誤記錄 ✓');
   renderStats();

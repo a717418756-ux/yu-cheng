@@ -1234,7 +1234,7 @@ async function applyBatchEdit(){  try{
 
 async function confirmListSelDel(){
   if(!_listSelected.size){ toast('請先選取題目'); return; }
-  if(!confirm(`確定刪除選取的 ${_listSelected.size} 題？`)) return;
+  if(!await askConfirm('刪除題目',`確定刪除選取的 ${_listSelected.size} 題？此操作無法復原。`,'刪除')) return;
   const ids=[..._listSelected];
   for(const id of ids) await dd('questions',id);
   toast(`已刪除 ${ids.length} 題`);
@@ -1455,7 +1455,7 @@ function _toggleDbCard(lawName){
 
 async function confirmDbSelDel(){
   if(!_dbSelected.size){ toast('請先選取法規'); return; }
-  if(!confirm(`確定刪除選取的 ${_dbSelected.size} 筆法規（含所有條文）？`)) return;
+  if(!await askConfirm('刪除法規',`確定刪除選取的 ${_dbSelected.size} 部法規（含所有條文）？此操作無法復原。`,'刪除')) return;
   const all = await da('laws');
   const toDelete = all.filter(l => _dbSelected.has(l.lawName));
   for(const l of toDelete){ await dd('laws', l.id); }
@@ -1539,7 +1539,7 @@ function _lawBody(text, fmt){
     return '<div class="law-ln" style="padding-left:' + stack.length + 'em"><span class="law-mk">' + fmt(m) + '</span><span>' + fmt(t.slice(m.length)) + '</span></div>';
   }).join('');
 }
-// 法條搜尋索引（★ 與 settings.js 的 _blobLaw 公式必須一致）；圖片內容（data:）不納入
+// 法條搜尋索引（存檔、匯入、重建索引、備份還原共用這一份）；圖片內容（data:）不納入
 const _lawBlob = l => [l.lawName, l.article, String(l.articleNumber||''), l.title,
   (l.keywords||[]).join(' '), (l.content||'').startsWith('data:') ? '' : (l.content||'')]
   .filter(Boolean).join(' ').toLowerCase();
@@ -2026,7 +2026,7 @@ async function openLawGroup(lawName, full){  try{
     // 動態顏色（隨資料變）只能 inline；固定樣式已抽到 .law-art-card class
     const dynStyle=hlC?` style="background:linear-gradient(to right, ${hlC}14, var(--bg2) 60%);border-left-color:${hlC}"`:'';
     const noteHtml=l.note?'<div class="law-note-box">📝 '+esc(l.note)+'</div>':'';
-    return '<div data-law-id="'+l.id+'" class="law-art-card"'+dynStyle+'>'
+    return '<div data-law-id="'+l.id+'" data-an="'+(l.articleNumber||art2n(l.article||''))+'" class="law-art-card"'+dynStyle+'>'
       +'<div class="law-art-head">'
         +'<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'
         +'<div class="law-art-acts">'
@@ -2181,11 +2181,77 @@ async function openLawGroup(lawName, full){  try{
     +arts
     +'</div>';
   window.currentLawName=lawName;window.currentLawContent=laws.map(l=>(l.article+(l.title?' '+l.title:'')+(l.content?' '+l.content:'')).trim()).filter(Boolean).join('\n');
+  // 本法搜尋列：換到別部法規就收起；同一部重新整理（存檔後）照原關鍵字重找
+  if(lawName!==S.curLawName) closeLvFind();
+  else if(!document.getElementById('lv-find').classList.contains('hide')) _lvFindRun();
   S.curLawName=lawName; // 供編輯按鈕使用
   document.getElementById('lv').style.display='flex';
   }catch(e){ logError('openLawGroup',e); }}
 
+// ── 本法搜尋：在目前這部法規裡找字（反白、上下跳），或輸入條號直接跳到該條 ──
+let _lvFindHits=[], _lvFindIdx=-1, _lvFindT=0;
+function toggleLvFind(){
+  const bar=document.getElementById('lv-find');
+  if(!bar.classList.contains('hide')){ closeLvFind(); return; }
+  bar.classList.remove('hide');
+  document.getElementById('lv-find-q').focus();
+}
+function closeLvFind(){
+  document.getElementById('lv-find')?.classList.add('hide');
+  const q=document.getElementById('lv-find-q'); if(q) q.value='';
+  _lvFindClear();
+}
+function _lvFindClear(){
+  const body=document.getElementById('lbody');
+  body?.querySelectorAll('mark.lv-hit').forEach(m=>m.replaceWith(m.textContent));
+  body?.normalize();
+  _lvFindHits=[]; _lvFindIdx=-1;
+  const n=document.getElementById('lv-find-n'); if(n) n.textContent='';
+}
+function _lvFindInput(){ clearTimeout(_lvFindT); _lvFindT=setTimeout(_lvFindRun,250); }
+function _lvFindRun(){
+  _lvFindClear();
+  const q=(document.getElementById('lv-find-q')?.value||'').trim(), n=document.getElementById('lv-find-n');
+  if(!q) return;
+  const body=document.getElementById('lbody');
+  // 條號：「15」「第15條」「15-1」「第三點」→ 直接跳到該條（有這條才跳，否則當一般文字找）
+  const m=q.match(/^(?:第\s*)?([\d一二三四五六七八九十百千]+)(?:\s*[-－之]\s*(\d+))?\s*[條點]?$/);
+  const card=m && body.querySelector('.law-art-card[data-an="'+art2n('第'+m[1]+'條'+(m[2]?'之'+m[2]:''))+'"]');
+  if(card){ _lvFindFlash(card); n.textContent='已跳到該條'; return; }
+  // 文字：只找條號標題與條文內容（不含按鈕、關聯標籤），不分大小寫
+  const lq=q.toLowerCase(), nodes=[];
+  body.querySelectorAll('.law-art-head > span, .law-art-body').forEach(el=>{
+    const w=document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for(let t; (t=w.nextNode());) if(t.nodeValue.toLowerCase().includes(lq)) nodes.push(t);
+  });
+  for(const t of nodes){
+    let node=t, i;
+    while(node && (i=node.nodeValue.toLowerCase().indexOf(lq))>=0){
+      const hit=node.splitText(i); node=hit.splitText(q.length);
+      const mk=document.createElement('mark'); mk.className='lv-hit'; mk.textContent=hit.nodeValue;
+      hit.replaceWith(mk); _lvFindHits.push(mk);
+    }
+  }
+  if(!_lvFindHits.length){ n.textContent='找不到'; return; }
+  lvFindStep(1);
+}
+function lvFindStep(d){
+  if(!_lvFindHits.length){ _lvFindRun(); return; }
+  _lvFindHits[_lvFindIdx]?.classList.remove('cur');
+  _lvFindIdx=(_lvFindIdx+d+_lvFindHits.length)%_lvFindHits.length;
+  const mk=_lvFindHits[_lvFindIdx];
+  mk.classList.add('cur');
+  mk.scrollIntoView({block:'center'});
+  document.getElementById('lv-find-n').textContent=(_lvFindIdx+1)+' / '+_lvFindHits.length;
+}
+function _lvFindFlash(card){
+  card.scrollIntoView({block:'start'});
+  card.classList.remove('lv-flash'); void card.offsetWidth; card.classList.add('lv-flash');
+  setTimeout(()=>card.classList.remove('lv-flash'),1300);
+}
+
 function exitLaw(){
+  closeLvFind();
   document.getElementById('lv').style.display='none';
   const cb = document.getElementById('lv-chapter-bar');
   if(cb){ cb.innerHTML=''; cb.style.display='none'; }
@@ -2318,26 +2384,35 @@ async function _setLawCat(cat){  try{
   openLawGroup(lawName);
   }catch(e){ logError('_setLawCat',e); }}
 
+// 編輯法規資訊（制定機關、發布／修正日期）：一個表單填完，日期即時顯示換算結果
 async function editLawGroupInfo(){  try{
-  const lawName=(S.curLawName||window.currentLawName||'').trim();
+  const lawName=(S.curLawName||'').trim();
   if(!lawName){toast('請先開啟法規');return;}
-  const allLaws=await da('laws');
-  const sample=allLaws.find(l=>l.lawName===lawName)||{};
-  const newOrg=prompt('制定機關（如：行政院、內政部）：',sample.org||'');
-  if(newOrg===null)return;
-  const rawAmend=prompt('發布／修正日期（格式：YYYMMDD，如 1130509 = 民國113年05月09日）：',sample.amendDate||'');
-  if(rawAmend===null)return;
-  // 解析 YYYMMDD 格式
-  const parsedAmend=parseMinguoDate(rawAmend.trim());
-  const targets=allLaws.filter(l=>l.lawName===lawName);
-  for(const l of targets){
-    l.org=newOrg.trim();
-    l.amendDate=parsedAmend;
-    await dp('laws',l);
-  }
-  toast('法規資訊已更新（共'+targets.length+'條）✓');
-  openLawGroup(lawName);
+  const info=_lawInfo((await da('laws')).filter(l=>l.lawName===lawName));
+  document.getElementById('linfo-name').textContent=lawName;
+  document.getElementById('linfo-org').value=info.org;
+  document.getElementById('linfo-date').value=info.amendDate;
+  _linfoPrev();
+  document.getElementById('linfo-ov').classList.add('on');
   }catch(e){ logError('editLawGroupInfo',e); }}
+function closeLawInfo(){ document.getElementById('linfo-ov')?.classList.remove('on'); }
+// 日期輸入即時換算：1130509、113.5.9、2024/5/9 都換成「民國113年05月09日」；換不出來就提示
+function _linfoPrev(){
+  const raw=document.getElementById('linfo-date').value.trim(), v=parseMinguoDate(raw);
+  const el=document.getElementById('linfo-prev');
+  el.textContent=!raw ? '（不填＝清除日期）' : /^民國\d+年\d{2}月\d{2}日$/.test(v) ? '→ '+v : '⚠ 無法辨識，會照原文儲存';
+}
+async function saveLawInfo(){  try{
+  const lawName=S.curLawName;
+  const org=document.getElementById('linfo-org').value.trim();
+  const amendDate=parseMinguoDate(document.getElementById('linfo-date').value.trim());
+  const targets=(await da('laws')).filter(l=>l.lawName===lawName);
+  targets.forEach(l=>{ l.org=org; l.amendDate=amendDate; });
+  await bulkPut('laws',targets);
+  closeLawInfo();
+  toast('法規資訊已更新 ✓');
+  openLawGroup(lawName);
+  }catch(e){ logError('saveLawInfo',e); }}
 
 // 解析民國日期：1130509 → 民國113年05月09日
 function parseMinguoDate(s){
@@ -2488,7 +2563,7 @@ async function delLawGroup(lawName){  try{
   const all=await da('laws');
   const targets=all.filter(l=>l.lawName===lawName);
   if(!targets.length){toast('找不到對應法條');return;}
-  if(!confirm('確定刪除「'+lawName+'」全部 '+targets.length+' 條？無法復原。'))return;
+  if(!await askConfirm('刪除整部法規','確定刪除「'+lawName+'」全部 '+targets.length+' '+_lawUnit(targets)+'？此操作無法復原。','刪除'))return;
   for(const l of targets) await dd('laws',l.id);
   toast('已刪除「'+lawName+'」共 '+targets.length+' 條');
   // 若正在檢視這部法規，關閉檢視
@@ -2497,7 +2572,7 @@ async function delLawGroup(lawName){  try{
   }catch(e){ logError('delLawGroup',e); }}
 
 async function delLaw(id){  try{
-  if(!confirm('確定刪除此條文？'))return;
+  if(!await askConfirm('刪除條文','確定刪除此條文？此操作無法復原。','刪除'))return;
   await dd('laws',id);
   toast('已刪除');
   renderDB();
@@ -3014,15 +3089,20 @@ async function importBulkLaw(){  try{
   const sameGroup=existing.filter(l=>l.lawName===name &&
     (l.category===realCat || (_lawCat(l.category) && _lawCat(realCat))));
   // ★ 已存在 → 依條號合併更新，不整部覆蓋：條文內容、編章節換成新的，
-  //   你自己加的標題（新文字沒寫標題時）、關鍵概念、關聯、備註、標記、收藏都保留。
+  //   你自己加的標題（新文字沒寫標題時）、類別、關鍵概念、關聯、備註、標記、收藏都保留。
   //   原本是刪掉整部再匯入，辛苦補的標題、筆記會全部消失。
   let removed=[];
   if(sameGroup.length>0){
     const old=new Map(sameGroup.map(l=>[l.articleNumber||art2n(l.article||''), l]));
-    const go=confirm('「'+name+'」已有 '+sameGroup.length+' '+_lawUnit(sameGroup)+'資料。\n\n'
-      +'確定 → 更新（依條號合併：內容換成新的，你加的標題、關鍵概念、備註、標記、收藏都保留）\n取消 → 取消匯入');
+    const go=await askConfirm('更新法規','「'+name+'」已有 '+sameGroup.length+' '+_lawUnit(sameGroup)+'資料。\n\n'
+      +'將依條號合併：內容換成新的，你加的標題、類別、關鍵概念、備註、標記、收藏都保留。','更新');
     if(!go) return;
+    // 類別整部沿用舊的（手動「變更類別」過的不被改回，新增的條文也跟著同一類）；
+    //   唯一例外：舊的是法規條文、新文字是「點」格式 → 確定是行政規則
+    const oldCat=sameGroup[0].category;
+    const cat=oldCat==='statute' && realCat==='admin' ? 'admin' : oldCat;
     items.forEach(l=>{
+      l.category=cat;
       const o=old.get(l.articleNumber); if(!o) return;
       old.delete(l.articleNumber);
       for(const k in o) if(!(k in l)) l[k]=o[k];        // 其他欄位（id 等）沿用
@@ -3507,7 +3587,8 @@ async function importBulk(){
     const existSet=new Set(existing.map(dupKey));
     const dupItems=items.filter(q=>existSet.has(dupKey(q)));
     if(dupItems.length>0){
-      const go=confirm('發現 '+dupItems.length+' 題已存在（相同年度+考試別+科目+題號）。\n\n確定 → 全部匯入（保留原有）\n取消 → 略過重複，只匯入 '+(items.length-dupItems.length)+' 題');
+      const go=await askConfirm('發現重複題目','有 '+dupItems.length+' 題已存在（相同年度＋考試別＋科目＋題號）。\n\n'
+        +'全部匯入：重複的也匯入（保留原有）\n略過重複：只匯入 '+(items.length-dupItems.length)+' 題','全部匯入','略過重複');
       if(!go){
         const newItems=items.filter(q=>!existSet.has(dupKey(q)));
         if(!newItems.length){toast('無新題目可匯入');return;}
@@ -3606,8 +3687,9 @@ const DataMod = {
   toggleLawSort,
   rebuildLawIndex,
   formatYearInput,
-  editQ,
-  changeLawCat, closeLawCat, _setLawCat, openLawTitles, closeLawTitles, saveLawTitles,
+  editQ, _lawBlob,
+  changeLawCat, closeLawCat, _setLawCat, closeLawInfo, saveLawInfo, _linfoPrev,
+  toggleLvFind, closeLvFind, _lvFindInput, lvFindStep, openLawTitles, closeLawTitles, saveLawTitles,
   _flInput, _flPick, _flHide, _flBlur,
   showSearchHelp,
   openYearGroup,

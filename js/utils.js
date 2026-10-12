@@ -103,7 +103,7 @@ function art2n(art){
 function getWrong(qs,ats){
   const s=new Set();
   for(const q of qs){
-    const qa=ats.filter(a=>a.qid===q.id&&a.correct!==null).sort((a,b)=>b.date>a.date?1:-1);
+    const qa=_atsOf(ats,q.id).filter(a=>a.correct!==null).sort((a,b)=>b.date>a.date?1:-1);   // 分組見 db.js
     if(!qa.length)continue;
     const r=qa.slice(0,3);
     if(r.every(a=>!a.correct)||(qa.filter(a=>!a.correct).length/qa.length>0.5&&qa.length>=2))s.add(q.id);
@@ -122,15 +122,29 @@ function debounce(fn, delay=200){
 
 // Confirm dialog
 let _cfmCb=null;
-function cfm(t,s,cb){
+let _cfmCancel=null;   // 取消（按取消、返回鍵）時要通知的對象（askConfirm 用）
+function cfm(t,s,cb,okText,cnText){
+  const prev=_cfmCancel; _cfmCancel=null; prev?.();   // 前一個還沒回覆的確認視窗視為取消
   _cfmCb=cb;
   document.getElementById('cfm-t').textContent=t;
   document.getElementById('cfm-s').textContent=s;
-  document.getElementById('cfm-ok').onclick=()=>{closeCfm();_cfmCb?.();};
-  document.getElementById('cfm-cn').onclick=()=>closeCfm();
+  const ok=document.getElementById('cfm-ok');
+  ok.textContent=okText||'確認';
+  ok.onclick=()=>{_cfmCancel=null;closeCfm();_cfmCb?.();};
+  const cn=document.getElementById('cfm-cn');
+  cn.textContent=cnText||'取消';
+  cn.onclick=()=>closeCfm();
   document.getElementById('cfm-ov').classList.add('on');
 }
-function closeCfm(){ document.getElementById('cfm-ov').classList.remove('on'); }
+function closeCfm(){
+  document.getElementById('cfm-ov').classList.remove('on');
+  const c=_cfmCancel; _cfmCancel=null; c?.();
+}
+// 確認視窗（Promise 版）：取代瀏覽器原生 confirm()，外觀與 App 一致、電子紙也清楚。
+//   按確認 → true；按取消或手機返回鍵 → false。用法：if(!await askConfirm('刪除', '確定？')) return;
+function askConfirm(t,s,okText,cnText){
+  return new Promise(r=>{ cfm(t,s,()=>r(true),okText,cnText); _cfmCancel=()=>r(false); });
+}
 
 const OCR_FIX = {
   '職橾':'職權','職棰':'職權','職権':'職權',
@@ -559,7 +573,6 @@ function parseQuestions(rawText){
     ...q,
     keywords: autoKeywords(q.stem),
     mustKeywords: [],
-    searchBlob: ((q.stem||'')+' '+(autoKeywords(q.stem)||[]).join(' ')).toLowerCase(),
   }));
 }
 

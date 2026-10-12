@@ -362,6 +362,10 @@ function _handleBackLayer(){
   const cfmOv = document.getElementById('cfm-ov');
   if(cfmOv && cfmOv.classList.contains('on')){ _callIf('closeCfm'); return true; }
 
+  // 1-1) 法條小視窗（疊在答題、法規頁之上）：從清單點進來的先回清單，與按 ✕ 相同
+  //      ★ 原本沒攔，答題中看法條按返回會直接離開測驗
+  if(_isShown(document.getElementById('lawpop-ov'))){ _callIf('closeLawPop'); return true; }
+
   // 2) FAB 
   const fabOv = document.getElementById('fab-overlay');
   if(fabOv && fabOv.classList.contains('open')){ _callIf('closeFab'); return true; }
@@ -397,14 +401,21 @@ function _handleBackLayer(){
   const ovMap = {
     'heatmap-ov':'closeHeatmapOv', 'bulk-ov':'closeBulkQ',
     'add-ov':'closeAdd', 'law-ov':'closeLawSh', 'blaw-ov':'closeBulkLaw',
-    'subj-ov':'closeSubjPick', 'qnote-ov':'closeQNote', 'exp-ov':'closeExportOv', 'lcat-ov':'closeLawCat', 'ltt-ov':'closeLawTitles',
+    'subj-ov':'closeSubjPick', 'qnote-ov':'closeQNote', 'exp-ov':'closeExportOv', 'lcat-ov':'closeLawCat', 'ltt-ov':'closeLawTitles', 'linfo-ov':'closeLawInfo',
   };
   const opened = [...document.querySelectorAll('.ov.on, .cov.on')];
   if(opened.length){
     const top = opened[opened.length - 1];
-    if(!_callIf(ovMap[top.id])) top.classList.remove('on');   // 
+    // 動態產生的視窗（如還原完成）帶有自己的 _close：返回鍵與按鈕走同一條路（例如關閉後要重新整理）
+    if(!_callIf(ovMap[top.id])) top._close ? top._close() : top.classList.remove('on');   // 
     return true;
   }
+
+  // 6-1) 法規頁的 ⋮ 選單、本法搜尋列：先收起，不直接離開法規頁
+  const lvMenu = document.getElementById('lv-menu');
+  if(lvMenu && lvMenu.style.display === 'block'){ _callIf('closeLvMenu'); return true; }
+  const lvFind = document.getElementById('lv-find');
+  if(lvFind && !lvFind.classList.contains('hide')){ _callIf('closeLvFind'); return true; }
 
   // 7)   display:flex  exitLaw
   const lv = document.getElementById('lv');

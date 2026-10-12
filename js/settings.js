@@ -39,13 +39,12 @@ async function _backupSettings(){
 }
 
 // 搜尋索引 searchBlob 由其他欄位算得，不寫進備份（約省 1/4 容量），還原時重建。
-// ★ 公式必須與 data.js 的 saveQ／saveLaw 完全一致。
+// ★ 題目公式必須與 data.js 的 saveQ 完全一致（法條直接用 data.js 的 _lawBlob）。
 const _noBlob = rows => rows.map(({ searchBlob, ...r }) => r);
+// 檔案類清單去掉檔案本體與縮圖（JSON 存不了 Blob，原本只會變成空物件 {}）
+const _noFile = ({ blob, coverBlob, coverThumb, spineThumb, thumbnail, ...r }) => r;
 const _blobQ = q => ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+(q.year||'')+' '
   +(q.exam||'')+' '+(q.num||'')+' '+(q.keywords||[]).join(' ')).toLowerCase();
-const _blobLaw = l => [l.lawName, l.article, String(l.articleNumber||''), l.title,
-  (l.keywords||[]).join(' '), (l.content||'').startsWith('data:') ? '' : (l.content||'')]
-  .filter(Boolean).join(' ').toLowerCase();
 
 // 還原一個資料表：檔案「有這個表」就以檔案為準，空陣列也會清空；
 // 檔案「沒有這個表」（舊版備份、雲端備份沒有學習區）才略過，保留手機現有資料。
@@ -55,7 +54,7 @@ async function _restoreTable(name, rows){
   if(name === 'questions') rows = rows.map(q => ({ ...q, searchBlob: _blobQ(q) }));
   if(name === 'laws')      rows = rows.map(l => {   // 條號一律以 art2n 為準（舊備份、桌面版寫回的可能是舊格式）
     const r = { ...l, articleNumber: art2n(l.article) || l.articleNumber || 0 };
-    r.searchBlob = _blobLaw(r); return r;
+    r.searchBlob = _lawBlob(r); return r;   // 公式在 data.js
   });
   await dc(name);
   if(rows.length) await bulkPut(name, rows);
@@ -197,8 +196,8 @@ async function gdriveBackup(){ try{
       // 大小以實際送出的內容計算（備份字串再包一層，引號會被跳脫，比原檔大）
       const payload = JSON.stringify({ password: pwd, action: 'backup', filename: GAS_BACKUP_FILE, data: body });
       const size = new Blob([payload]).size;
-      if(size > GAS_SIZE_WARN && !confirm('雲端備份檔 ' + _mb(size) + '，接近 Google Apps Script 的上傳上限，可能會失敗。\n'
-          + '建議改用「本機完整備份」。仍要上傳？')) return;
+      if(size > GAS_SIZE_WARN && !await askConfirm('備份檔偏大', '雲端備份檔 ' + _mb(size) + '，接近 Google Apps Script 的上傳上限，可能會失敗。\n'
+          + '建議改用「本機完整備份」。', '仍要上傳')) return;
       const json = await _gasCall(url, payload);
       if(!json.ok){ toast('備份失敗：'+(json.error||'未知錯誤')); return; }
       const t = new Date().toLocaleString('zh-TW');
@@ -445,8 +444,10 @@ async function localBackup(){
           settings: settings,
           countdowns: countdowns,
           usageLogs: usageLogs,
-          refbooks: refbooks,
-          learnmedia: learnmedia,
+          // 參考書、教材影音的檔案本體在 refbooks／learnmedia 子資料夾，這裡只放清單（不含檔案與縮圖）；
+          //   鍵名保留：桌面工具靠「有沒有這兩個鍵」分辨本機檔與雲端檔
+          refbooks: refbooks.map(_noFile),
+          learnmedia: learnmedia.map(_noFile),
           englishMaterials: engMats,
           // 單字本與健康數據：純文字無 blob，先前漏備份會導致還原後資料消失
           englishVocab: engVocab,
@@ -547,13 +548,12 @@ async function localRestore(){
       try{ examData = JSON.parse(await examFile.text()); }
       catch(e){ throw new Error('exam_data.json 內容損毀，無法讀取（' + e.message + '）'); }
     }
-    if(!confirm('本地完整還原\n\n'
-      + '資料夾：' + dirHandle.name + '\n'
+    if(!await askConfirm('本地完整還原', '資料夾：' + dirHandle.name + '\n'
       + (examFile
         ? 'exam_data.json 最後修改：' + new Date(examFile.lastModified).toLocaleString('zh-TW', { hour12:false }) + '\n'
           + '題目 ' + (examData.questions||[]).length + ' 題、法條 ' + (examData.laws||[]).length + ' 條\n'
         : '（這個資料夾沒有 exam_data.json，只還原書庫、影音等檔案）\n')
-      + '\n手機上的資料（題庫、法條、答題記錄、設定、倒數日、統計、書庫、影音、學習區教材、英語庫、單字本、健康數據）將被這份備份覆蓋，確定繼續？')) return;
+      + '\n手機上的資料（題庫、法條、答題記錄、設定、倒數日、統計、書庫、影音、學習區教材、英語庫、單字本、健康數據）將被這份備份覆蓋，確定繼續？', '還原')) return;
 
     await _keepAwake(async () => {
       toast('還原中…請保持畫面開啟');
@@ -655,6 +655,7 @@ function _showDoneDialog(title, lines, onClose){
     + '</div>'
     + '</div>';
   ov.onclick = (e)=>{ if(e.target === ov) close(); };
+  ov._close = close;   // 手機返回鍵也走同一個關閉（還原後要重新整理）
   document.body.appendChild(ov);
   document.getElementById('done-dialog-ok').onclick = close;
 }

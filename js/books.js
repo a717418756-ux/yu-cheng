@@ -1055,7 +1055,7 @@ async function _quickToggleBookFav(id, btn){
 }
 
 async function confirmDeleteBook(id){
-  if(!confirm('確定刪除這本書？此操作無法復原。')) return;
+  if(!await askConfirm('刪除書籍','確定刪除這本書？此操作無法復原。','刪除')) return;
   await dd('ebooks',id);
   _B.allBooks=_B.allBooks.filter(b=>b.id!==id);
   _renderBooksPage(); toast('已刪除');
@@ -2141,7 +2141,7 @@ function _toggleBookSelect(id, el){
 
 async function _executeBooksDelete(){
   if(!_B.bulkSelected.size){toast('請先勾選書本');return;}
-  if(!confirm(`確定刪除 ${_B.bulkSelected.size} 本書？此操作無法復原。`)) return;
+  if(!await askConfirm('刪除書籍',`確定刪除 ${_B.bulkSelected.size} 本書？此操作無法復原。`,'刪除')) return;
   const ids=[..._B.bulkSelected];
   for(const id of ids){
     await dd('ebooks',id);
