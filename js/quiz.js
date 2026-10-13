@@ -44,7 +44,7 @@ async function _resumeIfAny(mode){
   const s = await getSetting(_resumeKey(mode), null);
   if(!s?.ids?.length) return false;
   if(!await askConfirm('接續上次的進度？',
-      '已作答 ' + s.idx + '／' + s.ids.length + ' 題，接著從第 ' + (s.idx + 1) + ' 題開始\n（' + new Date(s.at).toLocaleDateString('zh-TW') + ' 離開）',
+      '已完成 ' + s.idx + '／' + s.ids.length + ' 題，接著從第 ' + (s.idx + 1) + ' 題開始\n（' + new Date(s.at).toLocaleDateString('zh-TW') + ' 離開）',
       '接續', '重新開始')) return false;
   // 期間刪掉的題目略過，進度跟著往前算
   const byId = new Map((await da('questions')).map(q => [q.id, q]));
@@ -229,6 +229,7 @@ function renderQCard(){
   document.getElementById('qink-btn')?.classList.add('hide');
   document.getElementById('qnote-btn')?.classList.add('hide');
   document.getElementById('qedit-btn')?.classList.add('hide');
+  document.getElementById('qtts-btn')?.classList.add('hide');
   if(_inkOn){
     _inkOn = false;
     document.getElementById('qink')?.classList.remove('on');
@@ -429,6 +430,7 @@ function _afterAnswer(qu){
   document.getElementById('qnxt').classList.remove('hide');
   // 作答後才開放（作答前不干擾判斷）
   ['qink-btn','qnote-btn','qedit-btn'].forEach(id => document.getElementById(id)?.classList.remove('hide'));
+  document.getElementById('qtts-btn')?.classList.toggle('hide', qu.type !== 'es');   // 申論才有朗讀
   // 版面此時會多出解析區，稍候再同步筆跡（此刻才允許顯示）
   setTimeout(_inkSync, 60);
   _updateNoteBtn();
@@ -556,11 +558,25 @@ function _esPaperHtml(qu){
     + '</div>';
 }
 
+// 申論朗讀：先唸題目，再逐行唸參考答案；反白跟著答案卷每一行走
+//   答案卷每一行對應參考答案的一行（_esPaperHtml 用同一套切行）
+function ttsEssay(){
+  const qu = S.quiz.q[S.quiz.idx];
+  if(!qu) return;
+  const lines = String(qu.answerEs || qu.answer || '').split(/\n+/).map(t => t.trim()).filter(Boolean);
+  const lnEls = [...document.querySelectorAll('#qres .es-ln')];
+  const stemEl = document.getElementById('qstem');
+  ttsReadSegs(['題目。' + stemEl.innerText.trim(), '參考答案。', ...lines],
+              '✍ ' + (qu.subject || '申論') + (qu.num ? ' 第' + qu.num + '題' : ''),
+              [stemEl, lnEls[0] || null, ...lines.map((_, i) => lnEls[i] || null)]);
+}
+
 // ════════ 流程控制 ════════
 // ════════════════════════════════════════════════════════════
 // 【答題：導覽與收藏】
 // ════════════════════════════════════════════════════════════
 function nextQ(){
+  _ttsStop();   // 換題：上一題的朗讀不再接著唸
   S.quiz.idx++;
   S.quiz.ans = false;
   renderQCard();
@@ -576,6 +592,7 @@ function exitQ(){
     return;
   }
   _stopMockTimer();   // 中途離開也要停止倒數
+  _ttsStop();
   _inkTeardown();
   document.getElementById('qv').style.display = 'none';
   S.quiz = {q:[], idx:0, ans:false, res:[], mode:''};
@@ -1125,7 +1142,7 @@ const Quiz = { startQ, startQWithPool, startQPick,
                toggleInk, inkUndo, inkClear, inkColor, inkCustomColor, inkSize, inkMode,
                startMockExam, beginMockExam,
                openQNote, closeQNote, saveQNote, endQuizNow,
-               submitAnswer, nextQ, exitQ, revealES, toggleQStar, editQInQuiz, _quizRefreshQ, _esPaperHtml };
+               submitAnswer, nextQ, exitQ, revealES, toggleQStar, editQInQuiz, _quizRefreshQ, _esPaperHtml, ttsEssay };
 window.Quiz = Quiz;
 Object.assign(window, Quiz);
 

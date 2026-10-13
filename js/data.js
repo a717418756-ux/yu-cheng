@@ -2030,6 +2030,7 @@ async function openLawGroup(lawName, full){  try{
       +'<div class="law-art-head">'
         +'<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'
         +'<div class="law-art-acts">'
+          +'<button onclick="ttsArt('+l.id+')" class="law-tts-btn" aria-label="朗讀這一條">🔊</button>'
           +'<button onclick="editLawInView('+l.id+')" class="law-edit-btn">✏</button>'
           +'<button onclick="delLaw('+l.id+')" class="law-del-btn">🗑</button>'
         +'</div>'
@@ -3126,6 +3127,7 @@ async function importBulkLaw(){  try{
 function _showLawListPop(lawName, laws, notFound){
   const el = document.getElementById('lawpop-ov');
   if(!el) return;
+  _setLawPopCur(null);
   const titleEl = document.getElementById('lawpop-title');
   const bodyEl  = document.getElementById('lawpop-body');
   const relEl   = document.getElementById('lawpop-related');
@@ -3228,6 +3230,7 @@ function _pickLawNames(part, names = _lawNameCache || []){
 async function showLawPop(ref){  try{
   if(!ref)return;
   _lawPopBack = null;   // 開新的彈窗內容：✕ 直接關閉（從清單點進來的由 _lawPopFromList 另外記）
+  _setLawPopCur(null);
   const laws=await da('laws');
   // 「§」是常見的條號簡寫（§2＝第2條、§2-1＝第2條之1），但 art2n() 與下面的
   // 「第X條」定位正則都只認得標準寫法，遇到§會完全解析不出條號，導致 artNum
@@ -3278,12 +3281,37 @@ async function showLawPop(ref){  try{
   }
   const l=matched[0];
   const isImg=l.content&&l.content.startsWith('data:image');
+  _setLawPopCur(l);
   document.getElementById('lawpop-title').textContent=(l.lawName||'')+' '+(l.article||'');
   document.getElementById('lawpop-body').innerHTML=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px">':_lawBody(l.content, esc);
   const rl=(l.relatedLaws||[]).map(r=>'<button class="chip" style="font-size:11px" onclick="showLawPop(\''+esc(r.ref||r.lawName||'')+'\')" >⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('');
   document.getElementById('lawpop-related').innerHTML=rl?'<div style="margin-top:8px;font-size:12px;color:var(--t2)">關聯法條：</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">'+rl+'</div>':'';
   el.style.display='flex';
   }catch(e){ logError('showLawPop',e); }}
+// ── 朗讀單一條文（法規頁每條的 🔊、法條彈窗的 🔊）──────────────
+//   條號＋標題先唸，內文逐行唸；圖片條文沒有文字可唸
+function _lawSpeechSegs(l){
+  if(!l || (l.content||'').startsWith('data:image')) return [];
+  return [((l.article||'')+' '+(l.title||'')).trim(),
+          ...(l.content||'').split('\n').map(t=>t.trim()).filter(t=>t.length>1)].filter(Boolean);
+}
+function _ttsLaw(l, el){
+  const segs = _lawSpeechSegs(l);
+  if(!segs.length){ toast('這一條沒有可朗讀的文字'); return; }
+  ttsReadSegs(segs, '⚖ '+(l.lawName||'')+' '+(l.article||''), segs.map(()=>el));
+}
+async function ttsArt(id){  try{
+  _ttsLaw(await dg('laws', id), document.querySelector('#lbody .law-art-card[data-law-id="'+id+'"]'));
+  }catch(e){ logError('ttsArt', e); }}
+// 彈窗目前顯示的條文（清單、查無時為 null，朗讀鈕隨之隱藏）
+let _lawPopCur = null;
+function _setLawPopCur(l){
+  _lawPopCur = l;
+  const b = document.getElementById('lawpop-tts');
+  if(b) b.style.display = l ? '' : 'none';
+}
+function ttsLawPop(){ if(_lawPopCur) _ttsLaw(_lawPopCur, document.getElementById('lawpop-body')); }
+
 // 從條文清單點進某一條：記住清單與捲動位置，按 ✕ 先回清單，再按一次才關閉
 let _lawPopBack = null;
 async function _lawPopFromList(lawName, ref, btn){
@@ -3687,7 +3715,7 @@ const DataMod = {
   toggleLawSort,
   rebuildLawIndex,
   formatYearInput,
-  editQ, _lawBlob,
+  editQ, _lawBlob, ttsArt, ttsLawPop,
   changeLawCat, closeLawCat, _setLawCat, closeLawInfo, saveLawInfo, _linfoPrev,
   toggleLvFind, closeLvFind, _lvFindInput, lvFindStep, openLawTitles, closeLawTitles, saveLawTitles,
   _flInput, _flPick, _flHide, _flBlur,

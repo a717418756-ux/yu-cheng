@@ -20,6 +20,7 @@
     rate:       1.0,
     voiceURI:   '',
     mode:       '',
+    title:      '',    // 控制列標題（ttsReadSegs 用來判斷是否同一來源）
     panel:      null,
     collapsed:  false,
     audio:      null,  // Azure 播放用的 HTMLAudioElement
@@ -223,7 +224,7 @@
   }
 
   // ── 朗讀核心 ─────────────────────────────────────────────────
-  async function _speak(segments, mode){
+  async function _speak(segments, mode, title){
     // ★ _stop() 會清掉段落對應表；呼叫端（法條、電子書）是在呼叫前才建好的，
     //   原本一開始朗讀就被清空，反白從來沒有作用。先保存、停止後再放回。
     const els = _TTS.highlightEls;
@@ -233,6 +234,7 @@
     _TTS.utterances = segments;
     _TTS.idx        = 0;
     if(mode) _TTS.mode = mode;
+    _TTS.title = title || '';
     await _createPanel(_TTS.mode);
     setTimeout(()=>{
       const s = document.getElementById('tts-rate');
@@ -521,7 +523,7 @@
         <div class="vp-info" style="padding:0 14px 8px">
           <div class="vp-info-text">
             <div class="vp-title" style="font-size:15px">
-              ${mode === 'epub' ? '📖 朗讀本頁' : '⚖ 朗讀法條'}
+              ${esc(_TTS.title || (mode === 'epub' ? '📖 朗讀本頁' : '⚖ 朗讀法條'))}
             </div>
             <div class="vp-artist">
               <span id="tts-progress">—</span>
@@ -619,6 +621,14 @@
     const segments = _getLawText();
     if(!segments.length){ toast('沒有可朗讀的法條'); return; }
     _speak(segments, 'law');
+  };
+
+  // 朗讀指定段落（單條法條、法條彈窗、申論題）。
+  //   els：每段對應要反白的元素（可省略）；title：控制列標題，同一個來源再按一次＝停止。
+  window.ttsReadSegs = function(segments, title, els){
+    if(_TTS.speaking && _TTS.title === title){ window._ttsStop(); return; }
+    _TTS.highlightEls = els || null;
+    _speak(segments, 'text', title);
   };
 
   // 給英文朗讀用：取得 Azure 合成的 mp3（base64）；沒設定或失敗回傳 null（由呼叫端改用系統語音）
