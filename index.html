@@ -709,7 +709,7 @@
   <button id="fab-main" onclick="toggleFab()" aria-label="快速功能選單">☰</button>
 </div>
 <!-- QUIZ -->
-<div id="qv" style="display:none;position:fixed;inset:0;z-index:400;background:var(--bg0);flex-direction:column">
+<div id="qv" style="display:none;position:fixed;inset:0;z-index:400;background:var(--bg0);flex-direction:column;max-width:var(--layout-page-max-w);margin:0 auto">
   <div class="qhd">
     <button class="btn bg" style="padding:6px 10px;font-size:13px" onclick="exitQ()" aria-label="離開答題">✕</button>
     <div class="qpw"><div class="qpb" id="qpb"></div></div>
@@ -758,7 +758,7 @@
     <div class="qstemb" id="qstem"></div>
     <div class="qos" id="qopts"></div>
     <div class="qres" id="qres"></div>
-    <div id="qnote" style="display:none;margin-top:11px;padding:10px;background:var(--bg2);border-radius:8px;font-size:13px;color:var(--t2);line-height:1.7"></div>
+    <div id="qnote" style="display:none;margin-top:11px;padding:10px;background:var(--bg2);border-radius:8px;font-size:13px;color:var(--t2);line-height:1.7;white-space:pre-line"></div>
     <div id="qes" style="display:none"><textarea id="qes-input" rows="4" placeholder="輸入你的答案重點（可選）..." style="width:100%;margin-top:8px;padding:10px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--t1);font-size:14px;resize:vertical;box-sizing:border-box"></textarea><button id="qrevbtn" class="btn bg bw" style="margin-top:10px;padding:14px;font-size:14px;width:100%" onclick="revealES()">顯示參考答案 / 解析</button></div>
     <div id="qlaw" style="display:none;margin-top:13px"><div class="sec" style="padding:0 0 5px;font-size:11px">相關法條</div><div id="qlaw-list"></div></div>
     <div id="qdone-area" style="display:none;flex-direction:column;align-items:center;padding:20px 0;gap:12px"></div>
