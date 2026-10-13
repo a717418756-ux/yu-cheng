@@ -405,3 +405,11 @@
 [data-theme="eink"] #pg-books .chip.on,
 [data-theme="eink"] #pg-media .chip.on{ background:#000; color:#fff; }
 [data-theme="eink"] ::placeholder{ color:#555; }
+
+/* 朗讀控制列：一般模式是深色浮層，電子紙改白底黑框（行內的半透明白字也一併改黑） */
+[data-theme="eink"] .tts-sheet{ background:#fff; border-top:2px solid #000; }
+[data-theme="eink"] .tts-handle{ background:#000; }
+[data-theme="eink"] #tts-panel .vpc-main{ color:#fff; }   /* 黑底播放鍵的圖示 */
+[data-theme="eink"] .tts-miniball{ background:#fff; border:2px solid #000; color:#000; }
+[data-theme="eink"] #tts-panel [style*="rgba(255,255,255"]{ color:#000 !important; }
+[data-theme="eink"] .tts-voice-sel{ background:#fff; color:#000; border:1.5px solid #000; }

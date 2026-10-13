@@ -971,7 +971,7 @@ input:focus, textarea:focus, select:focus{
   display:flex; align-items:center; justify-content:space-between;
 }
 .law-art-acts{ display:flex; gap:6px; }
-.law-edit-btn{ background:none; border:none; color:var(--t2); font-size:12px; cursor:pointer; }
+.law-edit-btn,.law-tts-btn{ background:none; border:none; color:var(--t2); font-size:12px; cursor:pointer; }
 .law-del-btn{ background:none; border:none; color:var(--red); font-size:12px; cursor:pointer; }
 .law-art-body{ font-size:14px; line-height:1.85; color:var(--t1); }
 /* 確認視窗永遠在最上層（法條小視窗 600、答題中的編輯 450 之上） */
