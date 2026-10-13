@@ -814,10 +814,10 @@
   background:var(--bg0);color:var(--t0);
   font-size:var(--fs-body);
   line-height:var(--lh-body);
-  /* 電子紙使用標楷體，閱讀更舒適 */
-  font-family:'標楷體','DFKai-SB','BiauKai','KaiTi',
-    'Noto Serif TC','Source Han Serif TC',
-    'AR PL UKai TW',Georgia,serif;
+  /* 字體沿用一般模式的黑體：楷書、明體筆畫細，在電子紙上發灰，看久了吃力。
+     Boox 內建中文字型多半只有一種字重，調 font-weight 無效（600 以上又變成假粗體），
+     改用 0.3px 描邊把每一筆加實：所有字一起變黑，不影響排版寬度。 */
+  -webkit-text-stroke:.3px currentColor;
 }
 [data-theme="eink"] input,
 [data-theme="eink"] textarea,
@@ -895,140 +895,6 @@
   border:1.5px solid var(--bd);font-size:13px;
   padding:7px 14px;
 }
-[data-theme="eink"] .chip.on{
-  background:var(--t0);color:var(--bg0);border-color:var(--t0);
-}
-
-/* 電子紙：答題選項更清晰 */
-[data-theme="eink"] .qabn{
-  background:var(--bg2);color:var(--t0);
-  border:1.5px solid var(--bd);
-  padding:10px 14px;font-size:15px;
-}
-
-/* 電子紙：單欄版面 */
-[data-theme="eink"] .grid-2,
-[data-theme="eink"] [style*="grid-template-columns"]{
-  grid-template-columns:1fr !important;
-}
-
-/* 電子紙：勉勵語 */
-[data-theme="eink"] .h-motto{
-  font-size:22px;font-weight:800;color:var(--t0);letter-spacing:-.01em;
-}
-
-/* 電子紙：scrollbar */
-[data-theme="eink"] .page::-webkit-scrollbar-thumb{ background:var(--bd); }
-
-/* 電子紙：zone-card */
-[data-theme="eink"] .zone-card{
-  background:var(--bg1);border:1.5px solid var(--bd);
-}
-[data-theme="eink"] .zone-card.zone-active{ border-color:var(--t0); }
-[data-theme="eink"] .zone-exam .zone-title{ color:var(--t0); }
-[data-theme="eink"] .zone-study .zone-title{ color:var(--t0); }
-
-/* FAB overlay */
-
-/* hcd 倒數列 */
-
-/* sec 分隔標題 */
-
-/* lw-card 法條卡片 */
-
-/* cov overlay */
-
-/* bottom sheet modal */
-
-/* ══ 電子紙模式：關閉動畫與特效 ════════════════════════════════ */
-[data-theme="eink"] *{
-  animation:none !important;
-  transition:none !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-  box-shadow:none !important;
-}
-[data-theme="eink"] body{
-  background:var(--bg0);color:var(--t0);
-  font-size:var(--fs-body);
-  line-height:var(--lh-body);
-  /* 電子紙使用標楷體，閱讀更舒適 */
-  font-family:'標楷體','DFKai-SB','BiauKai','KaiTi',
-    'Noto Serif TC','Source Han Serif TC',
-    'AR PL UKai TW',Georgia,serif;
-}
-[data-theme="eink"] input,
-[data-theme="eink"] textarea,
-[data-theme="eink"] select{
-  background:var(--bg2);color:var(--t0);
-  border-color:var(--bd);border-width:1.5px;
-  font-size:var(--fs-body);
-  min-height:var(--btn-h);
-}
-[data-theme="eink"] select option{ background:var(--bg2);color:var(--t0); }
-
-/* 電子紙：header / nav */
-[data-theme="eink"] .hd{
-  background:var(--bg1);border-bottom:2px solid var(--bd);
-}
-[data-theme="eink"] .nav{
-  background:var(--bg1);border-top:2px solid var(--bd);
-}
-[data-theme="eink"] .hdt{ font-size:17px;font-weight:800;color:var(--t0); }
-
-/* 電子紙：卡片加框線 */
-[data-theme="eink"] .card,
-[data-theme="eink"] .qc,
-[data-theme="eink"] .cc,
-[data-theme="eink"] .sc,
-[data-theme="eink"] .stb,
-[data-theme="eink"] .qb{
-  background:var(--bg1);
-  border:1.5px solid var(--bd);
-}
-
-/* 電子紙：FAB → 純文字按鈕，不用圓型 */
-[data-theme="eink"] #fab-list{
-  background:var(--bg1);border:1.5px solid var(--bd);
-}
-[data-theme="eink"] .fab-btn{
-  background:var(--bg2);color:var(--t0);
-  border:1.5px solid var(--bd);border-radius:8px;
-  font-size:13px;
-}
-[data-theme="eink"] #fab-main{
-  background:var(--t0);color:var(--bg0);
-  border:2px solid var(--t0);
-}
-
-/* 電子紙：題目字體放大 */
-[data-theme="eink"] .q-stem,
-[data-theme="eink"] .qstem,
-[data-theme="eink"] #q-stem,
-[data-theme="eink"] .qst{
-  font-size:var(--fs-q) !important;
-  line-height:var(--lh-body);
-  letter-spacing:.04em;
-  font-weight:500;
-}
-[data-theme="eink"] .law-content,
-
-[data-theme="eink"] .pi-s,
-[data-theme="eink"] .pi-n{ font-size:calc(var(--fs-body) - 1px); }
-
-/* 電子紙：按鈕加高、加粗邊線 */
-[data-theme="eink"] .btn,
-[data-theme="eink"] .nb,
-[data-theme="eink"] button{ min-height:var(--btn-h);font-size:15px; }
-[data-theme="eink"] .btn.bg{
-  background:var(--bg2);color:var(--t0);border:1.5px solid var(--bd);
-}
-[data-theme="eink"] .btn.bp{
-  background:var(--t0);color:var(--bg0);border:none;
-}
-
-/* 電子紙：chip */
-
 [data-theme="eink"] .chip.on{
   background:var(--t0);color:var(--bg0);border-color:var(--t0);
 }

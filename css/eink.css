@@ -45,19 +45,10 @@
 /* 每個 section 的底部分隔線：DOM 結構加在 hscroll-row 後面
    用 padding-bottom + ::after 實現，長度約等於標題文字 */
 
-[data-theme="eink"] .bookshelf{
-  background:#d8d0c0;
-  background-image:
-    repeating-linear-gradient(180deg,transparent,transparent 3px,rgba(0,0,0,0.02) 3px,rgba(0,0,0,0.02) 4px);
-}
-[data-theme="eink"] .shelf-top-plank{
-  background:#b8aa90;
-  box-shadow:0 2px 6px rgba(0,0,0,0.3);
-}
-[data-theme="eink"] .shelf-plank{
-  background:linear-gradient(180deg,#c8b898 0%,#b0a080 50%,#987860 100%);
-  box-shadow:0 3px 8px rgba(0,0,0,0.3);
-}
+/* 書架：電子紙不畫木紋與漸層（漸層在電子紙上是一格格的噪點），改純白底＋黑色層板 */
+[data-theme="eink"] .bookshelf{ background:#fff; }
+[data-theme="eink"] .shelf-top-plank,
+[data-theme="eink"] .shelf-plank{ background:#000; }
 [data-theme="eink"] .book-spine{
   box-shadow:1px 1px 0 rgba(0,0,0,0.4),2px 2px 0 rgba(0,0,0,0.15);
   filter:none;
@@ -67,52 +58,45 @@
   box-shadow:2px 6px 12px rgba(0,0,0,0.3);
   filter:none;
 }
-[data-theme="eink"] .shelf-recent-wrap{
-  background:#d0c8b0;
-  border-bottom:2px solid #a09070;
-}
-[data-theme="eink"] .shelf-mode-bar{
-  background:#d8d0c0;
-  border-bottom:1.5px solid #a09070;
-}
+[data-theme="eink"] .shelf-recent-wrap{ background:#fff; border-bottom:2px solid #000; }
+[data-theme="eink"] .shelf-mode-bar{ background:#fff; border-bottom:1.5px solid #000; }
 [data-theme="eink"] .shelf-mode-btn{
-  background:#c8c0a8;border:1.5px solid #a09070;
-  color:#111;font-size:12px;
+  background:#fff;border:1.5px solid #000;
+  color:#000;font-size:14px;
 }
 [data-theme="eink"] .shelf-mode-btn.on{
-  background:#111;color:#f0ece0;border-color:#111;
+  background:#000;color:#fff;border-color:#000;
 }
-[data-theme="eink"] .shelf-section-tab{ color:#555; }
-[data-theme="eink"] .shelf-section-tab.on{ color:#111; }
+[data-theme="eink"] .shelf-section-tab{ color:#444; }
+[data-theme="eink"] .shelf-section-tab.on{ color:#000; }
 
 /* ══ eink 主題：閱讀器 ══════════════════════════════════════════ */
 [data-theme="eink"] .reader-topbar{
-  background:#f0ece0;
-  border-bottom:2px solid #888;
+  background:#fff;
+  border-bottom:2px solid #000;
   backdrop-filter:none;
   -webkit-backdrop-filter:none;
 }
 [data-theme="eink"] .reader-title{
-  color:#111;
-  font-family:'標楷體','DFKai-SB','BiauKai',Georgia,serif;
-  font-size:15px;font-weight:700;
+  color:#000;
+  font-size:16px;font-weight:700;
 }
 [data-theme="eink"] .reader-btn{
-  background:#e0dcc8;border:1.5px solid #888;
-  color:#111;font-size:15px;border-radius:6px;
+  background:#fff;border:1.5px solid #000;
+  color:#000;font-size:15px;border-radius:6px;
 }
 [data-theme="eink"] #reader-settings{
-  background:#f0ece0 !important;
-  border:1.5px solid #888 !important;
-  color:#111 !important;
+  background:#fff !important;
+  border:1.5px solid #000 !important;
+  color:#000 !important;
 }
 [data-theme="eink"] #reader-settings button{
-  border:1.5px solid #888 !important;
-  font-size:13px;min-height:36px;
+  border:1.5px solid #000 !important;
+  font-size:14px;min-height:40px;
 }
 [data-theme="eink"] #epub-page-info{
-  color:#555 !important;font-size:13px;
-  background:#f0ece0;border-top:1px solid #ccc;
+  color:#000 !important;font-size:14px;
+  background:#fff;border-top:1px solid #000;
   padding:6px 0;
 }
 [data-theme="eink"] #epub-progress-fill{
@@ -274,16 +258,6 @@
   margin:0 0 1.1em;
   text-align:justify;
 }
-/* 閱讀器頂列：純淨高對比 */
-[data-theme="eink"] .reader-active .reader-topbar,
-
-/* 法條檢視內文：eink 下襯線 + 加大行距，與書籍一致的閱讀質感 */
-[data-theme="eink"] #lv{
-  background:#F6F4EE;
-}
-[data-theme="eink"] #lv-arts{
-  font-family:'Noto Serif TC','標楷體','DFKai-SB',Georgia,serif;
-}
 /* eink 閱讀進度條：純黑高對比 */
 [data-theme="eink"] #epub-progress-fill,
 [data-theme="eink"] .epub-progress-fill{
@@ -300,21 +274,21 @@
 }
 /* FAB 選單項目：實心高對比卡片（因為背景不再變暗，項目自己要夠醒目）*/
 [data-theme="eink"] .fab-item .fab-label{
-  background:#F6F4EE;
+  background:#fff;
   color:#000;
   border:1.5px solid #000;
   font-weight:700;
   box-shadow:none;
 }
 [data-theme="eink"] .fab-btn{
-  background:#F6F4EE !important;
+  background:#fff !important;
   color:#000 !important;
   border:2px solid #000 !important;
   box-shadow:none !important;
 }
 [data-theme="eink"] .fab-main{
   background:#000 !important;
-  color:#F6F4EE !important;
+  color:#fff !important;
   border:none !important;
   box-shadow:none !important;
 }
@@ -351,65 +325,83 @@
   transition:none !important;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   e-ink 全域效能優化（v3.7.9）
-   電子紙重繪昂貴、動畫會殘影閃爍且耗電。以下一次性覆蓋全站，
-   取代先前逐區塊關閉的做法（不再有漏網動畫）。僅 eink 生效。
-   ══════════════════════════════════════════════════════════════ */
+/* ══ 電子紙實機最佳化（v4.22.30）══════════════════════════════════
+   對象：在 Boox 等電子紙裝置上實際使用，不是在手機上模仿紙張。
+   ① 字夠大：手機用的 10～13px 小字，在電子紙上要瞇眼看
+   ② 不靠顏色分辨：電子紙多為黑白，對錯、選取改用框線粗細與 ✓ ✗ 文字
+   ③ 不用半透明與深色遮罩：字會變灰；整片變暗再變亮會留殘影
+   ═══════════════════════════════════════════════════════════════ */
+/* 彈窗遮罩：白霧取代黑幕，視窗加黑框 */
+[data-theme="eink"] .ov,
+[data-theme="eink"] .cov{ background:rgba(255,255,255,.8); }
+[data-theme="eink"] .sh{ border:2px solid #000; border-bottom:0; }
+[data-theme="eink"] .cbox{ border:2px solid #000; }
+[data-theme="eink"] .cbt{ font-size:19px; }
+[data-theme="eink"] .cbs{ font-size:16px; color:#000; }
+[data-theme="eink"] .btn.br,
+[data-theme="eink"] .btn.bgrn,
+[data-theme="eink"] .btn.bpur{ background:#fff; color:#000; border:1.5px solid #000; }
+[data-theme="eink"] .btn.blue,
+[data-theme="eink"] .hd-btn.blue,
+[data-theme="eink"] #cfm-ok{ background:#000; color:#fff; border-color:#000; }   /* 確認鍵實心，與取消一眼分開 */
+[data-theme="eink"] .toast{ font-size:16px; color:#000; background:#fff; border:2px solid #000; }
 
-/* 1. 全站停用所有動畫、過場、變形——e-ink 最關鍵的優化 */
-[data-theme="eink"] *,
-[data-theme="eink"] *::before,
-[data-theme="eink"] *::after{
-  transition: none !important;
-  animation: none !important;
-  scroll-behavior: auto !important;
+/* 小字下限 */
+[data-theme="eink"] .sec{ font-size:14px !important; color:#000; }   /* 有些標題寫了行內小字級 */
+[data-theme="eink"] .tag{ font-size:13px; color:#000; background:#fff; border:1px solid #000; }
+[data-theme="eink"] .badge{ font-size:13px; color:#000; background:#fff; border:1.5px solid #000; }
+
+/* 答題畫面（行內樣式需 !important 才蓋得過） */
+[data-theme="eink"] #qct{ font-size:16px !important; color:#000 !important; }
+[data-theme="eink"] #qmeta{ font-size:15px !important; color:#000 !important; }
+[data-theme="eink"] #q-type-hint{ font-size:15px !important; color:#000 !important; }
+[data-theme="eink"] #qnote{ font-size:17px !important; color:#000 !important; background:#fff !important; border:1.5px solid #000; }
+[data-theme="eink"] .qopt{ background:#fff; border:1.5px solid #000; }
+[data-theme="eink"] .qok{ background:#fff; border:1.5px solid #000; color:#000; font-size:15px; }
+[data-theme="eink"] .qov{ font-size:var(--fs-body); color:#000; }
+[data-theme="eink"] .qopt.selected,
+[data-theme="eink"] .qopt.selected-opt{ background:#fff; border-width:3px; transform:none; }
+[data-theme="eink"] .qopt.selected .qok,
+[data-theme="eink"] .qopt.selected-opt .qok,
+[data-theme="eink"] .qopt.correct .qok,
+[data-theme="eink"] .qopt.missed .qok{ background:#000; color:#fff; }
+[data-theme="eink"] .qopt.correct,
+[data-theme="eink"] .qopt.missed{ background:#fff; border:3px solid #000; color:#000; }
+[data-theme="eink"] .qopt.wrong{ background:#fff; border:3px dashed #000; }
+[data-theme="eink"] .qopt.wrong .qok{ background:#fff; color:#000; }
+[data-theme="eink"] .qopt.wrong .qov{ text-decoration:line-through; }
+[data-theme="eink"] .qopt.dim{ opacity:1; border-color:#999; }
+[data-theme="eink"] .qopt::after{ flex:none; align-self:center; font-size:15px; font-weight:700; }
+[data-theme="eink"] .qopt.correct::after{ content:'✓ 正解'; }
+[data-theme="eink"] .qopt.missed::after{ content:'✓ 漏選'; }
+[data-theme="eink"] .qopt.wrong::after{ content:'✗ 你選'; }
+[data-theme="eink"] .qres.c,
+[data-theme="eink"] .qres.w,
+[data-theme="eink"] .qres.r{ background:#fff; border:2px solid #000; color:#000; }
+
+/* 法條：內文放大到閱讀字級，卡片白底黑框（有標記顏色時由 JS 行內樣式覆蓋） */
+[data-theme="eink"] .law-art-card{ background:#fff; border:1px solid #000; border-left-width:4px; }
+[data-theme="eink"] .law-art-head{ font-size:17px; color:#000; }
+[data-theme="eink"] .law-art-body,
+[data-theme="eink"] #lawpop-body{ font-size:var(--fs-law) !important; color:#000 !important; }
+
+/* 粗體字本身已夠黑，再描邊會糊在一起（小字尤其明顯）→ 只有一般字重的內文描邊 */
+[data-theme="eink"] :is(button,.btn,.chip,.badge,.sec,.sht,.cbt,.hdt,.law-art-head,#q-type-hint,b,strong,h1,h2,h3,h4){
+  -webkit-text-stroke-width:0;
 }
 
-/* 2. 停用所有位移/縮放變形（殘影主因），但保留必要的定位用 transform
-      —— 僅清除動畫型 transform，translateY/scale 這類過場歸零 */
-[data-theme="eink"] .skeleton,
-[data-theme="eink"] .splash,
-[data-theme="eink"] [class*="fade"],
-[data-theme="eink"] [class*="slide"],
-[data-theme="eink"] [class*="anim"]{
-  animation: none !important;
-  transition: none !important;
-  opacity: 1 !important;
-}
-
-/* 3. 停用平滑捲動（e-ink 逐格捲動比平滑更清晰省電） */
-[data-theme="eink"] html,
-[data-theme="eink"] body,
-[data-theme="eink"] .scroll,
-[data-theme="eink"] [class*="scroll"]{
-  scroll-behavior: auto !important;
-}
-
-/* 4. 觸控回饋：即時邊框強調（不做整塊反白，減少 e-ink 重繪面積） */
-[data-theme="eink"] button:active,
-[data-theme="eink"] .btn:active{
-  outline: 2px solid #000 !important;
-  outline-offset: -2px;
-  transition: none !important;
-}
-
-/* 5. 移除半透明疊層的模糊（backdrop-filter 在 e-ink 上是效能殺手） */
-[data-theme="eink"] *{
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-/* ══ e-ink 質感補充（v3.7.10）══════════════════════════════ */
-
-/* 還原字體銳利：電子紙抗鋸齒會讓字發灰，銳利才實 */
-[data-theme="eink"] body{ -webkit-font-smoothing:auto; text-rendering:auto; }
-
-/* 選取色改純黑白（電子紙無彩色，半透明藍會變髒灰） */
-[data-theme="eink"] ::selection{ background:#000; color:#fff; }
-
-/* 隱藏捲軸：Boox 用觸控捲動，捲軸出現/消失是多餘重繪 */
-[data-theme="eink"] ::-webkit-scrollbar{ width:0; height:0; }
-
-/* eink 選取色：灰底黑字（e-ink 無彩色，且避免大面積反白重繪） */
-[data-theme="eink"] ::selection{ background:#ccc; color:#000; }
+/* 書庫、影音庫：一般模式是深色木質／霓虹質感，電子紙下原本整頁黑底、標題透明看不到 */
+[data-theme="eink"] #pg-books{ background:var(--bg0); }
+[data-theme="eink"] #pg-books .hd,
+[data-theme="eink"] #pg-media .hd{ background:#fff; border-bottom:2px solid #000; }
+[data-theme="eink"] #pg-books .hd .hdt,
+[data-theme="eink"] #pg-media .hd .hdt{ background:none; color:#000; -webkit-text-fill-color:#000; }
+[data-theme="eink"] #pg-books .sb,
+[data-theme="eink"] #pg-media .sb{ background:none; }
+[data-theme="eink"] #pg-books .sb input,
+[data-theme="eink"] #pg-media .sb input{ background:#fff; border:1.5px solid #000; color:#000; font-size:16px; }
+[data-theme="eink"] #pg-books .chip,
+[data-theme="eink"] #pg-media .chip{ background:#fff; border:1.5px solid #000; color:#000; }
+[data-theme="eink"] #pg-books .chip.on,
+[data-theme="eink"] #pg-media .chip.on{ background:#000; color:#fff; }
+[data-theme="eink"] ::placeholder{ color:#555; }
