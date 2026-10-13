@@ -435,7 +435,7 @@ function _highlightSentence(idx){
   const cur = body.querySelector(`.eng-sent[data-si="${idx}"]`);
   if(cur){
     cur.classList.add('reading');
-    cur.scrollIntoView({behavior:'smooth', block:'center'});
+    cur.scrollIntoView({behavior:scrollMode(), block:'center'});
   }
 }
 
@@ -1049,7 +1049,7 @@ function _showPAResult(idx, original, result){
     </div>`;
 
   _insertAfterSent(body, idx, div);
-  div.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  div.scrollIntoView({ behavior:scrollMode(), block:'nearest' });
   // 記錄練習歷史並顯示趨勢（不阻塞畫面）
   _recordPAHistory(idx, totalScore);
 }

@@ -19,10 +19,41 @@ let _lastMode = 'all';
 // 【答題：啟動與題目池】
 // ════════════════════════════════════════════════════════════
 async function startQ(mode){  try{
+  if(await _resumeIfAny(mode)) return;
   const pool = await getPriorityPool(mode);
   if(!pool.length){ toast(mode==='wrong' ? '目前沒有錯題' : '目前沒有題目'); return; }
   startQWithPool(pool, mode);
   }catch(e){ logError('startQ', e); }}
+
+// ══ 中途離開可接續 ═══════════════════════════════════════════
+//   每答完一題就記下「這一回的題目、下一題、成績」（每個入口各一份）；
+//   從同一入口再進來時問要不要接續。限時模擬考不記（計時一中斷就不是模擬考）。
+//   開新的一回（startQWithPool）或最後一題答完時清除。
+const _resumeKey = (mode = S.quiz.mode) => 'quiz_resume_' + mode;
+
+function _saveResume(){
+  const {q, idx, res, mode} = S.quiz;
+  if(mode === 'mock') return;
+  if(idx + 1 < q.length) setSetting(_resumeKey(), {ids:q.map(x => x.id), idx:idx + 1, res, at:Date.now()});
+  else dd('settings', _resumeKey()).catch(()=>{});   // 最後一題答完：沒有可接續的
+}
+
+// 有未完成的一回 → 詢問；選「接續」就從下一題開始並回傳 true。
+//   選「重新開始」（或按返回）不在這裡刪，等真的開新的一回時才清，免得誤觸就丟進度。
+async function _resumeIfAny(mode){
+  const s = await getSetting(_resumeKey(mode), null);
+  if(!s?.ids?.length) return false;
+  if(!await askConfirm('接續上次的進度？',
+      '已作答 ' + s.idx + '／' + s.ids.length + ' 題，接著從第 ' + (s.idx + 1) + ' 題開始\n（' + new Date(s.at).toLocaleDateString('zh-TW') + ' 離開）',
+      '接續', '重新開始')) return false;
+  // 期間刪掉的題目略過，進度跟著往前算
+  const byId = new Map((await da('questions')).map(q => [q.id, q]));
+  const done = s.ids.slice(0, s.idx).map(id => byId.get(id)).filter(Boolean);
+  const rest = s.ids.slice(s.idx).map(id => byId.get(id)).filter(Boolean);
+  if(!rest.length){ dd('settings', _resumeKey(mode)).catch(()=>{}); return false; }
+  startQWithPool(done.concat(rest), mode, done.length, s.res || []);
+  return true;
+}
 
 // ══ 限時模擬考 ═══════════════════════════════════════════════
 //   只收選擇題（申論重點在架構不在秒數，不適合速度訓練）。
@@ -82,13 +113,15 @@ async function beginMockExam(){  try{
   if(sub) pool = pool.filter(q=>q.subject===sub);
   if(!pool.length){ toast('這個科目沒有可用的選擇題'); return; }
 
-  // 隨機抽題（Fisher-Yates，避免 sort(()=>Math.random()) 的分佈偏差）
-  for(let i=pool.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [pool[i],pool[j]]=[pool[j],pool[i]];
+  // 隨機抽題：題組整組取或不取（裝不下就跳過，換下一個單位），不會只抽到半組
+  const picked = [];
+  for(const u of shuffleUnits(pool)){
+    if(picked.length + u.length <= n) picked.push(...u);
+    if(picked.length === n) break;
   }
-  pool = pool.slice(0, Math.min(n, pool.length));
   if(pool.length < n) toast('可用題目僅 '+pool.length+' 題，已全數出題');
+  else if(picked.length < n) toast('題組不拆開，本次共 '+picked.length+' 題');
+  pool = picked;
 
   document.getElementById('mock-ov')?.remove();
   startQWithPool(pool, 'mock');
@@ -126,8 +159,9 @@ function _stopMockTimer(){
   document.getElementById('mock-timer')?.remove();
 }
 
-function startQWithPool(pool, mode){
-  S.quiz = { q:pool, idx:0, ans:false, res:[], mode:mode||'all', _selected:new Set() };
+function startQWithPool(pool, mode, idx = 0, res = []){
+  S.quiz = { q:pool, idx, ans:false, res, mode:mode||'all', _selected:new Set() };
+  if(!idx) dd('settings', _resumeKey()).catch(()=>{});   // 開新的一回：舊進度作廢
   // 確保 qfoot 可見（showQDone 會隱藏）
   const qfoot = document.getElementById('qfoot');
   if(qfoot) qfoot.style.display = '';
@@ -159,12 +193,10 @@ function renderQCard(){
   document.getElementById('qpb').style.setProperty('--qpb-w', ((idx/q.length)*100)+'%');
   document.getElementById('qct').textContent = (idx+1)+'/'+q.length;
 
-  // 題型 badge + 危險等級
-  const danger = qu._danger || '';
+  // 題型 badge；出處（年度、考試別、題號）作答後才由 _afterAnswer 顯示——年度本身就是答題線索
   document.getElementById('qbadge').className = 'badge '+(qu.type==='mc' ? 'bmc' : 'bes');
   document.getElementById('qbadge').textContent = (qu.type==='mc' ? '選擇' : '申論');
-  document.getElementById('qmeta').textContent =
-    [qu.subject, qu.year, qu.num ? '第'+qu.num+'題' : '', danger].filter(Boolean).join(' · ');
+  document.getElementById('qmeta').textContent = '';
 
   // 題組共同題幹（有 groupStem 才顯示）
   const qGroupEl = document.getElementById('q-group-stem');
@@ -212,9 +244,6 @@ function renderQCard(){
     // 題型提示
     const hintEl = document.getElementById('q-type-hint');
     if(hintEl) hintEl.textContent = isMulti ? '🔢 複選題（可選多個）' : '☑ 單選題';
-    // 更新 meta
-    const meta = document.getElementById('qmeta');
-    if(meta) meta.textContent = [qu.subject, qu.year, qu.num ? '第'+qu.num+'題' : ''].filter(Boolean).join(' · ');
     // 選項（事件委派處理點擊，不用 inline onclick）
     optsEl.innerHTML = Object.entries(qu.options||{}).map(([k,v])=>
       '<div class="qopt" data-key="'+esc(k)+'"><div class="qok">'+esc(k)+'</div><div class="qov">'+renderStemMarkup(v)+'</div></div>'
@@ -334,6 +363,9 @@ async function ansQ(sel){  try{
     });
   }
 
+  // ★ 先記成績再分流：原本記在最後，模擬考提前 return → 交卷顯示 0/0、中途離開也不會確認
+  S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
+
   // ── 模擬考：作答時不揭曉，只標記已選，直接進入下一題 ──
   //   這是模擬考與一般練習的核心差異：真實考試不會告訴你對錯。
   if(S.quiz.mode === 'mock'){
@@ -372,8 +404,6 @@ async function ansQ(sel){  try{
 
   _showQNote(qu);
   _afterAnswer(qu);
-
-  S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
   }catch(e){ logError('ansQ', e); }}
 
 // 題目筆記／標記顏色（公布答案時顯示）
@@ -389,6 +419,12 @@ function _showQNote(qu){
 
 // 公布答案後（單選、複選、申論共用）：開放下一題、筆記、標註、編輯題目，並列出關聯法條
 function _afterAnswer(qu){
+  // 出處：例「113 升官等｜警察法規 第47題」
+  document.getElementById('qmeta').textContent = [
+    [qu.year, qu.exam].filter(Boolean).join(' '),
+    (qu.subject||'') + (qu.num ? ' 第'+qu.num+'題' : '')
+  ].map(s => s.trim()).filter(Boolean).join('｜');
+  _saveResume();
   document.getElementById('qmulti-confirm')?.classList.add('hide');
   document.getElementById('qnxt').classList.remove('hide');
   // 作答後才開放（作答前不干擾判斷）
@@ -605,13 +641,7 @@ function replayQuiz(){
   const pool = _lastPool || [];
   const mode = _lastMode || 'all';
   if(!pool.length){ exitQ(); return; }
-  // Fisher-Yates 洗牌
-  const shuffled = [...pool];
-  for(let i=shuffled.length-1; i>0; i--){
-    const j = Math.floor(Math.random()*(i+1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  startQWithPool(shuffled, mode);
+  startQWithPool(shuffleUnits(pool).flat(), mode);   // 題組不拆開
 }
 
 // ════════ 模擬考模式 ════════
@@ -625,6 +655,7 @@ let _pickSel  = new Set();
 
 async function startQPick(mode){  try{
   _pickMode = mode || 'review';
+  if(await _resumeIfAny(_pickMode)) return;
   const isEssay = _pickMode === 'essay' || _pickMode === 'esview';
   const list = await getSubjectList(isEssay ? 'es' : 'mc');
   if(!list.length){
@@ -1006,6 +1037,13 @@ async function ansQMulti(selected, correctStr, qu){  try{
   qu.difficultyScore = Math.min(10, (qu.difficultyScore||5) + (correct ? (hesitant?0:-0.5) : 1.5));
   await dp('questions', qu);
   await dp('attempts', {qid:qu.id, correct, date:today(), responseTime, hesitationFlag:hesitant, confidence:hesitant?'low':'normal', wrongReason:correct?'':''});
+  S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
+  // 模擬考：與單選相同，不揭曉對錯（原本複選題會直接公布答案）
+  if(S.quiz.mode === 'mock'){
+    document.getElementById('qmulti-confirm')?.classList.add('hide');
+    document.getElementById('qnxt')?.classList.remove('hide');
+    return;
+  }
   const opts = document.querySelectorAll('.qopt');
   opts.forEach(o=>{
     const k = o.querySelector('.qok')?.textContent || '';
@@ -1026,7 +1064,6 @@ async function ansQMulti(selected, correctStr, qu){  try{
   resEl.textContent = msg;
   _showQNote(qu);
   _afterAnswer(qu);
-  S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
   }catch(e){ logError('ansQMulti', e); }}
 
 function submitAnswer(){

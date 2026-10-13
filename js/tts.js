@@ -422,7 +422,7 @@
       if(p > (_epubGeom()?.idx ?? p)) _epubShowPage(p);
       return;
     }
-    try{ el.scrollIntoView({ behavior:'smooth', block:'center' }); }catch(_){}
+    try{ el.scrollIntoView({ behavior:scrollMode(), block:'center' }); }catch(_){}
   }
   // 清除朗讀反白（反白元素可能在電子書 iframe 內，document 查不到，所以記住元素直接清）
   function _clearReadingHighlight(){

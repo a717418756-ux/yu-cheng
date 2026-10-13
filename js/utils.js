@@ -595,6 +595,9 @@ function parseBulkText(text){
   }));
 }
 
+// 捲動方式：電子紙一律直接跳到定位（平滑捲動在電子紙上是一連串殘影，又慢又糊）
+const scrollMode = () => document.documentElement.dataset.theme === 'eink' ? 'auto' : 'smooth';
+
 // ── 7. 震動回饋（Haptic Feedback）──────────────────────────
 // 在支援的裝置上輕震，提供實體操作感；不支援則靜默忽略
 // type: 'light'(輕點) | 'success'(成功) | 'error'(錯誤) | 'medium'

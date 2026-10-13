@@ -285,7 +285,7 @@ async function buildAI(){  try{
   document.getElementById('ai-md').textContent = S.aiMd;
   const out = document.getElementById('ai-out');
   out.classList.remove('hide');
-  out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  out.scrollIntoView({ behavior:scrollMode(), block: 'nearest' });
   toast('診斷報告已產生 ✓');
   }catch(e){ logError('buildAI', e); }}
 

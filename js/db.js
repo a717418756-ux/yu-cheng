@@ -222,6 +222,28 @@ function getDangerLevel(q, recentAts) {
   return '🟢';
 }
 
+// 出題順序：以「單位」洗牌——題組整組是一個單位（組內依 groupOrder），其餘一題一單位。
+//   rankOf(單位) 有給時再依它排序（小的先）；排序是穩定的，同等級內仍保持隨機。
+//   ★ 題組代號是匯入時給的，不同年度可能重複，所以連同科目、年度、考試別一起比對，不會誤併。
+//   回傳單位陣列：要固定題數的（模擬考）才能整組取捨，不把題組切斷。
+function shuffleUnits(pool, rankOf) {
+  const groups = new Map(), units = [];
+  for (const q of pool) {
+    if (!q.groupId) { units.push([q]); continue; }
+    const k = [q.groupId, q.subject, q.year, q.exam].join('|');
+    let u = groups.get(k);
+    if (!u) { u = []; groups.set(k, u); units.push(u); }
+    u.push(q);
+  }
+  for (const u of groups.values()) u.sort((a, b) => (a.groupOrder || 0) - (b.groupOrder || 0));
+  for (let i = units.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [units[i], units[j]] = [units[j], units[i]];
+  }
+  if (rankOf) { const r = new Map(units.map(u => [u, rankOf(u)])); units.sort((a, b) => r.get(a) - r.get(b)); }
+  return units;
+}
+
 async function getPriorityPool(mode = 'all', subjects = null) { try {
   const [qs, ats] = await Promise.all([da('questions'), da('attempts')]);
   if (!qs.length) return [];
@@ -247,11 +269,11 @@ async function getPriorityPool(mode = 'all', subjects = null) { try {
     pool = qs.filter(q => q.type === 'es' && bySubj(q));
     return pool;   // 申論不套用危險度排序
   }
-  // 危險等級每題只算一次，再排序（原本每次比較都重算）
+  // 危險題先出；同一等級內隨機（原本照題庫順序，每次都同一年度先出）。題組以組內最危險的一題排序。
+  //   危險等級每題只算一次（原本每次比較都重算）
   const levelOrder = { '🔴': 0, '🟠': 1, '🟡': 2, '🟢': 3 };
   const rank = new Map(pool.map(q => [q, levelOrder[getDangerLevel(q, ats)] ?? 3]));
-  pool.sort((a, b) => rank.get(a) - rank.get(b));
-  return pool;
+  return shuffleUnits(pool, u => Math.min(...u.map(q => rank.get(q)))).flat();
 } catch(e) { logError('getPriorityPool', e); return []; } }
 
 // 取得題庫中所有科目（依題數多寡排序，供科目多選用）
@@ -386,5 +408,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.22.29';    // 複查：①大量新增法條合併時類別整部沿用舊的（手動變更過的不被改回）②法條搜尋索引公式只留 data.js 一份（備份還原共用）③題目解析移除會被覆蓋的搜尋索引計算 ④本地備份 exam_data.json 的參考書／教材影音清單不再夾帶空的檔案欄位
+const APP_VERSION  = '4.22.30';    // ①測驗出題：題組整組連續、同危險等級內隨機 ②作答前不顯示年度／考試別／題號，作答後才顯示出處 ③中途離開可接續 ④修正模擬考交卷 0/0、複選題提前公布答案 ⑤電子紙模式改為實機最佳化（純白底、黑體加實、放大小字、對錯不靠顏色）
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

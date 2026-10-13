@@ -1371,6 +1371,8 @@ async function _initEpubReader(url, savedCfi, bookId){
         'font-family': "'Noto Serif TC', 'Noto Serif SC', '標楷體', 'DFKai-SB', Georgia, serif !important",
         'font-size': _einkFontSize+'px',   // 同上：留 !important 會鎖死字級
         'font-weight': '500 !important',
+        // 電子紙內建中文字型多半只有一種字重，500 常常無效 → 0.3px 描邊把筆畫加實（與 App 介面相同作法）
+        '-webkit-text-stroke': '.3px #000 !important',
         'line-height': '1.95 !important',
         'padding': '0 !important',
         'margin': '0 !important',

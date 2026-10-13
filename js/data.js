@@ -1078,7 +1078,7 @@ async function saveQAndContinue(){  try{
   const orderEl=document.getElementById('f-group-order');
   if(orderEl && orderEl.value) orderEl.value=String((parseInt(orderEl.value)||0)+1);
   // 捲回頂部方便看到題幹
-  document.getElementById('add-ov')?.querySelector('.sht')?.scrollIntoView({behavior:'smooth'});
+  document.getElementById('add-ov')?.querySelector('.sht')?.scrollIntoView({behavior:scrollMode()});
 }catch(e){logError('saveQAndContinue',e);toast('儲存失敗，請重試');}}
 async function toggleStar(id){  try{
   const q=await dg('questions',id);if(!q)return;
@@ -3316,7 +3316,7 @@ function scrollToChapter(tagEl, encodedCh, typeHint){
   }
   if(!el) el = document.getElementById('ch-'+encodedCh);
   if(el){
-    el.scrollIntoView({behavior:'smooth',block:'start'});
+    el.scrollIntoView({behavior:scrollMode(),block:'start'});
     const orig=el.style.background;
     el.style.transition='background .2s';
     el.style.background='var(--bg3)';
