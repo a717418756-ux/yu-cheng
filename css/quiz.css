@@ -381,7 +381,13 @@
   background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600;
 }
 .subj-item .subj-name{ flex:1; }
-.subj-item .subj-cnt{ font-size:12px; opacity:.75; font-variant-numeric:tabular-nums; }
+/* 速讀篩選 */
+.spd-lbl{ font-size:12px; font-weight:700; color:var(--t2); margin:10px 0 6px; text-align:left; }
+.spd-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+.spd-chips .chip{ cursor:pointer; }
+[data-theme="eink"] .spd-lbl{ font-size:15px; color:#000; }
+[data-theme="eink"] #spd-go{ background:#000; color:#fff; }
+.subj-item .subj-cnt,.spd-chips .subj-cnt{ font-size:12px; opacity:.75; font-variant-numeric:tabular-nums; }
 [data-theme="eink"] .subj-item{ background:#fff; border-color:#000; color:#000; }
 [data-theme="eink"] .subj-item.on{ background:#000; color:#fff; }
 

@@ -653,6 +653,7 @@
   transition:background .14s;
 }
 .zpanel-row:active{background:rgba(255,255,255,0.05)}
+a.zpanel-row{text-decoration:none;color:inherit}
 .zpanel-row-icon{font-size:19px;flex-shrink:0}
 .zpanel-row-text .t{font-size:13px;font-weight:600;color:var(--t0);letter-spacing:.01em}
 .zpanel-row-text .s{font-size:10.5px;color:var(--t2);margin-top:1px}
