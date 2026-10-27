@@ -1171,12 +1171,11 @@ function selectOpt(el, key){
 function submitMulti(){
   if(S.quiz.ans) return;
   const qu = S.quiz.q[S.quiz.idx];
-  // 有手寫標註要回到原順序：選取的字母先換回原題字母再重畫
-  if(_ordOf(qu) && qu.inkImg && S.quiz.mode !== 'mock'){
-    S.quiz._selected = new Set(_toOrig([...(S.quiz._selected||[])].join(''), qu));
-    _inkRestoreOrder(qu);
-  }
-  const selected = [...(S.quiz._selected||new Set())].sort().join('');
+  // 有手寫標註時會回到原順序：選取的字母先換回原題字母，重畫後再換成畫面字母
+  const selO = _toOrig([...(S.quiz._selected||[])].join(''), qu);
+  _inkRestoreOrder(qu);
+  S.quiz._selected = new Set(_toDisp(selO, qu));
+  const selected = [...S.quiz._selected].sort().join('');
   const ansStr = _toDisp((qu.answer||'').replace(/[, ]/g,''), qu).split('').sort().join('');
   ansQMulti(selected, ansStr, qu);
 }
