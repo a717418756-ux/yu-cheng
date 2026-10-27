@@ -219,6 +219,7 @@
         <button class="zqb" onclick="startQPick('essay')"><span class="zqb-icon">✍️</span><div class="zqb-label">申論練習</div><div class="zqb-desc">申論題專區</div></button>
         <button class="zqb" onclick="startQPick('esview')"><span class="zqb-icon">📖</span><div class="zqb-label">申論瀏覽</div><div class="zqb-desc">題目＋參考答案直接看</div></button>
         <button class="zqb" onclick="startMockExam()"><span class="zqb-icon">🔢</span><div class="zqb-label">限時模擬考</div><div class="zqb-desc">選擇題・計時・交卷後檢討</div></button>
+        <button class="zqb" onclick="openSpeed()"><span class="zqb-icon">⚡</span><div class="zqb-label">速讀</div><div class="zqb-desc">選擇題・直接看答案解析</div></button>
     <button class="zqb" onclick="startNumberMode()"><span class="zqb-icon">🔢</span><div class="zqb-label">數字魔鬼</div><div class="zqb-desc">數字記憶訓練</div></button>
       </div>
       <!-- 題庫（原題目管理） -->
@@ -239,6 +240,15 @@
         </div>
         <span class="zpanel-main-arrow" style="margin-left:auto">›</span>
       </button>
+      <!-- 升官等記憶樹（另一個 PWA；已安裝成 App 時，Android 通常會直接用該 App 開啟） -->
+      <a class="zpanel-row" href="https://a717418756-ux.github.io/Promotion/" target="_blank" rel="noopener">
+        <span class="zpanel-row-icon">🌳</span>
+        <div class="zpanel-row-text">
+          <div class="t">升官等記憶樹</div>
+          <div class="s">申論記憶樹・劇情闖關（另開）</div>
+        </div>
+        <span class="zpanel-main-arrow" style="margin-left:auto">↗</span>
+      </a>
       <!-- AI 分析匯出 -->
       <button class="zpanel-row" onclick="fabGo('stats')">
         <span class="zpanel-row-icon">📊</span>
@@ -300,6 +310,7 @@
   <div class="hd">
     <div class="hdt">題目管理</div>
     <div style="display:flex;gap:6px">
+      <button class="hd-btn bg" onclick="openSpeed()" title="速讀：直接看答案與解析" aria-label="速讀">⚡</button>
       <button class="hd-btn bg" id="list-sel-btn" onclick="toggleListSelectMode()" title="選擇刪除"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
       <div style="position:relative" id="add-q-wrap">
         <button class="hd-btn blue plus" id="add-q-btn" aria-label="新增題目" onclick="toggleAddQMenu()">＋</button>
@@ -1098,6 +1109,23 @@
     <div class="cbn">
       <button class="btn br bw" onclick="closeSubjPick()">取消</button>
       <button class="btn br bw" onclick="confirmSubjPick()">開始測驗</button>
+    </div>
+  </div>
+</div>
+
+<!-- 速讀：科目／考試別／年度組合篩選 -->
+<div class="cov" id="spd-ov">
+  <div class="cbox" style="max-width:460px">
+    <div class="cbt">⚡ 速讀</div>
+    <div class="cbs">選擇題直接看答案與解析，不計入作答紀錄。<br>每組可複選，不選＝全部。</div>
+    <div id="spd-groups" style="max-height:48vh;overflow:auto;margin-bottom:8px;overscroll-behavior:contain"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <b id="spd-n" style="flex:1;text-align:left;font-size:14px"></b>
+      <button class="btn bg" style="padding:6px 12px;font-size:12px" onclick="spdClear()">清除條件</button>
+    </div>
+    <div class="cbn">
+      <button class="btn br bw" onclick="closeSpeed()">取消</button>
+      <button class="btn br bw" id="spd-go" onclick="startSpeed()">開始速讀</button>
     </div>
   </div>
 </div>
