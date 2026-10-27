@@ -245,10 +245,13 @@ function renderQCard(){
     // 題型提示
     const hintEl = document.getElementById('q-type-hint');
     if(hintEl) hintEl.textContent = isMulti ? '🔢 複選題（可選多個）' : '☑ 單選題';
-    // 選項（事件委派處理點擊，不用 inline onclick）
-    optsEl.innerHTML = Object.entries(qu.options||{}).map(([k,v])=>
-      '<div class="qopt" data-key="'+esc(k)+'"><div class="qok">'+esc(k)+'</div><div class="qov">'+renderStemMarkup(v)+'</div></div>'
-    ).join('');
+    // 選項隨機排列：只在新題目（尚未作答）時決定順序，作答後重畫沿用同一組
+    if(!S.quiz.ans && !_ordOf(qu) && _shufOk(qu)){
+      const k = Object.keys(qu.options||{});
+      for(let i = k.length - 1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [k[i], k[j]] = [k[j], k[i]]; }
+      (S.quiz.ord ||= {})[qu.id] = k;
+    }
+    _drawOpts(qu);
     // 多選才顯示確認按鈕，單選自動提交不需要
     const cfmBtn = document.getElementById('qmulti-confirm');
     if(cfmBtn){ if(isMulti) cfmBtn.classList.remove('hide'); else cfmBtn.classList.add('hide'); }
@@ -332,7 +335,8 @@ async function ansQ(sel){  try{
   S.quiz.ans = true;
   const responseTime = Date.now() - _qStart;
 
-  const normSel = (sel||'').toUpperCase().split('').sort().join('');
+  const selO    = _toOrig((sel||'').toUpperCase(), qu);   // 畫面字母 → 原題字母（未打亂時不變）
+  const normSel = selO.split('').sort().join('');
   const normAns = (qu.answer||'').toUpperCase().split('').sort().join('');
   // ★ 題目未填正確答案時（normAns 為空），不可用相等判斷：
   //   若使用者也沒選任何選項，'' === '' 會被判定「答對」，
@@ -387,10 +391,11 @@ async function ansQ(sel){  try{
     return;
   }
 
+  _inkRestoreOrder(qu);   // 有手寫標註：公布前回到原順序，標註才對得上
   // 顯示結果
   const opts = document.querySelectorAll('.qopt');
-  const correctKeys = (qu.answer||'').toUpperCase().split('');
-  const selKeys = [(sel||'').toUpperCase()];
+  const correctKeys = _toDisp((qu.answer||'').toUpperCase(), qu).split('');
+  const selKeys = [_toDisp(selO, qu)];
   opts.forEach(o=>{
     const k = o.querySelector('.qok')?.textContent;
     if(!k) return;
@@ -406,7 +411,7 @@ async function ansQ(sel){  try{
   haptic(correct ? 'success' : 'error');
   resEl.classList.add(correct ? 'qres-pop' : 'qres-shake');
   const isMultiQ = qu.multiAnswer || (qu.answer && qu.answer.length>1 && /^[A-E]{2,}$/.test(qu.answer));
-  let msg = correct ? '✓ 正確！' : '✗ 正確答案：'+(qu.answer||'')+(isMultiQ ? ' (多選)' : '');
+  let msg = correct ? '✓ 正確！' : '✗ 正確答案：'+_ansText(qu, '')+(isMultiQ ? ' (多選)' : '');
   if(hesitant) msg += ' ⚠ 作答超過40秒，列入猶豫題';
   resEl.textContent = msg;
 
@@ -416,12 +421,50 @@ async function ansQ(sel){  try{
 
 // 直接標出選擇題正確答案（速讀、答題中編輯後重畫共用）
 function _showMcKey(qu, prefix){
-  const keys = (qu.answer||'').toUpperCase();
+  const keys = _toDisp((qu.answer||'').toUpperCase(), qu);
   document.querySelectorAll('.qopt').forEach(o => o.classList.add(keys.includes(o.dataset.key) ? 'correct' : 'dim'));
   const resEl = document.getElementById('qres');
   resEl.className = 'qres on r';
-  resEl.textContent = prefix + '正確答案：' + (keys.split('').join('、') || '（未設定）');
+  resEl.textContent = prefix + '正確答案：' + (_ansText(qu, '、') || '（未設定）');
   _showQNote(qu);
+}
+
+// ══ 選項隨機排列（設定開關，預設關閉）════════════════════════
+//   只換畫面上的順序，題目資料不動：S.quiz.ord[題目id] = 畫面上第 1、2…個位置放的「原題字母」。
+//   判分一律換回原題字母；答案列、解析裡的 (A)(B) 換成本次順序。作答紀錄只存對錯，不受影響。
+let _optShuffle = false;
+getSetting('quiz_shuffle_opts', false).then(v => {
+  _optShuffle = !!v;
+  const c = document.getElementById('set-shuffle'); if(c) c.checked = _optShuffle;
+}).catch(()=>{});
+function setOptShuffle(on){ _optShuffle = !!on; setSetting('quiz_shuffle_opts', _optShuffle); }
+// 不打亂：速讀／申論瀏覽、英文與國文、題幹或選項引用其他選項（以上皆是、(A)選項之但書…）
+const _NO_SHUF = /以上(皆|均|都|全)|(其餘|其他)選項|[(（][A-E][)）]/;
+function _shufOk(qu){
+  if(!_optShuffle || S.quiz.mode === 'speed' || S.quiz.mode === 'esview' || ['英文','國文'].includes(qu.subject)) return false;
+  return ![qu.stem, qu.groupStem, ...Object.values(qu.options||{})].some(t => _NO_SHUF.test(String(t||'')));
+}
+const _ordOf  = qu => S.quiz.ord?.[qu.id];
+const _toOrig = (s, qu) => { const o = _ordOf(qu); return o ? [...s].map(c => o['ABCDE'.indexOf(c)] || c).join('') : s; };
+const _toDisp = (s, qu) => { const o = _ordOf(qu); return o ? [...s].map(c => o.includes(c) ? 'ABCDE'[o.indexOf(c)] : c).join('') : s; };
+// 答案文字：打亂時附上原題字母，方便對照紙本
+function _ansText(qu, sep){
+  const a = (qu.answer||'').toUpperCase().replace(/[^A-E]/g, '');
+  const d = _toDisp(a, qu).split('').sort().join(sep);
+  return _ordOf(qu) ? d + '（原題 ' + a.split('').join(sep) + '）' : d;
+}
+function _drawOpts(qu){
+  const o = _ordOf(qu);
+  document.getElementById('qopts').innerHTML = (o || Object.keys(qu.options||{})).map((k, i) => {
+    const d = o ? 'ABCDE'[i] : k;   // 畫面字母
+    return '<div class="qopt" data-key="'+esc(d)+'"><div class="qok">'+esc(d)+'</div><div class="qov">'+renderStemMarkup(qu.options[k])+'</div></div>';
+  }).join('');
+}
+// 手寫標註是照原題順序畫的：本題有標註時，公布答案前回到原順序（模擬考不公布，不必換）
+function _inkRestoreOrder(qu){
+  if(!_ordOf(qu) || !qu.inkImg || S.quiz.mode === 'mock') return;
+  delete S.quiz.ord[qu.id];
+  _drawOpts(qu);
 }
 
 // 題目筆記／標記顏色（公布答案時顯示）
@@ -432,7 +475,17 @@ function _showQNote(qu){
   const hlC=qu.hlColor&&hlMap[qu.hlColor]?hlMap[qu.hlColor]:'';
   noteEl.style.display = 'block';
   noteEl.style.borderLeft = hlC ? ('3px solid '+hlC) : '';
-  noteEl.textContent = qu.note ? ('📝 '+qu.note) : '🖍 已標記';
+  const o = _ordOf(qu);
+  // 「(A)至(E)」先展開成 (A)(B)(C)(D)(E)（只換兩端會變成看不懂的範圍）；
+  // 連續的 (A)(B)(E) 換算後重新排序，讀起來仍是 (A)(B)(C) 的習慣順序
+  const note = o && qu.note ? qu.note
+    .replace(/[(（]([A-E])[)）]\s*[~～至到－—-]\s*[(（]([A-E])[)）]/g,
+      (m, x, y) => 'ABCDE'.slice('ABCDE'.indexOf(x), 'ABCDE'.indexOf(y) + 1).replace(/./g, '($&)') || m)
+    .replace(/(?:[(（][A-E][)）])+/g,
+    m => _toDisp(m.replace(/[^A-E]/g, ''), qu).split('').sort().map(c => '(' + c + ')').join('')) : qu.note;
+  noteEl.textContent = (o && qu.note ? '🔀 選項已重新排列，解析字母已換成本次順序（原題→本次：'
+      + o.map((k, i) => k + '→' + 'ABCDE'[i]).sort().join('、') + '）\n' : '')
+    + (note ? ('📝 '+note) : '🖍 已標記');
 }
 
 // 公布答案後（單選、複選、申論共用）：開放下一題、筆記、標註、編輯題目，並列出關聯法條
@@ -469,9 +522,15 @@ function _quizRefreshQ(data){
   const qu = S.quiz?.q?.[S.quiz.idx];
   if(!qu || qu.id !== data.id || document.getElementById('qv')?.style.display !== 'flex') return;
   Object.assign(qu, data);
+  _redrawAnswered(qu, '✎ 題目已更新　');
+}
+
+// 已作答的題目重畫（編輯存檔後、開始手寫標註時）：選項回到原題順序，標出正解
+function _redrawAnswered(qu, prefix){
+  if(S.quiz.ord) delete S.quiz.ord[qu.id];
   renderQCard();                       // 題幹、選項用新內容重畫（S.quiz.ans 仍為已作答，選項點了不會再計分）
   if(qu.type === 'mc'){
-    _showMcKey(qu, '✎ 題目已更新　');
+    _showMcKey(qu, prefix);
   } else if(S.quiz.mode !== 'esview'){   // 申論瀏覽由 renderQCard 直接顯示答案卷
     const resEl = document.getElementById('qres');
     resEl.className = 'qres on r';
@@ -944,12 +1003,15 @@ function inkMode(m){
 async function toggleInk(){  try{
   const cv = document.getElementById('qink');
   if(!cv) return;
+  // 選項打亂中：先回到原題順序再開始標註（標註一律以原題版面為準，下次顯示才對得上）
+  const qu = S.quiz.q[S.quiz.idx], back = !_inkOn && qu && _ordOf(qu);
+  if(back) _redrawAnswered(qu, '');
   _inkOn = !_inkOn;
   if(_inkOn){
     _inkSync(); _inkBind();
     cv.classList.add('on');
     document.getElementById('qink-btn')?.classList.add('on');
-    toast('標註模式：直接在題目上圈畫');
+    toast(back ? '選項已回到原題順序，可直接圈畫' : '標註模式：直接在題目上圈畫');
   }else{
     cv.classList.remove('on');
     document.getElementById('qink-btn')?.classList.remove('on');
@@ -1109,8 +1171,13 @@ function selectOpt(el, key){
 function submitMulti(){
   if(S.quiz.ans) return;
   const qu = S.quiz.q[S.quiz.idx];
+  // 有手寫標註要回到原順序：選取的字母先換回原題字母再重畫
+  if(_ordOf(qu) && qu.inkImg && S.quiz.mode !== 'mock'){
+    S.quiz._selected = new Set(_toOrig([...(S.quiz._selected||[])].join(''), qu));
+    _inkRestoreOrder(qu);
+  }
   const selected = [...(S.quiz._selected||new Set())].sort().join('');
-  const ansStr = (qu.answer||'').replace(/[, ]/g,'').split('').sort().join('');
+  const ansStr = _toDisp((qu.answer||'').replace(/[, ]/g,''), qu).split('').sort().join('');
   ansQMulti(selected, ansStr, qu);
 }
 
@@ -1148,7 +1215,7 @@ async function ansQMulti(selected, correctStr, qu){  try{
   resEl.className = 'qres on '+(correct ? 'c' : 'w');
   haptic(correct ? 'success' : 'error');
   resEl.classList.add(correct ? 'qres-pop' : 'qres-shake');
-  let msg = correct ? '✓ 完全正確！' : '✗ 正確答案：'+correctStr.split('').join('、');
+  let msg = correct ? '✓ 完全正確！' : '✗ 正確答案：'+_ansText(qu, '、');
   if(!correct && selected) msg += '（你選：'+selected.split('').join('、')+'）';
   if(hesitant) msg += ' ⚠ 超過40秒';
   resEl.textContent = msg;
@@ -1216,7 +1283,7 @@ const Quiz = { startQ, startQWithPool, startQPick,
                startMockExam, beginMockExam,
                openQNote, closeQNote, saveQNote, endQuizNow,
                submitAnswer, nextQ, exitQ, revealES, toggleQStar, editQInQuiz, _quizRefreshQ, _esPaperHtml, ttsEssay,
-               openSpeed, spdToggle, spdClear, closeSpeed, startSpeed };
+               openSpeed, spdToggle, spdClear, closeSpeed, startSpeed, setOptShuffle };
 window.Quiz = Quiz;
 Object.assign(window, Quiz);
 
