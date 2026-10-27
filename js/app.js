@@ -401,7 +401,7 @@ function _handleBackLayer(){
   const ovMap = {
     'heatmap-ov':'closeHeatmapOv', 'bulk-ov':'closeBulkQ',
     'add-ov':'closeAdd', 'law-ov':'closeLawSh', 'blaw-ov':'closeBulkLaw',
-    'subj-ov':'closeSubjPick', 'qnote-ov':'closeQNote', 'exp-ov':'closeExportOv', 'lcat-ov':'closeLawCat', 'ltt-ov':'closeLawTitles', 'linfo-ov':'closeLawInfo',
+    'subj-ov':'closeSubjPick', 'qnote-ov':'closeQNote', 'exp-ov':'closeExportOv', 'lcat-ov':'closeLawCat', 'ltt-ov':'closeLawTitles', 'linfo-ov':'closeLawInfo', 'spd-ov':'closeSpeed',
   };
   const opened = [...document.querySelectorAll('.ov.on, .cov.on')];
   if(opened.length){

@@ -255,6 +255,13 @@ function renderQCard(){
     // 相關法條先隱藏，確認後顯示
     const lawEl = document.getElementById('qlaw');
     if(lawEl) lawEl.style.display = 'none';
+    // 速讀：不作答，題目一出來就公布答案與解析（不寫作答紀錄）
+    if(S.quiz.mode === 'speed'){
+      if(hintEl) hintEl.textContent = '⚡ 速讀・' + (isMulti ? '複選題' : '單選題');
+      _showMcKey(qu, '');
+      S.quiz.ans = true;
+      _afterAnswer(qu);
+    }
   } else {
     document.getElementById('qopts').innerHTML = '';
     document.getElementById('qes').style.display = 'block';
@@ -407,6 +414,16 @@ async function ansQ(sel){  try{
   _afterAnswer(qu);
   }catch(e){ logError('ansQ', e); }}
 
+// 直接標出選擇題正確答案（速讀、答題中編輯後重畫共用）
+function _showMcKey(qu, prefix){
+  const keys = (qu.answer||'').toUpperCase();
+  document.querySelectorAll('.qopt').forEach(o => o.classList.add(keys.includes(o.dataset.key) ? 'correct' : 'dim'));
+  const resEl = document.getElementById('qres');
+  resEl.className = 'qres on r';
+  resEl.textContent = prefix + '正確答案：' + (keys.split('').join('、') || '（未設定）');
+  _showQNote(qu);
+}
+
 // 題目筆記／標記顏色（公布答案時顯示）
 function _showQNote(qu){
   if(!qu.note && !qu.hlColor) return;
@@ -453,14 +470,11 @@ function _quizRefreshQ(data){
   if(!qu || qu.id !== data.id || document.getElementById('qv')?.style.display !== 'flex') return;
   Object.assign(qu, data);
   renderQCard();                       // 題幹、選項用新內容重畫（S.quiz.ans 仍為已作答，選項點了不會再計分）
-  const resEl = document.getElementById('qres');
-  resEl.className = 'qres on r';
   if(qu.type === 'mc'){
-    const keys = (qu.answer||'').toUpperCase();
-    document.querySelectorAll('.qopt').forEach(o => o.classList.add(keys.includes(o.dataset.key) ? 'correct' : 'dim'));
-    resEl.textContent = '✎ 題目已更新　正確答案：' + (keys.split('').join('、') || '（未設定）');
-    _showQNote(qu);
+    _showMcKey(qu, '✎ 題目已更新　');
   } else if(S.quiz.mode !== 'esview'){   // 申論瀏覽由 renderQCard 直接顯示答案卷
+    const resEl = document.getElementById('qres');
+    resEl.className = 'qres on r';
     resEl.innerHTML = _esSheetHtml(qu);
     document.getElementById('qrevbtn').disabled = true;
   }
@@ -636,17 +650,18 @@ function showQDone(){
   const doneArea = document.getElementById('qdone-area');
   if(doneArea){
     doneArea.style.display = 'flex';
-    doneArea.innerHTML = (_lastMode === 'esview'
-      ? '<div style="font-size:48px">📖</div>'+
+    const browse = _lastMode === 'esview' || _lastMode === 'speed';   // 瀏覽類：沒有作答成績
+    doneArea.innerHTML = (browse
+      ? '<div style="font-size:48px">'+(_lastMode === 'speed' ? '⚡' : '📖')+'</div>'+
         '<div style="font-size:22px;font-weight:700">瀏覽完畢</div>'+
-        '<div style="font-size:14px;color:var(--t2)">共 '+S.quiz.q.length+' 題申論</div>'
+        '<div style="font-size:14px;color:var(--t2)">共 '+S.quiz.q.length+' 題'+(_lastMode === 'speed' ? '選擇' : '申論')+'</div>'
       : '<div style="font-size:48px">'+emoji+'</div>'+
       '<div style="font-size:22px;font-weight:700">'+correct+'/'+total+' 正確</div>'+
       '<div style="font-size:14px;color:var(--t2)">正確率 '+pct+'%</div>'+
       (hesitant ? '<div style="font-size:13px;color:var(--org)">⚠ '+hesitant+' 題猶豫超過40秒</div>' : '')+
       '<div style="font-size:13px;color:var(--t2)">平均作答 '+avgTime+' 秒</div>')+
       '<div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;width:100%">'+
-      '<button class="btn bp bw" style="padding:14px;font-size:15px" data-action="replay">🔄 '+(_lastMode === 'esview' ? '再看一次' : '再練習一次')+'</button>'+
+      '<button class="btn bp bw" style="padding:14px;font-size:15px" data-action="replay">🔄 '+(browse ? '再看一次' : '再練習一次')+'</button>'+
       '<button class="btn bg bw" style="padding:12px;font-size:14px" data-action="exit">← 返回首頁</button>'+
       '</div>';
   }
@@ -662,6 +677,64 @@ function replayQuiz(){
 }
 
 // ════════ 模擬考模式 ════════
+
+// ════════════════════════════════════════════════════════════
+// 【速讀】選擇題直接看答案與解析，不作答、不寫作答紀錄
+//   依科目、考試別、年度組合篩選（每組可複選，不選＝全部），上次的條件會記住。
+//   選項旁的數字＝套用另外兩組條件後的題數；組合後沒有題目的反灰（已選的仍可取消）。
+// ════════════════════════════════════════════════════════════
+const _SPD_KEYS = { subject:'科目', exam:'考試別', year:'年度' };
+let _spdQs = [], _spdSel = {};
+const _spdVal = (q, k) => String(q[k] || '').trim() || '未分類';
+const _spdHit = (q, skip) => Object.keys(_SPD_KEYS).every(k => k === skip || !_spdSel[k].size || _spdSel[k].has(_spdVal(q, k)));
+
+async function openSpeed(){  try{
+  if(await _resumeIfAny('speed')) return;
+  _spdQs = (await da('questions')).filter(q => q.type === 'mc');
+  if(!_spdQs.length){ toast('目前沒有選擇題'); return; }
+  const saved = await getSetting('speed_filter', {});
+  for(const k in _SPD_KEYS){
+    const have = new Set(_spdQs.map(q => _spdVal(q, k)));
+    _spdSel[k] = new Set((saved?.[k] || []).filter(v => have.has(v)));   // 已不存在的條件略過
+  }
+  _spdRender();
+  document.getElementById('spd-ov').classList.add('on');
+  }catch(e){ logError('openSpeed', e); }}
+
+function _spdRender(){
+  const yr = v => parseInt(v) || 0;
+  document.getElementById('spd-groups').innerHTML = Object.entries(_SPD_KEYS).map(([k, label]) => {
+    const vals = [...new Set(_spdQs.map(q => _spdVal(q, k)))]
+      .sort(k === 'year' ? (a, b) => yr(b) - yr(a) : (a, b) => a.localeCompare(b, 'zh-Hant'));
+    const pool = _spdQs.filter(q => _spdHit(q, k));
+    return '<div class="spd-lbl">' + label + '</div><div class="spd-chips">' + vals.map(v => {
+      const n = pool.filter(q => _spdVal(q, k) === v).length, on = _spdSel[k].has(v);
+      return '<button class="chip' + (on ? ' on' : n ? '' : ' chip-off') + '" data-k="' + k + '" data-v="' + esc(v)
+           + '" onclick="spdToggle(this)">' + esc(v) + ' <span class="subj-cnt">' + n + '</span></button>';
+    }).join('') + '</div>';
+  }).join('');
+  document.getElementById('spd-n').textContent = '符合 ' + _spdQs.filter(q => _spdHit(q)).length + ' 題';
+}
+
+function spdToggle(btn){
+  const s = _spdSel[btn.dataset.k], v = btn.dataset.v;
+  s.has(v) ? s.delete(v) : s.add(v);
+  _spdRender();
+}
+function spdClear(){ for(const k in _SPD_KEYS) _spdSel[k].clear(); _spdRender(); }
+function closeSpeed(){ document.getElementById('spd-ov')?.classList.remove('on'); }
+
+function startSpeed(){
+  const pool = _spdQs.filter(q => _spdHit(q));
+  if(!pool.length){ toast('沒有符合的題目'); return; }
+  setSetting('speed_filter', Object.fromEntries(Object.keys(_SPD_KEYS).map(k => [k, [..._spdSel[k]]])));
+  closeSpeed();
+  // 新年度在前；同一份考卷依題號（題組自然連在一起）
+  const yn = q => parseInt(q.year) || 0, nn = q => parseInt(q.num) || 0;
+  pool.sort((a, b) => yn(b) - yn(a) || _spdVal(a, 'exam').localeCompare(_spdVal(b, 'exam'))
+    || _spdVal(a, 'subject').localeCompare(_spdVal(b, 'subject')) || nn(a) - nn(b) || (a.groupOrder || 0) - (b.groupOrder || 0));
+  startQWithPool(pool, 'speed');
+}
 
 // ════════════════════════════════════════════════════════════
 // 【科目多選 → 開始測驗】
@@ -1142,7 +1215,8 @@ const Quiz = { startQ, startQWithPool, startQPick,
                toggleInk, inkUndo, inkClear, inkColor, inkCustomColor, inkSize, inkMode,
                startMockExam, beginMockExam,
                openQNote, closeQNote, saveQNote, endQuizNow,
-               submitAnswer, nextQ, exitQ, revealES, toggleQStar, editQInQuiz, _quizRefreshQ, _esPaperHtml, ttsEssay };
+               submitAnswer, nextQ, exitQ, revealES, toggleQStar, editQInQuiz, _quizRefreshQ, _esPaperHtml, ttsEssay,
+               openSpeed, spdToggle, spdClear, closeSpeed, startSpeed };
 window.Quiz = Quiz;
 Object.assign(window, Quiz);
 
