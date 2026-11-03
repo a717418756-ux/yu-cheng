@@ -100,7 +100,7 @@ function _fitDateLabel(){
 async function editFitField(field, label, unit){
   const key = _fitTodayKey();
   const cur = await _getFitData(key);
-  const input = prompt(`輸入${label}（${unit}）：`, cur[field] || '');
+  const input = await askInput(`今日${label}`, `單位：${unit}`, cur[field] || '', {type:'number', placeholder:'0', okText:'儲存'});
   if(input === null) return;  // 取消
   const v = parseInt(input);
   const val = isNaN(v) ? 0 : Math.max(0, v);

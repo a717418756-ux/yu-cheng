@@ -46,7 +46,13 @@ function toast(m,d=2200){ const e=document.getElementById('toast');if(!e)return;
 // 本地日期 YYYY-MM-DD（不可用 toISOString：那是 UTC，台灣 00:00~08:00 會記成前一天）
 function ymd(d=new Date()){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function today(){ return ymd(); }
-function dl(c,fn,t='text/plain'){ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=fn;a.click(); }
+// 下載檔案：連結先放進頁面再點（未掛上 DOM 的連結，部分瀏覽器會忽略檔名），用完釋放 blob 網址
+function dl(c,fn,t='text/plain'){
+  const u=URL.createObjectURL(c instanceof Blob?c:new Blob([c],{type:t}));
+  const a=document.createElement('a'); a.href=u; a.download=fn; a.style.display='none';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u), 30000);
+}
 function kwArr(s){ return (s||'').split(/[,，、\s]+/).map(k=>k.trim()).filter(Boolean); }
 
 // ── 空格清理（PDF/OCR 常見問題）──────────────────────────────
@@ -144,6 +150,38 @@ function closeCfm(){
 }
 // 確認視窗（Promise 版）：取代瀏覽器原生 confirm()，外觀與 App 一致、電子紙也清楚。
 //   按確認 → true；按取消或手機返回鍵 → false。用法：if(!await askConfirm('刪除', '確定？')) return;
+// 輸入視窗（Promise 版）：取代瀏覽器原生 prompt()，外觀與確認視窗一致。
+//   按確認 → 輸入的字串；按取消、點背景、返回鍵 → null。opts：{type:'number', placeholder, okText}
+function askInput(t, s, def='', opts={}){
+  return new Promise(resolve=>{
+    document.getElementById('ask-in-ov')?._close?.();
+    const ov = document.createElement('div');
+    ov.className = 'cov on'; ov.id = 'ask-in-ov'; ov.style.zIndex = '900';
+    ov.innerHTML = '<div class="cbox" style="max-width:360px;width:100%">'+
+      '<div class="cbt">'+esc(t)+'</div>'+(s?'<div class="cbs" style="white-space:pre-line">'+esc(s)+'</div>':'')+
+      '<input id="ask-in-val" style="width:100%;box-sizing:border-box;margin:0 0 14px;padding:11px 12px;border-radius:10px;'+
+        'background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:15px"'+
+        (opts.type==='number'?' type="number" inputmode="numeric" min="0"':' type="text"')+
+        ' placeholder="'+esc(opts.placeholder||'')+'" value="'+esc(String(def??''))+'">'+
+      '<div class="cbn"><button class="btn bg bw" data-a="cn">取消</button>'+
+      '<button class="btn bp bw" data-a="ok">'+esc(opts.okText||'確認')+'</button></div></div>';
+    let done = false;
+    const finish = v => { if(done) return; done = true; ov.remove(); resolve(v); };
+    ov._close = () => finish(null);   // 返回鍵（app.js 的 .cov.on 處理）走這裡
+    ov.addEventListener('click', e=>{
+      if(e.target === ov) return finish(null);
+      const a = e.target.closest('[data-a]')?.dataset.a;
+      if(a === 'cn') finish(null);
+      else if(a === 'ok') finish(ov.querySelector('#ask-in-val').value);
+    });
+    ov.addEventListener('keydown', e=>{
+      if(e.key === 'Enter'){ e.preventDefault(); finish(ov.querySelector('#ask-in-val').value); }
+      else if(e.key === 'Escape') finish(null);
+    });
+    document.body.appendChild(ov);
+    setTimeout(()=>{ const i = ov.querySelector('#ask-in-val'); i?.focus(); i?.select?.(); }, 60);
+  });
+}
 function askConfirm(t,s,okText,cnText){
   return new Promise(r=>{ cfm(t,s,()=>r(true),okText,cnText); _cfmCancel=()=>r(false); });
 }

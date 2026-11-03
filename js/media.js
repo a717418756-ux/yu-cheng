@@ -532,7 +532,7 @@ async function _executeBulk(){
     }
     toast(`已移除 ${ids.length} 項收藏`);
   } else {
-    if(!confirm(`確定刪除 ${ids.length} 項？此操作無法復原。`)) return;
+    if(!await askConfirm('刪除影音', `確定刪除 ${ids.length} 項？此操作無法復原。`, '刪除')) return;
     for(const id of ids){
       await dd('leisuremedia', id);
       _M.allMedia = _M.allMedia.filter(x=>x.id!==id);
@@ -1838,7 +1838,7 @@ async function toggleMediaFav(id,btn){
 }
 
 async function confirmDeleteMedia(id){
-  if(!confirm('確定刪除？此操作無法復原。')) return;
+  if(!await askConfirm('刪除影音', '確定刪除？此操作無法復原。', '刪除')) return;
   await dd('leisuremedia',id);
   _M.allMedia=_M.allMedia.filter(m=>m.id!==id);
   _renderMediaPage();toast('已刪除');

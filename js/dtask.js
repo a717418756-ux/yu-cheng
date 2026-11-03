@@ -79,7 +79,7 @@ async function renderDtask(){
     const noAuto = !it.auto;
     return `<div class="dtask-item${isDone?' done':''}" onclick="dtaskToggle('${it.id}')">
       <span class="dtask-check">${isDone?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>':''}</span>
-      <span class="dtask-text">${_esc(it.text)}${noAuto?'<span class="dtask-noauto">未設條件</span>':''}</span>
+      <span class="dtask-text">${_esc(it.text)}${noAuto?'<span class="dtask-noauto">手動</span>':''}</span>
     </div>`;
   }).join('');
 
@@ -291,9 +291,11 @@ async function dtaskToggle(id){
     // 已完成 → 允許取消（誤判時可手動取消）
     done.splice(idx,1);
   } else {
-    // 未完成 → 不允許手動勾，改用重新整理鈕比對資料（防偷懶）
-    toast('請按右上角 🔄 由系統比對資料完成');
-    return;
+    // 未完成：有設自動條件的 → 不允許手動勾，改用重新整理鈕比對資料（防偷懶）
+    //   沒設條件的（含預設的 4 項）系統無從比對，只能手動勾；原本一律擋下，導致永遠 0%
+    const it = (await _getDtaskItems()).find(x=>x.id===id);
+    if(it?.auto){ toast('此任務已設自動條件，請按右上角 🔄 由系統比對完成'); return; }
+    done.push(id);
   }
   try{ await setSetting(_dtaskTodayKey(), done); }catch(e){ logError('dtaskToggle',e); }
   await _recordDtaskHistory();
@@ -373,7 +375,13 @@ async function _getDtaskHistory(){
 // ════════════════════════════════════════════════════════════
 // 【每日任務：編輯模式（增刪改）】
 // ════════════════════════════════════════════════════════════
-function toggleDtaskEdit(){
+async function toggleDtaskEdit(){
+  if(_dtaskEditMode){
+    // 完成編輯：以畫面上的輸入框為準（避免 400ms 延遲儲存還沒寫入），並丟掉空白任務
+    const items = _dtaskCollectInputs(await _getDtaskItems());
+    const kept = items.filter(it=>(it.text||'').trim());
+    try{ if(kept.length) await setSetting('dtask_items', kept); }catch(e){ logError('toggleDtaskEdit',e); }
+  }
   _dtaskEditMode = !_dtaskEditMode;
   renderDtask();
 }
@@ -390,17 +398,30 @@ async function dtaskEditText(id, text){
   }, 400);
 }
 
+// 編輯中的輸入框內容寫回 items（文字是延遲 400ms 才存，重畫前要先收，否則剛打的字會消失）
+function _dtaskCollectInputs(items){
+  clearTimeout(_dtaskSaveTimer);
+  document.querySelectorAll('#dtask-list .dtask-item-input').forEach(inp=>{
+    const it = items.find(x=>x.id===inp.dataset.id);
+    if(it) it.text = inp.value;
+  });
+  return items;
+}
+
 // 新增任務
 async function dtaskAdd(){
-  const items = await _getDtaskItems();
-  items.push({ id:'t'+Date.now(), text:'' });
+  const items = _dtaskCollectInputs(await _getDtaskItems());
+  const nid = 't'+Date.now();
+  items.push({ id:nid, text:'' });
   try{ await setSetting('dtask_items', items); }catch(e){ logError('dtaskAdd',e); }
-  renderDtask();
+  await renderDtask();
+  const inp = document.querySelector(`#dtask-list .dtask-item-input[data-id="${nid}"]`);
+  if(inp){ inp.placeholder = '輸入任務名稱'; inp.focus(); }
 }
 
 // 刪除任務
 async function dtaskDelete(id){
-  const items = await _getDtaskItems();
+  const items = _dtaskCollectInputs(await _getDtaskItems());
   const filtered = items.filter(x=>x.id!==id);
   try{ await setSetting('dtask_items', filtered); }catch(e){ logError('dtaskDelete',e); }
   renderDtask();
