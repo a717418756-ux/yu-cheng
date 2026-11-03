@@ -607,14 +607,14 @@
 
 /* 面板主按鈕（測驗 toggle） */
 .zpanel-main{
-  display:flex;align-items:center;gap:13px;
+  display:flex;align-items:center;gap:12px;
   padding:13px 15px;cursor:pointer;border:none;
   background:none;width:100%;text-align:left;
   border-bottom:1px solid rgba(255,255,255,0.06);
   transition:background .14s;
 }
 .zpanel-main:active{background:rgba(255,255,255,0.05)}
-.zpanel-main-icon{font-size:22px;flex-shrink:0}
+.zpanel-main-icon{font-size:22px;flex-shrink:0;width:28px;text-align:center}
 .zpanel-main-text .t{font-size:13.5px;font-weight:700;color:var(--t0);letter-spacing:.01em}
 .zpanel-main-text .s{font-size:10.5px;color:var(--t2);margin-top:2px}
 .zpanel-main-arrow{margin-left:auto;font-size:13px;color:var(--t2);transition:transform .28s;flex-shrink:0}
@@ -641,6 +641,8 @@
 }
 .zqb:active{background:linear-gradient(160deg,rgba(37,98,200,0.28) 0%,rgba(20,40,120,0.2) 100%)}
 .zqb-icon{font-size:20px;margin-bottom:4px;display:block}
+/* 子選單項目數為奇數時，最後一格橫跨兩欄，不留空洞 */
+.zqb:last-child:nth-child(odd){grid-column:1/-1}
 .zqb-label{font-size:11.5px;font-weight:700;color:var(--t0);letter-spacing:.01em}
 .zqb-desc{font-size:9.5px;color:var(--t2);margin-top:2px;line-height:1.3}
 
@@ -654,7 +656,7 @@
 }
 .zpanel-row:active{background:rgba(255,255,255,0.05)}
 a.zpanel-row{text-decoration:none;color:inherit}
-.zpanel-row-icon{font-size:19px;flex-shrink:0}
+.zpanel-row-icon{font-size:19px;flex-shrink:0;width:28px;text-align:center}
 .zpanel-row-text .t{font-size:13px;font-weight:600;color:var(--t0);letter-spacing:.01em}
 .zpanel-row-text .s{font-size:10.5px;color:var(--t2);margin-top:1px}
 

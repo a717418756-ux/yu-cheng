@@ -618,7 +618,7 @@ async function _renderAzureUsage(){
   const box = document.getElementById('azure-usage');
   if(!box) return;
   const u = await getSetting('azure_usage', null);
-  const ym = new Date().toISOString().slice(0, 7);
+  const ym = today().slice(0, 7);
   const chars = (u && u.ym === ym) ? (u.chars || 0) : 0;
   const FREE = 500000;
   const pct  = Math.min(100, Math.round(chars / FREE * 100));

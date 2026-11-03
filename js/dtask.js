@@ -234,7 +234,7 @@ async function dtaskSyncAuto(){
   let changed = 0;
 
   // 預先抓取比對所需資料
-  const todayStr = new Date().toISOString().slice(0,10);
+  const todayStr = today();
   let qs=[], ats=[], usage=[], fit=null, planEvents=[];
   try{ [qs, ats] = await Promise.all([da('questions'), da('attempts')]); }catch(e){}
   try{ usage = await da('usageLogs'); }catch(e){}

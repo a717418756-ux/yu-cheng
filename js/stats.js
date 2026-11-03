@@ -12,7 +12,7 @@ let _dchart = null;
 const _isWrong    = a => a.correct === false;
 const _isAnswered = a => a.correct === true || a.correct === false;
 const _pct = (n, d) => d ? Math.round(n / d * 100) : 0;
-const _daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+const _daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return ymd(d); };
 
 // 每題的作答彙總（一次掃過 attempts，避免 qs.find 巢狀迴圈）
 function _attemptStats(ats){

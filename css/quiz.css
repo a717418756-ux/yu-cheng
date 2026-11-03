@@ -546,10 +546,13 @@
 }
 
 /* ══ e-ink：熱力圖用邊框層次取代顏色深淺 ══════════════════════ */
+/* 電子紙全域 box-shadow:none !important，外框改用 border 才畫得出來 */
 [data-theme="eink"] .hm-cell{
-  box-shadow:inset 0 0 0 1px #999;
+  border:1px solid #999;
   border-radius:4px;
 }
+[data-theme="eink"] .hm-cell.hm-today{ border:2.5px solid #000; }
+[data-theme="eink"] .heatmap-dot{ border:1px solid #999; }
 [data-theme="eink"] .heatmap-wrap{
   background:none; border:1.5px solid #000;
 }
@@ -668,3 +671,31 @@
 [data-theme="eink"] .mock-timer.warn{
   background:#000; color:#fff; animation:none;
 }
+
+/* ── 完成畫面：成績環 + 統計格 ───────────────────────────── */
+.qd-ring{
+  --p:0; --c:var(--acc);
+  width:148px; height:148px; border-radius:50%;
+  background:conic-gradient(var(--c) calc(var(--p) * 1%), var(--bg3) 0);
+  display:grid; place-items:center; margin-top:8px;
+}
+.qd-ring-in{
+  width:122px; height:122px; border-radius:50%; background:var(--bg0);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.qd-pct{ font-size:38px; font-weight:800; line-height:1; color:var(--t0); font-variant-numeric:tabular-nums; }
+.qd-pct small{ font-size:16px; font-weight:700; margin-left:1px; color:var(--t2); }
+.qd-sub{ font-size:12px; color:var(--t2); margin-top:4px; letter-spacing:.08em; }
+.qd-verdict{ font-size:15px; font-weight:700; color:var(--t0); margin-top:4px; }
+.qd-grid{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:8px; width:100%; margin-top:6px;
+}
+.qd-cell{
+  background:var(--bg1); border:1px solid var(--bd); border-radius:var(--r);
+  padding:12px 4px 10px; text-align:center;
+}
+.qd-n{ font-size:20px; font-weight:800; color:var(--t0); font-variant-numeric:tabular-nums; line-height:1.1; }
+.qd-n small{ font-size:12px; font-weight:600; color:var(--t2); margin-left:1px; }
+.qd-l{ font-size:11px; color:var(--t2); margin-top:4px; white-space:nowrap; }
+[data-theme="eink"] .qd-ring{ background:conic-gradient(#000 calc(var(--p) * 1%), #ddd 0); }
+[data-theme="eink"] .qd-cell{ border-color:#000; }

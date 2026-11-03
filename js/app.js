@@ -230,9 +230,18 @@ function fabGo(pg){
 // ════════════════════════════════════════════════════════════
 // 【頁面切換主控】
 // ════════════════════════════════════════════════════════════
+let _staticOv = null;   // 頁面載入時就存在的浮層（第一次換頁時記錄，此時尚無動態浮層）
 function goPage(pg, btn, fromBack){
   // bulk 是 overlay，不跳頁，直接開啟後返回
   if(pg==='bulk'){ openBulkQ(); return; }
+  // 換頁時收掉上一頁殘留的浮層（法條彈窗、底部面板），避免蓋在新頁面上
+  const lp = document.getElementById('lawpop-ov');
+  if(lp) lp.style.display = 'none';
+  //   HTML 內建的只收起；JS 動態建立的（模擬考設定等）直接移除，否則下次開啟會出現重複 id
+  _staticOv ||= new Set(document.querySelectorAll('.ov'));
+  document.querySelectorAll('.ov.on').forEach(o=>{
+    if(_staticOv.has(o)) o.classList.remove('on'); else o.remove();
+  });
   document.querySelectorAll('.page').forEach(p=>p.classList.add('hide'));
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
   const el = document.getElementById('pg-'+pg); if(el) el.classList.remove('hide');

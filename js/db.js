@@ -352,7 +352,7 @@ async function logZoneUsage(zone, seconds) {
 // 取得過去 N 天的所有記錄
 async function getUsageLogs(days = 35) {
   try {
-    const from = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+    const from = (()=>{ const d=new Date(); d.setDate(d.getDate()-days); return ymd(d); })();
     return await _db.usageLogs.where('date').aboveOrEqual(from).toArray();
   } catch(e) { logError('getUsageLogs', e); return []; }
 }
@@ -408,5 +408,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.22.35';    // ⓪複選題回原順序的流程精簡 ⓪解析裡「(A)至(E)」的範圍寫法在選項打亂時先展開再換算 ①設定新增「選擇題選項隨機排列」（預設關閉）：判分、答案列、解析 (A)(B) 字母自動換算；英文、國文與互相引用選項的題目不打亂；有手寫標註時作答後回原順序 ②含 v4.22.32 速讀、記憶樹連結
+const APP_VERSION  = '4.22.36';    // ⓪日期改用本地時間（原為 UTC，台灣清晨 0~8 點的作答、使用時間會記到前一天） ⓪貼題解析保留中文全形標點（，？（）），英文標點後空格不再被吃掉 ⓪題庫搜尋結果卡片多出「NaN」修正 ⓪申論題誤標「單選題」、關聯法條純文字格式不顯示修正 ⓪換頁時收掉殘留的法條彈窗與浮層 ①完成畫面改版：成績環、統計格、「錯題重做」 ②熱力圖桌機格子上限、電子紙格線；考試區選單對齊；首頁「新增考試倒數」可直接點
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

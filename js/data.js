@@ -174,8 +174,8 @@ async function renderHeatmap(){
   const today_ = today();
   const cells = [];
   for(let i = _HM_COLS - 1; i >= 0; i--){
-    const d = new Date(Date.now() - i * 86400000);
-    const dateStr = d.toISOString().slice(0, 10);
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const dateStr = ymd(d);
     const sec = dayMap[dateStr] || 0;
     // 時間分（0~1，60分鐘封頂）+ 任務分（0~1，當日完成比例）
     const timeScore = Math.min(1, sec / TARGET_SEC);
@@ -499,7 +499,6 @@ async function renderList(){  try{
           '<button class="qabn" onclick="editQ('+q.id+')">✏ 編輯</button>'+
           '<button class="qabn" data-qid="'+q.id+'" onclick="startSingleQ(this)">▶ 練習</button>'+
           '<button class="qabn" onclick="toggleStar('+q.id+')">'+(q.starred?'★':'☆')+'</button>'+
-          +
         '</div>';
       div.dataset.qid = q.id;
       div.dataset.selkey = 'qid:'+q.id;
@@ -792,7 +791,7 @@ function showAdd(q){
   set('f-must-kw', (q?.mustKeywords||[]).join('，'));
   set('f-note', q?.note||'');
   _setMarkRow('f-mark-row', q?.hlColor||'');
-  set('f-laws', (q?.relatedLaws||[]).map(l=>l.ref).join('，'));
+  set('f-laws', (q?.relatedLaws||[]).map(l=>typeof l==='string'?l:l.ref).join('，'));
   const exEl = document.getElementById('f-ex');
   if(exEl) exEl.value = q?.exam||'';
   const isNum = document.getElementById('f-is-number');
@@ -1898,7 +1897,7 @@ function _findBacklinks(target, allLaws){
   for(const [l, { auto, parents }] of _citeIndex(allLaws)){
     if(l.id === target.id) continue;
     // 手動填的關聯 ＋ 從內文自動擷取的引用，兩者都算
-    for(const raw of [...(l.relatedLaws||[]).map(r=>r.ref||r.lawName||''), ...auto]){
+    for(const raw of [...(l.relatedLaws||[]).map(r=>typeof r==='string'?r:(r.ref||r.lawName||'')), ...auto]){
       let ref = (raw||'').trim();
       if(!ref) continue;
       // §簡寫正規化後再比對（與 showLawPop 同一套規則）
@@ -2003,7 +2002,7 @@ async function openLawGroup(lawName, full){  try{
     //   使用者在意的是「這條跟哪些法規有關」，誰引用誰是法制作業的事，
     //   讀法條時反而多一個區塊要看。反推來源以「法規名稱」呈現並去重，
     //   避免同一部子法有多條引用時擠出一堆重複標籤。
-    const manualRefs = (l.relatedLaws||[]).map(r=>r.ref||r.lawName||'').filter(Boolean);
+    const manualRefs = (l.relatedLaws||[]).map(r=>typeof r==='string'?r:(r.ref||r.lawName||'')).filter(Boolean);
     const { auto: autoRefs, parents } = _citeIndex(allLaws).get(l);
     // 反推來源（只取法規名稱並去重）。若正向已經有更精確的「○○法第X條」，
     // 就不要再重複列出同一部法規的名稱，否則同一條會出現兩個指向同處的標籤。
@@ -3284,7 +3283,7 @@ async function showLawPop(ref){  try{
   _setLawPopCur(l);
   document.getElementById('lawpop-title').textContent=(l.lawName||'')+' '+(l.article||'');
   document.getElementById('lawpop-body').innerHTML=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px">':_lawBody(l.content, esc);
-  const rl=(l.relatedLaws||[]).map(r=>'<button class="chip" style="font-size:11px" onclick="showLawPop(\''+esc(r.ref||r.lawName||'')+'\')" >⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('');
+  const rl=(l.relatedLaws||[]).map(r=>'<button class="chip" style="font-size:11px" onclick="showLawPop(\''+escJs(r.ref||r.lawName||'')+'\')" >⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('');
   document.getElementById('lawpop-related').innerHTML=rl?'<div style="margin-top:8px;font-size:12px;color:var(--t2)">關聯法條：</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">'+rl+'</div>':'';
   el.style.display='flex';
   }catch(e){ logError('showLawPop',e); }}
