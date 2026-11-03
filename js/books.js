@@ -1085,6 +1085,7 @@ async function openBookReader(id){
   const ov = document.createElement('div');
   ov.id = 'book-reader-ov';
   ov.className = 'book-ov-full';
+  ov.dataset.bookId = id;   // 返回鍵呼叫 closeBookReader() 不帶參數，靠這個找回書號存閱讀位置
 
 
 
@@ -1207,6 +1208,9 @@ async function openBookReader(id){
 
   document.body.appendChild(ov);
   ov._objectUrl = url;
+  // 所有格式（txt / pdf / epub）都標記閱讀中：返回鍵靠它判斷要先關閱讀器。
+  //   原本只有 epub 初始化完才加，txt、pdf 按返回會切換底下的頁面，閱讀器卻還蓋在上面
+  document.documentElement.classList.add('reader-active');
 
   // eink 模式：自動套用電子紙專屬主題（純黑粗體大字，最適合反射光閱讀）
   if(document.documentElement.dataset.theme==='eink'){
@@ -1981,6 +1985,7 @@ function _readerTheme(theme){
 async function closeBookReader(id){
   const ov=document.getElementById('book-reader-ov');
   if(!ov) return;
+  if(id == null) id = Number(ov.dataset.bookId);
   // 儲存閱讀位置
   try{
     const txt=document.getElementById('reader-txt');

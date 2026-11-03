@@ -230,6 +230,8 @@ function fabGo(pg){
 // ════════════════════════════════════════════════════════════
 // 【頁面切換主控】
 // ════════════════════════════════════════════════════════════
+// JS 動態建立的面板類別（不是 .ov，各模組自己 createElement 後 append 到 body）
+const _DYN_SHEETS = '.book-ov-sheet, .book-ov-center, .media-ov-sheet, .ov-sheet-c, .ov-full-col';
 let _staticOv = null;   // 頁面載入時就存在的浮層（第一次換頁時記錄，此時尚無動態浮層）
 function goPage(pg, btn, fromBack){
   // bulk 是 overlay，不跳頁，直接開啟後返回
@@ -242,6 +244,7 @@ function goPage(pg, btn, fromBack){
   document.querySelectorAll('.ov.on').forEach(o=>{
     if(_staticOv.has(o)) o.classList.remove('on'); else o.remove();
   });
+  document.querySelectorAll(_DYN_SHEETS).forEach(o=>o.remove());
   document.querySelectorAll('.page').forEach(p=>p.classList.add('hide'));
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
   const el = document.getElementById('pg-'+pg); if(el) el.classList.remove('hide');
@@ -370,6 +373,8 @@ function _handleBackLayer(){
   // 1) 
   const cfmOv = document.getElementById('cfm-ov');
   if(cfmOv && cfmOv.classList.contains('on')){ _callIf('closeCfm'); return true; }
+  const askIn = document.getElementById('ask-in-ov');   // askInput 輸入視窗（永遠在最上層）
+  if(askIn){ askIn._close ? askIn._close() : askIn.remove(); return true; }
 
   // 1-1) 法條小視窗（疊在答題、法規頁之上）：從清單點進來的先回清單，與按 ✕ 相同
   //      ★ 原本沒攔，答題中看法條按返回會直接離開測驗
@@ -385,8 +390,17 @@ function _handleBackLayer(){
     if(m && m.style.display !== 'none' && m.style.display !== ''){ _callIf(fn); return true; }
   }
 
+  // 3-1) JS 動態建立的底部面板／彈窗（書籍詳情、新增／編輯書籍、新增影音、英語上傳、新增考試倒數…）
+  //      ★ 原本沒攔：按返回會切換底下的頁面，面板卻還留在畫面上。取最上層（最後加入）的關閉
+  const sheets = [...document.querySelectorAll(_DYN_SHEETS)].filter(_isShown);
+  if(sheets.length){
+    const top = sheets[sheets.length - 1];
+    top._close ? top._close() : top.remove();
+    return true;
+  }
+
   // 4)  / PDF 
-  if(document.documentElement.classList.contains('reader-active')){
+  if(document.documentElement.classList.contains('reader-active') || document.getElementById('book-reader-ov')){
     if(_callIf('closeBookReader')) return true;
   }
 

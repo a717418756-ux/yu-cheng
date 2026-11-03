@@ -43,15 +43,30 @@ function _splitSentences(text){
   norm.split(/\n\s*\n/).forEach(para=>{
     const p = para.trim();
     if(!p) return;
-    // 句末標點：. ! ? 後接空白或結尾；保留標點。避免縮寫誤切（Mr. Dr. 等）
-    const parts = p.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [p];
-    parts.forEach(s=>{
-      const t = s.trim();
+    // 句末標點：. ! ? （可接引號、括號）後面是空白或結尾才切；保留標點。
+    //   ★ 原本用 match() 抓片段，抓不到的文字會被直接丟掉（如「It was 3.5 km」的「It was 3.」整段消失），
+    //     改成逐一掃描切點，切點之間的文字一定保留。
+    //   不切：縮寫（Mr. Dr. e.g. U.S.）、單一大寫字母縮寫（J. Smith）、句點後接小寫字（多半是縮寫）
+    const re = /[.!?]+["'\u201D\u2019)\]]*(?=\s|$)/g;
+    let start = 0, m;
+    while((m = re.exec(p))){
+      const end = m.index + m[0].length;
+      const chunk = p.slice(start, end);
+      if(/^\.+["'\u201D\u2019)\]]*$/.test(m[0])){
+        const next = p.slice(end).trimStart()[0] || '';
+        if(/[a-z]/.test(next)) continue;   // 句點／刪節號後接小寫：句子還沒結束
+        if(/^\.["'\u201D\u2019)\]]*$/.test(m[0]) && _ENG_ABBR.test(chunk.replace(/["'\u201D\u2019)\]]+$/, ''))) continue;
+      }
+      const t = chunk.trim();
       if(t) out.push(t);
-    });
+      start = end;
+    }
+    const rest = p.slice(start).trim();
+    if(rest) out.push(rest);
   });
   return out;
 }
+const _ENG_ABBR = /(?:^|[\s("'])(?:Mr|Mrs|Ms|Mx|Dr|Prof|Sr|Jr|St|Mt|vs|etc|No|Vol|Fig|Inc|Ltd|Co|Corp|Gen|Gov|Sen|Rep|Capt|Lt|Col|Sgt|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|e\.g|i\.e|a\.m|p\.m|U\.S|U\.K|[A-Z])\.$/;
 
 // ════════ 列表頁渲染 ════════
 // ════════════════════════════════════════════════════════════

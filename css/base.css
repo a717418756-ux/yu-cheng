@@ -1577,11 +1577,11 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
 
 /* 每日任務：未設自動條件標示 */
 .dtask-noauto{
-  font-size:10px; color:#e0a020; margin-left:6px;
-  padding:1px 6px; border-radius:8px; background:rgba(224,160,32,0.12);
+  font-size:10px; color:var(--t2); margin-left:6px;
+  padding:1px 6px; border-radius:8px; background:rgba(255,255,255,0.06);
   vertical-align:middle;
 }
-[data-theme="eink"] .dtask-noauto{ background:#f0e8d0; color:#000; }
+[data-theme="eink"] .dtask-noauto{ background:none; border:1px solid #555; color:#000; }
 
 /* ════ 標記語法說明 + 驚嘆號鈕 ════════════════════════════ */
 .markup-help-btn{

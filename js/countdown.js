@@ -161,7 +161,7 @@ async function editMotto(){
   const el = document.getElementById('h-motto');
   if(!el) return;
   const cur = el.textContent.trim();
-  const nv = prompt('輸入你的備考勉勵語：', cur);
+  const nv = await askInput('備考勉勵語', '顯示在首頁頂端，每天提醒自己', cur, {okText:'儲存'});
   if(nv === null) return;
   const val = nv.trim() || '備考如磨刃，臨陣方知銳';
   el.textContent = val;
