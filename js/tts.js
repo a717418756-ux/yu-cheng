@@ -70,7 +70,7 @@
     try{
       const n = (text || '').length;
       if(!n) return;
-      const ym = new Date().toISOString().slice(0, 7);   // YYYY-MM
+      const ym = today().slice(0, 7);   // YYYY-MM（本地月份）
       getSetting('azure_usage', null).then(u => {
         const cur = (u && u.ym === ym) ? u : { ym, chars: 0 };   // 跨月自動歸零
         cur.chars += n;

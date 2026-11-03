@@ -43,7 +43,9 @@ function renderStemMarkup(text){
 // 先跳脫 JS 層（\ 與 '），再跳脫 HTML 屬性層
 function escJs(s){ return esc((s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
 function toast(m,d=2200){ const e=document.getElementById('toast');if(!e)return;e.textContent=m;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),d); }
-function today(){ return new Date().toISOString().slice(0,10); }
+// 本地日期 YYYY-MM-DD（不可用 toISOString：那是 UTC，台灣 00:00~08:00 會記成前一天）
+function ymd(d=new Date()){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function today(){ return ymd(); }
 function dl(c,fn,t='text/plain'){ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=fn;a.click(); }
 function kwArr(s){ return (s||'').split(/[,，、\s]+/).map(k=>k.trim()).filter(Boolean); }
 
@@ -395,9 +397,28 @@ function _tidyText(s){
   if(!s) return '';
   return cleanSpaces(
     s.replace(/\s+/g,' ')
-     .replace(/([，。！？、：；,.!?:;])\s+/g,'$1')
+     .replace(/([，。！？、：；])\s+/g,'$1')
+     // 半形標點後的空白只在接中文時刪（英文題目的 "correct? Choose" 要保留空格）
+     .replace(/([,.!?:;])\s+(?=[\u2E80-\u9FFF\uFF00-\uFFEF])/g,'$1')
      .trim()
   );
+}
+
+// ─────── 中文標點還原 ───────────────────────────────────────────
+// 前處理的 NFKC 會把全形標點轉半形（，？：（）→ , ? : ( )），中文題目會變成「規定,警察任務為何?」。
+// 解析完成後，緊鄰中文的標點轉回全形；英文、數字之間的（如 1,000、A:B）維持原樣。
+//   括號：內容含中文或為空白（填空「（　）」）才轉全形；(A)(1) 這類選項／款目編號不動
+const _CJK = '[\\u2E80-\\u9FFF\\uF900-\\uFAFF\\u3000-\\u303F\\uFF00-\\uFFEF①-⑳❶-❿⑴-⑽㈠-㈩]';
+const _CJK_PUNCT_MAP = { ',':'，', '?':'？', '!':'！', ':':'：', ';':'；' };
+function restoreCJKPunct(s){
+  if(!s) return s;
+  let t = s;
+  t = t.replace(/\(\s*\)/g, '（　）');
+  t = t.replace(/\(([^()\n]*)\)/g, (m, inner) =>
+    new RegExp(_CJK).test(inner) ? '（'+inner+'）' : m);
+  t = t.replace(new RegExp('('+_CJK+')\\s*([,?!:;])', 'g'), (m, a, p) => a + _CJK_PUNCT_MAP[p]);
+  t = t.replace(new RegExp('([,?!:;])\\s*(?='+_CJK+')', 'g'), (m, p) => _CJK_PUNCT_MAP[p]);
+  return t;
 }
 
 function parseQuestions(rawText){
@@ -445,8 +466,8 @@ function parseQuestions(rawText){
         }
       }
     }
-    curQ.stem=_tidyText(curQ.stem);
-    Object.keys(curQ.options).forEach(k=>{ curQ.options[k]=_tidyText(curQ.options[k]); });
+    curQ.stem=restoreCJKPunct(_tidyText(curQ.stem));
+    Object.keys(curQ.options).forEach(k=>{ curQ.options[k]=restoreCJKPunct(_tidyText(curQ.options[k])); });
     curQ.type=Object.keys(curQ.options).length>=2?'mc':'es';
     // 有題幹 → 保留；無題幹但有選項（題號可能被黏住漏掉）→ 也保留並標記題幹待補
     if(curQ.stem){

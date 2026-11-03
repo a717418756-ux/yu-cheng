@@ -12,6 +12,7 @@
 
 let _qStart = 0;            // 題目開始時間
 let _lastPool = [];         // 完成後供「再練習一次」用
+let _lastWrong = [];        // 完成後供「錯題重做」用
 let _lastMode = 'all';
 
 // ════════ 啟動入口 ════════
@@ -267,6 +268,8 @@ function renderQCard(){
     }
   } else {
     document.getElementById('qopts').innerHTML = '';
+    const hintEs = document.getElementById('q-type-hint');
+    if(hintEs) hintEs.textContent = '✍️ 申論題';
     document.getElementById('qes').style.display = 'block';
     document.getElementById('qrevbtn').textContent = '顯示參考答案 / 解析';
     document.getElementById('qrevbtn').disabled = false;
@@ -316,10 +319,10 @@ function showQLawLinks(qu){
   const lawEl  = document.getElementById('qlaw');
   const listEl = document.getElementById('qlaw-list');
   const laws = qu.relatedLaws || [];
-  if(!laws.length){ lawEl.style.display = 'none'; return; }
+  if(!laws.some(l => typeof l === 'string' ? l.trim() : (l && (l.ref || l.lawName)))){ lawEl.style.display = 'none'; return; }
   // 法條參照放在 data-ref 屬性，由事件委派讀取（不經過 JS 字串層，無跳脫問題）
   listEl.innerHTML = laws.map(l=>{
-    const ref = l.ref || l.lawName || '';
+    const ref = typeof l === 'string' ? l : (l.ref || l.lawName || '');
     return `<span class="tag qlaw-tag" style="color:var(--pur);cursor:pointer" data-ref="${esc(ref)}">⚖ ${esc(ref)}</span>`;
   }).join('');
   lawEl.style.display = 'block';
@@ -668,6 +671,8 @@ function exitQ(){
   _ttsStop();
   _inkTeardown();
   document.getElementById('qv').style.display = 'none';
+  const lp = document.getElementById('lawpop-ov');   // 作答中開的法條彈窗一併關閉
+  if(lp) lp.style.display = 'none';
   S.quiz = {q:[], idx:0, ans:false, res:[], mode:''};
   if(S.page === 'home') renderHome();
 }
@@ -707,24 +712,47 @@ function showQDone(){
   _inkTeardown();   // 結束畫面不該殘留上一題的手寫筆跡
 
   const doneArea = document.getElementById('qdone-area');
+  document.getElementById('qpb').style.setProperty('--qpb-w', '100%');   // 進度條補滿
+  const wrongIds = res.filter(r => r.correct === false).map(r => r.qid);
+  _lastWrong = S.quiz.q.filter(q => wrongIds.includes(q.id));
   if(doneArea){
     doneArea.style.display = 'flex';
     const browse = _lastMode === 'esview' || _lastMode === 'speed';   // 瀏覽類：沒有作答成績
+    const tone = pct>=80 ? 'var(--grn)' : pct>=60 ? 'var(--acc)' : pct>=40 ? 'var(--org)' : 'var(--red)';
+    const verdict = pct>=90 ? '表現優異，維持手感' : pct>=70 ? '穩定掌握，再補弱點' : pct>=50 ? '持續累積，錯題重做' : '基礎待補，先看解析再重做';
+    const cell = (n, l, c) => '<div class="qd-cell"><div class="qd-n"'+(c?' style="color:'+c+'"':'')+'>'+n+'</div><div class="qd-l">'+l+'</div></div>';
     doneArea.innerHTML = (browse
       ? '<div style="font-size:48px">'+(_lastMode === 'speed' ? '⚡' : '📖')+'</div>'+
         '<div style="font-size:22px;font-weight:700">瀏覽完畢</div>'+
         '<div style="font-size:14px;color:var(--t2)">共 '+S.quiz.q.length+' 題'+(_lastMode === 'speed' ? '選擇' : '申論')+'</div>'
-      : '<div style="font-size:48px">'+emoji+'</div>'+
-      '<div style="font-size:22px;font-weight:700">'+correct+'/'+total+' 正確</div>'+
-      '<div style="font-size:14px;color:var(--t2)">正確率 '+pct+'%</div>'+
-      (hesitant ? '<div style="font-size:13px;color:var(--org)">⚠ '+hesitant+' 題猶豫超過40秒</div>' : '')+
-      '<div style="font-size:13px;color:var(--t2)">平均作答 '+avgTime+' 秒</div>')+
-      '<div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;width:100%">'+
-      '<button class="btn bp bw" style="padding:14px;font-size:15px" data-action="replay">🔄 '+(browse ? '再看一次' : '再練習一次')+'</button>'+
+      : !total
+      ? '<div style="font-size:48px">✍️</div>'+
+        '<div style="font-size:22px;font-weight:700">練習結束</div>'+
+        '<div style="font-size:14px;color:var(--t2)">共 '+S.quiz.q.length+' 題</div>'
+      : '<div class="qd-ring" style="--p:'+pct+';--c:'+tone+'" role="img" aria-label="正確率 '+pct+'%">'+
+          '<div class="qd-ring-in"><div class="qd-pct">'+pct+'<small>%</small></div><div class="qd-sub">正確率</div></div></div>'+
+        '<div class="qd-verdict">'+emoji+' '+verdict+'</div>'+
+        '<div class="qd-grid">'+
+          cell(correct, '答對', 'var(--grn)')+
+          cell(total-correct, '答錯', total-correct ? 'var(--red)' : '')+
+          cell(avgTime+'<small>s</small>', '平均作答')+
+          cell(hesitant, '猶豫 >40s', hesitant ? 'var(--org)' : '')+
+        '</div>')+
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;width:100%">'+
+      (!browse && _lastWrong.length
+        ? '<button class="btn bp bw" style="padding:14px;font-size:15px" data-action="retry-wrong">✕ 錯題重做（'+_lastWrong.length+' 題）</button>'+
+          '<button class="btn bg bw" style="padding:12px;font-size:14px" data-action="replay">🔄 全部再練一次</button>'
+        : '<button class="btn bp bw" style="padding:14px;font-size:15px" data-action="replay">🔄 '+(browse ? '再看一次' : '再練習一次')+'</button>')+
       '<button class="btn bg bw" style="padding:12px;font-size:14px" data-action="exit">← 返回首頁</button>'+
       '</div>';
   }
   document.getElementById('qfoot').style.display = 'none';
+}
+
+function retryWrongQuiz(){
+  const pool = _lastWrong || [];
+  if(!pool.length){ replayQuiz(); return; }
+  startQWithPool(shuffleUnits(pool).flat(), _lastMode || 'all');
 }
 
 function replayQuiz(){
@@ -1266,6 +1294,7 @@ function _initDelegation(){
       const btn = e.target.closest('[data-action]');
       if(!btn) return;
       if(btn.dataset.action === 'replay') replayQuiz();
+      else if(btn.dataset.action === 'retry-wrong') retryWrongQuiz();
       else if(btn.dataset.action === 'exit') exitQ();
     });
   }

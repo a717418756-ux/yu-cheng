@@ -186,7 +186,7 @@ function plannerEditAction(){
   if(_plannerTab==='ms'){
     openMilestoneEdit();
   } else {
-    const key = (typeof _planDateKey==='function') ? _planDateKey(0) : new Date().toISOString().slice(0,10);
+    const key = (typeof _planDateKey==='function') ? _planDateKey(0) : today();
     if(typeof _openPlanEditor==='function') _openPlanEditor(key, null, 540);
   }
 }

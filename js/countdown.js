@@ -29,7 +29,7 @@ async function renderCountdown(){
   const list = (await getCountdowns()).sort((a,b)=>new Date(a.date)-new Date(b.date));
 
   if(!list.length){
-    el.innerHTML = '<div class="hcd-hint">尚未新增考試，可至設定頁新增 →</div>';
+    el.innerHTML = '<button type="button" class="hcd-hint hcd-hint-btn" onclick="openCountdownMgr()">＋ 新增考試倒數，掌握備考節奏 →</button>';
     return;
   }
 
