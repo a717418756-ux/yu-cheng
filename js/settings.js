@@ -66,10 +66,13 @@ async function _restoreTable(name, rows){
 //   新手機還原一次就能用；但已經設好的不會被舊備份蓋回舊值
 //   （Apps Script 重新部署會換網址，用舊備份還原後網址變回舊的 → 雲端一直 HTTP 404）
 const _CONN_KEYS = [GAS_URL_KEY, GAS_PWD_KEY, 'tts_azure_key'];
+// 舊版把「上次備份／還原時間」存在設定裡，會跟著備份跑到別台裝置，造成誤判 → 還原時略過
+const _DEVICE_LOCAL_KEYS = ['lastBackupTime', 'lastRestoreTime'];
 async function _restoreSettings(rows){
   let n = 0;
   for(const st of (Array.isArray(rows) ? rows : [])){
     if(!st || st.key == null) continue;
+    if(_DEVICE_LOCAL_KEYS.includes(st.key)) continue;
     if(_CONN_KEYS.includes(st.key) && String((await dg('settings', st.key))?.value || '').trim()) continue;
     await dp('settings', st); n++;
   }
@@ -154,6 +157,232 @@ async function _gasLoadSavedConfig(){
   if(pwdEl && pwd) pwdEl.value = pwd;
 }
 
+// ══ 備份辨識：裝置名稱、備份資訊、同步紀錄 ═══════════════════════
+//   問題：三台裝置共用同一份雲端備份。原本「上次備份時間」存在資料庫設定裡，
+//   會跟著備份／還原在裝置間搬來搬去，看到的不是雲端檔案真正的備份時間，容易誤蓋。
+//   做法：①每份備份都寫入 meta：備份時間、哪台裝置、各類筆數、最後作答日
+//        ②裝置名稱、這台「上次同步的是哪一份」存在 localStorage——不進備份，每台各自一份
+//        ③備份前先讀雲端（或資料夾）現有那份的 meta，與本機並排比較，有風險就醒目警告
+//        ④還原前自動保留本機快照，還原錯了可一鍵復原
+const _DEV_KEY = 'yc_device', _ANCHOR_KEY = 'yc_sync_anchor', _GAS_FEAT_KEY = 'yc_gas_features';
+const _ls = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k) || 'null'); }catch(e){ return null; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+};
+function _guessDevName(){
+  const ua = navigator.userAgent || '';
+  if(/iPad|Tablet|BOOX|Android(?!.*Mobile)/i.test(ua)) return '平板';
+  if(/Mobi|iPhone|Android/i.test(ua)) return '手機';
+  return '電腦';
+}
+function _device(){
+  let d = _ls.get(_DEV_KEY);
+  if(!d || !d.id){
+    d = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), name: _guessDevName(), named: false };
+    _ls.set(_DEV_KEY, d);
+  }
+  return d;
+}
+// 第一次備份前請使用者為裝置命名（三台裝置才分得清楚）；取消 → null
+async function _ensureDeviceName(){
+  const d = _device();
+  if(d.named) return d;
+  const v = await askInput('為這台裝置命名', '備份檔會記錄是哪台裝置備份的，多台裝置才不會搞混。\n例如：手機、平板、電腦', d.name, { okText:'確定', placeholder:'手機' });
+  if(v === null) return null;
+  d.name = (v.trim() || d.name).slice(0, 20); d.named = true;
+  _ls.set(_DEV_KEY, d);
+  return d;
+}
+async function renameDevice(){
+  const d = _device();
+  const v = await askInput('裝置名稱', '只存在這台裝置，不會被備份或還原覆蓋', d.name, { okText:'儲存' });
+  if(v === null) return;
+  d.name = (v.trim() || d.name).slice(0, 20); d.named = true;
+  _ls.set(_DEV_KEY, d);
+  toast('裝置名稱：' + d.name);
+  _renderSyncStatus();
+}
+// 這台裝置上次與 target（'cloud'／'local'）同步的是哪一份備份
+const _anchor = target => (_ls.get(_ANCHOR_KEY) || {})[target] || null;
+function _setAnchor(target, sum, op){
+  const a = _ls.get(_ANCHOR_KEY) || {};
+  a[target] = { at: sum.at, device: sum.device, deviceId: sum.deviceId, op, when: new Date().toISOString() };
+  _ls.set(_ANCHOR_KEY, a);
+}
+
+// 備份檔的 meta（寫進備份）
+function _buildMeta(d){
+  const dev = _device();
+  return {
+    device: dev.name, deviceId: dev.id, app: typeof APP_VERSION !== 'undefined' ? APP_VERSION : '',
+    counts: { questions: d.questions.length, laws: d.laws.length, attempts: d.attempts.length,
+              englishMaterials: (d.englishMaterials || []).length },
+    lastAttempt: (d.attempts || []).reduce((m, a) => a.date && a.date > m ? a.date : m, ''),
+  };
+}
+// 一份備份（或本機目前資料）的摘要：優先用 meta；舊版備份沒有 meta 就從資料本身數
+function _summ(bk){
+  if(!bk) return null;
+  const c = bk.meta?.counts || {};
+  const n = k => Array.isArray(bk[k]) ? bk[k].length : (c[k] ?? null);
+  return {
+    at: bk.exportedAt || '', device: bk.meta?.device || '', deviceId: bk.meta?.deviceId || '',
+    q: n('questions'), l: n('laws'), a: n('attempts'), e: n('englishMaterials'),
+    lastAttempt: bk.meta?.lastAttempt || (Array.isArray(bk.attempts) ? bk.attempts.reduce((m, a) => a.date && a.date > m ? a.date : m, '') : ''),
+  };
+}
+async function _localSumm(){
+  const [questions, laws, attempts, englishMaterials] = await Promise.all([da('questions'), da('laws'), da('attempts'), da('englishMaterials')]);
+  return { ..._summ({ questions, laws, attempts, englishMaterials }), device: _device().name, deviceId: _device().id };
+}
+// 時間：2026/11/04 10:20（3 小時前）
+function _fmtAt(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  if(isNaN(d)) return String(iso);
+  const p = n => String(n).padStart(2, '0');
+  const s = d.getFullYear() + '/' + p(d.getMonth()+1) + '/' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  const m = Math.round((Date.now() - d) / 60000);
+  const rel = m < 1 ? '剛剛' : m < 60 ? m + ' 分鐘前' : m < 1440 ? Math.round(m/60) + ' 小時前' : Math.round(m/1440) + ' 天前';
+  return s + '（' + rel + '）';
+}
+
+// 並排比較視窗：left／right 是摘要；warns：[{lv:'danger'|'warn'|'ok'|'info', t:'文字'}]
+//   有 danger 時「確認」變紅色、改成明確的字，預設焦點在取消 → 不會順手按下去
+function _syncCompare({ title, left, right, leftLabel, rightLabel, warns = [], okText = '確認', cnText = '取消', infoOnly = false }){
+  return new Promise(resolve => {
+    document.getElementById('sync-cmp-ov')?._close?.();
+    const danger = warns.some(w => w.lv === 'danger');
+    const row = (label, a, b, hi) => '<tr' + (hi ? ' class="sc-diff"' : '') + '><th>' + label + '</th><td>' + a + '</td><td>' + b + '</td></tr>';
+    const num = v => v == null ? '—' : Number(v).toLocaleString();
+    const L = left || {}, R = right || {};
+    const cell = (s, k) => !s ? '—' : k === 'at' ? esc(_fmtAt(s.at)).replace('（', '<br><small>').replace('）', '</small>') : k === 'device' ? esc(s.device || '（未記錄）') : esc(s[k] || '—');
+    const ov = document.createElement('div');
+    ov.className = 'cov on'; ov.id = 'sync-cmp-ov'; ov.style.zIndex = '880';
+    ov.innerHTML = '<div class="cbox sc-box">'
+      + '<div class="cbt">' + esc(title) + '</div>'
+      + '<table class="sc-tbl"><thead><tr><th></th><th>' + esc(leftLabel) + '</th><th>' + esc(rightLabel) + '</th></tr></thead><tbody>'
+      + row('備份時間', left ? cell(L, 'at') : '<span class="sc-none">沒有備份</span>', cell(R, 'at'))
+      + row('裝置', cell(left, 'device'), cell(right, 'device'))
+      + row('題目', num(L.q), num(R.q), left && right && L.q !== R.q)
+      + row('法條', num(L.l), num(R.l), left && right && L.l !== R.l)
+      + row('作答紀錄', num(L.a), num(R.a), left && right && L.a !== R.a)
+      + row('最後作答日', cell(left, 'lastAttempt'), cell(right, 'lastAttempt'), left && right && L.lastAttempt !== R.lastAttempt)
+      + '</tbody></table>'
+      + warns.map(w => '<div class="sc-warn ' + w.lv + '">' + ({ danger:'⚠ ', warn:'⚠ ', ok:'✓ ', info:'ⓘ ' }[w.lv] || '') + esc(w.t) + '</div>').join('')
+      + '<div class="cbn" style="margin-top:14px">'
+      + (infoOnly ? '' : '<button class="btn ' + (danger ? 'bp' : 'bg') + ' bw" data-a="cn">' + esc(cnText) + '</button>')
+      + '<button class="btn ' + (infoOnly ? 'bp' : danger ? 'br sc-danger' : 'bp') + ' bw" data-a="ok">' + esc(infoOnly ? '知道了' : okText) + '</button>'
+      + '</div></div>';
+    let done = false;
+    const finish = v => { if(done) return; done = true; ov.remove(); resolve(v); };
+    ov._close = () => finish(false);
+    ov.addEventListener('click', e => {
+      if(e.target === ov) return finish(false);
+      const a = e.target.closest('[data-a]')?.dataset.a;
+      if(a) finish(a === 'ok' && !infoOnly);
+    });
+    document.body.appendChild(ov);
+  });
+}
+
+// 備份前的風險判斷：target＝目的地現有那份（可能 null）、local＝本機、an＝這台上次同步紀錄
+function _backupWarns(target, local, an, where){
+  const w = [], me = _device();
+  if(!target){ w.push({ lv:'info', t: where + '目前沒有備份，這會是第一份。' }); }
+  else{
+    const mine = target.deviceId && target.deviceId === me.id;
+    const synced = an && target.at && target.at <= an.at;
+    if(synced) w.push({ lv:'ok', t: where + '這份就是這台上次' + (an.op === 'restore' ? '還原' : '備份') + '的版本，之後沒有其他裝置備份過，可以放心覆蓋。' });
+    else if(target.at && (!an || target.at > an.at) && !mine)
+      w.push({ lv: target.deviceId ? 'danger' : 'warn', t: where + '這份是「' + (target.device || '其他裝置／舊版') + '」在 ' + _fmtAt(target.at)
+        + ' 備份的' + (an ? '，比這台裝置上次同步（' + _fmtAt(an.at) + '）還新' : '，這台裝置還沒同步過')
+        + '。直接覆蓋，那台裝置之後的進度會不見。建議先「還原」再繼續使用。' });
+    const less = [['q','題目'],['l','法條'],['a','作答紀錄']].filter(([k]) => target[k] != null && local[k] < target[k]);
+    if(less.length) w.push({ lv:'danger', t: where + '的' + less.map(([k, n]) => n + '比本機多 ' + (target[k] - local[k]).toLocaleString() + ' 筆').join('、') + '，覆蓋後就少了這些資料。' });
+    if(target.lastAttempt && local.lastAttempt && target.lastAttempt > local.lastAttempt)
+      w.push({ lv:'warn', t: where + '最後作答日（' + target.lastAttempt + '）比本機（' + local.lastAttempt + '）新。' });
+  }
+  if(!local.q && !local.l) w.push({ lv:'danger', t:'本機沒有題目與法條，上傳會把備份變成空的！' });
+  return w;
+}
+// 還原前的風險判斷
+function _restoreWarns(src, local, an){
+  const w = [], me = _device();
+  if(src.deviceId && src.deviceId === me.id) w.push({ lv:'info', t:'這份是這台裝置自己備份的。' });
+  else if(src.device) w.push({ lv:'info', t:'這份是「' + src.device + '」備份的。' });
+  const more = [['q','題目'],['l','法條'],['a','作答紀錄']].filter(([k]) => src[k] != null && local[k] > src[k]);
+  if(more.length) w.push({ lv:'danger', t:'本機的' + more.map(([k, n]) => n + '比備份多 ' + (local[k] - src[k]).toLocaleString() + ' 筆').join('、') + '，還原後會不見。' });
+  if(local.lastAttempt && src.lastAttempt && local.lastAttempt > src.lastAttempt)
+    w.push({ lv:'warn', t:'本機最後作答日（' + local.lastAttempt + '）比備份（' + src.lastAttempt + '）新。' });
+  if(an && src.at && an.at > src.at) w.push({ lv:'warn', t:'這份比這台裝置上次同步的版本（' + _fmtAt(an.at) + '）還舊。' });
+  w.push({ lv:'info', t:'還原前會自動保留目前資料的快照，還原錯了可到設定頁「復原」。' });
+  return w;
+}
+
+// ══ 還原前快照（只存在這台裝置；保留最近 2 份）══════════════════
+const _SNAP_TABLES = ['questions','laws','attempts','countdowns','usageLogs','englishVocab','healthLogs','englishMaterials'];
+async function _takeSnapshot(reason){
+  if(!_db.snapshots) return;
+  const data = {};
+  for(const t of _SNAP_TABLES) data[t] = await da(t);
+  data.settings = await da('settings');
+  const summary = { ..._summ(data), device: _device().name };
+  await _db.snapshots.add({ createdAt: Date.now(), reason, summary, data });
+  const all = await _db.snapshots.orderBy('createdAt').primaryKeys();
+  if(all.length > 2) await _db.snapshots.bulkDelete(all.slice(0, all.length - 2));
+}
+async function _latestSnapshot(){
+  if(!_db.snapshots) return null;
+  return (await _db.snapshots.orderBy('createdAt').last()) || null;
+}
+async function restoreSnapshot(){ try{
+  const snap = await _latestSnapshot();
+  if(!snap){ toast('沒有可復原的快照'); return; }
+  const cur = await _localSumm();
+  const ok = await _syncCompare({
+    title:'復原到還原前的資料', leftLabel:'快照', rightLabel:'目前本機',
+    left: { ...snap.summary, at: new Date(snap.createdAt).toISOString() }, right: { ...cur, at:'' },
+    warns: [{ lv:'info', t:'快照建立於「' + (snap.reason || '還原') + '」之前。復原只影響題庫、法條、作答紀錄、設定、倒數、統計、英語、健康數據（書庫、影音檔案不在快照內）。' },
+            { lv:'info', t:'復原前會先把目前資料再存一份快照，可以來回切換。' }],
+    okText:'復原'
+  });
+  if(!ok) return;
+  await _keepAwake(async () => {
+    const data = snap.data;
+    await _takeSnapshot('復原快照');
+    await _restoreAll(data, _SNAP_TABLES);
+    _showDoneDialog('已復原 ✓', ['資料已回到 ' + _fmtAt(new Date(snap.createdAt).toISOString()) + ' 的狀態。', '', '按「知道了」後會重新整理頁面。'], () => location.reload());
+  });
+}catch(e){ logError('restoreSnapshot', e); toast('復原失敗：' + e.message); }}
+
+// ══ 雲端讀取 ═════════════════════════════════════════════════
+//   新版 Apps Script（docs/gas-backup.gs）回應會帶 features：['info','list','history']，
+//   有宣告才用 info／list；舊版程式碼不認識的動作，可能被當成「備份」把雲端蓋成空的，絕不亂送。
+const _gasFeat = url => ((_ls.get(_GAS_FEAT_KEY) || {})[url]) || [];
+function _rememberFeat(url, json){
+  if(!json || !Array.isArray(json.features)) return;
+  const all = _ls.get(_GAS_FEAT_KEY) || {}; all[url] = json.features; _ls.set(_GAS_FEAT_KEY, all);
+}
+const _parseBk = json => (typeof json.data === 'string') ? JSON.parse(json.data) : json.data;
+// 讀雲端那份的摘要：{ sum, bk(完整資料，只有完整下載時才有), none(雲端沒有檔案), error }
+async function _cloudRead(url, pwd, full, fileId){
+  if(!full && !fileId && _gasFeat(url).includes('info')){
+    const j = await _gasCall(url, JSON.stringify({ password:pwd, action:'info', filename:GAS_BACKUP_FILE }));
+    _rememberFeat(url, j);
+    if(!j.ok) return { error: j.error || '未知錯誤' };
+    if(!j.info) return { none:true };
+    return { sum: _summ(j.info) };
+  }
+  const j = await _gasCall(url, JSON.stringify({ password:pwd, action:'restore', filename:GAS_BACKUP_FILE, ...(fileId ? { fileId } : {}) }));
+  _rememberFeat(url, j);
+  if(!j.ok) return /找不到|not\s*found|no\s*file|不存在|沒有備份/i.test(j.error || '') ? { none:true } : { error: j.error || '未知錯誤' };
+  if(!j.data) return { none:true };
+  const bk = _parseBk(j);
+  if(!bk || typeof bk !== 'object') return { error:'備份資料格式錯誤' };
+  return { sum: _summ(bk), bk };
+}
+
 // ── 備份 ────────────────────────────────────────────────────
 // ════════════════════════════════════════════════════════════
 // 【雲端備份：備份/還原】
@@ -161,6 +390,7 @@ async function _gasLoadSavedConfig(){
 async function gdriveBackup(){ try{
   const { url, pwd } = await _gasGetConfig();
   if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
+  if(!await _ensureDeviceName()) return;
   // 雲端備份：考試區 + 答題記錄 + 倒數日 + 使用統計 + 設定（不含 blob 類大檔）
   //   englishVocab（單字本，含自己的遺忘曲線進度）與 healthLogs（健康數據）
   //   都是純文字、無 blob 欄位，理應納入雲端備份；先前漏掉會導致還原後這兩塊資料消失。
@@ -169,18 +399,26 @@ async function gdriveBackup(){ try{
     da('countdowns'), da('usageLogs'),
     da('englishVocab'), da('healthLogs'), da('englishMaterials')
   ]);
-  // 確認視窗：避免誤觸。雲端只有一份，上傳會蓋掉上一次的備份
-  const last = await getSetting('lastBackupTime', '');
-  cfm('備份到雲端', '將以本機資料覆蓋雲端上的備份。\n'
-    + '題目 ' + qs.length + ' 題、法條 ' + ls.length + ' 條\n'
-    + '上次雲端備份：' + (last || '無')
-    + (!qs.length && !ls.length ? '\n\n⚠ 本機沒有題目與法條，上傳會把雲端備份變成空的！' : ''),
-    () => _keepAwake(async () => { try{
+  // 先讀雲端「現在那一份」的真正備份時間與裝置，和本機並排比較（避免誤蓋其他裝置的進度）
+  toast('讀取雲端目前的備份…');
+  const cloud = await _keepAwake(() => _cloudRead(url, pwd, false));
+  if(cloud.error){ toast('無法讀取雲端：' + cloud.error); return; }
+  const local = await _localSumm();
+  const ok = await _syncCompare({
+    title:'備份到雲端（覆蓋雲端）', leftLabel:'雲端目前', rightLabel:'這台（' + _device().name + '）',
+    left: cloud.sum || null, right: { ...local, at: new Date().toISOString() },
+    warns: _backupWarns(cloud.sum, local, _anchor('cloud'), '雲端'), okText:'覆蓋雲端'
+  });
+  if(!ok) return;
+  await _keepAwake(async () => { try{
       toast('備份中…請保持畫面開啟');
       const settings = await _backupSettings();
+      const exportedAt = new Date().toISOString();
+      const meta = _buildMeta({ questions:qs, laws:ls, attempts:ats, englishMaterials:engMats });
       const body = JSON.stringify({
           version: 3,
-          exportedAt: new Date().toISOString(),
+          exportedAt,
+          meta,
           questions: _noBlob(qs),
           laws: _noBlob(ls),
           attempts: ats,
@@ -193,65 +431,153 @@ async function gdriveBackup(){ try{
           // 資料量遠小於題庫，納入雲端備份不會造成負擔
           englishMaterials: engMats
       });
+      // info：新版 Apps Script 會存成檔案說明，之後不用下載整份就能看備份時間與裝置（舊版忽略此欄）
+      const payload = JSON.stringify({ password: pwd, action: 'backup', filename: GAS_BACKUP_FILE, data: body,
+                                       info: { exportedAt, meta } });
       // 大小以實際送出的內容計算（備份字串再包一層，引號會被跳脫，比原檔大）
-      const payload = JSON.stringify({ password: pwd, action: 'backup', filename: GAS_BACKUP_FILE, data: body });
       const size = new Blob([payload]).size;
       if(size > GAS_SIZE_WARN && !await askConfirm('備份檔偏大', '雲端備份檔 ' + _mb(size) + '，接近 Google Apps Script 的上傳上限，可能會失敗。\n'
           + '建議改用「本機完整備份」。', '仍要上傳')) return;
       const json = await _gasCall(url, payload);
+      _rememberFeat(url, json);
       if(!json.ok){ toast('備份失敗：'+(json.error||'未知錯誤')); return; }
-      const t = new Date().toLocaleString('zh-TW');
-      await setSetting('lastBackupTime', t);
+      _setAnchor('cloud', _summ({ exportedAt, meta }), 'backup');
       _showDoneDialog('雲端備份完成 ✓', [
         '已上傳到你的 Google Drive。',
         '',
-        '時間：' + t,
+        '備份時間：' + _fmtAt(exportedAt),
+        '裝置：' + meta.device,
+        '題目 ' + qs.length + '、法條 ' + ls.length + '、作答紀錄 ' + ats.length,
         '大小：' + _mb(size),
-        '涵蓋：題庫、法條、答題記錄、設定、倒數日、統計、英語教材、單字本、健康數據',
+        _gasFeat(url).includes('history') ? '雲端已自動保留前幾份備份，可在還原時選擇。' : '',
       ]);
       renderSet();
-    }catch(e){ logError('gdriveBackup',e); toast('備份失敗：'+e.message); } }));
+    }catch(e){ logError('gdriveBackup',e); toast('備份失敗：'+e.message); } });
 }catch(e){ logError('gdriveBackup',e); toast('備份失敗：'+e.message); }}
+
+// 選擇要還原哪一份（新版 Apps Script 才有歷史版本）
+function _pickVersion(title, items){
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.className = 'cov on'; ov.id = 'ver-pick-ov'; ov.style.zIndex = '870';
+    ov.innerHTML = '<div class="cbox sc-box"><div class="cbt">' + esc(title) + '</div>'
+      + '<div class="cbs">選擇要還原的版本（最新的在最上面）</div>'
+      + '<div class="ver-list">' + items.map((it, i) => '<button class="ver-item" data-i="' + i + '">'
+        + '<div class="ver-t">' + esc(_fmtAt(it.sum?.at || it.time || it.updated)) + (it.current ? '<span class="ver-cur">目前</span>' : '') + '</div>'
+        + '<div class="ver-s">' + esc((it.sum?.device || '未記錄裝置') + (it.sum?.q != null ? '・題目 ' + it.sum.q + '・作答 ' + it.sum.a : '')) + '</div>'
+        + '</button>').join('') + '</div>'
+      + '<div class="cbn" style="margin-top:12px"><button class="btn bg bw" data-cn>取消</button></div></div>';
+    let done = false;
+    const finish = v => { if(done) return; done = true; ov.remove(); resolve(v); };
+    ov._close = () => finish(null);
+    ov.addEventListener('click', e => {
+      if(e.target === ov || e.target.closest('[data-cn]')) return finish(null);
+      const b = e.target.closest('[data-i]');
+      if(b) finish(items[+b.dataset.i]);
+    });
+    document.body.appendChild(ov);
+  });
+}
 
 // ── 還原 ────────────────────────────────────────────────────
 async function gdriveRestore(){ try{
   const { url, pwd } = await _gasGetConfig();
   if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
-  cfm('從雲端還原','手機上的題庫、法條、答題記錄、設定等資料，將被雲端備份覆蓋，確定繼續？', () => _keepAwake(async()=>{
-    // ── callback 內有獨立的 try-catch（cfm 是非同步，外層 catch 無法攔截）──
-    try{
+  let fileId = null;
+  // 新版 Apps Script：列出雲端保留的各個版本供選擇
+  if(_gasFeat(url).includes('list')){
+    toast('讀取雲端備份清單…');
+    const j = await _gasCall(url, JSON.stringify({ password:pwd, action:'list', filename:GAS_BACKUP_FILE }));
+    if(!j.ok){ toast('讀取失敗：' + (j.error || '未知錯誤')); return; }
+    const files = (j.files || []).map(f => ({ ...f, sum: f.info ? _summ(f.info) : null }));
+    if(!files.length){ toast('雲端還沒有備份'); return; }
+    if(files.length > 1){
+      const pick = await _pickVersion('從雲端還原', files);
+      if(!pick) return;
+      if(!pick.current) fileId = pick.id;
+    }
+  }
+  toast('下載雲端備份…請保持畫面開啟');
+  const cloud = await _keepAwake(() => _cloudRead(url, pwd, true, fileId));
+  if(cloud.none){ toast('雲端還沒有備份'); return; }
+  if(cloud.error){ toast('還原失敗：' + cloud.error); return; }
+  const bk = cloud.bk;
+  // 至少要有題目或法規，避免把空的（或壞掉的）備份蓋回來
+  if(!(bk.questions?.length || bk.laws?.length)){ toast('還原失敗：備份資料為空，請先備份再還原'); return; }
+  const local = await _localSumm();
+  const ok = await _syncCompare({
+    title:'從雲端還原（覆蓋這台）', leftLabel:'雲端備份', rightLabel:'這台（' + _device().name + '）',
+    left: cloud.sum, right: { ...local, at:'' },
+    warns: _restoreWarns(cloud.sum, local, _anchor('cloud')), okText:'還原'
+  });
+  if(!ok) return;
+  await _keepAwake(async()=>{ try{
       toast('還原中…請保持畫面開啟');
-      const json = await _gasCall(url, JSON.stringify({ password:pwd, action:'restore', filename:GAS_BACKUP_FILE }));
-      if(!json.ok){ toast('還原失敗：'+(json.error||'未知錯誤')); return; }
-
-      // json.data 可能是字串或已解析的物件（依 GAS 實作而定）
-      const bk = (typeof json.data === 'string') ? JSON.parse(json.data) : json.data;
-      if(!bk || typeof bk !== 'object'){
-        toast('還原失敗：備份資料格式錯誤'); return;
-      }
-
-      // 至少要有題目或法規，避免把空的（或壞掉的）備份蓋回來
-      const hasData = (bk.questions?.length || bk.laws?.length);
-      if(!hasData){
-        toast('還原失敗：備份資料為空，請先備份再還原'); return;
-      }
-
+      await _takeSnapshot('雲端還原');
       await _restoreAll(bk, ['questions','laws','attempts','countdowns','usageLogs',
                              'englishVocab','healthLogs','englishMaterials']);
-      const rt = new Date().toLocaleString('zh-TW');
-      await setSetting('lastRestoreTime', rt);
+      if(!fileId) _setAnchor('cloud', cloud.sum, 'restore');   // 還原舊版本不算同步到最新
       _showDoneDialog('雲端還原完成 ✓', [
-        '資料已從 Google Drive 還原。',
+        '已還原「' + (cloud.sum.device || '未記錄裝置') + '」在 ' + _fmtAt(cloud.sum.at) + ' 的備份。',
         '',
-        '時間：' + rt,
+        '還原前的資料已存成快照，需要時可到設定頁「復原」。',
         '按「知道了」後會重新整理頁面。',
       ], ()=> location.reload());
     } catch(innerErr){
       logError('gdriveRestore-inner', innerErr);
       toast('還原失敗：'+innerErr.message+'（手機資料維持原樣）');
     }
-  }));
+  });
 }catch(e){ logError('gdriveRestore',e); toast('還原失敗：'+e.message); }}
+
+// ── 檢查同步狀態：不做任何變更，只比較雲端與本機並給建議 ──────────
+async function gdriveCheck(){ try{
+  const { url, pwd } = await _gasGetConfig();
+  if(!url){ toast('請先在設定頁填入 Apps Script 網址'); return; }
+  toast('讀取雲端目前的備份…');
+  const cloud = await _keepAwake(() => _cloudRead(url, pwd, false));
+  if(cloud.error){ toast('無法讀取雲端：' + cloud.error); return; }
+  const local = await _localSumm(), an = _anchor('cloud'), c = cloud.sum;
+  const w = [];
+  if(!c) w.push({ lv:'info', t:'雲端還沒有備份，建議現在備份一次。' });
+  else{
+    const otherNewer = c.at && (!an || c.at > an.at) && c.deviceId !== _device().id;
+    const localMore = local.a > (c.a ?? 0) || local.q > (c.q ?? 0);
+    if(otherNewer && localMore) w.push({ lv:'danger', t:'兩邊都有對方沒有的新資料（雲端有「' + (c.device || '其他裝置') + '」的新備份，這台也有新作答）。請先決定以哪台為主：以雲端為主就還原，以這台為主就備份。' });
+    else if(otherNewer) w.push({ lv:'warn', t:'雲端有「' + (c.device || '其他裝置') + '」較新的備份 → 建議「從雲端還原」。' });
+    else if(localMore) w.push({ lv:'ok', t:'這台有較新的資料 → 建議「備份到雲端」。' });
+    else w.push({ lv:'ok', t:'雲端與這台一致，不需要動作。' });
+  }
+  if(an) w.push({ lv:'info', t:'這台上次同步：' + _fmtAt(an.when) + '（' + (an.op === 'restore' ? '還原' : '備份') + '）' });
+  await _syncCompare({ title:'雲端同步狀態', leftLabel:'雲端', rightLabel:'這台（' + _device().name + '）',
+    left: c || null, right: { ...local, at:'' }, warns: w, infoOnly: true });
+}catch(e){ logError('gdriveCheck', e); toast('讀取失敗：' + e.message); }}
+
+// 設定頁：裝置名稱、上次同步、快照
+async function _renderSyncStatus(){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  const d = _device(), cl = _anchor('cloud'), lo = _anchor('local'), snap = await _latestSnapshot().catch(()=>null);
+  const line = (k, v) => '<div class="ss-row"><span class="ss-k">' + k + '</span><span class="ss-v">' + v + '</span></div>';
+  el.innerHTML =
+    line('這台裝置', esc(d.name) + ' <button class="ss-btn" onclick="renameDevice()">改名</button>')
+    + line('雲端同步', cl ? esc((cl.op === 'restore' ? '還原 ' : '備份 ') + _fmtAt(cl.at)) + (cl.op === 'restore' && cl.device ? '<small>（來自 ' + esc(cl.device) + '）</small>' : '') : '<span class="ss-none">尚未同步</span>')
+    + line('資料夾備份', lo ? esc((lo.op === 'restore' ? '還原 ' : '備份 ') + _fmtAt(lo.at)) : '<span class="ss-none">尚未備份</span>')
+    + (snap ? line('還原前快照', esc(_fmtAt(new Date(snap.createdAt).toISOString())) + ' <button class="ss-btn" onclick="restoreSnapshot()">復原</button>') : '');
+}
+
+// 複製新版 Apps Script 程式碼（支援雲端版本紀錄）
+async function copyGasScript(){
+  try{
+    const res = await fetch('docs/gas-backup.gs', { cache:'no-store' });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const code = await res.text();
+    await navigator.clipboard.writeText(code);
+    toast('已複製 Apps Script 程式碼 ✓（記得改密碼）');
+  }catch(e){
+    toast('複製失敗：' + e.message + '，請到 GitHub 的 docs/gas-backup.gs 取得');
+  }
+}
 
 
 // ════════════════════════════════════════════════════════════
@@ -263,19 +589,14 @@ async function renderSet(){  _renderAzureKey().catch(()=>{}); try{
   document.getElementById('db-info').innerHTML=`總題數：${qs.length}<br>法條數：${ls.length}<br>作答記錄：${ats.length}<br>科目：${esc(subs.join('、'))||'無'}<br>題型：選擇 ${qs.filter(q=>q.type==='mc').length} / 申論 ${qs.filter(q=>q.type==='es').length}`;
   renderSetCountdown();
   _gasLoadSavedConfig();
-  // 版本號與備份時間
-  const [lastBk, lastRs] = await Promise.all([
-    getSetting('lastBackupTime','—'),
-    getSetting('lastRestoreTime','—')
-  ]);
+  _renderSyncStatus().catch(()=>{});
+  // 版本號（備份／還原時間改顯示在「雲端同步」區，且以這台裝置自己的紀錄為準）
   const verInfoEl = document.getElementById('set-ver-info');
   if(verInfoEl){
     const av = typeof APP_VERSION  !== 'undefined' ? APP_VERSION  : '';
     const dv = typeof DATA_VERSION !== 'undefined' ? DATA_VERSION : '';
     verInfoEl.innerHTML =
-      `程式版本：<b>v${av}</b>　題庫版本：<b>${dv}</b><br>` +
-      `最後備份：<span style="color:var(--t2)">${esc(lastBk)}</span>　` +
-      `最後還原：<span style="color:var(--t2)">${esc(lastRs)}</span>`;
+      `程式版本：<b>v${av}</b>　題庫版本：<b>${dv}</b>`;
 
     // 診斷資訊：錯誤日誌
     const diagEl = document.getElementById('set-diag-info');
@@ -419,10 +740,20 @@ async function localBackup(){
     toast('你的瀏覽器不支援資料夾存取，請用 Chrome 或 Edge');
     return;
   }
-  // 確認視窗：避免誤觸（資料夾裡舊的備份檔會被覆蓋）
-  cfm('備份到資料夾', '將把全部資料（含書庫、影音、學習教材檔案）寫入你接著選的資料夾，資料夾裡舊的備份會被覆蓋。', async()=>{
+  if(!await _ensureDeviceName()) return;
+  // 先選資料夾，讀出裡面現有那份的備份時間與裝置，和本機並排比較後才覆蓋
     try{
       const dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
+      const existing = await _readExamFile(dirHandle, 'exam_data.json').catch(()=>null);
+      const local = await _localSumm();
+      const tSum = existing ? { ..._summ(existing.data), at: existing.data.exportedAt || new Date(existing.file.lastModified).toISOString() } : null;
+      if(!await _syncCompare({
+        title:'備份到資料夾「' + dirHandle.name + '」', leftLabel:'資料夾目前', rightLabel:'這台（' + _device().name + '）',
+        left: tSum, right: { ...local, at: new Date().toISOString() },
+        warns: [..._backupWarns(tSum, local, _anchor('local'), '資料夾裡'),
+                { lv:'info', t:'舊的那份會移到 history 資料夾保留（最近 ' + _LOCAL_KEEP + ' 份），不會直接消失。' }],
+        okText:'備份'
+      })) return;
       await _keepAwake(async () => {
         toast('備份中…請保持畫面開啟');
         const [ebooks, media, qs, ls, ats, countdowns, usageLogs, refbooks, learnmedia, engMats,
@@ -433,11 +764,14 @@ async function localBackup(){
           da('englishVocab'), da('healthLogs')
         ]);
         const settings = await _backupSettings();
+        const exportedAt = new Date().toISOString();
+        const meta = _buildMeta({ questions:qs, laws:ls, attempts:ats, englishMaterials:engMats });
 
         // ── 完整資料備份（JSON 單檔，含設定/答題/倒數/統計等非 blob 資料）──
         const examBody = JSON.stringify({
           version: 3,
-          exportedAt: new Date().toISOString(),
+          exportedAt,
+          meta,
           questions: _noBlob(qs),
           laws: _noBlob(ls),
           attempts: ats,
@@ -453,7 +787,10 @@ async function localBackup(){
           englishVocab: engVocab,
           healthLogs: healthLogs
         });
+        // 舊的 exam_data.json 先移進 history（檔名帶備份時間與裝置），再寫新的
+        if(existing) await _archiveExam(dirHandle, existing);
         await _writeFile(dirHandle, 'exam_data.json', examBody);
+        _setAnchor('local', _summ({ exportedAt, meta }), 'backup');
 
         // ── 書庫、影音、學習區（參考書／教材影音）：每筆一個說明檔＋實際檔案 ──
         const count = 1
@@ -463,18 +800,51 @@ async function localBackup(){
           + await _backupDir(dirHandle, 'learnmedia', learnmedia, _EXT.learnmedia);
 
         _showDoneDialog('本機備份完成 ✓', [
-          '共 ' + count + ' 個項目已寫入你選的資料夾。',
+          '共 ' + count + ' 個項目已寫入「' + dirHandle.name + '」。',
           '',
-          '時間：' + new Date().toLocaleString('zh-TW'),
+          '備份時間：' + _fmtAt(exportedAt),
+          '裝置：' + meta.device,
           '內容：exam_data.json（' + _mb(new Blob([examBody]).size) + '）＋ ebooks／media／refbooks／learnmedia 四個資料夾',
+          existing ? '上一份已移到 history 資料夾保留。' : '',
         ]);
+        _renderSyncStatus().catch(()=>{});
       });
     }catch(e){
       if(e.name === 'AbortError') return;  // 使用者取消
       logError('localBackup', e);
       toast('備份失敗：' + e.message);
     }
-  });
+}
+
+// ── 資料夾備份的版本紀錄：history/exam_data_日期-時間.json，保留最近 _LOCAL_KEEP 份 ──
+const _LOCAL_KEEP = 10;
+async function _readExamFile(dir, name){
+  const file = await (await dir.getFileHandle(name)).getFile();
+  let data;
+  try{ data = JSON.parse(await file.text()); }
+  catch(e){ throw new Error(name + ' 內容損毀，無法讀取（' + e.message + '）'); }
+  return { file, data, name };
+}
+function _stamp(iso){
+  const d = new Date(iso), p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+}
+async function _archiveExam(dirHandle, existing){
+  const hist = await dirHandle.getDirectoryHandle('history', { create:true });
+  const at = existing.data.exportedAt || new Date(existing.file.lastModified).toISOString();
+  // 檔名只用英數（部分裝置的檔案系統不接受中文檔名）；裝置名稱記在檔案內容與 index.json
+  const fname = 'exam_data_' + _stamp(at) + '.json';
+  await _writeFile(hist, fname, existing.file);
+  // 版本索引：還原時列清單用，不必每份都讀進來
+  let idx = [];
+  try{ idx = JSON.parse(await (await (await hist.getFileHandle('index.json')).getFile()).text()); }catch(e){}
+  idx = (Array.isArray(idx) ? idx : []).filter(x => x && x.file);
+  idx = idx.filter(x => x.file !== fname);
+  idx.unshift({ file: fname, sum: { ..._summ(existing.data), at } });
+  const drop = idx.slice(_LOCAL_KEEP);
+  idx = idx.slice(0, _LOCAL_KEEP);
+  for(const x of drop){ try{ await hist.removeEntry(x.file); }catch(e){} }
+  await _writeFile(hist, 'index.json', JSON.stringify(idx));
 }
 
 // 各類檔案的副檔名（備份寫檔、還原找檔用同一套）
@@ -541,22 +911,38 @@ async function localRestore(){
     const dirHandle = await window.showDirectoryPicker({ mode:'read' });
 
     // ── 題庫、法條等（exam_data.json）：只有真的沒有這個檔才略過，損毀則中止 ──
-    let examFile = null, examData = null;
-    try{ examFile = await (await dirHandle.getFileHandle('exam_data.json')).getFile(); }
+    let main = null;
+    try{ main = await _readExamFile(dirHandle, 'exam_data.json'); }
     catch(e){ if(e.name !== 'NotFoundError') throw e; }
-    if(examFile){
-      try{ examData = JSON.parse(await examFile.text()); }
-      catch(e){ throw new Error('exam_data.json 內容損毀，無法讀取（' + e.message + '）'); }
+    // history 資料夾有舊版本 → 讓使用者選要還原哪一份
+    let hist = null, idx = [];
+    try{
+      hist = await dirHandle.getDirectoryHandle('history');
+      idx = JSON.parse(await (await (await hist.getFileHandle('index.json')).getFile()).text());
+    }catch(e){}
+    let chosen = main;
+    if(Array.isArray(idx) && idx.length){
+      const items = [...(main ? [{ current:true, sum: { ..._summ(main.data), at: main.data.exportedAt || new Date(main.file.lastModified).toISOString() } }] : []),
+                     ...idx.map(x => ({ file: x.file, sum: x.sum }))];
+      const pick = await _pickVersion('從資料夾「' + dirHandle.name + '」還原', items);
+      if(!pick) return;
+      if(!pick.current) chosen = await _readExamFile(hist, pick.file);
     }
-    if(!await askConfirm('本地完整還原', '資料夾：' + dirHandle.name + '\n'
-      + (examFile
-        ? 'exam_data.json 最後修改：' + new Date(examFile.lastModified).toLocaleString('zh-TW', { hour12:false }) + '\n'
-          + '題目 ' + (examData.questions||[]).length + ' 題、法條 ' + (examData.laws||[]).length + ' 條\n'
-        : '（這個資料夾沒有 exam_data.json，只還原書庫、影音等檔案）\n')
-      + '\n手機上的資料（題庫、法條、答題記錄、設定、倒數日、統計、書庫、影音、學習區教材、英語庫、單字本、健康數據）將被這份備份覆蓋，確定繼續？', '還原')) return;
+    const examFile = chosen?.file || null, examData = chosen?.data || null;
+    const src = examData ? { ..._summ(examData), at: examData.exportedAt || new Date(examFile.lastModified).toISOString() } : null;
+    const local = await _localSumm();
+    if(!await _syncCompare({
+      title:'從資料夾還原（覆蓋這台）', leftLabel:'備份', rightLabel:'這台（' + _device().name + '）',
+      left: src, right: { ...local, at:'' },
+      warns: src ? [..._restoreWarns(src, local, _anchor('local')),
+                    { lv:'info', t:'書庫、影音、學習教材檔案也會以這個資料夾為準（這些檔案不在快照內）。' }]
+                 : [{ lv:'warn', t:'這個資料夾沒有 exam_data.json，只會還原書庫、影音等檔案。' }],
+      okText:'還原'
+    })) return;
 
     await _keepAwake(async () => {
       toast('還原中…請保持畫面開啟');
+      if(examData) await _takeSnapshot('資料夾還原');
       let count = examData ? await _restoreAll(examData, ['questions','laws','attempts','countdowns','usageLogs',
         'refbooks','learnmedia','englishMaterials','englishVocab','healthLogs']) : 0;
 
@@ -566,10 +952,12 @@ async function localRestore(){
              + await _restoreDir(dirHandle, 'refbooks',   'refbooks',     _EXT.refbooks)
              + await _restoreDir(dirHandle, 'learnmedia', 'learnmedia',   _EXT.learnmedia);
 
+      if(src && chosen === main) _setAnchor('local', src, 'restore');
       _showDoneDialog('本機還原完成 ✓', [
         '共 ' + count + ' 個項目已還原。',
         '',
-        '時間：' + new Date().toLocaleString('zh-TW'),
+        src ? '已還原「' + (src.device || '未記錄裝置') + '」在 ' + _fmtAt(src.at) + ' 的備份。' : '',
+        examData ? '還原前的資料已存成快照，需要時可到設定頁「復原」。' : '',
         '按「知道了」後會重新整理頁面。',
       ], ()=> location.reload());
     });
@@ -763,7 +1151,7 @@ function openDebugPanel(){
 
 // ════════ 公開 API ════════
 const Settings = {
-  saveGasConfig, gdriveBackup, gdriveRestore,
+  saveGasConfig, gdriveBackup, gdriveRestore, gdriveCheck, renameDevice, restoreSnapshot, copyGasScript,
   renderSet, openExport, closeExportOv, doExport, _expSet, _expToggleSubj,
   clearAts, delAll, toggleGasHelp,
   localBackup, localRestore, saveAzureKey, openDebugPanel

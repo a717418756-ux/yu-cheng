@@ -318,14 +318,21 @@ function _inkFlushAndSync(){
 function showQLawLinks(qu){
   const lawEl  = document.getElementById('qlaw');
   const listEl = document.getElementById('qlaw-list');
-  const laws = qu.relatedLaws || [];
-  if(!laws.some(l => typeof l === 'string' ? l.trim() : (l && (l.ref || l.lawName)))){ lawEl.style.display = 'none'; return; }
-  // 法條參照放在 data-ref 屬性，由事件委派讀取（不經過 JS 字串層，無跳脫問題）
-  listEl.innerHTML = laws.map(l=>{
-    const ref = typeof l === 'string' ? l : (l.ref || l.lawName || '');
-    return `<span class="tag qlaw-tag" style="color:var(--pur);cursor:pointer" data-ref="${esc(ref)}">⚖ ${esc(ref)}</span>`;
-  }).join('');
-  lawEl.style.display = 'block';
+  // 手動填的關聯法條 ＋ 題幹、選項、詳解裡寫到的法條（資料庫有這部法規才算）
+  const draw = () => {
+    const refs = typeof qLawRefs === 'function' ? qLawRefs(qu)
+      : (qu.relatedLaws || []).map(l => ({ ref: typeof l === 'string' ? l : (l?.ref || l?.lawName || ''), auto:false })).filter(r => r.ref.trim());
+    if(!refs.length){ lawEl.style.display = 'none'; return; }
+    // 法條參照放在 data-ref 屬性，由事件委派讀取（不經過 JS 字串層，無跳脫問題）
+    listEl.innerHTML = refs.map(({ ref, auto }) =>
+      `<span class="tag qlaw-tag${auto ? ' auto' : ''}" style="color:var(--pur);cursor:pointer" data-ref="${esc(ref)}"`
+      + (auto ? ' title="從題目內文自動偵測"' : '') + `>⚖ ${esc(ref)}</span>`).join('');
+    lawEl.style.display = 'block';
+  };
+  draw();
+  // 法規名稱清單還沒載入（剛開 App 就作答）→ 載入後補上自動偵測的引用
+  if(typeof ensureLawNames === 'function')
+    ensureLawNames().then(loaded => { if(loaded && S.quiz.q[S.quiz.idx] === qu) draw(); }).catch(()=>{});
 }
 
 // ════════ 作答（單選）════════

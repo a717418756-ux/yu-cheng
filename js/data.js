@@ -1922,15 +1922,130 @@ function _findBacklinks(target, allLaws){
     ((a.law.articleNumber||0) - (b.law.articleNumber||0)));
 }
 
+// ── 法條 ↔ 考題（雙向連結）──────────────────────────────────
+//   題目引用的法條 = 手動填的「關聯法條」＋ 題幹、選項、詳解內文自動擷取
+//   （「依警察職權行使法第6條規定…」不必另外填，只要資料庫有這部法規就連得到）。
+//   反過來，讀法條時就能看到「這條考過哪些題、答對率多少」，一鍵練習。
+//   同一份題目資料只建一次索引；法規名稱清單變動時重建。
+function _refKey(ref, names){
+  let r = String(ref||'').trim();
+  if(!r) return null;
+  r = r.replace(_SEC_RE, (_, m, sub) => _secToArticle(m, sub));
+  const pos = r.match(/第[一二三四五六七八九十百千\d]+[條點]/);
+  const pick = _pickLawNames(_refLawName(pos ? r.slice(0, pos.index) : r), names || _lawNameCache || [])[0];
+  return pick ? pick + '|' + (pos ? art2n(r) : 0) : null;
+}
+// 題目的引用：[{ ref, auto }]；auto＝從內文擷取（手動已填同一條的不重複）
+function qLawRefs(q){
+  if(!q) return [];
+  const manual = (q.relatedLaws||[]).map(r => typeof r === 'string' ? r : (r?.ref || r?.lawName || '')).map(x => x.trim()).filter(Boolean);
+  if(!_lawNameCache) return manual.map(ref => ({ ref, auto:false }));
+  const text = [q.stem, q.groupStem, q.note, q.type === 'es' ? q.answer : '', q.answerEs, ...Object.values(q.options||{})]
+    .filter(x => typeof x === 'string' && x).join('\n');
+  const have = new Set(manual.map(m => _refKey(m)).filter(Boolean));
+  const auto = _autoCites(text, null).filter(a => { const k = _refKey(a); if(!k || have.has(k)) return false; have.add(k); return true; });
+  return [...manual.map(ref => ({ ref, auto:false })), ...auto.map(ref => ({ ref, auto:true }))];
+}
+// 法規名稱清單還沒建立時載入（答題頁自動偵測引用用）；有新建立回傳 true
+async function ensureLawNames(){
+  if(_lawNameCache) return false;
+  _setLawNames(await da('laws'));
+  return true;
+}
+const _qLawCache = new WeakMap();
+function _qLawIndex(qs){
+  const hit = _qLawCache.get(qs);
+  if(hit && hit.names === _lawNameCache) return hit.idx;
+  const idx = new Map();
+  for(const q of qs){
+    for(const { ref } of qLawRefs(q)){
+      const k = _refKey(ref);
+      if(!k) continue;
+      if(!idx.has(k)) idx.set(k, new Set());
+      idx.get(k).add(q.id);
+    }
+  }
+  _qLawCache.set(qs, { names:_lawNameCache, idx });
+  return idx;
+}
+// 某條（或整部：art 省略）相關的題目 id
+function _lawQIds(qs, lawName, artNum){
+  const idx = _qLawIndex(qs), out = new Set();
+  if(artNum) (idx.get(lawName + '|' + artNum) || []).forEach(id => out.add(id));
+  else for(const [k, ids] of idx) if(k.startsWith(lawName + '|')) ids.forEach(id => out.add(id));
+  return out;
+}
+// 相關考題摘要：題數、作答次數、答對率
+function _lawQStat(ids, ats){
+  let n = 0, ok = 0;
+  for(const a of ats) if(ids.has(a.qid) && (a.correct === true || a.correct === false)){ n++; if(a.correct) ok++; }
+  return { count: ids.size, tries: n, rate: n ? Math.round(ok / n * 100) : null };
+}
+function _lawQHtml(lawName, artNum, st, compact){
+  if(!st.count) return '';
+  const rate = st.rate == null ? '尚未作答' : '答對 ' + st.rate + '%';
+  const col = st.rate == null ? 'var(--t2)' : st.rate >= 80 ? 'var(--grn)' : st.rate >= 60 ? 'var(--acc)' : 'var(--red)';
+  const inQuiz = (document.getElementById('qv')?.style.display || 'none') !== 'none';
+  const act = 'practiceLawQs(\'' + escJs(lawName) + '\',' + (artNum || 0) + ')';
+  if(compact) return '<button class="chip law-q-chip" onclick="' + act + '">📝 考過 ' + st.count + ' 題・<span style="color:' + col + '">' + rate + '</span></button>';
+  return '<div class="lp-qs"><div class="lp-qs-t">📝 相關考題 <b>' + st.count + '</b> 題'
+    + '<span class="lp-qs-r" style="color:' + col + '">' + rate + (st.tries ? '（' + st.tries + ' 次）' : '') + '</span></div>'
+    + (inQuiz ? '<div class="lp-qs-hint">作答中，結束後可從資料庫練習</div>'
+              : '<button class="btn bp lp-qs-btn" onclick="' + act + '">▶ 練習這 ' + st.count + ' 題</button>')
+    + '</div>';
+}
+// 弱點法條排行：依「相關考題的答對率」由低到高（至少作答 minTries 次才列入，避免一次答錯就上榜）
+async function lawWeakRank(limit = 10, minTries = 2){
+  const [qs, ats, laws] = await Promise.all([da('questions'), da('attempts'), da('laws')]);
+  _setLawNames(laws);
+  const idx = _qLawIndex(qs), out = [];
+  for(const [k, ids] of idx){
+    const [lawName, n] = k.split('|'); const artNum = +n;
+    if(!artNum) continue;   // 只排具體條號
+    const st = _lawQStat(ids, ats);
+    if(st.tries >= minTries) out.push({ lawName, artNum, label: lawName + ' ' + _artLabel(artNum), ...st });
+  }
+  return out.sort((a, b) => a.rate - b.rate || b.tries - a.tries).slice(0, limit);
+}
+async function practiceLawQs(lawName, artNum){ try{
+  const [qs, laws] = await Promise.all([da('questions'), da('laws')]);
+  if(!_lawNameCache) _setLawNames(laws);
+  const ids = _lawQIds(qs, lawName, artNum || 0);
+  const pool = qs.filter(q => ids.has(q.id));
+  if(!pool.length){ toast('沒有相關考題'); return; }
+  const lp = document.getElementById('lawpop-ov'); if(lp) lp.style.display = 'none';
+  toast((artNum ? lawName + ' ' + _artLabel(artNum) : lawName) + '：' + pool.length + ' 題');
+  startQWithPool(shuffleUnits(pool).flat(), 'all');
+}catch(e){ logError('practiceLawQs', e); }}
+const _artLabel = n => '第 ' + Math.floor(n / 1000) + ' 條' + (n % 1000 ? '之' + (n % 1000) : '');
+// 法條的關聯（手動＋內文引用＋被引用；母法、子法排最前）——法規頁條文卡與法條彈窗共用
+function _lawRelRefs(l, allLaws){
+  const manualRefs = (l.relatedLaws||[]).map(r=>typeof r==='string'?r:(r.ref||r.lawName||'')).filter(Boolean);
+  const { auto: autoRefs, parents } = _citeIndex(allLaws).get(l) || { auto:[], parents:new Set() };
+  const backs    = _findBacklinks(l, allLaws);
+  const backRefs = [...new Set(backs.map(b=>b.law.lawName||''))]
+    .filter(n => n && ![...manualRefs, ...autoRefs].some(r => r.startsWith(n)));
+  const children = new Set(backs.filter(b=>b.child).map(b=>b.law.lawName||''));
+  const rank = r => parents.has(r) ? 0 : children.has(r) ? 1 : 2;
+  return [...new Set([...manualRefs, ...autoRefs, ...backRefs])].filter(Boolean)
+    .sort((a,b) => rank(a) - rank(b)).map(ref => ({ ref, rank: rank(ref), manual: manualRefs.includes(ref) }));
+}
+function _lawRelChips(refs){
+  return refs.map(({ ref, rank, manual }) => '<button class="chip law-rel-chip' + (manual ? '' : ' auto')
+    + '" onclick="showLawPop(\'' + escJs(ref) + '\')">' + ['⬆ 母法 ','⬇ 子法 ','⚖ '][rank] + esc(ref) + '</button>').join('');
+}
+
 let _lvFull = false;   // 目前法規頁是否為「整部」模式（從連結開啟）
+let _lvQs = [], _lvAts = [];
 async function openLawGroup(lawName, full){  try{
   if(!document.getElementById('lv')){ return; }  // 防衛：lv 元素不存在時不執行
   // 編輯、儲存後重新整理同一部法規（未指定 full）→ 沿用原本的模式，
   //   否則從連結開的整部法規，一存檔就被搜尋框殘留的關鍵字篩掉
   if(full === undefined) full = lawName === S.curLawName && _lvFull;
   _lvFull = !!full;
-  const allLaws=await da('laws');
+  const [allLaws, _qsAll, _atsAll]=await Promise.all([da('laws'), da('questions'), da('attempts')]);
   _setLawNames(allLaws);   // 供 _autoCites 比對用
+  _lvQs = _qsAll; _lvAts = _atsAll;   // 條文卡的「考過幾題」用
   // 與 renderDB 共用同一套搜尋規則（parseSecSearch／_lawHit），點進來的結果才會和列表一致：
   //   法規命中 → 整部；條文命中 → 只列相符條文；條號搜尋 → 只列該條
   //   full：從連結、其他法規捷徑開啟 → 看整部，不套用資料庫搜尋框裡殘留的關鍵字
@@ -1978,7 +2093,7 @@ async function openLawGroup(lawName, full){  try{
   const favN=laws.filter(l=>l.favorite).length;
   const starItem=document.getElementById('lv-star-item');
   if(starItem) starItem.textContent=favN?'★ 已收藏':'☆ 收藏';
-  const jumpHtml=others.map(n=>'<button class="chip" style="flex-shrink:0;font-size:11px" onclick="openLawGroup(\''+esc(n)+'\',true)">'+esc(n)+'</button>').join('');
+  const jumpHtml=others.map(n=>'<button class="chip" style="flex-shrink:0;font-size:11px" onclick="openLawGroup(\''+escJs(n)+'\',true)">'+esc(n)+'</button>').join('');
 
   // ── 三層分組（編 > 章 > 節）────────────────────────────────
   const parts    = [...new Set(laws.map(l=>l.part   ||''))];
@@ -1997,28 +2112,14 @@ async function openLawGroup(lawName, full){  try{
     const isImg=l.content&&l.content.startsWith('data:image');
     const contentHtml=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px;cursor:zoom-in" onclick="openImgViewer(this.src)" title="點擊放大">':_lawBody(l.content, _hl);
     const kwHtml=(l.keywords||[]).length?'<div style="margin-top:8px">'+l.keywords.map(k=>'<span class="tag">'+esc(k)+'</span>').join('')+'</div>':'';
-    // 正向關聯 = 手動填的 ＋ 從本條內文自動擷取的（去重）
     // 關聯法條 = 手動填的 ＋ 本條內文引用到的 ＋ 引用到本條的（三者合一，不分方向）。
-    //   使用者在意的是「這條跟哪些法規有關」，誰引用誰是法制作業的事，
-    //   讀法條時反而多一個區塊要看。反推來源以「法規名稱」呈現並去重，
-    //   避免同一部子法有多條引用時擠出一堆重複標籤。
-    const manualRefs = (l.relatedLaws||[]).map(r=>typeof r==='string'?r:(r.ref||r.lawName||'')).filter(Boolean);
-    const { auto: autoRefs, parents } = _citeIndex(allLaws).get(l);
-    // 反推來源（只取法規名稱並去重）。若正向已經有更精確的「○○法第X條」，
-    // 就不要再重複列出同一部法規的名稱，否則同一條會出現兩個指向同處的標籤。
-    const backs    = _findBacklinks(l, allLaws);
-    const backRefs = [...new Set(backs.map(b=>b.law.lawName||''))]
-      .filter(n => n && ![...manualRefs, ...autoRefs].some(r => r.startsWith(n)));
-    // 母法（本條為第一條／第一點且寫明依據）與子法（對方第一條／第一點依據本條）標明，排在最前
-    const children = new Set(backs.filter(b=>b.child).map(b=>b.law.lawName||''));
-    const rank = r => parents.has(r) ? 0 : children.has(r) ? 1 : 2;
-    const allRefs = [...new Set([...manualRefs, ...autoRefs, ...backRefs])].filter(Boolean)
-      .sort((a,b) => rank(a) - rank(b));
-    const relHtml=allRefs.length
-      ?'<div class="law-art-rel-title">🔗 關聯法條：</div>'
-        +allRefs.map(ref=>'<button class="chip law-rel-chip'+(manualRefs.includes(ref)?'':' auto')
-          +'" onclick="showLawPop(\''+esc(ref)+'\')">'+['⬆ 母法 ','⬇ 子法 ','⚖ '][rank(ref)]+esc(ref)+'</button>').join('')
-      :'';
+    //   使用者在意的是「這條跟哪些法規有關」，誰引用誰是法制作業的事；母法、子法標明排最前
+    const rels = _lawRelRefs(l, allLaws);
+    const an = l.articleNumber || art2n(l.article||'');
+    const qHtml = an ? _lawQHtml(l.lawName||'', an, _lawQStat(_lawQIds(_lvQs, l.lawName||'', an), _lvAts), true) : '';
+    const relHtml=(rels.length
+      ?'<div class="law-art-rel-title">🔗 關聯法條：</div>'+_lawRelChips(rels)
+      :'')+(qHtml ? '<div style="margin-top:6px">'+qHtml+'</div>' : '');
     // 劃線/筆記顯示（顏色標記 hlColor + 備註 note，整合進編輯表單）
     const hlColors={yellow:'#d4a438',green:'#4caf7d',red:'#e05c57'};
     const hlC=l.hlColor&&hlColors[l.hlColor]?hlColors[l.hlColor]:'';
@@ -3123,7 +3224,10 @@ async function importBulkLaw(){  try{
 // 以彈窗列出某部法規的條文清單（供「只給法規名稱、沒有條號」的連結使用）
 //   點清單中的任一條 → 直接在同一個彈窗顯示該條內容（不離開目前畫面）
 //   底部保留「在資料庫開啟」，需要完整瀏覽時才跳頁
-function _showLawListPop(lawName, laws, notFound){
+// 資料庫沒有這部法規：直接到全國法規資料庫搜尋
+const _mojLink = name => '<div style="margin-top:10px"><a class="chip" style="font-size:12px;text-decoration:none" target="_blank" rel="noopener" href="https://law.moj.gov.tw/Law/LawSearchResult.aspx?ty=ONEBAR&amp;kw='
+  + encodeURIComponent(_refLawName(name) || name) + '">🔎 到全國法規資料庫查詢 ↗</a></div>';
+async function _showLawListPop(lawName, laws, notFound){
   const el = document.getElementById('lawpop-ov');
   if(!el) return;
   _setLawPopCur(null);
@@ -3133,7 +3237,7 @@ function _showLawListPop(lawName, laws, notFound){
   if(titleEl) titleEl.textContent = lawName;
 
   if(notFound){
-    if(bodyEl) bodyEl.innerHTML = '<span style="color:var(--t2)">查無「'+esc(lawName)+'」，請先在資料庫新增。</span>';
+    if(bodyEl) bodyEl.innerHTML = '<span style="color:var(--t2)">查無「'+esc(lawName)+'」，請先在資料庫新增。</span>'+_mojLink(lawName);
     if(relEl)  relEl.innerHTML = '';
     el.style.display = 'flex';
     return;
@@ -3155,9 +3259,9 @@ function _showLawListPop(lawName, laws, notFound){
     const label = (a.article||'').trim() || (a.title||'') || '（未標條號）';
     const hint  = (a.title||'').trim();
     // 用 article 全文當參數，讓點擊後走既有的 showLawPop 精確定位邏輯
-    const ref   = esc(lawName + (a.article||''));
+    const ref   = escJs(lawName + (a.article||''));
     return '<button class="chip" style="display:block;width:100%;text-align:left;font-size:12px;margin-bottom:4px"'
-         + ' onclick="_lawPopFromList(\''+esc(lawName)+'\',\''+ref+'\',this)">'
+         + ' onclick="_lawPopFromList(\''+escJs(lawName)+'\',\''+ref+'\',this)">'
          + '<b>'+esc(label)+'</b>'
          + (hint ? '<span style="color:var(--t2);margin-left:6px">'+esc(hint)+'</span>' : '')
          + '</button>';
@@ -3169,9 +3273,11 @@ function _showLawListPop(lawName, laws, notFound){
       + '<div style="max-height:52vh;overflow:auto">'+items+'</div>';
   }
   if(relEl){
-    relEl.innerHTML =
+    const qs = await da('questions'), ats = await da('attempts');
+    _setLawNames(laws);
+    relEl.innerHTML = _lawQHtml(lawName, 0, _lawQStat(_lawQIds(qs, lawName, 0), ats)) +
       '<div style="margin-top:8px;display:flex;justify-content:flex-end">'
-      + '<button class="chip" style="font-size:11px" onclick="closeLawPop();openLawGroup(\''+esc(lawName)+'\',true)">在資料庫開啟 ›</button>'
+      + '<button class="chip" style="font-size:11px" onclick="closeLawPop();openLawGroup(\''+escJs(lawName)+'\',true)">在資料庫開啟 ›</button>'
       + '</div>';
   }
   el.style.display = 'flex';
@@ -3274,7 +3380,7 @@ async function showLawPop(ref){  try{
   const el=document.getElementById('lawpop-ov');if(!el)return;
   if(!matched.length){
     document.getElementById('lawpop-title').textContent=ref;
-    document.getElementById('lawpop-body').innerHTML='<span style="color:var(--t2)">查無「'+esc(ref)+'」，請先在資料庫新增。</span>';
+    document.getElementById('lawpop-body').innerHTML='<span style="color:var(--t2)">查無「'+esc(ref)+'」，請先在資料庫新增。</span>'+_mojLink(namePart||ref);
     document.getElementById('lawpop-related').innerHTML='';
     el.style.display='flex';return;
   }
@@ -3283,8 +3389,13 @@ async function showLawPop(ref){  try{
   _setLawPopCur(l);
   document.getElementById('lawpop-title').textContent=(l.lawName||'')+' '+(l.article||'');
   document.getElementById('lawpop-body').innerHTML=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px">':_lawBody(l.content, esc);
-  const rl=(l.relatedLaws||[]).map(r=>'<button class="chip" style="font-size:11px" onclick="showLawPop(\''+escJs(r.ref||r.lawName||'')+'\')" >⚖ '+esc(r.ref||r.lawName||'')+'</button>').join('');
-  document.getElementById('lawpop-related').innerHTML=rl?'<div style="margin-top:8px;font-size:12px;color:var(--t2)">關聯法條：</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">'+rl+'</div>':'';
+  // 與法規頁同一套關聯（手動＋內文引用＋被引用），再加上「這條考過哪些題」
+  _setLawNames(laws);
+  const rl=_lawRelChips(_lawRelRefs(l, laws));
+  const an=l.articleNumber||art2n(l.article||'');
+  const [qsAll, atsAll]=await Promise.all([da('questions'), da('attempts')]);
+  const qHtml=an?_lawQHtml(l.lawName||'', an, _lawQStat(_lawQIds(qsAll, l.lawName||'', an), atsAll)):'';
+  document.getElementById('lawpop-related').innerHTML=(rl?'<div style="margin-top:8px;font-size:12px;color:var(--t2)">🔗 關聯法條：</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px">'+rl+'</div>':'')+qHtml;
   el.style.display='flex';
   }catch(e){ logError('showLawPop',e); }}
 // ── 朗讀單一條文（法規頁每條的 🔊、法條彈窗的 🔊）──────────────
@@ -3322,7 +3433,7 @@ async function closeLawPop(){
   const b = _lawPopBack;
   _lawPopBack = null;
   if(b){
-    _showLawListPop(b.lawName, await da('laws'));
+    await _showLawListPop(b.lawName, await da('laws'));
     const box = document.querySelector('#lawpop-body > div:last-child');
     if(box) box.scrollTop = b.top;
     return;
@@ -3648,6 +3759,7 @@ function clearBulk(){
 // 新程式碼請使用 DataMod.xxx；window 別名供 index.html 與動態 onclick 相容
 const DataMod = {
   renderHome,
+  practiceLawQs, qLawRefs, ensureLawNames, lawWeakRank,
   closeHeatmapOv,
   setF,
   renderList,

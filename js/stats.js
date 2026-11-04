@@ -39,6 +39,22 @@ async function _nextExam(){
 // ════════════════════════════════════════════════════════════
 // 【統計頁渲染】
 // ════════════════════════════════════════════════════════════
+async function _renderWeakLaws(){
+  const el = document.getElementById('weak-laws');
+  if(!el || typeof lawWeakRank !== 'function') return;
+  const list = await lawWeakRank(8, 2);
+  el.innerHTML = list.length ? list.map(w => {
+    const color = w.rate >= 80 ? 'var(--grn)' : w.rate >= 60 ? 'var(--org)' : 'var(--red)';
+    return `<button class="wl-row" onclick="practiceLawQs('${escJs(w.lawName)}',${w.artNum})" title="練習這條的相關考題">
+      <span class="wl-name">${esc(w.label)}</span>
+      <span class="wl-bar"><i style="width:${w.rate}%;background:${color}"></i></span>
+      <span class="wl-rate" style="color:${color}">${w.rate}%</span>
+      <span class="wl-meta">${w.count} 題・${w.tries} 次 ›</span>
+    </button>`;
+  }).join('') + '<div class="wl-hint">點任一條直接練習相關考題。題目要有「關聯法條」或在題幹寫明條號（且資料庫有該法規）才會計入。</div>'
+  : '<div style="font-size:12px;color:var(--t2);line-height:1.7">還沒有足夠資料。題目填上「關聯法條」（或題幹寫明「○○法第X條」）、每條作答 2 次以上，就會列出最常錯的法條。</div>';
+}
+
 async function renderStats(){  try{
   const [qs, ats] = await Promise.all([da('questions'), da('attempts')]);
   const qById = new Map(qs.map(q => [q.id, q]));
@@ -74,6 +90,9 @@ async function renderStats(){  try{
       </div>`;
     }).join('')
     : '<div style="font-size:12px;color:var(--t2)">尚無作答記錄</div>';
+
+  // 弱點法條：題目的關聯法條＋題幹裡寫到的條號，彙整成「哪幾條最常錯」，點一下就練那條的題
+  _renderWeakLaws().catch(e => logError('weakLaws', e));
 
   // 學習軌跡：最近 30 天，畫面顯示 7 天，左右滑動查看
   const totalDays = 30, visibleDays = 7;
