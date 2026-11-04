@@ -67,6 +67,7 @@ function _views(s){
   if(s.articles) v.push(['articles','⚖ 法條'], ['laws','📚 法規']);
   if(s.topics) v.push(['topics','🧩 題型']);
   Object.keys(s.points||{}).forEach(k => v.push(['pt:' + k, '📌 ' + k]));
+  if(s.trend) v.push(['trend','📈 趨勢']);
   v.push(['variants','🎲 猜題變化題']);
   return v;
 }
@@ -85,6 +86,7 @@ async function _rBody(){
   else if(_cur.view === 'topics') h += _rTopics(s);
   else if(_cur.view.startsWith('pt:')) h += await _rPoints(s, _cur.view.slice(3));
   else if(_cur.view === 'variants') h += await _rVariants(s);
+  else if(_cur.view === 'trend') h += await _rTrend(s);
   el.innerHTML = h;
 }
 
@@ -197,6 +199,40 @@ async function _rPoints(s, kind){
       '</div></div>';
   }).join('') + '</div>';
   if(kind === '規範') h += '<div class="pr-note">勤務規範押前 50 名的命中率與隨機差不多，參考價值有限；學理名詞（如警勤區、見警率）的命中率明顯高於隨機。</div>';
+  return h;
+}
+
+// 📈 趨勢：出題風格、最近兩年才出現的條文、警佐班考得多的條文
+const _STYLE = [['multi','多選題（答案不只一個）'], ['neg','否定題（何者錯誤／不正確）'], ['num','數字題（期間、金額、人數）'], ['case','案例題（甲乙丙）']];
+function _styleAdvice(r){
+  const tips = [];
+  if(r.multi >= 40) tips.push('一半是多選題：每個選項 1/5 分、選錯倒扣 1/5。款次要記完整，記憶庫「🔢 數字口訣」的多款口訣最有用；沒把握的選項寧可不選。');
+  if(r.neg >= 20) tips.push('否定題比例偏高：讀題先圈「錯誤／不正確」，用「⚠️ 易錯爭點」練反向判斷。');
+  if(r.num >= 25) tips.push('數字題多：用「🔢 數字速記」與數字抽考，把期間、金額、門檻背到秒答。');
+  if(r.case >= 15) tips.push('案例題多：先判斷罪名或程序階段，再套法條要件（記憶樹的要件分支）。');
+  return tips;
+}
+async function _rTrend(s){
+  const t = s.trend || {};
+  const a = (t.style||{}).all || {}, r = (t.style||{}).recent || {};
+  let h = '<div class="cc"><div class="ct">出題風格（藍＝全部年度 ' + (a.n||0) + ' 題、橘＝近3次 ' + (r.n||0) + ' 題）</div>' +
+    _STYLE.map(([k, label]) => '<div class="pr-bar"><div class="pr-bar-l" style="width:150px">' + label + '</div><div class="pr-bar-t"><i style="width:' + (a[k]||0) + '%"></i><i class="r" style="width:' + (r[k]||0) + '%"></i></div>' +
+      '<div class="pr-bar-n">' + (a[k]||0) + '%／' + (r[k]||0) + '%</div></div>').join('') + '</div>';
+  const tips = _styleAdvice(r);
+  if(tips.length) h += '<div class="pr-note">' + tips.map(x => '・' + esc(x)).join('<br>') + '</div>';
+  const qmap = await _qById();
+  const row = (x, meta) => {
+    const key = x.law + '|' + x.article_n, ref = x.law + x.article;
+    const n = (x.question_ids||[]).filter(id => qmap.has(id)).length;
+    return '<div class="pr-row"><div class="pr-main"><div class="pr-title">' + esc(x.law) + ' ' + esc(x.article) + '</div><div class="pr-meta">' + meta + '</div>' +
+      '<div class="pr-acts">' + (n ? '<button class="go" data-qids="' + esc(x.question_ids.join(',')) + '" data-label="' + esc(ref) + '">▶ 練習 ' + n + ' 題</button>' : '') +
+      '<button data-ref="' + esc(ref) + '">📖 條文</button>' + (_keys && _keys.has(key) ? '<button data-mem="' + esc(key) + '">🌳 記憶樹</button>' : '') + '</div></div></div>';
+  };
+  if((t.newest||[]).length) h += '<div class="sec">最近兩年才首次出現的條文（新考點）</div><div class="card">' +
+    t.newest.map(x => row(x, x.first + ' 年首次出題・共 ' + x.count + ' 題')).join('') + '</div>';
+  if((t.zuo||[]).length) h += '<div class="sec">警佐班考得最多的條文（同科）</div><div class="card">' +
+    t.zuo.map(x => row(x, '警佐班 ' + x.zuo + ' 題・警大二技 ' + x.count + ' 題')).join('') + '</div>' +
+    '<div class="mem-prog">警佐班題數只計入警大二技也考過的條文，是參考值。</div>';
   return h;
 }
 

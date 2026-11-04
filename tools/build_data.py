@@ -40,6 +40,15 @@ def build_memory(promo_dir):
     for sid, name in SUBJECTS:
         if sid in extras:
             d = load(os.path.join(promo_dir, sid + '.json'))
+            # 複核後的文字修正（Promotion 原檔不動，建置時套用；找不到就報錯，避免修正悄悄失效）
+            raw = json.dumps(d, ensure_ascii=False)
+            for fx in extras[sid].get('fixes', []):
+                n = raw.count(fx['find'])
+                if not n:
+                    sys.exit(f'{sid} 找不到要修正的文字：{fx["find"]}')
+                raw = raw.replace(fx['find'], fx['replace'])
+            d = json.loads(raw)
+            d['chapters'].extend(extras[sid].get('chapters', []))
             d.setdefault('mnemonics', []).extend(extras[sid].get('mnemonics', []))
             d.setdefault('traps', []).extend(extras[sid].get('traps', []))
             d['source'] = 'Promotion 升官等記憶樹 ' + d.get('updated', '')
@@ -71,6 +80,35 @@ def _bt_summary(bt):
     return out
 
 
+_NEG = re.compile(r'錯誤|不正確|非屬|不屬|不包括|不適用|何者為非|不符|有誤')
+_NUM = re.compile(r'\d|[一二三四五六七八九十百]+[日月年時小人款條項次倍分]|幾')
+_CASE = re.compile(r'[甲乙丙丁][男女]?[於因與為向持駕將被在]|某[甲乙人男女]')
+
+
+def _style(qs):
+    n = len(qs) or 1
+    pct = lambda r: round(100 * sum(1 for q in qs if r.search(q['stem'] or '')) / n)
+    multi = round(100 * sum(1 for q in qs if len(re.sub(r'[^A-E]', '', q.get('answer') or '')) > 1) / n)
+    return {'n': len(qs), 'neg': pct(_NEG), 'num': pct(_NUM), 'case': pct(_CASE), 'multi': multi}
+
+
+def _trend(s, qs):
+    """趨勢：出題風格（全期 vs 近3次）、最近兩年才首次出現的條文、警佐班考得多的條文。"""
+    recent = set(s.get('recent_years') or [])
+    t = {'style': {'all': _style(qs), 'recent': _style([q for q in qs if q['year'] in recent])}}
+    arts = s.get('article_ranking') or []
+    if arts:
+        last = max(s['years'])
+        t['newest'] = [{'law': a['law'], 'article': a['article'], 'article_n': a['article_n'], 'count': a['count'],
+                        'first': min(int(y) for y in a['by_year']), 'question_ids': a['question_ids']}
+                       for a in arts if a.get('by_year') and min(int(y) for y in a['by_year']) >= last - 1][:20]
+        z = sorted((a for a in arts if (a.get('other_exams') or {}).get('警佐班')),
+                   key=lambda a: -a['other_exams']['警佐班'])[:25]
+        t['zuo'] = [{'law': a['law'], 'article': a['article'], 'article_n': a['article_n'],
+                     'zuo': a['other_exams']['警佐班'], 'count': a['count'], 'question_ids': a['question_ids']} for a in z]
+    return t
+
+
 def build_predict(pack):
     subs = []
     for s in pack['subjects']:
@@ -93,6 +131,7 @@ def build_predict(pack):
                     'levels': pr.get('levels'), 'backtest': _bt_summary(pr.get('backtest')),
                     'rows': [{k: r[k] for k in ('rank', 'name', 'sub', 'count', 'recent_count', 'last_year', 'question_ids') if k in r}
                              for r in rows[:40]]}
+        o['trend'] = _trend(s, [q for q in pack['questions'] if q['subject'] == s['name']])
         subs.append(o)
     meta = {k: pack['meta'][k] for k in ('exam', 'generated_at', 'year_range')}
     dump({'meta': meta, 'subjects': subs}, os.path.join(ROOT, 'data', 'predict.json'))

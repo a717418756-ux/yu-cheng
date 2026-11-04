@@ -9,7 +9,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALIAS = {'刑法': '刑法', '中華民國刑法': '刑法', '刑訴': '刑事訴訟法', '刑訴法': '刑事訴訟法', '憲法': '中華民國憲法',
          '增修': '中華民國憲法增修條文', '憲法增修條文': '中華民國憲法增修條文', '增修條文': '中華民國憲法增修條文',
          '勤務條例': '警察勤務條例', '社維法': '社會秩序維護法', '職權法': '警察職權行使法', '集遊法': '集會遊行法',
-         '查訪辦法': '治安顧慮人口查訪辦法', '人事條例': '警察人員人事條例', '警械條例': '警械使用條例', '施行法': '刑法施行法'}
+         '查訪辦法': '治安顧慮人口查訪辦法', '人事條例': '警察人員人事條例', '警械條例': '警械使用條例', '施行法': '刑法施行法',
+         '訪查辦法': '警察勤務區訪查辦法', '勤休要點': '警察機關輪班輪休人員勤休實施要點', '設置基準': '警察分駐所派出所設置基準',
+         '勤指中心作業規定': '警察機關勤務指揮中心作業規定', '訪查作業規定': '警察勤務區訪查作業規定',
+         '通保法': '通訊保障及監察法', '家暴法': '家庭暴力防治法', '道交條例': '道路交通管理處罰條例', '跟騷法': '跟蹤騷擾防制法'}
 CN = {'零': 0, '〇': 0, '一': 1, '二': 2, '兩': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
 
 
@@ -107,6 +110,8 @@ def main():
     ap.add_argument('--out', required=True)
     ap.add_argument('--subjects', default='police,constitution,criminal,procedure,duty')
     ap.add_argument('--kinds', default='', help='只輸出這些類型，如 口訣,易錯（預設全部）')
+    ap.add_argument('--chapters', default='', help='只輸出這些章節 id，如 c90（其他類型一併略過）')
+    ap.add_argument('--part', default='', help='分段輸出，如 1/3（依章節切，方便交給 AI 逐段檢查）')
     a = ap.parse_args()
     L = json.load(open(a.laws, encoding='utf-8'))['laws']
     md, flags_all, stats = [], [], {}
@@ -115,6 +120,18 @@ def main():
         d = json.load(open(os.path.join(ROOT, 'data', 'memory', sid + '.min.json'), encoding='utf-8'))
         md.append(f'\n# {d["name"]}\n')
         n_item = n_flag = n_missing = 0
+        if a.part:
+            k, m = map(int, a.part.split('/'))
+            n = len(d['chapters'])
+            keep = {c['id'] for c in d['chapters'][(k - 1) * n // m: k * n // m]}
+            # 樹只留這一段的章節；對照表、數字、口訣、易錯、閃卡依 ch 欄位分段，沒有 ch 的放最後一段
+            d = dict(d, chapters=[c for c in d['chapters'] if c['id'] in keep],
+                     **{f: [x for x in d.get(f, []) if x.get('ch') in keep or (not x.get('ch') and k == m)]
+                        for f in ('compare', 'numbers', 'mnemonics', 'traps', 'cards')})
+        if a.chapters:
+            keep = set(a.chapters.split(','))
+            d = dict(d, chapters=[c for c in d['chapters'] if c['id'] in keep],
+                     **{f: [x for x in d.get(f, []) if x.get('ch') in keep] for f in ('compare', 'numbers', 'mnemonics', 'traps', 'cards')})
         for kind, title, body, ref in items(d):
             if a.kinds and kind not in a.kinds.split(','):
                 continue
