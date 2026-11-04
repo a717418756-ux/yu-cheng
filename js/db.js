@@ -91,6 +91,24 @@ _db.version(5).stores({
   healthLogs:  'id, updatedAt'
 });
 
+// version(6)：還原前自動快照（還原錯了可以一鍵復原；只存在這台裝置，不進備份）
+_db.version(6).stores({
+  questions:   '++id, subject, createdAt, nextReview, reviewLevel, difficultyScore, type, starred',
+  laws:        '++id, lawName, category, articleNumber',
+  attempts:    '++id, qid, date, responseTime',
+  settings:    'key',
+  countdowns:  '++id',
+  refbooks:    '++id, title, category, fileType, lastRead, createdAt',
+  learnmedia:  '++id, title, mediaType, subject, lastPlay, createdAt',
+  ebooks:      '++id, title, author, category, fileType, lastRead, createdAt, favorite',
+  leisuremedia:'++id, title, type, category, lastPlay, createdAt, favorite',
+  usageLogs:   '++id, [date+zone], date, zone',
+  englishMaterials: '++id, title, sourceType, createdAt, lastRead, favorite',
+  englishVocab:     '++id, word, materialId, reviewLevel, nextReview, createdAt',
+  healthLogs:  'id, updatedAt',
+  snapshots:   '++id, createdAt'
+});
+
 // ── 遺忘曲線間隔 ─────────────────────────────────────────────
 const REVIEW_INTERVALS = [1, 3, 7, 14, 30, 60, 180];
 
@@ -408,5 +426,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.22.37';    // ⓪書庫 txt／pdf 按返回鍵關不掉閱讀器、返回鍵關閉時沒存閱讀位置 ⓪書籍詳情、新增書籍／影音、英語上傳、倒數等面板按返回或換頁會殘留 ⓪每日任務未設條件的項目永遠無法勾選（預設 3 項都卡 0%）、新增任務時剛打的字會消失、空白任務自動移除 ⓪英文句子切分：Mr./Dr. 被切開、「3.5」這類小數前的整句被吃掉 ①運動數值、勉勵語改用 App 內輸入視窗；影音刪除改用 App 內確認視窗 ②下載檔案連結掛上頁面並釋放記憶體
+const APP_VERSION  = '4.22.38';    // ⓪多裝置防誤蓋：備份記錄時間／裝置／筆數，覆蓋前讀取雲端（資料夾）現有那份並排比較、紅色警告；裝置名稱與同步紀錄只存本機；檢查同步狀態 ⓪還原前自動快照、可一鍵復原（db version 6：snapshots） ⓪資料夾備份保留 history 10 份、還原可選版本；新版 Apps Script（docs/gas-backup.gs）雲端保留 10 份 ①法條↔考題雙向：題幹自動偵測引用、法條彈窗／條文卡顯示相關考題與答對率、一鍵練習；分析頁弱點法條排行；法條彈窗關聯與法規頁一致；查無時連到全國法規資料庫 ②法規頁 onclick 跳脫修正
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

@@ -441,6 +441,7 @@
   <div class="cc"><div class="ct">📊 各科正確率</div><div id="subj-bars"></div></div>
   <div class="cc"><div class="ct">📅 近30天練習量（左右滑動）</div><canvas id="dchart" height="110"></canvas></div>
   <div class="cc"><div class="ct">🚦 危險等級分佈</div><div id="wrong-subs"></div></div>
+  <div class="cc"><div class="ct">⚖ 弱點法條（相關考題答對率最低）</div><div id="weak-laws"></div></div>
   <div class="cc"><div class="ct">🏷 高頻關鍵概念</div><div id="kw-cloud" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
   <div class="sec">AI 分析</div>
   <div class="aic">
@@ -615,10 +616,11 @@
     </div>
     <div id="gas-help" style="display:none;font-size:10.5px;color:var(--t2);margin-bottom:10px;line-height:1.8;padding:9px 11px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.07)">
       1. 前往 <span style="color:var(--acc)">script.google.com</span> → 建立新專案<br>
-      2. 貼上備份程式碼（README 有完整程式碼）<br>
+      2. 貼上備份程式碼 <button class="ss-btn" onclick="copyGasScript()">📋 複製程式碼</button>，把第一行的密碼改成你自己的<br>
       3. 部署 → 新增部署 → 網路應用程式<br>
       4. 執行身分：我、存取權：任何人 → 部署<br>
-      5. 複製網址貼到下方，設定自訂密碼後儲存
+      5. 複製網址貼到下方，填入同一組密碼後儲存<br>
+      <span style="color:var(--acc)">已在使用舊程式碼？</span>換成新版（部署 → 管理部署 → 編輯 → 新版本，網址不變）即可：雲端自動保留最近 10 份備份、還原時可選版本、讀取備份時間不用下載整份。舊版也能用，只是每次都要先下載整份比對。
     </div>
     <div style="margin-bottom:8px">
       <div style="font-size:11.5px;color:var(--t2);margin-bottom:4px">Apps Script 網址</div>
@@ -642,6 +644,10 @@
         <span style="font-size:14px">📥</span> 從雲端還原
       </button>
     </div>
+    <button class="btn bg bw" style="margin-top:8px;padding:9px;font-size:12px" onclick="gdriveCheck()">
+      🔍 檢查同步狀態（只比較雲端與這台，不會變更資料）
+    </button>
+    <div id="sync-status" class="sync-status"></div>
     <div style="font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.5">
       ☁️ 備份範圍：<b>題庫</b>（含手寫標註、複習進度）、<b>法條</b>、<b>答題記錄</b>、<b>設定</b>、<b>倒數日</b>、<b>使用統計</b>、<b>英語教材</b>、<b>單字本</b>、<b>健康數據</b><br>
       <span style="color:var(--org)">不含</span>電子書、影音、學習教材等大型檔案（請用下方本地完整備份）｜檔名：<code style="color:var(--acc)">YC_Platform_backup.json</code>

@@ -699,3 +699,27 @@
 .qd-l{ font-size:11px; color:var(--t2); margin-top:4px; white-space:nowrap; }
 [data-theme="eink"] .qd-ring{ background:conic-gradient(#000 calc(var(--p) * 1%), #ddd 0); }
 [data-theme="eink"] .qd-cell{ border-color:#000; }
+
+/* ── 法條 ↔ 考題 ─────────────────────────────────────────── */
+.lp-qs{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--bg2);border:1px solid var(--bd);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lp-qs-t{font-size:13px;color:var(--t0);flex:1;min-width:150px}
+.lp-qs-t b{font-size:15px;color:var(--acc);margin:0 1px}
+.lp-qs-r{display:block;font-size:11.5px;margin-top:2px;font-weight:600}
+.lp-qs-btn{padding:8px 14px;font-size:13px;white-space:nowrap}
+.lp-qs-hint{font-size:11px;color:var(--t2)}
+.law-q-chip{font-size:11px}
+.qlaw-tag.auto{border-style:dashed;opacity:.9}
+[data-theme="eink"] .lp-qs{border:1.5px solid #000;background:#fff}
+/* 弱點法條排行（分析頁） */
+.wl-row{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) 38px auto;align-items:center;gap:8px;width:100%;
+  background:none;border:none;border-bottom:1px solid var(--bd);padding:9px 2px;cursor:pointer;color:var(--t0);font-family:inherit;text-align:left}
+.wl-row:last-of-type{border-bottom:none}
+.wl-row:active{background:var(--bg2)}
+.wl-name{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wl-bar{height:6px;border-radius:3px;background:var(--bg3);overflow:hidden}
+.wl-bar i{display:block;height:100%;border-radius:3px}
+.wl-rate{font-size:12px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.wl-meta{font-size:10.5px;color:var(--t2);white-space:nowrap}
+.wl-hint{font-size:10.5px;color:var(--t2);margin-top:8px;line-height:1.6}
+[data-theme="eink"] .wl-bar{border:1px solid #000;background:#fff}

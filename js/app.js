@@ -442,7 +442,8 @@ function _handleBackLayer(){
 
   // 7)   display:flex  exitLaw
   const lv = document.getElementById('lv');
-  if(lv && lv.style.display === 'flex'){
+  const qvOn = (document.getElementById('qv')?.style.display || 'none') !== 'none';   // 從法規頁開始練習時，測驗蓋在法規頁上 → 先結束測驗
+  if(lv && lv.style.display === 'flex' && !qvOn){
     if(!_callIf('exitLaw')) lv.style.display = 'none';
     return true;
   }
