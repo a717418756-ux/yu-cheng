@@ -173,7 +173,12 @@ const da = (st, idx, qry) => {
   return _db[st].toArray();
 };
 
-const dp = (st, data) =>
+// 記憶庫數字抽考、猜題庫預覽等「臨時題」（id 以 virt: 開頭）只借用測驗畫面，
+//   不存進題庫、不留作答紀錄，避免污染複習排程與統計。
+const _isVirtual = (st, data) => !!data && (
+  (st === 'questions' && String(data.id || '').startsWith('virt:')) ||
+  (st === 'attempts'  && String(data.qid || '').startsWith('virt:')));
+const dp = (st, data) => _isVirtual(st, data) ? Promise.resolve(data.id) :
   _db[st].put(data).then(key => { _cacheInvalidate(st); return key; });
 
 const dd = (st, k) =>
@@ -426,5 +431,5 @@ async function deleteEbook(id) {
 // ════════════════════════════════════════════════════════════════
 // 版本常數
 // ════════════════════════════════════════════════════════════════
-const APP_VERSION  = '4.22.38';    // ⓪多裝置防誤蓋：備份記錄時間／裝置／筆數，覆蓋前讀取雲端（資料夾）現有那份並排比較、紅色警告；裝置名稱與同步紀錄只存本機；檢查同步狀態 ⓪還原前自動快照、可一鍵復原（db version 6：snapshots） ⓪資料夾備份保留 history 10 份、還原可選版本；新版 Apps Script（docs/gas-backup.gs）雲端保留 10 份 ①法條↔考題雙向：題幹自動偵測引用、法條彈窗／條文卡顯示相關考題與答對率、一鍵練習；分析頁弱點法條排行；法條彈窗關聯與法規頁一致；查無時連到全國法規資料庫 ②法規頁 onclick 跳脫修正
+const APP_VERSION  = '4.23.0';    // ⓪考試區新增記憶庫（法條樹連結資料庫、對照表、易錯爭點、數字口訣、閃卡）與猜題庫（預測資料包排名、押題練習、猜題變化題匯入）；成長區新增考試英文重點；臨時題（virt:）不寫入題庫 ⓪（4.22.38）⓪多裝置防誤蓋：備份記錄時間／裝置／筆數，覆蓋前讀取雲端（資料夾）現有那份並排比較、紅色警告；裝置名稱與同步紀錄只存本機；檢查同步狀態 ⓪還原前自動快照、可一鍵復原（db version 6：snapshots） ⓪資料夾備份保留 history 10 份、還原可選版本；新版 Apps Script（docs/gas-backup.gs）雲端保留 10 份 ①法條↔考題雙向：題幹自動偵測引用、法條彈窗／條文卡顯示相關考題與答對率、一鍵練習；分析頁弱點法條排行；法條彈窗關聯與法規頁一致；查無時連到全國法規資料庫 ②法規頁 onclick 跳脫修正
 const DATA_VERSION = '1150614-01';   // 題庫版本（題庫/法條資料更新時遞增）

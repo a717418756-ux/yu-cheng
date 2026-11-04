@@ -280,6 +280,9 @@ function goPage(pg, btn, fromBack){
     media:renderMedia,
     english:renderEnglish,
     fitness:renderFitness,
+    memory:renderMemory,
+    predict:renderPredict,
+    engexam:renderEngExam,
   })[pg]?.();
 }
 

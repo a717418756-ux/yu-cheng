@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.22.38';
+const APP_VERSION = '4.23.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
@@ -39,6 +39,20 @@ const CORE_ASSETS = [
   './js/app.js',
   './js/layout.js',
   './js/tts.js',
+  './css/memory.css',
+  './js/memory.js',
+  './js/predict.js',
+  './js/engexam.js',
+  './data/memory/index.json',
+  './data/memory/police.min.json',
+  './data/memory/constitution.min.json',
+  './data/memory/criminal.min.json',
+  './data/memory/procedure.min.json',
+  './data/memory/duty.min.json',
+  './data/predict.json',
+  './data/variants.json',
+  './data/english_exam.json',
+  './data/english_police.json',
 ];
 
 // ── 可選資源（快取失敗不影響 SW 安裝）──────────────────────

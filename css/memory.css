@@ -1,0 +1,150 @@
+/* ══ memory.css — 記憶庫、猜題庫、英語考點 ══════════════════════ */
+
+/* ── 共用：分頁列、工具列 ── */
+.mem-search{flex:1;min-width:0;height:34px;padding:0 10px;border-radius:8px;border:1px solid var(--bd);background:var(--bg2);color:var(--t0);font-size:13px}
+.mem-tabs{display:flex;gap:4px;padding:4px 12px 6px;overflow-x:auto;-webkit-overflow-scrolling:touch;border-bottom:1px solid var(--bd)}
+.mem-tabs::-webkit-scrollbar{display:none}
+.mem-tab{flex-shrink:0;padding:7px 11px;border-radius:8px;font-size:12.5px;font-weight:600;background:none;border:none;color:var(--t2);cursor:pointer}
+.mem-tab.on{background:var(--bg3);color:var(--t0)}
+.mem-tools{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 4px}
+.mem-tools .btn{padding:7px 11px;font-size:12px}
+.mem-sel{height:32px;padding:0 8px;border-radius:6px;border:1px solid var(--bd);background:var(--bg2);color:var(--t0);font-size:12px;max-width:60%}
+.mem-empty{text-align:center;padding:40px 20px;color:var(--t2);font-size:13px;line-height:1.8}
+.mem-intro{margin:6px 12px;padding:10px 12px;border-radius:var(--r);background:var(--bg1);border:1px solid var(--bd);font-size:12.5px;color:var(--t1);line-height:1.7}
+.mem-src{margin-top:4px;font-size:11px;color:var(--t2)}
+.mem-legend{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:2px 12px 6px;font-size:11px;color:var(--t2)}
+.mem-prog{padding:8px 14px 2px;font-size:12px;color:var(--t2)}
+.mem-trail{font-size:11px;color:var(--t2);margin-bottom:3px}
+
+/* ── 標籤 ── */
+.mem-tag{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;vertical-align:1px;white-space:nowrap}
+.mem-tag.must{background:var(--red2);color:var(--red)}
+.mem-tag.trap{background:var(--org2);color:var(--org)}
+.mem-tag.mn{background:var(--pur2);color:var(--pur)}
+.mem-tag.new{background:var(--grn2);color:var(--grn)}
+.mem-hot{font-size:11px;font-weight:700;color:var(--org);white-space:nowrap}
+
+/* ── 法條按鈕 ── */
+.mem-refs{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.mem-ref{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:11.5px;background:rgba(154,126,219,.10);color:var(--pur);border:1px solid rgba(154,126,219,.28);cursor:pointer;line-height:1.5}
+.mem-ref.plain{cursor:default;background:var(--bg2);color:var(--t2);border-color:var(--bd)}
+.mem-ref:active{opacity:.6}
+
+/* ── 🌳 法條樹 ── */
+.mem-ch{margin:6px 12px;border-radius:var(--r);background:var(--bg1);border:1px solid var(--bd);overflow:hidden}
+.mem-ch > summary{list-style:none;cursor:pointer;padding:11px 13px 11px 30px;display:flex;flex-direction:column;gap:2px;position:relative}
+.mem-ch > summary::-webkit-details-marker{display:none}
+.mem-ch > summary::before{content:'▸';position:absolute;left:13px;top:12px;color:var(--t2)}
+.mem-ch[open] > summary::before{content:'▾'}
+.mem-ch-t{font-size:14.5px;font-weight:700;color:var(--t0)}
+.mem-ch-lead{font-size:11.5px;color:var(--t2);line-height:1.5}
+.mem-tree{padding:0 8px 10px 4px}
+.mem-tree ul{list-style:none;margin:0;padding-left:14px;border-left:1px dashed var(--bd)}
+.mem-tree > ul{border-left:none;padding-left:4px}
+.mem-tree li{margin:5px 0;position:relative}
+.mem-tree li::before{content:'';position:absolute;left:-14px;top:11px;width:10px;border-top:1px dashed var(--bd)}
+.mem-tree > ul > li::before{display:none}
+.mem-node > summary{list-style:none;cursor:pointer}
+.mem-node > summary::-webkit-details-marker{display:none}
+.mem-node > summary .mem-n::before{content:'▾ ';color:var(--t2);font-size:11px}
+.mem-node:not([open]) > summary .mem-n::before{content:'▸ '}
+.mem-n{font-size:13.5px;line-height:1.55}
+.mem-t{font-weight:600;color:var(--t0)}
+.mem-d{font-size:12.8px;color:var(--t1);line-height:1.65;margin:2px 0 0 2px;white-space:pre-wrap}
+.mem-flashhl{animation:memhl 1.8s ease}
+@keyframes memhl{0%,60%{background:rgba(212,164,56,.35)}100%{background:transparent}}
+
+/* 挖空回想：說明遮起來，點一下才出現 */
+.hidden[data-reveal]{color:transparent !important;background:repeating-linear-gradient(90deg,var(--bg3) 0 10px,var(--bg2) 10px 20px);border-radius:4px;cursor:pointer;user-select:none;min-height:1.4em}
+.hidden[data-reveal] *{visibility:hidden}
+
+/* ── 📊 對照表 ── */
+.mem-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px}
+.mem-tbl{border-collapse:collapse;width:100%;min-width:420px;font-size:12.3px;line-height:1.55}
+.mem-tbl th,.mem-tbl td{border:1px solid var(--bd);padding:6px 7px;vertical-align:top;text-align:left}
+.mem-tbl thead th{background:var(--bg3);color:var(--t0);font-weight:700}
+.mem-tbl tbody th{background:var(--bg2);color:var(--t1);font-weight:600;white-space:nowrap}
+.mem-tbl td{color:var(--t1)}
+
+/* ── ⚠️ 易錯 ── */
+.mem-trap-t{font-size:13.5px;font-weight:700;color:var(--t0);margin-bottom:4px}
+.mem-wrong{font-size:12.8px;color:var(--red);line-height:1.6;text-decoration:line-through;text-decoration-color:rgba(224,92,87,.5)}
+.mem-right{font-size:12.8px;color:var(--grn);line-height:1.6;margin-top:2px;white-space:pre-wrap}
+.mem-must-row{padding:5px 0;border-bottom:1px solid var(--bd);font-size:13px;color:var(--t0)}
+.mem-must-row:last-child{border-bottom:none}
+.mem-must-row .mem-tag{margin:0 6px 0 0}
+
+/* ── 🔢 數字口訣 ── */
+.mem-mn-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}
+.mem-mn-t{font-size:14px;font-weight:700;color:var(--t0)}
+.mem-kind{font-size:10.5px;color:var(--pur);background:var(--pur2);padding:1px 7px;border-radius:10px;white-space:nowrap}
+.mem-code{font-size:15.5px;font-weight:700;color:var(--org);line-height:1.6;padding:6px 10px;border-radius:6px;background:var(--org2);margin-bottom:6px}
+.mem-items{margin:0 0 6px;padding-left:22px;font-size:12.8px;color:var(--t1);line-height:1.65}
+.mem-logic{font-size:12.3px;color:var(--t2);line-height:1.65}
+.mem-num-row{padding:7px 0;border-bottom:1px solid var(--bd)}
+.mem-num-row:last-child{border-bottom:none}
+.mem-num-k{font-size:12.5px;color:var(--t2)}
+.mem-num-v{font-size:14px;font-weight:700;color:var(--t0);margin-top:1px;line-height:1.5}
+
+/* ── 🃏 閃卡 ── */
+.mem-flash{margin:10px 12px;min-height:200px;padding:18px 16px;border-radius:14px;background:var(--bg1);border:1px solid var(--bd);cursor:pointer;display:flex;flex-direction:column;gap:10px}
+.mem-flash.flip{border-color:var(--acc)}
+.mem-flash-n{font-size:11px;color:var(--t2)}
+.mem-flash-q{font-size:16px;font-weight:700;color:var(--t0);line-height:1.6}
+.mem-flash-a{font-size:14px;color:var(--t1);line-height:1.75;padding-top:10px;border-top:1px dashed var(--bd)}
+.mem-flash-hint{margin-top:auto;text-align:center;font-size:12px;color:var(--t2)}
+.mem-flash-btns{display:flex;gap:8px;padding:0 12px 14px}
+.mem-flash-btns .btn{flex:1;padding:12px}
+
+/* ── 🆕 修法時間軸 ── */
+.mem-tl-row{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--bd)}
+.mem-tl-row:last-child{border-bottom:none}
+.mem-tl-d{flex-shrink:0;width:72px;font-size:12px;font-weight:700;color:var(--acc)}
+.mem-tl-x{font-size:12.8px;color:var(--t1);line-height:1.6;min-width:0}
+
+/* ══ 猜題庫 ══════════════════════════════════════════════════ */
+.pr-note{margin:6px 12px;padding:9px 12px;border-radius:var(--r);background:var(--org2);color:var(--t1);font-size:12px;line-height:1.7}
+.pr-bt{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.pr-bt > div{background:var(--bg2);border-radius:8px;padding:7px 6px;text-align:center}
+.pr-bt b{display:block;font-size:17px;color:var(--grn)}
+.pr-bt span{font-size:10.5px;color:var(--t2)}
+.pr-row{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--bd);align-items:flex-start}
+.pr-row:last-child{border-bottom:none}
+.pr-rank{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--bg3);color:var(--t1);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.pr-rank.top{background:var(--org2);color:var(--org)}
+.pr-main{flex:1;min-width:0}
+.pr-title{font-size:13.5px;font-weight:700;color:var(--t0)}
+.pr-meta{font-size:11.5px;color:var(--t2);margin-top:1px}
+.pr-text{font-size:12.3px;color:var(--t1);line-height:1.6;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pr-text.open{display:block}
+.pr-years{display:flex;gap:2px;margin-top:4px;align-items:flex-end;height:18px}
+.pr-years i{display:block;width:8px;background:var(--acc);border-radius:2px 2px 0 0;opacity:.75}
+.pr-years i.z{background:var(--bg3);height:2px !important}
+.pr-acts{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.pr-acts button{padding:3px 9px;border-radius:12px;font-size:11.5px;background:var(--bg2);color:var(--t1);border:1px solid var(--bd);cursor:pointer}
+.pr-acts button.go{background:rgba(110,168,254,.12);color:var(--acc);border-color:rgba(110,168,254,.35)}
+.pr-bar{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12.5px}
+.pr-bar-l{width:78px;flex-shrink:0;color:var(--t1)}
+.pr-bar-t{flex:1;height:14px;background:var(--bg2);border-radius:7px;overflow:hidden;position:relative}
+.pr-bar-t i{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:7px}
+.pr-bar-t i.r{background:var(--org);opacity:.85;height:5px;top:auto}
+.pr-bar-n{width:64px;flex-shrink:0;text-align:right;color:var(--t2);font-size:11.5px}
+.pr-k{display:flex;gap:4px}
+.pr-k .chip{padding:4px 10px}
+
+/* ══ 英語考點 ══════════════════════════════════════════════ */
+.ee-entry{margin:4px 12px 8px;padding:12px 14px;border-radius:var(--r);background:linear-gradient(135deg,rgba(110,168,254,.14),rgba(154,126,219,.12));border:1px solid rgba(110,168,254,.3);cursor:pointer;display:flex;align-items:center;gap:12px}
+.ee-entry .i{font-size:26px}
+.ee-entry .t{font-size:14px;font-weight:700;color:var(--t0)}
+.ee-entry .s{font-size:11.5px;color:var(--t2);margin-top:2px}
+.ee-word{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd)}
+.ee-word:last-child{border-bottom:none}
+.ee-w{font-size:15px;font-weight:700;color:var(--t0)}
+.ee-zh{font-size:12.5px;color:var(--t1);margin-top:1px}
+.ee-ex{font-size:12.3px;color:var(--t2);margin-top:3px;line-height:1.55;font-style:italic}
+.ee-ex mark{background:var(--org2);color:var(--org);font-style:normal;border-radius:3px;padding:0 2px}
+.ee-say{flex-shrink:0;width:32px;height:32px;border-radius:50%;border:1px solid var(--bd);background:var(--bg2);color:var(--t0);cursor:pointer;font-size:14px}
+.ee-add{flex-shrink:0;height:28px;padding:0 9px;border-radius:14px;border:1px solid var(--bd);background:var(--bg2);color:var(--t1);font-size:11.5px;cursor:pointer}
+.ee-add.on{color:var(--grn);border-color:var(--grn)}
+.ee-tip{font-size:12.8px;color:var(--t1);line-height:1.75}
+.ee-tip b{color:var(--t0)}

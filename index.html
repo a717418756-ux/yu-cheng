@@ -27,6 +27,7 @@
 <link rel="stylesheet" href="css/splash.css">
 <link rel="stylesheet" href="css/english.css">
 <link rel="stylesheet" href="css/fitness.css">
+<link rel="stylesheet" href="css/memory.css">
 <script>
 /* 早期主題套用：避免畫面閃白（IDB 非同步，先暫存到 localStorage） */
 (function(){
@@ -237,6 +238,24 @@
         <div class="zpanel-row-text">
           <div class="t">資料庫</div>
           <div class="s">法條・SOP・補充資料・法律解釋與裁判</div>
+        </div>
+        <span class="zpanel-main-arrow" style="margin-left:auto">›</span>
+      </button>
+      <!-- 記憶庫：法條樹、對照表、易錯爭點、數字口訣、閃卡 -->
+      <button class="zpanel-row" onclick="fabGo('memory')">
+        <span class="zpanel-row-icon">🧠</span>
+        <div class="zpanel-row-text">
+          <div class="t">記憶庫</div>
+          <div class="s">法條樹・對照表・易錯爭點・數字口訣・閃卡</div>
+        </div>
+        <span class="zpanel-main-arrow" style="margin-left:auto">›</span>
+      </button>
+      <!-- 猜題庫：預測資料包排名、押題練習、猜題變化題 -->
+      <button class="zpanel-row" onclick="fabGo('predict')">
+        <span class="zpanel-row-icon">🎯</span>
+        <div class="zpanel-row-text">
+          <div class="t">猜題庫</div>
+          <div class="s">高頻法條排名・押題練習・變化題</div>
         </div>
         <span class="zpanel-main-arrow" style="margin-left:auto">›</span>
       </button>
@@ -520,8 +539,41 @@
       <button class="hd-btn blue plus" onclick="openEngUpload()" title="上傳材料" aria-label="上傳材料">＋</button>
     </div>
   </div>
+  <div class="ee-entry" onclick="goPage('engexam')">
+    <div class="i">📘</div>
+    <div style="flex:1;min-width:0">
+      <div class="t">考試英文重點</div>
+      <div class="s">題型比重・高頻字彙・警察專業英文・閱讀轉教材</div>
+    </div>
+    <span class="zpanel-main-arrow">›</span>
+  </div>
   <div style="font-size:11px;color:var(--t2);padding:8px 14px 4px">點材料開始閱讀，朗讀時逐句高亮</div>
   <div id="eng-list" style="padding:8px 12px"></div>
+</div>
+
+<!-- MEMORY 記憶庫（考試區） -->
+<div id="pg-memory" class="page hide">
+  <div class="hd">
+    <div class="hdt">記憶庫</div>
+    <input class="mem-search" id="mem-search" type="search" placeholder="搜尋全部科目（如：管束、§88-1）" aria-label="搜尋記憶庫">
+  </div>
+  <div class="chips" id="mem-subj"></div>
+  <div class="mem-tabs" id="mem-tabs"></div>
+  <div id="mem-body"></div>
+</div>
+
+<!-- PREDICT 猜題庫（考試區） -->
+<div id="pg-predict" class="page hide">
+  <div class="hd"><div class="hdt">猜題庫</div></div>
+  <div class="chips" id="pr-subj"></div>
+  <div id="pr-body"></div>
+</div>
+
+<!-- ENGEXAM 考試英文重點（成長區・英語學習庫） -->
+<div id="pg-engexam" class="page hide">
+  <div class="hd"><div class="hdt">考試英文重點</div></div>
+  <div class="mem-tabs" id="ee-tabs"></div>
+  <div id="ee-body"></div>
 </div>
 
 <!-- FITNESS 運動健康庫 -->
@@ -1169,6 +1221,9 @@
 <script src="js/quiz.js"></script>
 <script src="js/data.js"></script>
 <script src="js/english.js"></script>
+<script src="js/memory.js"></script>
+<script src="js/predict.js"></script>
+<script src="js/engexam.js"></script>
 <script src="js/fitness.js"></script>
 <script src="js/dtask.js"></script>
 <script src="js/plan.js"></script>

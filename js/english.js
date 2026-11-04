@@ -1157,6 +1157,7 @@ const English = {
   toggleEngTTS, setEngRate, engRateStep, setEngVoice,
   openEngAudioMgr, toggleEngAudio, engAudioSeek,
   startRepeat, retryRepeat,
+  splitEngSentences: _splitSentences,   // 考試英文重點（engexam.js）把閱讀題組轉成教材時用
 };
 window.English = English;
 Object.assign(window, English);

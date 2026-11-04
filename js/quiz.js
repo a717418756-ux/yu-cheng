@@ -34,7 +34,7 @@ const _resumeKey = (mode = S.quiz.mode) => 'quiz_resume_' + mode;
 
 function _saveResume(){
   const {q, idx, res, mode} = S.quiz;
-  if(mode === 'mock') return;
+  if(mode === 'mock' || q.some(x => String(x.id).startsWith('virt:'))) return;   // 臨時題不留接續進度
   if(idx + 1 < q.length) setSetting(_resumeKey(), {ids:q.map(x => x.id), idx:idx + 1, res, at:Date.now()});
   else dd('settings', _resumeKey()).catch(()=>{});   // 最後一題答完：沒有可接續的
 }
