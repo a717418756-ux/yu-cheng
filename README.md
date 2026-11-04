@@ -1,6 +1,6 @@
 # Y.C. 多功能專用平台
 
-> 警察特考備考 PWA｜版本 **4.23.0**
+> 警察特考備考 PWA｜版本 **4.23.1**
 > 離線可用．資料存本機．支援電子紙
 
 ---
@@ -370,6 +370,12 @@ python3 tools/build_data.py --promotion ../Promotion/data --pack 警大二技預
 
 改完 data/ 也要同步改版本號，快取才會更新。
 
+內容複核（每筆內容對照引用條文全文、自動標出數字不符；輸出 Markdown 可交給人或其他 AI 檢查）：
+
+```bash
+python3 tools/verify_memory.py --laws ../Promotion/data/laws.json --subjects police --out 複核_警察法規.md
+```
+
 ### CSS（8 個）
 
 | 檔案 | 負責介面 |
@@ -448,4 +454,4 @@ python3 tools/build_data.py --promotion ../Promotion/data --pack 警大二技預
 
 ---
 
-*版本 4.23.0*
+*版本 4.23.1*

@@ -78,8 +78,12 @@ const LAW_ALIAS = {
   '勤務條例':'警察勤務條例', '社維法':'社會秩序維護法', '職權法':'警察職權行使法', '警職法':'警察職權行使法',
   '集遊法':'集會遊行法', '查訪辦法':'治安顧慮人口查訪辦法', '人事條例':'警察人員人事條例', '警械條例':'警械使用條例',
   '通保法':'通訊保障及監察法', '家暴法':'家庭暴力防治法', '道交條例':'道路交通管理處罰條例', '跟騷法':'跟蹤騷擾防制法',
-  '施行法':'刑法施行法', '行執法':'行政執行法',
+  '施行法':'刑法施行法', '行執法':'行政執行法', '訪查辦法':'警察勤務區訪查辦法',
+  '勤指中心作業規定':'警察機關勤務指揮中心作業規定', '勤休要點':'警察機關輪班輪休人員勤休實施要點',
+  '訪查作業規定':'警察勤務區訪查作業規定', '設置基準':'警察分駐所派出所設置基準',
 };
+// 看起來是法規、行政規則、解釋或判決字號的才做成可點的按鈕；「讀家總複習」「學理」「108.2.19函」只顯示文字
+const _LAWLIKE = /(法|律|條例|通則|規則|細則|辦法|綱要|標準|準則|規程|要點|規定|原則|基準)(第[\d一二三四五六七八九十百]+[點條](之\d+)?)?$|釋字|憲判/;
 function _fullLaw(n){
   n = (n||'').replace(/[（(].*?[)）]/g,'').trim();
   return LAW_ALIAS[n] || n;
@@ -91,6 +95,8 @@ function parseRefs(ref){
   String(ref).split(/[、；;，,]/).forEach(part => {
     const p = part.trim();
     if(!p) return;
+    // 「刑法§19Ⅰ、Ⅱ」裡單獨的項次、款次：併回前一筆，不另做按鈕
+    if(/^[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ①-⑳]/.test(p) && out.length){ out[out.length-1].label += '、' + p; return; }
     let m = p.match(/^(.*?)§\s*(\d+)(?:[-－之](\d+))?/);
     if(!m) m = p.match(/^(.*?)第(\d+)條(?:之(\d+))?/);
     if(m){
@@ -101,9 +107,11 @@ function parseRefs(ref){
       out.push({ label:p, ref: law + '第' + main + '條' + (sub ? '之' + sub : ''), key: law + '|' + (main*1000 + sub) });
       return;
     }
-    // 釋字、憲判、判例、整部法規名：不帶條號
-    if(/釋字|憲判|大法庭/.test(p)) out.push({ label:p, ref:p, plain:true });
-    else out.push({ label:p, ref:_fullLaw(p), plain:true });
+    // 行政規則的「第N點」：法規名換成全名，條號照原樣交給 showLawPop
+    const pt = p.match(/^(.*?)(第[\d一二三四五六七八九十百]+點.*)$/);
+    if(pt && _LAWLIKE.test(p)){ out.push({ label:p, ref:_fullLaw(pt[1]) + pt[2], plain:true }); return; }
+    if(_LAWLIKE.test(p)) out.push({ label:p, ref:/釋字|憲判/.test(p) ? p : _fullLaw(p), plain:true });
+    else out.push({ label:p });   // 判決字號、教材名、日期函：只顯示
   });
   return out;
 }
@@ -327,7 +335,8 @@ function _rUpd(d){
 function _numQuiz(){
   const d = _subj[_cur.sid];
   const nums = (d.numbers||[]).filter(n => n.v);
-  if(nums.length < 4){ toast('數字太少，無法出題'); return; }
+  // 錯誤選項從其他數字的答案挑，答案要至少 4 種才出得了四選一（否則下面的迴圈會停不下來）
+  if(new Set(nums.map(n => n.v)).size < 4){ toast('數字太少，無法出題'); return; }
   const pick = arr => arr[Math.floor(Math.random()*arr.length)];
   const shuffled = nums.slice().sort(() => Math.random() - .5).slice(0, 20);
   const pool = shuffled.map((n, i) => {
@@ -462,6 +471,6 @@ function _clearSearch(){
   if(inp && inp.value) inp.value = '';
 }
 
-const Memory = { renderMemory, memSearch, openMemoryAt, memoryKeys, parseRefs };
+const Memory = { renderMemory, memSearch, openMemoryAt, memoryKeys };
 Object.assign(window, Memory);
 })();

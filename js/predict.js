@@ -77,7 +77,7 @@ async function _rBody(){
   const m = _data.meta;
   let h = '<div class="pr-note">📈 ' + esc(m.exam) + ' ' + m.year_range[0] + '–' + m.year_range[1] + ' 年，' +
     esc(s.name) + ' ' + s.question_count + ' 題；最近 3 次：' + (s.recent_years||[]).join('、') + ' 年。' +
-    '排名只代表「優先順序」，不是必考清單。</div>' +
+    '排名只代表「優先順序」，不是必考清單。<br><small>資料包產生於 ' + esc(m.generated_at || '') + '</small></div>' +
     '<div class="mem-tabs">' + views.map(([k, t]) => '<button class="mem-tab' + (k===_cur.view?' on':'') + '" data-view="' + esc(k) + '">' + t + '</button>').join('') + '</div>';
   const el = document.getElementById('pr-body');
   if(_cur.view === 'articles') h += await _rArticles(s);

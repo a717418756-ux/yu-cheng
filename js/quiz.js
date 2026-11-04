@@ -34,7 +34,7 @@ const _resumeKey = (mode = S.quiz.mode) => 'quiz_resume_' + mode;
 
 function _saveResume(){
   const {q, idx, res, mode} = S.quiz;
-  if(mode === 'mock' || q.some(x => String(x.id).startsWith('virt:'))) return;   // 臨時題不留接續進度
+  if(mode === 'mock' || q.some(isVirtualQ)) return;   // 臨時題不留接續進度
   if(idx + 1 < q.length) setSetting(_resumeKey(), {ids:q.map(x => x.id), idx:idx + 1, res, at:Date.now()});
   else dd('settings', _resumeKey()).catch(()=>{});   // 最後一題答完：沒有可接續的
 }
@@ -687,6 +687,7 @@ function exitQ(){
 async function toggleQStar(){  try{
   const qu = S.quiz.q[S.quiz.idx];
   if(!qu) return;
+  if(isVirtualQ(qu)){ toast('這是臨時題（不在題庫），無法收藏'); return; }
   qu.starred = !qu.starred;
   await dp('questions', qu);
   const star = document.getElementById('qstar');
@@ -1151,7 +1152,7 @@ async function saveQNote(){  try{
   // 同步回目前這份，畫面才會即時反映
   _noteQ.note = target.note;
   closeQNote();
-  toast('備註已儲存');
+  toast(isVirtualQ(target) ? '臨時題不在題庫：備註只在這一回有效' : '備註已儲存');
   _updateNoteBtn();
   }catch(e){ logError('saveQNote', e); toast('儲存失敗'); }}
 

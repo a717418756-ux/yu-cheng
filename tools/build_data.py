@@ -14,12 +14,12 @@ import argparse, json, os, re, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MEM = os.path.join(ROOT, 'data', 'memory')
 
-SUBJECTS = [  # 記憶庫顯示順序；exam＝預測資料包裡對應的科目
-    ('police', '警察法規', '警察法規'),
-    ('constitution', '憲法、法學緒論', '憲法、法學緒論'),
-    ('criminal', '刑法', '刑法與刑事訴訟法'),
-    ('procedure', '刑事訴訟法', '刑法與刑事訴訟法'),
-    ('duty', '警察勤務', '警察勤務'),
+SUBJECTS = [  # 記憶庫顯示順序
+    ('police', '警察法規'),
+    ('constitution', '憲法、法學緒論'),
+    ('criminal', '刑法'),
+    ('procedure', '刑事訴訟法'),
+    ('duty', '警察勤務'),
 ]
 
 
@@ -37,7 +37,7 @@ def dump(obj, p):
 def build_memory(promo_dir):
     extras = load(os.path.join(MEM, '_extras.json'))
     index = []
-    for sid, name, exam in SUBJECTS:
+    for sid, name in SUBJECTS:
         if sid in extras:
             d = load(os.path.join(promo_dir, sid + '.json'))
             d.setdefault('mnemonics', []).extend(extras[sid].get('mnemonics', []))
@@ -47,16 +47,14 @@ def build_memory(promo_dir):
         else:
             d = load(os.path.join(MEM, sid + '.json'))
             dump(d, os.path.join(MEM, sid + '.min.json'))
-        index.append({'id': sid, 'name': name, 'exam': exam,
-                      'chapters': len(d['chapters']), 'cards': len(d.get('cards', [])),
-                      'mnemonics': len(d.get('mnemonics', [])), 'updated': d.get('updated', '')})
+        index.append({'id': sid, 'name': name})
     dump({'subjects': index}, os.path.join(MEM, 'index.json'))
 
 
-def _trim_rank(r, keep_text=True):
+def _trim_rank(r):
     out = {k: r[k] for k in ('rank', 'law', 'article', 'article_n', 'count', 'recent_count',
                              'last_year', 'by_year', 'question_ids') if k in r}
-    if keep_text and r.get('text'):
+    if r.get('text'):
         out['text'] = r['text'][:220]
     if r.get('other_exams'):
         out['other'] = r['other_exams']
@@ -69,8 +67,7 @@ def _bt_summary(bt):
     for _kind, levels in (bt or {}).items():
         for lv, v in levels.items():
             s = v.get('summary', {})
-            out[lv] = {k: {'hit': round(s[k]['hit_rate'], 3), 'rand': round(s[k]['random_rate'], 3),
-                           'n': s[k].get('n_test')} for k in s}
+            out[lv] = {k: {'hit': round(s[k]['hit_rate'], 3), 'rand': round(s[k]['random_rate'], 3)} for k in s}
     return out
 
 
@@ -78,8 +75,7 @@ def build_predict(pack):
     subs = []
     for s in pack['subjects']:
         o = {'name': s['name'], 'status': s['status'], 'years': s.get('years', []),
-             'recent_years': s.get('recent_years', []), 'question_count': s.get('question_count', 0),
-             'with_article_count': s.get('with_article_count', 0)}
+             'recent_years': s.get('recent_years', []), 'question_count': s.get('question_count', 0)}
         if s.get('article_ranking'):
             o['articles'] = [_trim_rank(r) for r in s['article_ranking'][:120]]
             o['laws'] = [{k: r[k] for k in ('rank', 'law', 'count', 'recent_count', 'last_year', 'by_year') if k in r}
@@ -88,8 +84,7 @@ def build_predict(pack):
         if s.get('topic_types'):
             t = s['topic_types']
             o['topics'] = {'overall': t.get('overall'), 'recent': t.get('recent'), 'by_year': t.get('by_year'),
-                           'misallocated_rate': (t.get('backtest_summary') or {}).get('misallocated_rate'),
-                           'gold': t.get('gold_accuracy'), 'method': t.get('method')}
+                           'misallocated_rate': (t.get('backtest_summary') or {}).get('misallocated_rate')}
         if s.get('point_rankings'):
             o['points'] = {}
             for kind, pr in s['point_rankings'].items():
@@ -97,14 +92,10 @@ def build_predict(pack):
                 o['points'][kind] = {
                     'levels': pr.get('levels'), 'backtest': _bt_summary(pr.get('backtest')),
                     'rows': [{k: r[k] for k in ('rank', 'name', 'sub', 'count', 'recent_count', 'last_year', 'question_ids') if k in r}
-                             for r in rows[:40]],
-                    'groups': [{k: r[k] for k in ('rank', 'name', 'count', 'recent_count', 'last_year') if k in r}
-                               for r in (pr.get('group_ranking') or [])[:20]]}
+                             for r in rows[:40]]}
         subs.append(o)
-    meta = {k: pack['meta'][k] for k in ('exam', 'generated_at', 'year_range', 'ks', 'notes', 'source_sha256')}
-    # 題目 ID → 年度／題號，讓猜題庫在平台題庫缺題時仍能顯示來源
-    qmap = {q['id']: [q['year'], q['num'], q['subject']] for q in pack['questions']}
-    dump({'meta': meta, 'subjects': subs, 'qmeta': qmap}, os.path.join(ROOT, 'data', 'predict.json'))
+    meta = {k: pack['meta'][k] for k in ('exam', 'generated_at', 'year_range')}
+    dump({'meta': meta, 'subjects': subs}, os.path.join(ROOT, 'data', 'predict.json'))
 
 
 def build_english(pack):
@@ -120,7 +111,7 @@ def build_english(pack):
         out.append(o)
     eng = next(s for s in pack['subjects'] if s['name'] == '英文')
     dump({'meta': {'exam': pack['meta']['exam'], 'generated_at': pack['meta']['generated_at']},
-          'topics': eng.get('topic_types', {}), 'questions': out},
+          'topics': {k: (eng.get('topic_types') or {}).get(k) for k in ('overall', 'recent')}, 'questions': out},
          os.path.join(ROOT, 'data', 'english_exam.json'))
 
 
@@ -146,7 +137,7 @@ def build_variants(promo_dir):
         if it.get('why'):
             note += '\n【猜題理由】' + it['why']
         out.append({
-            'key': it['id'], 'subject': names.get(it['s'], subj.get(it['s'], it['s'])),
+            'subject': names.get(it['s'], subj.get(it['s'], it['s'])),
             'variant': bool(it.get('v')), 'topic': it.get('topic', ''),
             'stem': it['q'], 'options': {'ABCDE'[i]: o for i, o in enumerate(it['o'])},
             'answer': ''.join(sorted('ABCDE'[i] for i in ans)), 'note': note,

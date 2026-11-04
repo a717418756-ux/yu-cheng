@@ -148,3 +148,14 @@
 .ee-add.on{color:var(--grn);border-color:var(--grn)}
 .ee-tip{font-size:12.8px;color:var(--t1);line-height:1.75}
 .ee-tip b{color:var(--t0)}
+
+/* ── 電子紙：純黑白高對比，法條標籤維持小尺寸 ── */
+[data-theme="eink"] .mem-ref{min-height:0;padding:2px 8px;font-size:12px;background:#fff;color:#000;border:1px solid #000}
+[data-theme="eink"] .mem-code{background:#fff;color:#000;border:2px solid #000}
+[data-theme="eink"] .mem-tag,[data-theme="eink"] .mem-kind{background:#fff;color:#000;border:1px solid #000}
+[data-theme="eink"] .mem-hot,[data-theme="eink"] .mem-wrong,[data-theme="eink"] .mem-right{color:#000}
+[data-theme="eink"] .mem-flashhl{animation:none;outline:2px solid #000}
+[data-theme="eink"] .pr-years i{background:#000}
+[data-theme="eink"] .pr-bar-t i{background:#000}
+[data-theme="eink"] .pr-bar-t i.r{background:#777}
+[data-theme="eink"] .pr-note,[data-theme="eink"] .ee-entry{background:#fff;border:1px solid #000}
