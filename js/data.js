@@ -1789,8 +1789,10 @@ const _ART_RE = /第([一二三四五六七八九十百千\d]+)([條點])(?:之(
 let _lawNameCache = null;        // 依長度排序的法規名（長名優先，避免短名先命中）
 function _setLawNames(allLaws){
   _collectLawPcodes(allLaws);
-  _lawNameCache = [...new Set((allLaws||[]).map(l=>(l.lawName||'').trim()).filter(Boolean))]
+  const next = [...new Set((allLaws||[]).map(l=>(l.lawName||'').trim()).filter(Boolean))]
                     .sort((a,b)=>b.length-a.length);
+  // 名稱沒變就沿用同一個陣列：考題↔法條索引以它判斷要不要重建
+  if(!_lawNameCache || next.join('\n') !== _lawNameCache.join('\n')) _lawNameCache = next;
 }
 // law：傳入條文物件時，若它是該法規的「第一條／第一點」，另外辨識沒有條號的母法名稱。
 //   法制慣例：子法（施行細則、辦法、要點…）都在第一條／第一點寫授權依據，

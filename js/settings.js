@@ -206,7 +206,7 @@ async function renameDevice(){
 const _anchor = target => (_ls.get(_ANCHOR_KEY) || {})[target] || null;
 function _setAnchor(target, sum, op){
   const a = _ls.get(_ANCHOR_KEY) || {};
-  a[target] = { at: sum.at, device: sum.device, deviceId: sum.deviceId, op, when: new Date().toISOString() };
+  a[target] = { id: sum.id || '', at: sum.at, device: sum.device, deviceId: sum.deviceId, op, when: new Date().toISOString() };
   _ls.set(_ANCHOR_KEY, a);
 }
 
@@ -214,6 +214,8 @@ function _setAnchor(target, sum, op){
 function _buildMeta(d){
   const dev = _device();
   return {
+    // 每份備份的唯一編號：判斷「是不是同一份」靠它，不靠時間（各裝置時鐘可能差好幾分鐘）
+    backupId: Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10),
     device: dev.name, deviceId: dev.id, app: typeof APP_VERSION !== 'undefined' ? APP_VERSION : '',
     counts: { questions: d.questions.length, laws: d.laws.length, attempts: d.attempts.length,
               englishMaterials: (d.englishMaterials || []).length },
@@ -226,7 +228,7 @@ function _summ(bk){
   const c = bk.meta?.counts || {};
   const n = k => Array.isArray(bk[k]) ? bk[k].length : (c[k] ?? null);
   return {
-    at: bk.exportedAt || '', device: bk.meta?.device || '', deviceId: bk.meta?.deviceId || '',
+    id: bk.meta?.backupId || '', at: bk.exportedAt || '', device: bk.meta?.device || '', deviceId: bk.meta?.deviceId || '',
     q: n('questions'), l: n('laws'), a: n('attempts'), e: n('englishMaterials'),
     lastAttempt: bk.meta?.lastAttempt || (Array.isArray(bk.attempts) ? bk.attempts.reduce((m, a) => a.date && a.date > m ? a.date : m, '') : ''),
   };
@@ -286,17 +288,19 @@ function _syncCompare({ title, left, right, leftLabel, rightLabel, warns = [], o
   });
 }
 
+// target 是不是這台上次同步的那一份：有備份編號就比編號；舊版備份沒有編號才退回比時間
+const _isSynced = (target, an) => !!(target && an) && (target.id && an.id ? target.id === an.id : !!(target.at && an.at && target.at <= an.at));
 // 備份前的風險判斷：target＝目的地現有那份（可能 null）、local＝本機、an＝這台上次同步紀錄
 function _backupWarns(target, local, an, where){
   const w = [], me = _device();
   if(!target){ w.push({ lv:'info', t: where + '目前沒有備份，這會是第一份。' }); }
   else{
     const mine = target.deviceId && target.deviceId === me.id;
-    const synced = an && target.at && target.at <= an.at;
+    const synced = _isSynced(target, an);
     if(synced) w.push({ lv:'ok', t: where + '這份就是這台上次' + (an.op === 'restore' ? '還原' : '備份') + '的版本，之後沒有其他裝置備份過，可以放心覆蓋。' });
-    else if(target.at && (!an || target.at > an.at) && !mine)
+    else if(!mine)
       w.push({ lv: target.deviceId ? 'danger' : 'warn', t: where + '這份是「' + (target.device || '其他裝置／舊版') + '」在 ' + _fmtAt(target.at)
-        + ' 備份的' + (an ? '，比這台裝置上次同步（' + _fmtAt(an.at) + '）還新' : '，這台裝置還沒同步過')
+        + ' 備份的' + (an ? '，不是這台上次同步（' + _fmtAt(an.when) + '）的那一份' : '，這台裝置還沒同步過')
         + '。直接覆蓋，那台裝置之後的進度會不見。建議先「還原」再繼續使用。' });
     const less = [['q','題目'],['l','法條'],['a','作答紀錄']].filter(([k]) => target[k] != null && local[k] < target[k]);
     if(less.length) w.push({ lv:'danger', t: where + '的' + less.map(([k, n]) => n + '比本機多 ' + (target[k] - local[k]).toLocaleString() + ' 筆').join('、') + '，覆蓋後就少了這些資料。' });
@@ -315,7 +319,7 @@ function _restoreWarns(src, local, an){
   if(more.length) w.push({ lv:'danger', t:'本機的' + more.map(([k, n]) => n + '比備份多 ' + (local[k] - src[k]).toLocaleString() + ' 筆').join('、') + '，還原後會不見。' });
   if(local.lastAttempt && src.lastAttempt && local.lastAttempt > src.lastAttempt)
     w.push({ lv:'warn', t:'本機最後作答日（' + local.lastAttempt + '）比備份（' + src.lastAttempt + '）新。' });
-  if(an && src.at && an.at > src.at) w.push({ lv:'warn', t:'這份比這台裝置上次同步的版本（' + _fmtAt(an.at) + '）還舊。' });
+  if(an && src.at && an.at > src.at && !_isSynced(src, an)) w.push({ lv:'warn', t:'這份比這台裝置上次同步的版本（' + _fmtAt(an.at) + '）還舊。' });
   w.push({ lv:'info', t:'還原前會自動保留目前資料的快照，還原錯了可到設定頁「復原」。' });
   return w;
 }
@@ -331,6 +335,14 @@ async function _takeSnapshot(reason){
   await _db.snapshots.add({ createdAt: Date.now(), reason, summary, data });
   const all = await _db.snapshots.orderBy('createdAt').primaryKeys();
   if(all.length > 2) await _db.snapshots.bulkDelete(all.slice(0, all.length - 2));
+}
+// 還原前建快照；失敗（例如裝置空間不足）時說明清楚，讓使用者決定要不要在沒有快照的情況下繼續
+async function _snapOrAsk(reason){
+  try{ await _takeSnapshot(reason); return true; }
+  catch(e){
+    logError('snapshot', e);
+    return await askConfirm('無法建立還原前快照', '原因：' + e.message + '\n\n繼續還原的話，還原錯了就無法一鍵復原。建議先取消，清出空間或先備份後再試。', '仍要還原');
+  }
 }
 async function _latestSnapshot(){
   if(!_db.snapshots) return null;
@@ -350,7 +362,7 @@ async function restoreSnapshot(){ try{
   if(!ok) return;
   await _keepAwake(async () => {
     const data = snap.data;
-    await _takeSnapshot('復原快照');
+    if(!await _snapOrAsk('復原快照')) return;
     await _restoreAll(data, _SNAP_TABLES);
     _showDoneDialog('已復原 ✓', ['資料已回到 ' + _fmtAt(new Date(snap.createdAt).toISOString()) + ' 的狀態。', '', '按「知道了」後會重新整理頁面。'], () => location.reload());
   });
@@ -361,8 +373,11 @@ async function restoreSnapshot(){ try{
 //   有宣告才用 info／list；舊版程式碼不認識的動作，可能被當成「備份」把雲端蓋成空的，絕不亂送。
 const _gasFeat = url => ((_ls.get(_GAS_FEAT_KEY) || {})[url]) || [];
 function _rememberFeat(url, json){
-  if(!json || !Array.isArray(json.features)) return;
-  const all = _ls.get(_GAS_FEAT_KEY) || {}; all[url] = json.features; _ls.set(_GAS_FEAT_KEY, all);
+  if(!json || typeof json !== 'object') return;
+  const all = _ls.get(_GAS_FEAT_KEY) || {};
+  if(Array.isArray(json.features)) all[url] = json.features;
+  else delete all[url];   // 換回舊版程式碼：不再送 info／list
+  _ls.set(_GAS_FEAT_KEY, all);
 }
 const _parseBk = json => (typeof json.data === 'string') ? JSON.parse(json.data) : json.data;
 // 讀雲端那份的摘要：{ sum, bk(完整資料，只有完整下載時才有), none(雲端沒有檔案), error }
@@ -402,7 +417,13 @@ async function gdriveBackup(){ try{
   // 先讀雲端「現在那一份」的真正備份時間與裝置，和本機並排比較（避免誤蓋其他裝置的進度）
   toast('讀取雲端目前的備份…');
   const cloud = await _keepAwake(() => _cloudRead(url, pwd, false));
-  if(cloud.error){ toast('無法讀取雲端：' + cloud.error); return; }
+  if(cloud.error){
+    if(/密碼|password/i.test(cloud.error)){ toast('無法讀取雲端：' + cloud.error); return; }
+    // 舊版程式碼「雲端還沒有檔案」的訊息各有不同，讀不到不一定是壞掉：說清楚後讓使用者決定
+    if(!await askConfirm('讀不到雲端現有的備份', 'Apps Script 回應：' + cloud.error
+        + '\n\n如果這是第一次備份，可以繼續；如果雲端應該已經有其他裝置的備份，請先取消並確認網址與密碼。', '仍要備份')) return;
+    cloud.sum = null;
+  }
   const local = await _localSumm();
   const ok = await _syncCompare({
     title:'備份到雲端（覆蓋雲端）', leftLabel:'雲端目前', rightLabel:'這台（' + _device().name + '）',
@@ -513,7 +534,7 @@ async function gdriveRestore(){ try{
   if(!ok) return;
   await _keepAwake(async()=>{ try{
       toast('還原中…請保持畫面開啟');
-      await _takeSnapshot('雲端還原');
+      if(!await _snapOrAsk('雲端還原')) return;
       await _restoreAll(bk, ['questions','laws','attempts','countdowns','usageLogs',
                              'englishVocab','healthLogs','englishMaterials']);
       if(!fileId) _setAnchor('cloud', cloud.sum, 'restore');   // 還原舊版本不算同步到最新
@@ -541,11 +562,13 @@ async function gdriveCheck(){ try{
   const w = [];
   if(!c) w.push({ lv:'info', t:'雲端還沒有備份，建議現在備份一次。' });
   else{
-    const otherNewer = c.at && (!an || c.at > an.at) && c.deviceId !== _device().id;
-    const localMore = local.a > (c.a ?? 0) || local.q > (c.q ?? 0);
+    const otherNewer = !_isSynced(c, an) && c.deviceId !== _device().id;
+    const known = c.a != null && c.q != null;   // 舊版備份（沒有筆數資訊）無法比較多寡
+    const localMore = known && (local.a > c.a || local.q > c.q);
     if(otherNewer && localMore) w.push({ lv:'danger', t:'兩邊都有對方沒有的新資料（雲端有「' + (c.device || '其他裝置') + '」的新備份，這台也有新作答）。請先決定以哪台為主：以雲端為主就還原，以這台為主就備份。' });
     else if(otherNewer) w.push({ lv:'warn', t:'雲端有「' + (c.device || '其他裝置') + '」較新的備份 → 建議「從雲端還原」。' });
     else if(localMore) w.push({ lv:'ok', t:'這台有較新的資料 → 建議「備份到雲端」。' });
+    else if(!known) w.push({ lv:'info', t:'雲端這份是舊版格式（沒有筆數資訊），無法比較多寡；下次備份後就能比較。' });
     else w.push({ lv:'ok', t:'雲端與這台一致，不需要動作。' });
   }
   if(an) w.push({ lv:'info', t:'這台上次同步：' + _fmtAt(an.when) + '（' + (an.op === 'restore' ? '還原' : '備份') + '）' });
@@ -575,7 +598,9 @@ async function copyGasScript(){
     await navigator.clipboard.writeText(code);
     toast('已複製 Apps Script 程式碼 ✓（記得改密碼）');
   }catch(e){
-    toast('複製失敗：' + e.message + '，請到 GitHub 的 docs/gas-backup.gs 取得');
+    // 剪貼簿被擋（部分瀏覽器、未授權）→ 直接開檔案，長按全選複製
+    toast('無法自動複製，已開啟程式碼檔案，請全選後複製');
+    window.open('docs/gas-backup.gs', '_blank', 'noopener');
   }
 }
 
@@ -942,7 +967,7 @@ async function localRestore(){
 
     await _keepAwake(async () => {
       toast('還原中…請保持畫面開啟');
-      if(examData) await _takeSnapshot('資料夾還原');
+      if(examData && !await _snapOrAsk('資料夾還原')) return;
       let count = examData ? await _restoreAll(examData, ['questions','laws','attempts','countdowns','usageLogs',
         'refbooks','learnmedia','englishMaterials','englishVocab','healthLogs']) : 0;
 
