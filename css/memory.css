@@ -159,3 +159,6 @@
 [data-theme="eink"] .pr-bar-t i{background:#000}
 [data-theme="eink"] .pr-bar-t i.r{background:#777}
 [data-theme="eink"] .pr-note,[data-theme="eink"] .ee-entry{background:#fff;border:1px solid #000}
+.pr-sep{display:inline-block;width:1px;height:20px;background:var(--bd,#ccc);margin:0 4px;vertical-align:middle}
+.chip.pr-ex.on{font-weight:700}
+.pr-bt > div.best{outline:2px solid var(--grn)}

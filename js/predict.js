@@ -1,13 +1,15 @@
 // ══ predict.js — 猜題庫（考試區）═════════════════════════════════
-// 依賴：db.js(da/bulkPut/getSetting), utils.js(esc/toast), data.js(showLawPop), quiz.js(startQWithPool),
+// 依賴：db.js(da/dd/bulkPut), utils.js(esc/toast), data.js(showLawPop), quiz.js(startQWithPool),
 //       memory.js(openMemoryAt/memoryKeys)
 // 資料：data/predict.json（警大二技預測資料包的排名與回測，題目只留 ID）
-//       data/variants.json（升官等記憶樹的猜題原題＋變化題，可一鍵匯入題庫）
+//       data/variants.json（116 年二技＋警佐班猜題庫：四科各猜題 100、變化題 100，可練習或匯入題庫）
+//       predict.json 各科 zuo（警佐班條文排名，題目以「年-題號」對應平台題庫）、reasons（近三年出題理由回測）、xval（交互驗證）
 // 功能：
 //   ①各科押題清單：法條（或題型、出處、規範、學理名詞）依考過題數排名，附近3年題數與年度分布
 //   ②一鍵押題練習：前 K 名相關的歷屆考題（從平台題庫取），可只出答錯過的
 //   ③回測命中率：誠實標示「押前 K 名」過去能蓋到幾成題目
-//   ④匯入猜題變化題到題庫（依題幹去重）
+//   ④二技／警佐班切換（警佐班只列佐二類的四科）
+//   ⑤猜題庫：直接練習或匯入題庫（依題幹去重），可刪除舊的升官等猜題
 //
 // 公開 API 見檔尾 window.Predict
 
@@ -16,7 +18,14 @@
 
 let _data = null;
 let _keys = null;                         // 記憶樹引用到的法條（顯示 🌳 用）
-let _cur = { si:0, k:20, sort:'count', onlyWrong:false, view:'articles' };
+let _cur = { si:0, k:20, sort:'count', onlyWrong:false, view:'articles', exam:'二技' };
+try{ if(localStorage.getItem('prExam') === '警佐') _cur.exam = '警佐'; }catch(e){}
+const _ZUO_SUBJ = ['憲法、法學緒論', '警察法規', '警察勤務', '刑法與刑事訴訟法'];
+const _isZuo = () => _cur.exam === '警佐';
+// 目前考試別下可選的科目（回傳 _data.subjects 的索引）
+function _subjIdx(){
+  return _data.subjects.map((s, i) => i).filter(i => !_isZuo() || (_data.subjects[i].zuo && _ZUO_SUBJ.includes(_data.subjects[i].name)));
+}
 
 async function _load(){
   if(!_data){
@@ -59,25 +68,35 @@ async function renderPredict(){
   }
 }
 function _rSubj(){
-  document.getElementById('pr-subj').innerHTML = _data.subjects.map((s, i) =>
-    '<button class="chip' + (i===_cur.si?' on':'') + '" data-si="' + i + '">' + esc(s.name) + '</button>').join('');
+  const idx = _subjIdx();
+  if(!idx.includes(_cur.si)) _cur.si = idx[0];
+  document.getElementById('pr-subj').innerHTML =
+    [['二技','警大二技'], ['警佐','警佐班（佐二類）']].map(([k, t]) => '<button class="chip pr-ex' + (k===_cur.exam?' on':'') + '" data-exam="' + k + '">' + t + '</button>').join('') +
+    '<span class="pr-sep"></span>' +
+    idx.map(i => '<button class="chip' + (i===_cur.si?' on':'') + '" data-si="' + i + '">' + esc(_data.subjects[i].name) + '</button>').join('');
 }
 function _views(s){
   const v = [];
+  if(_isZuo()){
+    v.push(['articles','⚖ 法條']);
+    if(s.reasons || s.trend) v.push(['trend','📈 趨勢']);
+    if(_ZUO_SUBJ.includes(s.name)) v.push(['variants','🎲 猜題庫']);
+    return v;
+  }
   if(s.articles) v.push(['articles','⚖ 法條'], ['laws','📚 法規']);
   if(s.topics) v.push(['topics','🧩 題型']);
   Object.keys(s.points||{}).forEach(k => v.push(['pt:' + k, '📌 ' + k]));
   if(s.trend) v.push(['trend','📈 趨勢']);
-  v.push(['variants','🎲 猜題變化題']);
+  if(_ZUO_SUBJ.includes(s.name)) v.push(['variants','🎲 猜題庫']);
   return v;
 }
 async function _rBody(){
   const s = _data.subjects[_cur.si];
   const views = _views(s);
   if(!views.some(v => v[0] === _cur.view)) _cur.view = views[0][0];
-  const m = _data.meta;
-  let h = '<div class="pr-note">📈 ' + esc(m.exam) + ' ' + m.year_range[0] + '–' + m.year_range[1] + ' 年，' +
-    esc(s.name) + ' ' + s.question_count + ' 題；最近 3 次：' + (s.recent_years||[]).join('、') + ' 年。' +
+  const m = _data.meta, z = _isZuo() ? s.zuo : null;
+  let h = '<div class="pr-note">📈 ' + (z ? '警佐班 ' + z.years[0] + '–' + z.years[z.years.length-1] : esc(m.exam) + ' ' + m.year_range[0] + '–' + m.year_range[1]) + ' 年，' +
+    esc(s.name) + ' ' + (z ? z.question_count : s.question_count) + ' 題；最近 3 次：' + ((z ? z.recent_years : s.recent_years)||[]).join('、') + ' 年。' +
     '排名只代表「優先順序」，不是必考清單。<br><small>資料包產生於 ' + esc(m.generated_at || '') + '</small></div>' +
     '<div class="mem-tabs">' + views.map(([k, t]) => '<button class="mem-tab' + (k===_cur.view?' on':'') + '" data-view="' + esc(k) + '">' + t + '</button>').join('') + '</div>';
   const el = document.getElementById('pr-body');
@@ -117,6 +136,7 @@ function _sorted(rows){
 
 // ⚖ 法條
 async function _rArticles(s){
+  if(_isZuo()) return _rZuoArticles(s);
   const rows = _sorted(s.articles);
   const [qmap, wrong] = await Promise.all([_qById(), _onlyWrongSet()]);
   const ids = [...new Set(rows.flatMap(a => a.question_ids||[]))];
@@ -145,6 +165,51 @@ async function _rArticles(s){
   }).join('') + '</div>';
   return h;
 }
+// ⚖ 警佐班法條：題目以「年-題號」對應平台題庫裡考試別＝警佐班的題目
+async function _zuoMap(sub){
+  const [qs, wrong] = await Promise.all([da('questions'), _onlyWrongSet()]);
+  const m = new Map();
+  qs.forEach(q => { if(q.exam === '警佐班' && q.subject === sub && (!wrong || wrong.has(String(q.id)))) m.set(String(q.year) + '-' + String(q.num), q); });
+  return m;
+}
+async function _rZuoArticles(s){
+  const rows = _sorted(s.zuo.articles);
+  const zm = await _zuoMap(s.name);
+  const keys = [...new Set(rows.flatMap(a => a.keys||[]))];
+  const have = keys.filter(k => zm.has(k));
+  let h = _kChips() +
+    '<div class="mem-tools"><button class="btn bp" data-act="zpractice" style="flex:1">▶ 押題練習：這 ' + rows.length + ' 條的警佐班歷屆題（' + have.length + ' 題）</button>' +
+    '<button class="btn ' + (_cur.onlyWrong?'bp':'bg') + '" data-act="wrong">只出答錯過的</button></div>';
+  if(keys.length && !have.length && !_cur.onlyWrong)
+    h += '<div class="mem-prog">題庫裡找不到考試別「警佐班」的題目，練習按鈕會無效；請先匯入警佐班考古題。</div>';
+  const years = (s.zuo.years||[]).map(String);
+  const twoTech = new Map((s.articles||[]).map(a => [a.law + '|' + a.article_n, a.count]));
+  h += '<div class="card">' + rows.map(a => {
+    const key = a.law + '|' + a.article_n, ref = a.law + a.article;
+    const n = (a.keys||[]).filter(k => zm.has(k)).length;
+    return '<div class="pr-row"><div class="pr-rank' + (a.rank<=10?' top':'') + '">' + a.rank + '</div><div class="pr-main">' +
+      '<div class="pr-title">' + esc(a.law) + ' ' + esc(a.article) + '</div>' +
+      '<div class="pr-meta">考過 ' + a.count + ' 題・近3年 ' + (a.recent_count||0) + ' 題・最近 ' + (a.last_year||'—') + ' 年' +
+        (twoTech.has(key) ? '・警大二技 ' + twoTech.get(key) + ' 題' : '') + '</div>' +
+      _yearBars(a.by_year, years) +
+      (a.text ? '<div class="pr-text" data-act="clamp">' + esc(a.text) + '</div>' : '') +
+      '<div class="pr-acts">' +
+        (n ? '<button class="go" data-zkeys="' + esc(a.keys.join(',')) + '" data-label="' + esc(ref) + '">▶ 練習 ' + n + ' 題</button>' : '') +
+        '<button data-ref="' + esc(ref) + '">📖 條文</button>' +
+        (_keys && _keys.has(key) ? '<button data-mem="' + esc(key) + '">🌳 記憶樹</button>' : '') +
+      '</div></div></div>';
+  }).join('') + '</div>';
+  return h;
+}
+async function _practiceZuo(keys, label){
+  const s = _data.subjects[_cur.si];
+  const zm = await _zuoMap(s.name);
+  const pool = [...new Set(keys)].map(k => zm.get(k)).filter(Boolean);
+  if(!pool.length){ toast(_cur.onlyWrong ? '這個範圍沒有答錯過的題目' : '題庫裡找不到這些警佐班題目'); return; }
+  pool.sort(() => Math.random() - .5);
+  startQWithPool(pool, '🎯 警佐班 ' + label);
+}
+
 function _yearsOf(s){
   const [a, b] = _data.meta.year_range;
   const ys = [];
@@ -212,7 +277,40 @@ function _styleAdvice(r){
   if(r.case >= 15) tips.push('案例題多：先判斷罪名或程序階段，再套法條要件（記憶樹的要件分支）。');
   return tips;
 }
+// 近三年出題理由回測＋交互驗證
+const _REASONS = ['常考條文', '考過一次', '首次出題', '近3年修法', '釋憲／憲判', '實務見解', '時事議題', '無對應條文（作業規定、學理）'];
+const _REASON_TIP = {
+  '常考條文':'以前考過 2 次以上的條文又出現',
+  '考過一次':'以前只考過 1 次的條文',
+  '首次出題':'以前從沒考過的條文',
+  '近3年修法':'條文近 3 年修正，或題幹寫明「修正／新制」',
+  '釋憲／憲判':'題目引用大法官解釋或憲法法庭判決',
+  '實務見解':'題目引用最高法院等實務見解',
+  '時事議題':'詐騙、AI 深偽、跟騷、疫情、科技執法等社會議題',
+  '無對應條文（作業規定、學理）':'作業程序、規定或學理（對不到法條）'};
+function _rReasons(s){
+  const rs = s.reasons || {};
+  const ex = _isZuo() ? '警佐班' : '警大二技';
+  const r = rs[ex];
+  if(!r) return '';
+  const ys = Object.keys(r.n).sort().reverse();   // 新的年度在左，手機窄螢幕也看得到
+  const cell = (y, k) => { const v = r.rows[y + '|' + k] || 0; return v ? Math.round(100*v/r.n[y]) + '%' : ''; };
+  let h = '<div class="cc"><div class="ct">🧭 回測：近三年每題「為什麼會考」（' + ex + '，一題可有多個理由）</div><div class="mem-tbl-wrap"><table class="mem-tbl"><thead><tr><th>理由</th>' +
+    ys.map(y => '<th>' + y + '<br><small>' + r.n[y] + '題</small></th>').join('') + '</tr></thead><tbody>' +
+    _REASONS.filter(k => ys.some(y => r.rows[y + '|' + k])).map(k => '<tr><th title="' + esc(_REASON_TIP[k]||'') + '">' + esc(k) + '</th>' + ys.map(y => '<td>' + cell(y, k) + '</td>').join('') + '</tr>').join('') +
+    '</tbody></table></div>' +
+    '<div class="pr-meta">' + Object.entries(r.ex||{}).filter(([k]) => k !== '常考條文').slice(0, 3).map(([k, list]) => esc(k) + '例：' + esc(String((list||[])[0]||'').slice(0, 34)) + '…').join('<br>') + '</div></div>';
+  const x = (s.xval||{})[ex];
+  if(x){
+    const best = Object.entries(x).sort((a, b) => b[1] - a[1])[0][0];
+    h += '<div class="cc"><div class="ct">🔁 交互驗證：押前 50 條，隔年能蓋到幾成（逐年回測平均）</div><div class="pr-bt">' +
+      Object.entries(x).map(([k, v]) => '<div' + (k===best?' class="best"':'') + '><b>' + v + '%</b><span>' + esc(k) + '</span></div>').join('') + '</div>' +
+      '<div class="pr-meta">「兩考試合併」＝警大二技＋警佐班一起算排名；「近3次加權」＝最近三次的題目加倍計算。最好的是 <b>' + esc(best) + '</b>。</div></div>';
+  }
+  return h;
+}
 async function _rTrend(s){
+  if(_isZuo()) return _rReasons(s) || '<div class="mem-empty">這科沒有警佐班的回測資料</div>';
   const t = s.trend || {};
   const a = (t.style||{}).all || {}, r = (t.style||{}).recent || {};
   let h = '<div class="cc"><div class="ct">出題風格（藍＝全部年度 ' + (a.n||0) + ' 題、橘＝近3次 ' + (r.n||0) + ' 題）</div>' +
@@ -220,6 +318,7 @@ async function _rTrend(s){
       '<div class="pr-bar-n">' + (a[k]||0) + '%／' + (r[k]||0) + '%</div></div>').join('') + '</div>';
   const tips = _styleAdvice(r);
   if(tips.length) h += '<div class="pr-note">' + tips.map(x => '・' + esc(x)).join('<br>') + '</div>';
+  h += _rReasons(s);
   const qmap = await _qById();
   const row = (x, meta) => {
     const key = x.law + '|' + x.article_n, ref = x.law + x.article;
@@ -228,7 +327,8 @@ async function _rTrend(s){
       '<div class="pr-acts">' + (n ? '<button class="go" data-qids="' + esc(x.question_ids.join(',')) + '" data-label="' + esc(ref) + '">▶ 練習 ' + n + ' 題</button>' : '') +
       '<button data-ref="' + esc(ref) + '">📖 條文</button>' + (_keys && _keys.has(key) ? '<button data-mem="' + esc(key) + '">🌳 記憶樹</button>' : '') + '</div></div></div>';
   };
-  if((t.newest||[]).length) h += '<div class="sec">最近兩年才首次出現的條文（新考點）</div><div class="card">' +
+  if((t.newest||[]).length) h += '<div class="sec">最近兩年才首次出現的條文（新考點）</div>' +
+    '<div class="mem-prog">⚠️ 回測顯示：只看「新考點」押題，命中率沒有比「考過題數」排名好，請當補充清單，不要取代法條排名。</div><div class="card">' +
     t.newest.map(x => row(x, x.first + ' 年首次出題・共 ' + x.count + ' 題')).join('') + '</div>';
   if((t.zuo||[]).length) h += '<div class="sec">警佐班考得最多的條文（同科）</div><div class="card">' +
     t.zuo.map(x => row(x, '警佐班 ' + x.zuo + ' 題・警大二技 ' + x.count + ' 題')).join('') + '</div>' +
@@ -236,7 +336,7 @@ async function _rTrend(s){
   return h;
 }
 
-// 🎲 猜題變化題（升官等記憶樹）
+// 🎲 猜題庫（116 年二技＋警佐班：四科各猜題 100、變化題 100）
 let _variants = null;
 async function _loadVariants(){
   if(!_variants){
@@ -247,28 +347,33 @@ async function _loadVariants(){
   return _variants;
 }
 const _norm = t => String(t||'').replace(/[\s，,。．.、：:？?「」『』（）()]/g, '').slice(0, 60);
-async function _rVariants(){
+const _EX_NEW = { guess:'116猜題', vari:'116變化題' };
+const _EX_OLD = ['猜題（原題）', '猜題（變化題）'];          // 舊版升官等記憶樹匯入的考試別
+async function _rVariants(s){
   const v = await _loadVariants();
   const qs = await da('questions');
   const stems = new Set(qs.map(q => _norm(q.stem)));
-  const bySub = {};
-  v.items.forEach(it => {
-    const o = bySub[it.subject] || (bySub[it.subject] = { orig:0, vari:0, have:0 });
-    it.variant ? o.vari++ : o.orig++;
-    if(stems.has(_norm(it.stem))) o.have++;
-  });
-  return '<div class="pr-note">來源：' + esc(v.title || '升官等記憶樹選擇題猜題') + '。依升官等歷屆題回測挑出的高機率原題，與改寫成否定題、數字互換、對象互換的變化題；每題附詳解與猜題理由。警察法規、憲法與警大二技範圍重疊度高。</div>' +
-    '<div class="card">' + Object.entries(bySub).map(([k, o]) =>
-      '<div class="pr-row"><div class="pr-main"><div class="pr-title">' + esc(k) + '</div><div class="pr-meta">原題 ' + o.orig + '・變化題 ' + o.vari + '・題庫已有 ' + o.have + '</div>' +
-      '<div class="pr-acts"><button class="go" data-vprev="' + esc(k) + '">▶ 直接練習（不存題庫）</button><button data-vimp="' + esc(k) + '">⬇ 匯入題庫</button></div></div></div>').join('') + '</div>' +
-    '<div style="padding:0 12px 12px"><button class="btn bg" style="width:100%" data-vimp="*">⬇ 全部匯入題庫（' + v.items.length + ' 題，已有的會略過）</button></div>' +
-    '<div class="mem-prog">匯入後考試別為「猜題（原題）」或「猜題（變化題）」，會進入今日複習、加強複習與統計；不想混在一起就用「直接練習」。</div>';
+  const items = v.items.filter(it => it.subject === s.name);
+  const g = items.filter(it => !it.variant), va = items.filter(it => it.variant);
+  const have = items.filter(it => stems.has(_norm(it.stem))).length;
+  const rc = {};
+  items.forEach(it => { rc[it.reason] = (rc[it.reason]||0) + 1; });
+  const old = qs.filter(q => _EX_OLD.includes(q.exam) && (q.tags||[]).includes('猜題')).length;
+  let h = '<div class="pr-note">' + esc(v.title) + '：依二技與警佐班近三年回測的出題理由配比命題。<b>猜題</b>＝沒考過原題、但考點樣式類似的新題；<b>變化題</b>＝把近三年考古題換角度、換數字、換對象改寫，不與原題重複。每題附詳解、出題理由與法條。</div>' +
+    '<div class="cc"><div class="ct">' + esc(s.name) + '：猜題 ' + g.length + '・變化題 ' + va.length + '・題庫已有 ' + have + '</div>' +
+    '<div class="pr-meta">出題理由：' + Object.entries(rc).sort((x, y) => y[1] - x[1]).map(([k, n]) => esc(k) + ' ' + n).join('、') + '</div>' +
+    '<div class="pr-acts"><button class="go" data-vprev="guess">▶ 練習猜題 ' + g.length + '</button><button class="go" data-vprev="vari">▶ 練習變化題 ' + va.length + '</button>' +
+    '<button data-vprev="all">▶ 全部混合</button></div>' +
+    '<div class="pr-acts"><button data-vimp="sub">⬇ 匯入本科 ' + items.length + ' 題</button><button data-vimp="*">⬇ 匯入四科全部 ' + v.items.length + ' 題</button></div></div>' +
+    '<div class="mem-prog">「練習」不存題庫、不留紀錄；匯入後考試別為「116猜題」「116變化題」，會進入複習排程與統計。單選答錯倒扣 1/3 題分、多選每個選項 1/5 分，練習時照考試規則作答。</div>';
+  if(old) h += '<div style="padding:0 12px 12px"><button class="btn bg" style="width:100%" data-act="delold">🗑 刪除舊的升官等猜題（' + old + ' 題）</button></div>';
+  return h;
 }
 function _variantToQ(it){
   const q = {
     type:'mc', stem:it.stem, options:it.options, answer:it.answer, answerEs:'',
-    subject:it.subject, year:'116', exam: it.variant ? '猜題（變化題）' : '猜題（原題）', num:'',
-    keywords: it.topic ? [it.topic.replace(/（變化）$/, '')] : [], mustKeywords:[], tags:['猜題'],
+    subject:it.subject, year:'116', exam: it.variant ? _EX_NEW.vari : _EX_NEW.guess, num:'',
+    keywords: it.reason ? [it.reason] : [], mustKeywords:[], tags:['猜題'],
     note:it.note, hlColor:'', isNumberQ:false, groupStem:'', groupId:'', groupOrder:0,
     relatedLaws:(it.laws||[]).map(ref => ({ ref })),
     starred:false, createdAt:Date.now(), reviewLevel:0, nextReview:Date.now(), lastReview:null,
@@ -279,7 +384,8 @@ function _variantToQ(it){
 }
 async function _importVariants(sub){
   const v = await _loadVariants();
-  const items = v.items.filter(it => sub === '*' || it.subject === sub);
+  const name = _data.subjects[_cur.si].name;
+  const items = v.items.filter(it => sub === '*' || it.subject === name);
   const qs = await da('questions');
   const stems = new Set(qs.map(q => _norm(q.stem)));
   const add = items.filter(it => !stems.has(_norm(it.stem))).map(_variantToQ);
@@ -289,11 +395,23 @@ async function _importVariants(sub){
   toast('已匯入 ' + add.length + ' 題');
   _rBody();
 }
-async function _previewVariants(sub){
+async function _deleteOld(){
+  const qs = await da('questions');
+  const old = qs.filter(q => _EX_OLD.includes(q.exam) && (q.tags||[]).includes('猜題'));
+  if(!old.length){ toast('沒有舊的升官等猜題'); return; }
+  if(!await askConfirm('刪除舊猜題', '刪除舊版升官等記憶樹匯入的 ' + old.length + ' 題（考試別「猜題（原題）」「猜題（變化題）」），無法復原。', '刪除')) return;
+  for(const q of old) await dd('questions', q.id);
+  toast('已刪除 ' + old.length + ' 題');
+  _rBody();
+}
+async function _previewVariants(kind){
   const v = await _loadVariants();
-  const pool = v.items.filter(it => it.subject === sub).map((it, i) => Object.assign(_variantToQ(it), { id:'virt:var-' + i, num:String(i+1) }));
+  const name = _data.subjects[_cur.si].name;
+  const pool = v.items.filter(it => it.subject === name && (kind === 'all' || (kind === 'vari') === !!it.variant))
+    .map((it, i) => Object.assign(_variantToQ(it), { id:'virt:var-' + kind + '-' + i, num:String(i+1) }));
+  if(!pool.length){ toast('這科沒有猜題'); return; }
   pool.sort(() => Math.random() - .5);
-  startQWithPool(pool, '🎲 ' + sub + '猜題');
+  startQWithPool(pool, '🎲 ' + name + ({ guess:'猜題', vari:'變化題', all:'猜題＋變化題' }[kind]));
 }
 
 // ════════ 練習 ════════
@@ -311,14 +429,16 @@ function _bind(){
   if(!page || page._prBound) return;
   page._prBound = true;
   page.addEventListener('click', e => {
-    const t = e.target.closest('[data-si],[data-view],[data-k],[data-sort],[data-act],[data-qids],[data-ref],[data-mem],[data-vimp],[data-vprev]');
+    const t = e.target.closest('[data-exam],[data-si],[data-view],[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem],[data-vimp],[data-vprev]');
     if(!t) return;
     const ds = t.dataset;
-    if(ds.si != null){ _cur.si = +ds.si; _rSubj(); _rBody(); }
+    if(ds.exam){ _cur.exam = ds.exam; try{ localStorage.setItem('prExam', ds.exam); }catch(err){} _rSubj(); _rBody(); }
+    else if(ds.si != null){ _cur.si = +ds.si; _rSubj(); _rBody(); }
     else if(ds.view){ _cur.view = ds.view; _rBody(); }
     else if(ds.k){ _cur.k = +ds.k; _rBody(); }
     else if(ds.sort){ _cur.sort = _cur.sort === 'recent' ? 'count' : 'recent'; _rBody(); }
     else if(ds.qids) _practiceIds(ds.qids.split(','), ds.label || '');
+    else if(ds.zkeys) _practiceZuo(ds.zkeys.split(','), ds.label || '');
     else if(ds.ref) showLawPop(ds.ref);
     else if(ds.mem) openMemoryAt(ds.mem);
     else if(ds.vimp) _importVariants(ds.vimp).catch(err => { logError('importVariants', err); toast('匯入失敗'); });
@@ -326,6 +446,11 @@ function _bind(){
     else if(ds.act === 'clamp') t.classList.toggle('open');
     else if(ds.act === 'wrong'){ _cur.onlyWrong = !_cur.onlyWrong; _rBody(); }
     else if(ds.act === 'goeng') goPage('engexam');
+    else if(ds.act === 'delold') _deleteOld().catch(err => { logError('deleteOldVariants', err); toast('刪除失敗'); });
+    else if(ds.act === 'zpractice'){
+      const s = _data.subjects[_cur.si];
+      _practiceZuo(_sorted(s.zuo.articles).flatMap(a => a.keys||[]), s.name + ' 前' + _cur.k + '條');
+    }
     else if(ds.act === 'practice'){
       const s = _data.subjects[_cur.si];
       _practiceIds(_sorted(s.articles).flatMap(a => a.question_ids||[]), s.name + ' 前' + _cur.k + '條');

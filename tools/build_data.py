@@ -109,7 +109,8 @@ def _trend(s, qs):
     return t
 
 
-def build_predict(pack):
+def build_predict(pack, zpath=None):
+    zuo, reasons, xval = _zuo(zpath) if zpath else ({}, {}, {})
     subs = []
     for s in pack['subjects']:
         o = {'name': s['name'], 'status': s['status'], 'years': s.get('years', []),
@@ -132,8 +133,19 @@ def build_predict(pack):
                     'rows': [{k: r[k] for k in ('rank', 'name', 'sub', 'count', 'recent_count', 'last_year', 'question_ids') if k in r}
                              for r in rows[:40]]}
         o['trend'] = _trend(s, [q for q in pack['questions'] if q['subject'] == s['name']])
+        if s['name'] in zuo:
+            zr = zuo[s['name']]
+            for r in zr['articles']:
+                r['text'] = _law_text(r['law'], r['article_n'])
+            o['zuo'] = zr
+        rs = {ex: reasons.get(ex + '|' + s['name']) for ex in ('警大二技', '警佐班') if reasons.get(ex + '|' + s['name'])}
+        if rs:
+            o['reasons'] = rs
+            o['xval'] = {ex: xval.get(ex + '|' + s['name']) for ex in ('警大二技', '警佐班') if xval.get(ex + '|' + s['name'])}
         subs.append(o)
     meta = {k: pack['meta'][k] for k in ('exam', 'generated_at', 'year_range')}
+    if zuo:
+        meta['zuo_years'] = [min(min(v['years']) for v in zuo.values()), max(max(v['years']) for v in zuo.values())]
     dump({'meta': meta, 'subjects': subs}, os.path.join(ROOT, 'data', 'predict.json'))
 
 
@@ -154,6 +166,16 @@ def build_english(pack):
          os.path.join(ROOT, 'data', 'english_exam.json'))
 
 
+_LAWS = {}
+_LAW_ALIAS = {'中華民國刑法': '刑法'}
+
+
+def _law_text(law, n):
+    a = _LAWS.get(_LAW_ALIAS.get(law, law), {}).get('a', {})
+    key = str(n // 1000) + ('-' + str(n % 1000) if n % 1000 else '')
+    return a.get(key, '')
+
+
 def _art_ref(law, art):
     """('警察法', '16') → 警察法第16條；('刑法', '2-1') → 刑法第2條之1；非條號（如釋字）原樣接上。"""
     if art is None or art == '':
@@ -164,37 +186,88 @@ def _art_ref(law, art):
     return law + '第' + m.group(1) + '條' + ('之' + m.group(2) if m.group(2) else '')
 
 
-def build_variants(promo_dir):
-    """Promotion 選擇題猜題（升官等：警察法規、行政法、憲法與法學緒論，原題＋變化題）→ 平台題目格式。"""
-    d = load(os.path.join(promo_dir, 'mcq.json'))
-    subj = dict(d['subjects'])
-    names = {'police': '警察法規', 'admin': '行政法', 'const': '憲法、法學緒論'}
+GUESS = os.path.join(ROOT, 'tools', 'guess')
+GUESS_SUBJ = {'const': '憲法、法學緒論', 'police': '警察法規', 'duty': '警察勤務', 'crim': '刑法與刑事訴訟法'}
+
+
+def _split_refs(ref):
+    """「警察法§3、§4、釋字第718號」→ ['警察法第3條', '警察法第4條', '釋字第718號']；沒有條號的學理、作業規定不列。"""
+    out, law = [], ''
+    for part in re.split(r'[、，,]', ref or ''):
+        part = part.strip()
+        m = re.match(r'^(.*?)§\s*(\d+)(?:-(\d+))?(?:～§?(\d+))?', part)
+        if m:
+            law = m.group(1).strip() or law
+            out.append(_art_ref(law, m.group(2) + ('-' + m.group(3) if m.group(3) else '')))
+        elif re.search(r'釋字第\d+號|\d{3}年憲判字第\d+號', part):
+            out.append(re.search(r'釋字第\d+號|\d{3}年憲判字第\d+號', part).group(0))
+    return out
+
+
+def build_variants():
+    """tools/guess/*.json（116 年二技＋警佐班猜題：各科猜題 100＋變化題 100）→ 平台題目格式。
+    來源檔欄位：k 猜/變、src 母題（變化題）、r 出題理由類別、w 理由說明、t s單選/m多選、q 題幹、o 選項、a 答案、e 詳解、ref 法條。"""
+    import glob
     out = []
-    for it in d['items']:
-        ans = it['a'] if isinstance(it['a'], list) else [it['a']]
-        note = it.get('ex', '')
-        if it.get('why'):
-            note += '\n【猜題理由】' + it['why']
-        out.append({
-            'subject': names.get(it['s'], subj.get(it['s'], it['s'])),
-            'variant': bool(it.get('v')), 'topic': it.get('topic', ''),
-            'stem': it['q'], 'options': {'ABCDE'[i]: o for i, o in enumerate(it['o'])},
-            'answer': ''.join(sorted('ABCDE'[i] for i in ans)), 'note': note,
-            'laws': [_art_ref(law, art) for law, art in it.get('refs', [])],
-        })
-    dump({'title': d.get('title', ''), 'version': d.get('version', ''), 'items': out},
-         os.path.join(ROOT, 'data', 'variants.json'))
+    for f in sorted(glob.glob(os.path.join(GUESS, '*.json'))):
+        sub = GUESS_SUBJ[os.path.basename(f).split('_')[0]]
+        for it in load(f):
+            note = it['e'] + '\n【出題理由】' + it['r'] + '：' + it['w']
+            if it.get('src'):
+                m = re.match(r'(警佐|警大)(\d+)-(\d+)', it['src'])
+                note += '\n【母題】' + ({'警佐': '警佐班', '警大': '警大二技'}[m.group(1)] + ' ' + m.group(2) + ' 年第 ' + m.group(3) + ' 題' if m else it['src'])
+            out.append({
+                'subject': sub, 'variant': it['k'] == '變', 'reason': it['r'], 'src': it.get('src', ''),
+                'multi': it['t'] == 'm', 'stem': it['q'], 'options': {'ABCDE'[i]: o for i, o in enumerate(it['o'])},
+                'answer': it['a'], 'note': note, 'ref': it.get('ref', ''), 'laws': _split_refs(it.get('ref', '')),
+            })
+    dump({'title': '116 年警大二技・警佐班（佐二類）猜題庫', 'version': '2026-11-05',
+          'items': out}, os.path.join(ROOT, 'data', 'variants.json'))
+
+
+def _zuo(zpath):
+    """警佐班分析（tools/zuo/zuo_analysis.json）→ 各科條文排名、近三年出題理由回測、交互驗證。"""
+    z = load(zpath)
+    by = {}
+    for q in z['questions']:
+        by.setdefault(q['s'], []).append(q)
+    res = {}
+    for sub, qs in by.items():
+        years = sorted({q['y'] for q in qs})
+        recent = years[-3:]
+        cnt = {}
+        for q in qs:
+            for a in q['a']:
+                c = cnt.setdefault(a, {'count': 0, 'recent_count': 0, 'by_year': {}, 'keys': []})
+                c['count'] += 1
+                c['recent_count'] += q['y'] in recent
+                c['by_year'][str(q['y'])] = c['by_year'].get(str(q['y']), 0) + 1
+                c['keys'].append(str(q['y']) + '-' + str(q['n']))
+        rows = []
+        for a, c in cnt.items():
+            m = re.match(r'(.+?)第(\d+)條(?:之(\d+))?$', a)
+            if not m:
+                continue
+            rows.append(dict(law=m.group(1), article='第' + m.group(2) + '條' + ('之' + m.group(3) if m.group(3) else ''),
+                             article_n=int(m.group(2)) * 1000 + int(m.group(3) or 0), last_year=max(int(k.split('-')[0]) for k in c['keys']), **c))
+        rows.sort(key=lambda r: (-r['count'], -r['recent_count'], r['law'], r['article_n']))
+        for i, r in enumerate(rows[:120]):
+            r['rank'] = i + 1
+        res[sub] = {'question_count': len(qs), 'years': years, 'recent_years': recent, 'articles': rows[:120]}
+    return res, z['reasons'], z['xval']
 
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--promotion', required=True, help='Promotion/data 資料夾')
     ap.add_argument('--pack', required=True, help='預測資料包 JSON')
+    ap.add_argument('--zuo', default=os.path.join(ROOT, 'tools', 'zuo', 'zuo_analysis.json'), help='警佐班分析（排名、出題理由回測、交互驗證）')
     a = ap.parse_args()
+    _LAWS.update(load(os.path.join(a.promotion, 'laws.json'))['laws'])
     build_memory(a.promotion)
-    build_variants(a.promotion)
+    build_variants()
     pack = load(a.pack)
     if pack['meta'].get('schema_version') != '2':
         sys.exit('預測資料包格式版本不符（需要 schema_version 2）')
-    build_predict(pack)
+    build_predict(pack, a.zuo)
     build_english(pack)
