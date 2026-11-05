@@ -365,7 +365,7 @@ async function _rVariants(s){
     '<div class="pr-acts"><button class="go" data-vprev="guess">▶ 練習猜題 ' + g.length + '</button><button class="go" data-vprev="vari">▶ 練習變化題 ' + va.length + '</button>' +
     '<button data-vprev="all">▶ 全部混合</button></div>' +
     '<div class="pr-acts"><button data-vimp="sub">⬇ 匯入本科 ' + items.length + ' 題</button><button data-vimp="*">⬇ 匯入四科全部 ' + v.items.length + ' 題</button></div></div>' +
-    '<div class="mem-prog">「練習」不存題庫、不留紀錄；匯入後考試別為「116猜題」「116變化題」，會進入複習排程與統計。單選答錯倒扣 1/3 題分、多選每個選項 1/5 分，練習時照考試規則作答。</div>';
+    '<div class="mem-prog">「練習」不存題庫、不留紀錄；匯入後考試別為「116猜題」「116變化題」，會進入複習排程與統計。題目更新後再按一次匯入，會同步修正已匯入的題目。單選答錯倒扣 1/3 題分、多選每個選項 1/5 分，練習時照考試規則作答。</div>';
   if(old) h += '<div style="padding:0 12px 12px"><button class="btn bg" style="width:100%" data-act="delold">🗑 刪除舊的升官等猜題（' + old + ' 題）</button></div>';
   return h;
 }
@@ -389,10 +389,28 @@ async function _importVariants(sub){
   const qs = await da('questions');
   const stems = new Set(qs.map(q => _norm(q.stem)));
   const add = items.filter(it => !stems.has(_norm(it.stem))).map(_variantToQ);
-  if(!add.length){ toast('這些題目題庫裡都有了'); return; }
-  if(!await askConfirm('匯入猜題到題庫', '新增 ' + add.length + ' 題（略過題庫已有的 ' + (items.length - add.length) + ' 題）', '匯入')) return;
-  await bulkPut('questions', add);
-  toast('已匯入 ' + add.length + ' 題');
+  // 已匯入的 116 猜題：題目修正後同步更新（選項、答案、詳解、法條）；題幹已改寫而不在新版的舊題刪除
+  const newExams = Object.values(_EX_NEW);
+  const subs = new Set(items.map(it => it.subject));
+  const byStem = new Map(v.items.map(it => [_norm(it.stem), it]));
+  const mine = qs.filter(q => newExams.includes(q.exam) && (q.tags||[]).includes('猜題') && subs.has(q.subject));
+  const upd = [], gone = [];
+  mine.forEach(q => {
+    const it = byStem.get(_norm(q.stem));
+    if(!it){ gone.push(q); return; }
+    const n = _variantToQ(it);
+    if(JSON.stringify([q.options, q.answer, q.note, q.relatedLaws]) !== JSON.stringify([n.options, n.answer, n.note, n.relatedLaws]))
+      upd.push(Object.assign({}, q, { options:n.options, answer:n.answer, note:n.note, relatedLaws:n.relatedLaws, stem:n.stem, searchBlob:n.searchBlob }));
+  });
+  if(!add.length && !upd.length && !gone.length){ toast('這些題目題庫裡都有了，且已是最新版'); return; }
+  const msg = (add.length ? '新增 ' + add.length + ' 題' : '') +
+    (upd.length ? (add.length ? '；' : '') + '更新已匯入題目 ' + upd.length + ' 題（依複核修正答案或詳解，作答紀錄保留）' : '') +
+    (gone.length ? '；移除已改寫的舊版題目 ' + gone.length + ' 題' : '');
+  if(!await askConfirm('匯入猜題到題庫', msg, '確定')) return;
+  if(add.length) await bulkPut('questions', add);
+  if(upd.length) await bulkPut('questions', upd);
+  for(const q of gone) await dd('questions', q.id);
+  toast('完成：' + msg);
   _rBody();
 }
 async function _deleteOld(){
