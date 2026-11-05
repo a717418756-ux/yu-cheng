@@ -159,6 +159,10 @@
 [data-theme="eink"] .pr-bar-t i{background:#000}
 [data-theme="eink"] .pr-bar-t i.r{background:#777}
 [data-theme="eink"] .pr-note,[data-theme="eink"] .ee-entry{background:#fff;border:1px solid #000}
-.pr-sep{display:inline-block;width:1px;height:20px;background:var(--bd,#ccc);margin:0 4px;vertical-align:middle}
-.chip.pr-ex.on{font-weight:700}
+/* 考試別切換（分段按鈕） */
+.pr-seg{display:flex;gap:4px;margin:8px 12px 2px;padding:3px;background:var(--bg2);border-radius:10px}
+.pr-seg button{flex:1;border:0;background:transparent;color:var(--t1);padding:7px 0;border-radius:8px;font-size:13.5px;font-family:inherit;cursor:pointer}
+.pr-seg button.on{background:var(--acc);color:#fff;font-weight:700}
+[data-theme="eink"] .pr-seg{border:1px solid #000;background:#fff}
+[data-theme="eink"] .pr-seg button.on{background:#000;color:#fff}
 .pr-bt > div.best{outline:2px solid var(--grn)}

@@ -1,5 +1,5 @@
 // ══ predict.js — 猜題庫（考試區）═════════════════════════════════
-// 依賴：db.js(da/dd/bulkPut), utils.js(esc/toast), data.js(showLawPop), quiz.js(startQWithPool),
+// 依賴：db.js(da/bulkPut/_db/_cacheInvalidate), utils.js(esc/toast), data.js(showLawPop), quiz.js(startQWithPool),
 //       memory.js(openMemoryAt/memoryKeys)
 // 資料：data/predict.json（警大二技預測資料包的排名與回測，題目只留 ID）
 //       data/variants.json（116 年二技＋警佐班猜題庫：四科各猜題 100、變化題 100，可練習或匯入題庫）
@@ -18,8 +18,17 @@
 
 let _data = null;
 let _keys = null;                         // 記憶樹引用到的法條（顯示 🌳 用）
-let _cur = { si:0, k:20, sort:'count', onlyWrong:false, view:'articles', exam:'二技' };
-try{ if(localStorage.getItem('prExam') === '警佐') _cur.exam = '警佐'; }catch(e){}
+let _cur = { si:0, k:20, sort:'count', onlyWrong:false, view:'articles', exam:'二技', vn:20 };
+// 記住上次的考試別、科目、分頁、押前幾條、練習題數（只存本機；讀不到就用預設）
+try{
+  const st = JSON.parse(localStorage.getItem('prState') || '{}');
+  ['si','k','vn'].forEach(k => { if(Number.isFinite(st[k])) _cur[k] = st[k]; });
+  if(st.exam === '警佐' || st.exam === '二技') _cur.exam = st.exam;
+  if(typeof st.view === 'string') _cur.view = st.view;
+}catch(e){}
+function _saveState(){
+  try{ localStorage.setItem('prState', JSON.stringify({ si:_cur.si, k:_cur.k, vn:_cur.vn, exam:_cur.exam, view:_cur.view })); }catch(e){}
+}
 const _ZUO_SUBJ = ['憲法、法學緒論', '警察法規', '警察勤務', '刑法與刑事訴訟法'];
 const _isZuo = () => _cur.exam === '警佐';
 // 目前考試別下可選的科目（回傳 _data.subjects 的索引）
@@ -68,12 +77,15 @@ async function renderPredict(){
   }
 }
 function _rSubj(){
-  const idx = _subjIdx();
+  let idx = _subjIdx();
+  if(!idx.length){ _cur.exam = '二技'; idx = _subjIdx(); }   // 資料缺警佐班時退回二技
   if(!idx.includes(_cur.si)) _cur.si = idx[0];
-  document.getElementById('pr-subj').innerHTML =
-    [['二技','警大二技'], ['警佐','警佐班（佐二類）']].map(([k, t]) => '<button class="chip pr-ex' + (k===_cur.exam?' on':'') + '" data-exam="' + k + '">' + t + '</button>').join('') +
-    '<span class="pr-sep"></span>' +
-    idx.map(i => '<button class="chip' + (i===_cur.si?' on':'') + '" data-si="' + i + '">' + esc(_data.subjects[i].name) + '</button>').join('');
+  const ex = document.getElementById('pr-exam');
+  if(ex) ex.innerHTML = [['二技','警大二技'], ['警佐','警佐班（佐二類）']].map(([k, t]) =>
+    '<button class="' + (k===_cur.exam?'on':'') + '" data-exam="' + k + '">' + t + '</button>').join('');
+  const el = document.getElementById('pr-subj');
+  el.innerHTML = idx.map(i => '<button class="chip' + (i===_cur.si?' on':'') + '" data-si="' + i + '">' + esc(_data.subjects[i].name) + '</button>').join('');
+  el.querySelector('.on')?.scrollIntoView({ block:'nearest', inline:'center' });
 }
 function _views(s){
   const v = [];
@@ -94,6 +106,7 @@ async function _rBody(){
   const s = _data.subjects[_cur.si];
   const views = _views(s);
   if(!views.some(v => v[0] === _cur.view)) _cur.view = views[0][0];
+  _saveState();
   const m = _data.meta, z = _isZuo() ? s.zuo : null;
   let h = '<div class="pr-note">📈 ' + (z ? '警佐班 ' + z.years[0] + '–' + z.years[z.years.length-1] : esc(m.exam) + ' ' + m.year_range[0] + '–' + m.year_range[1]) + ' 年，' +
     esc(s.name) + ' ' + (z ? z.question_count : s.question_count) + ' 題；最近 3 次：' + ((z ? z.recent_years : s.recent_years)||[]).join('、') + ' 年。' +
@@ -206,7 +219,7 @@ async function _practiceZuo(keys, label){
   const zm = await _zuoMap(s.name);
   const pool = [...new Set(keys)].map(k => zm.get(k)).filter(Boolean);
   if(!pool.length){ toast(_cur.onlyWrong ? '這個範圍沒有答錯過的題目' : '題庫裡找不到這些警佐班題目'); return; }
-  pool.sort(() => Math.random() - .5);
+  _shuffle(pool);
   startQWithPool(pool, '🎯 警佐班 ' + label);
 }
 
@@ -346,7 +359,9 @@ async function _loadVariants(){
   }
   return _variants;
 }
-const _norm = t => String(t||'').replace(/[\s，,。．.、：:？?「」『』（）()]/g, '').slice(0, 60);
+function _shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+// 題幹比對用（去標點、全長比對；只取前段會讓開頭相同的不同題被當成同一題）
+const _norm = t => String(t||'').replace(/[\s，,。．.、：:？?「」『』（）()]/g, '');
 const _EX_NEW = { guess:'116猜題', vari:'116變化題' };
 const _EX_OLD = ['猜題（原題）', '猜題（變化題）'];          // 舊版升官等記憶樹匯入的考試別
 async function _rVariants(s){
@@ -364,8 +379,9 @@ async function _rVariants(s){
     '<div class="cc"><div class="ct">' + esc(s.name) + '：猜題 ' + g.length + '・變化題 ' + va.length + '・題庫已有 ' + have + '</div>' +
     '<div class="pr-meta">📌 警大二技、警佐班兩邊看到的是<b>同一份題庫</b>（兩種考試這科範圍相同），切換考試別不會換題目。變化題的母題：警佐班 ' + srcZ + ' 題、警大二技 ' + srcT + ' 題。</div>' +
     '<div class="pr-meta">出題理由：' + Object.entries(rc).sort((x, y) => y[1] - x[1]).map(([k, n]) => esc(k) + ' ' + n).join('、') + '</div>' +
-    '<div class="pr-acts"><button class="go" data-vprev="guess">▶ 練習猜題 ' + g.length + '</button><button class="go" data-vprev="vari">▶ 練習變化題 ' + va.length + '</button>' +
-    '<button data-vprev="all">▶ 全部混合</button></div>' +
+    '<div class="mem-tools pr-k" style="padding:8px 0 0;align-items:center"><span class="pr-meta" style="margin:0">每次練習</span>' + [10,20,50,0].map(n => '<button class="chip' + (n===_cur.vn?' on':'') + '" data-vn="' + n + '">' + (n ? n + ' 題' : '全部') + '</button>').join('') + '</div>' +
+    '<div class="pr-acts"><button class="go" data-vprev="guess">▶ 猜題（共 ' + g.length + '）</button><button class="go" data-vprev="vari">▶ 變化題（共 ' + va.length + '）</button>' +
+    '<button data-vprev="all">▶ 兩種混合</button></div>' +
     '<div class="pr-acts"><button data-vimp="sub">⬇ 匯入本科 ' + items.length + ' 題</button><button data-vimp="*">⬇ 匯入四科全部 ' + v.items.length + ' 題</button></div></div>' +
     '<div class="mem-prog">「練習」不存題庫、不留紀錄；匯入後考試別為「116猜題」「116變化題」，會進入複習排程與統計。題目更新後再按一次匯入，會同步修正已匯入的題目。單選答錯倒扣 1/3 題分、多選每個選項 1/5 分，練習時照考試規則作答。</div>';
   if(old) h += '<div style="padding:0 12px 12px"><button class="btn bg" style="width:100%" data-act="delold">🗑 刪除舊的升官等猜題（' + old + ' 題）</button></div>';
@@ -374,7 +390,8 @@ async function _rVariants(s){
 function _variantToQ(it){
   const q = {
     type:'mc', stem:it.stem, options:it.options, answer:it.answer, answerEs:'',
-    subject:it.subject, year:'116', exam: it.variant ? _EX_NEW.vari : _EX_NEW.guess, num:'',
+    subject:it.subject, year:'116', exam: it.variant ? _EX_NEW.vari : _EX_NEW.guess, num:'', guessId:it.gid || '', guessHash:it.h || '',
+    multiAnswer: !!it.multi,
     keywords: it.reason ? [it.reason] : [], mustKeywords:[], tags:['猜題'],
     note:it.note, hlColor:'', isNumberQ:false, groupStem:'', groupId:'', groupOrder:0,
     relatedLaws:(it.laws||[]).map(ref => ({ ref })),
@@ -390,37 +407,55 @@ async function _importVariants(sub){
   const items = v.items.filter(it => sub === '*' || it.subject === name);
   const qs = await da('questions');
   const stems = new Set(qs.map(q => _norm(q.stem)));
-  const add = items.filter(it => !stems.has(_norm(it.stem))).map(_variantToQ);
+  const gids = new Set(qs.map(q => q.guessId).filter(Boolean));
+  const add = items.filter(it => !gids.has(it.gid) && !stems.has(_norm(it.stem))).map(_variantToQ);
   // 已匯入的 116 猜題：題目修正後同步更新（選項、答案、詳解、法條）；題幹已改寫而不在新版的舊題刪除
   const newExams = Object.values(_EX_NEW);
   const subs = new Set(items.map(it => it.subject));
+  // 先用穩定編號（guessId）對，舊版匯入沒有編號的再用題幹對；使用者自己改過題幹的題目不會被刪
+  const byGid = new Map(v.items.map(it => [it.gid, it]));
   const byStem = new Map(v.items.map(it => [_norm(it.stem), it]));
+  const retired = new Set((v.retired||[]).map(_norm));
   const mine = qs.filter(q => newExams.includes(q.exam) && (q.tags||[]).includes('猜題') && subs.has(q.subject));
   const upd = [], gone = [];
+  let nChanged = 0;            // 內容真的有改的題數（其餘只是補編號、版本）
   mine.forEach(q => {
-    const it = byStem.get(_norm(q.stem));
-    if(!it){ gone.push(q); return; }
+    const it = (q.guessId && byGid.get(q.guessId)) || byStem.get(_norm(q.stem));
+    if(!it){ if(retired.has(_norm(q.stem))) gone.push(q); return; }
     const n = _variantToQ(it);
-    if(JSON.stringify([q.options, q.answer, q.note, q.relatedLaws]) !== JSON.stringify([n.options, n.answer, n.note, n.relatedLaws]))
-      upd.push(Object.assign({}, q, { options:n.options, answer:n.answer, note:n.note, relatedLaws:n.relatedLaws, stem:n.stem, searchBlob:n.searchBlob }));
+    // 有內容版本（guessHash）：來源版本變了才覆蓋，使用者自己改過題幹、詳解而來源沒變時不動
+    // 舊版匯入沒有版本：比對內容（含題幹）
+    const changed = q.guessHash ? q.guessHash !== n.guessHash
+      : JSON.stringify([_norm(q.stem), q.options, q.answer, q.note, q.relatedLaws]) !== JSON.stringify([_norm(n.stem), n.options, n.answer, n.note, n.relatedLaws]);
+    const patch = { guessId:n.guessId, guessHash:n.guessHash, multiAnswer:n.multiAnswer };
+    if(changed){ nChanged++; Object.assign(patch, { stem:n.stem, options:n.options, answer:n.answer, note:n.note, relatedLaws:n.relatedLaws, searchBlob:n.searchBlob }); }
+    if(changed || q.guessId !== n.guessId || q.guessHash !== n.guessHash || q.multiAnswer !== n.multiAnswer) upd.push(Object.assign({}, q, patch));
   });
-  if(!add.length && !upd.length && !gone.length){ toast('這些題目題庫裡都有了，且已是最新版'); return; }
-  const msg = (add.length ? '新增 ' + add.length + ' 題' : '') +
-    (upd.length ? (add.length ? '；' : '') + '更新已匯入題目 ' + upd.length + ' 題（依複核修正答案或詳解，作答紀錄保留）' : '') +
-    (gone.length ? '；移除已改寫的舊版題目 ' + gone.length + ' 題' : '');
+  if(!add.length && !nChanged && !gone.length){
+    if(upd.length) await bulkPut('questions', upd);     // 只補編號、版本，不用問
+    toast('這些題目題庫裡都有了，且已是最新版'); return;
+  }
+  const msg = [add.length && '新增 ' + add.length + ' 題',
+    nChanged && '更新已匯入題目 ' + nChanged + ' 題（套用最新修正；作答紀錄保留，來源有改的題目會蓋過你自己的修改）',
+    gone.length && '移除已改寫的舊版題目 ' + gone.length + ' 題'].filter(Boolean).join('；');
   if(!await askConfirm('匯入猜題到題庫', msg, '確定')) return;
   if(add.length) await bulkPut('questions', add);
   if(upd.length) await bulkPut('questions', upd);
-  for(const q of gone) await dd('questions', q.id);
+  if(gone.length) await _bulkDel(gone.map(q => q.id));
   toast('完成：' + msg);
   _rBody();
+}
+// 一次交易刪除（失敗就全部不刪）
+async function _bulkDel(ids){
+  await _db.questions.bulkDelete(ids);
+  _cacheInvalidate('questions');
 }
 async function _deleteOld(){
   const qs = await da('questions');
   const old = qs.filter(q => _EX_OLD.includes(q.exam) && (q.tags||[]).includes('猜題'));
   if(!old.length){ toast('沒有舊的升官等猜題'); return; }
   if(!await askConfirm('刪除舊猜題', '刪除舊版升官等記憶樹匯入的 ' + old.length + ' 題（考試別「猜題（原題）」「猜題（變化題）」），無法復原。', '刪除')) return;
-  for(const q of old) await dd('questions', q.id);
+  await _bulkDel(old.map(q => q.id));
   toast('已刪除 ' + old.length + ' 題');
   _rBody();
 }
@@ -430,7 +465,8 @@ async function _previewVariants(kind){
   const pool = v.items.filter(it => it.subject === name && (kind === 'all' || (kind === 'vari') === !!it.variant))
     .map((it, i) => Object.assign(_variantToQ(it), { id:'virt:var-' + kind + '-' + i, num:String(i+1) }));
   if(!pool.length){ toast('這科沒有猜題'); return; }
-  pool.sort(() => Math.random() - .5);
+  _shuffle(pool);
+  if(_cur.vn) pool.length = Math.min(pool.length, _cur.vn);
   startQWithPool(pool, '🎲 ' + name + ({ guess:'猜題', vari:'變化題', all:'猜題＋變化題' }[kind]));
 }
 
@@ -439,7 +475,7 @@ async function _practiceIds(ids, label){
   const [qmap, wrong] = await Promise.all([_qById(), _onlyWrongSet()]);
   const pool = [...new Set(ids)].map(id => qmap.get(id)).filter(q => q && (!wrong || wrong.has(String(q.id))));
   if(!pool.length){ toast(_cur.onlyWrong ? '這個範圍沒有答錯過的題目' : '題庫裡找不到這些題目'); return; }
-  pool.sort(() => Math.random() - .5);
+  _shuffle(pool);
   startQWithPool(pool, '🎯 ' + label);
 }
 
@@ -449,13 +485,14 @@ function _bind(){
   if(!page || page._prBound) return;
   page._prBound = true;
   page.addEventListener('click', e => {
-    const t = e.target.closest('[data-exam],[data-si],[data-view],[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem],[data-vimp],[data-vprev]');
+    const t = e.target.closest('[data-vn],[data-exam],[data-si],[data-view],[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem],[data-vimp],[data-vprev]');
     if(!t) return;
     const ds = t.dataset;
-    if(ds.exam){ _cur.exam = ds.exam; try{ localStorage.setItem('prExam', ds.exam); }catch(err){} _rSubj(); _rBody(); }
+    if(ds.vn != null){ _cur.vn = +ds.vn; _saveState(); _rBody(); }
+    else if(ds.exam){ _cur.exam = ds.exam; _rSubj(); _rBody(); }
     else if(ds.si != null){ _cur.si = +ds.si; _rSubj(); _rBody(); }
     else if(ds.view){ _cur.view = ds.view; _rBody(); }
-    else if(ds.k){ _cur.k = +ds.k; _rBody(); }
+    else if(ds.k){ _cur.k = +ds.k; _rBody(); }   // _rBody 內會存狀態
     else if(ds.sort){ _cur.sort = _cur.sort === 'recent' ? 'count' : 'recent'; _rBody(); }
     else if(ds.qids) _practiceIds(ds.qids.split(','), ds.label || '');
     else if(ds.zkeys) _practiceZuo(ds.zkeys.split(','), ds.label || '');

@@ -110,6 +110,9 @@ def _trend(s, qs):
 
 
 def build_predict(pack, zpath=None):
+    if zpath and not os.path.exists(zpath):
+        print('（找不到警佐班分析檔 ' + zpath + '，略過警佐班資料）')
+        zpath = None
     zuo, reasons, xval = _zuo(zpath) if zpath else ({}, {}, {})
     subs = []
     for s in pack['subjects']:
@@ -199,6 +202,8 @@ def _split_refs(ref):
         if m:
             law = m.group(1).strip() or law
             out.append(_art_ref(law, m.group(2) + ('-' + m.group(3) if m.group(3) else '')))
+            if m.group(4) and not m.group(3):          # §6～§10：區間內每一條都列
+                out += [_art_ref(law, str(n)) for n in range(int(m.group(2)) + 1, int(m.group(4)) + 1)]
         elif re.search(r'釋字第\d+號|\d{3}年憲判字第\d+號', part):
             out.append(re.search(r'釋字第\d+號|\d{3}年憲判字第\d+號', part).group(0))
     return out
@@ -207,22 +212,33 @@ def _split_refs(ref):
 def build_variants():
     """tools/guess/*.json（116 年二技＋警佐班猜題：各科猜題 100＋變化題 100）→ 平台題目格式。
     來源檔欄位：k 猜/變、src 母題（變化題）、r 出題理由類別、w 理由說明、t s單選/m多選、q 題幹、o 選項、a 答案、e 詳解、ref 法條。"""
-    import glob
-    out = []
-    for f in sorted(glob.glob(os.path.join(GUESS, '*.json'))):
-        sub = GUESS_SUBJ[os.path.basename(f).split('_')[0]]
-        for it in load(f):
+    import glob, hashlib
+    out, seen = [], set()
+    for f in sorted(glob.glob(os.path.join(GUESS, '[a-z]*.json'))):
+        base = os.path.basename(f)[:-5]
+        sub = GUESS_SUBJ[base.split('_')[0]]
+        for idx, it in enumerate(load(f)):
             note = it['e'] + '\n【出題理由】' + it['r'] + '：' + it['w']
             if it.get('src'):
                 m = re.match(r'(警佐|警大)(\d+)-(\d+)', it['src'])
                 note += '\n【母題】' + ({'警佐': '警佐班', '警大': '警大二技'}[m.group(1)] + ' ' + m.group(2) + ' 年第 ' + m.group(3) + ' 題' if m else it['src'])
+            gid = it.get('id') or base + '#' + str(idx)
+            if gid in seen:
+                sys.exit('猜題編號重複：' + gid)
+            seen.add(gid)
+            laws_ = _split_refs(it.get('ref', ''))
+            h = hashlib.sha1(json.dumps([it['q'], it['o'], it['a'], note, laws_], ensure_ascii=False).encode()).hexdigest()[:12]
             out.append({
+                'gid': gid,     # 固定編號（來源檔的 id，寫入後不再變）：已匯入的題目靠它同步更新
+                'h': h,         # 內容版本：來源改過才覆蓋已匯入的題目，使用者自己的修改不動
                 'subject': sub, 'variant': it['k'] == '變', 'reason': it['r'], 'src': it.get('src', ''),
                 'multi': it['t'] == 'm', 'stem': it['q'], 'options': {'ABCDE'[i]: o for i, o in enumerate(it['o'])},
-                'answer': it['a'], 'note': note, 'ref': it.get('ref', ''), 'laws': _split_refs(it.get('ref', '')),
+                'answer': it['a'], 'note': note, 'ref': it.get('ref', ''), 'laws': laws_,
             })
+    # 改寫過題幹的舊版題目：使用者若已匯入，同步時刪除
+    retired = load(os.path.join(GUESS, '_retired.json')) if os.path.exists(os.path.join(GUESS, '_retired.json')) else []
     dump({'title': '116 年警大二技・警佐班（佐二類）猜題庫', 'version': '2026-11-05',
-          'items': out}, os.path.join(ROOT, 'data', 'variants.json'))
+          'items': out, 'retired': retired}, os.path.join(ROOT, 'data', 'variants.json'))
 
 
 def _zuo(zpath):

@@ -13,6 +13,7 @@
 
 let _exam = null, _police = null;
 let _cur = { tab:'topic', vq:'', vyear:'', pg:'' };
+try{ const t = localStorage.getItem('eeTab'); if(['topic','vocab','police','read'].includes(t)) _cur.tab = t; }catch(e){}
 let _vocabSet = null;       // 單字本已有的字（小寫）
 
 async function _load(){
@@ -225,7 +226,7 @@ function _bind(){
     if(!t) return;
     const d = t.dataset;
     try{
-      if(d.tab){ _cur.tab = d.tab; _rTabs(); _rBody(); }
+      if(d.tab){ _cur.tab = d.tab; try{ localStorage.setItem('eeTab', d.tab); }catch(err){} _rTabs(); _rBody(); }
       else if(d.say != null) _say(d.say);
       else if(d.add != null){
         if(await _addVocab(d.add, d.zh, d.ex)){ t.classList.add('on'); t.textContent = '✓ 已加'; toast('已加入單字本'); }

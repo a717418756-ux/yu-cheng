@@ -24,6 +24,13 @@ const TAG_CLS = { '必考':'must', '易錯':'trap', '口訣':'mn', '新法':'new
 let _index = null;          // index.json
 const _subj = {};           // id → 科目資料
 let _cur = { sid:'police', tab:'tree', recall:false, cardOnlyWeak:false, cardIdx:0, cardFlip:false, cardCh:'' };
+// 記住上次看的科目與分頁（只存本機）
+try{
+  const st = JSON.parse(localStorage.getItem('memState') || '{}');
+  if(typeof st.sid === 'string') _cur.sid = st.sid;
+  if(TABS.some(t => t[0] === st.tab)) _cur.tab = st.tab;
+}catch(e){}
+function _saveState(){ try{ localStorage.setItem('memState', JSON.stringify({ sid:_cur.sid, tab:_cur.tab })); }catch(e){} }
 let _heat = null;           // 'law|articleN' → { count, recent, last, ids }
 let _prog = null;           // 閃卡熟練度
 
@@ -49,10 +56,15 @@ async function _loadHeat(){
     const p = await _json('data/predict.json');
     (p.subjects||[]).forEach(s => (s.articles||[]).forEach(a => {
       const k = a.law + '|' + a.article_n;
-      const o = _heat[k] || (_heat[k] = { count:0, recent:0, last:0, ids:[] });
+      const o = _heat[k] || (_heat[k] = { count:0, recent:0, last:0, ids:[], zuo:0 });
       o.count += a.count; o.recent += a.recent_count || 0;
       o.last = Math.max(o.last, a.last_year || 0);
       o.ids.push(...(a.question_ids||[]));
+    }));
+    (p.subjects||[]).forEach(s => ((s.zuo||{}).articles||[]).forEach(a => {
+      const k = a.law + '|' + a.article_n;
+      const o = _heat[k] || (_heat[k] = { count:0, recent:0, last:0, ids:[], zuo:0 });
+      o.zuo += a.count;
     }));
   }catch(e){ logError('memory.heat', e); }
   return _heat;
@@ -119,7 +131,7 @@ function _refChips(ref){
   return parseRefs(ref).map(r => {
     if(!r.ref) return '<span class="mem-ref plain">' + esc(r.label) + '</span>';
     const h = r.key && _heat && _heat[r.key];
-    const hot = h ? ' <b class="mem-hot" title="警大二技考過 ' + h.count + ' 題（近3年 ' + h.recent + '）">🔥' + h.count + '</b>' : '';
+    const hot = h && (h.count || h.zuo) ? ' <b class="mem-hot" title="警大二技考過 ' + h.count + ' 題（近3年 ' + h.recent + '）・警佐班 ' + (h.zuo||0) + ' 題">🔥' + (h.count || ('佐' + h.zuo)) + '</b>' : '';
     return '<button class="mem-ref" data-ref="' + esc(r.ref) + '">' + esc(r.label) + hot + '</button>';
   }).join('');
 }
@@ -141,8 +153,10 @@ async function renderMemory(){
 }
 function _renderSubjChips(){
   const box = document.getElementById('mem-subj');
+  if(!_index.subjects.some(s => s.id === _cur.sid)) _cur.sid = _index.subjects[0].id;
   box.innerHTML = _index.subjects.map(s =>
     '<button class="chip' + (s.id===_cur.sid?' on':'') + '" data-sid="' + s.id + '">' + esc(s.name) + '</button>').join('');
+  box.querySelector('.on')?.scrollIntoView({ block:'nearest', inline:'center' });
 }
 function _renderTabs(){
   const box = document.getElementById('mem-tabs');
@@ -151,6 +165,7 @@ function _renderTabs(){
 }
 async function _renderBody(){
   const el = document.getElementById('mem-body');
+  _saveState();
   const d = await _loadSubj(_cur.sid);
   const fn = { tree:_rTree, cmp:_rCmp, trap:_rTrap, num:_rNum, card:_rCard, upd:_rUpd }[_cur.tab];
   el.innerHTML = fn(d);
