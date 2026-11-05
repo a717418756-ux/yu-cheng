@@ -358,9 +358,11 @@ async function _rVariants(s){
   const have = items.filter(it => stems.has(_norm(it.stem))).length;
   const rc = {};
   items.forEach(it => { rc[it.reason] = (rc[it.reason]||0) + 1; });
+  const srcZ = va.filter(it => (it.src||'').startsWith('警佐')).length, srcT = va.filter(it => (it.src||'').startsWith('警大')).length;
   const old = qs.filter(q => _EX_OLD.includes(q.exam) && (q.tags||[]).includes('猜題')).length;
   let h = '<div class="pr-note">' + esc(v.title) + '：依二技與警佐班近三年回測的出題理由配比命題。<b>猜題</b>＝沒考過原題、但考點樣式類似的新題；<b>變化題</b>＝把近三年考古題換角度、換數字、換對象改寫，不與原題重複。每題附詳解、出題理由與法條。</div>' +
     '<div class="cc"><div class="ct">' + esc(s.name) + '：猜題 ' + g.length + '・變化題 ' + va.length + '・題庫已有 ' + have + '</div>' +
+    '<div class="pr-meta">📌 警大二技、警佐班兩邊看到的是<b>同一份題庫</b>（兩種考試這科範圍相同），切換考試別不會換題目。變化題的母題：警佐班 ' + srcZ + ' 題、警大二技 ' + srcT + ' 題。</div>' +
     '<div class="pr-meta">出題理由：' + Object.entries(rc).sort((x, y) => y[1] - x[1]).map(([k, n]) => esc(k) + ' ' + n).join('、') + '</div>' +
     '<div class="pr-acts"><button class="go" data-vprev="guess">▶ 練習猜題 ' + g.length + '</button><button class="go" data-vprev="vari">▶ 練習變化題 ' + va.length + '</button>' +
     '<button data-vprev="all">▶ 全部混合</button></div>' +
