@@ -1751,3 +1751,34 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 #ai-out .aipv{ max-height:260px; }
 [data-theme="eink"] .ai-grid select{ background:#fff; color:#000; border-color:#000; }
 [data-theme="eink"] .ai-info.warn{ color:#000; font-weight:700; }
+
+/* ══ 跨裝置調整（手機／平板／電腦）══════════════════════════════ */
+/* 電腦：內容欄置中 900px，選單鈕跟著靠在內容欄右側，不會飄到螢幕最右邊，
+   做題畫面（同寬）也能完整蓋住它 */
+html[data-layout="desktop"] #fab-wrap{
+  right:max(16px, calc((100vw - var(--layout-page-max-w)) / 2 + 16px));
+}
+/* 平板、電腦：做題字級放大、留白加寬，長題幹比較好讀 */
+html[data-layout="tablet"] .qstemb,
+html[data-layout="desktop"] .qstemb{ font-size:17.5px; }
+html[data-layout="tablet"] .qov,
+html[data-layout="desktop"] .qov{ font-size:15.5px; }
+html[data-layout="tablet"] .qbody,
+html[data-layout="desktop"] .qbody{ padding:18px 24px; }
+html[data-layout="tablet"] .qfoot,
+html[data-layout="desktop"] .qfoot{ padding:10px 24px; }
+/* 滑鼠：選項有懸停回饋 */
+@media (hover:hover) and (pointer:fine){
+  .qopt:hover{ border-color:var(--acc); }
+  .qopt.correct:hover{ border-color:var(--grn); }
+  .qopt.wrong:hover{ border-color:var(--red); }
+}
+/* 觸控：太小的按鈕放大點擊範圍（不改外觀大小，只加高） */
+@media (pointer:coarse){
+  .shelf-section-tab{ min-height:32px; padding:6px 8px; }
+  .lw-gov{ min-height:30px; }
+  .ss-btn{ min-height:28px; padding:2px 10px; }
+  .cd-del{ min-width:34px; }
+  .mem-ref{ min-height:28px; }
+  .pr-acts button{ min-height:32px; }
+}

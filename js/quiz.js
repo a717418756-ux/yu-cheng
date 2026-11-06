@@ -1294,6 +1294,31 @@ function _initDelegation(){
       if(tag && tag.dataset.ref) showLawPop(tag.dataset.ref);
     });
   }
+  // 電腦／外接鍵盤：1–6 或 A–F 選答案，Enter 送出複選或到下一題，→ 下一題
+  if(!document._qKeyBound){
+    document._qKeyBound = true;
+    document.addEventListener('keydown', e=>{
+      const qv = document.getElementById('qv');
+      if(!qv || qv.style.display === 'none' || !S.quiz) return;
+      if(e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+      const t = e.target;
+      if(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(t.tagName))) return;
+      if(document.querySelector('.ov.on') || document.getElementById('qink')?.classList.contains('on')) return;
+      const k = e.key;
+      if(k.length === 1 && !S.quiz.ans){
+        let i = '123456'.indexOf(k);
+        if(i < 0) i = 'abcdef'.indexOf(k.toLowerCase());
+        const o = i >= 0 ? document.querySelectorAll('#qopts .qopt')[i] : null;
+        if(o){ e.preventDefault(); o.click(); }
+        return;
+      }
+      if(k === 'Enter' || k === 'ArrowRight'){
+        const nx = document.getElementById('qnxt');
+        if(nx && !nx.classList.contains('hide') && nx.offsetParent){ e.preventDefault(); nextQ(); }
+        else if(k === 'Enter' && !S.quiz.ans){ e.preventDefault(); submitAnswer(); }
+      }
+    });
+  }
   // 完成畫面按鈕
   const doneArea = document.getElementById('qdone-area');
   if(doneArea && !doneArea._qBound){

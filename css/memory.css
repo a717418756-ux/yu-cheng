@@ -9,6 +9,8 @@
 .mem-tools{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 4px}
 .mem-tools .btn{padding:7px 11px;font-size:12px}
 .mem-sel{height:32px;padding:0 8px;border-radius:6px;border:1px solid var(--bd);background:var(--bg2);color:var(--t0);font-size:12px;max-width:60%}
+/* 篩選下拉：寬螢幕排成一列、手機兩兩一列（全域 select 預設 width:100% 會讓每個都獨佔一行） */
+.mem-tools .mem-sel{width:auto;flex:1 1 130px;min-width:0;max-width:100%}
 .mem-empty{text-align:center;padding:40px 20px;color:var(--t2);font-size:13px;line-height:1.8}
 .mem-intro{margin:6px 12px;padding:10px 12px;border-radius:var(--r);background:var(--bg1);border:1px solid var(--bd);font-size:12.5px;color:var(--t1);line-height:1.7}
 .mem-src{margin-top:4px;font-size:11px;color:var(--t2)}

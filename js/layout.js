@@ -103,14 +103,15 @@
     if(window.ResizeObserver){
       _ro = new ResizeObserver(_update);
       _ro.observe(document.documentElement);
-    } else {
-      // fallback：throttle resize 事件
-      let _timer = null;
-      window.addEventListener('resize', ()=>{
-        if(_timer) return;
-        _timer = setTimeout(()=>{ _timer=null; _update(); }, 150);
-      });
     }
+    // 視窗縮放、平板轉向時一併重算（部分瀏覽器 ResizeObserver 對 <html> 不觸發）
+    let _timer = null;
+    const _later = ()=>{
+      if(_timer) return;
+      _timer = setTimeout(()=>{ _timer=null; _update(); }, 150);
+    };
+    window.addEventListener('resize', _later);
+    window.addEventListener('orientationchange', _later);
   }
 
   // ── epub 閱讀模式 ────────────────────────────────────────────
