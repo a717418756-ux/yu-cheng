@@ -237,7 +237,7 @@ def build_variants():
             })
     # 改寫過題幹的舊版題目：使用者若已匯入，同步時刪除
     retired = load(os.path.join(GUESS, '_retired.json')) if os.path.exists(os.path.join(GUESS, '_retired.json')) else []
-    dump({'title': '116 年警大二技・警佐班（佐二類）猜題庫', 'version': '2026-11-05',
+    dump({'title': '116 年警大二技・警佐班（佐二類）猜題庫', 'version': '2026-11-06',
           'items': out, 'retired': retired}, os.path.join(ROOT, 'data', 'variants.json'))
 
 
