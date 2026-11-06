@@ -21,7 +21,7 @@
 
 ### 🧠 記憶庫（考試區）
 
-五科：**警察法規、憲法與法學緒論、刑法、刑事訴訟法、警察勤務**。刑法、刑訴、勤務沿用「升官等記憶樹」的內容；警察法規、憲法依平台法規庫現行條文另行整理。
+六科：**警察法規、憲法與法學緒論、刑法、刑事訴訟法、警察勤務、期限時效（警法＋行政法）**。刑法、刑訴、勤務沿用「升官等記憶樹」的內容；警察法規、憲法依平台法規庫現行條文另行整理；期限時效整合 Claude 時效期間總整理與 GPT 期限時效考古題復核包（2026-11-06）。
 
 | 分頁 | 內容 |
 |------|------|
@@ -31,8 +31,10 @@
 | 🔢 數字口訣 | 多款項目口訣（字首、諧音、邏輯順序，附記憶理由）＋數字速記；「🔢 數字隨機抽考」出四選一 |
 | 🃏 閃卡 | 翻面自測，連續答對 2 次算熟，可只看未熟；進度存在設定裡，會隨備份 |
 | 🆕 修法 | 修法與憲法判決時間軸 |
+| 📋 期限總表 | 只有「期限時效」科目：GPT 從 45 部法規抽出的 1,853 筆期限原句（含優先 432 筆、同數字反查、132 種法源查漏），可依科別／類型／法規／關鍵字篩選，每筆附考古題「▶ 練習」與全國法規連結。這是 GPT 工作底稿，含刑度、修業年限等非救濟期間 |
+| 📝 考古對照 | 只有「期限時效」科目：284 題時間考古題、341 題修法提醒題、升官等 105–113 年 500 題官答比對（3 題複數給分），題目依題庫 id 直接出題；題庫裡沒有的題目會顯示「題庫無此」 |
 
-上方搜尋框跨五科搜尋（如「管束」「§88-1」）。
+上方搜尋框跨六科搜尋（如「管束」「§88-1」）。
 
 ### 🎯 猜題庫（考試區）
 
@@ -359,6 +361,7 @@
 |------|------|---------|
 | `data/memory/police.json`、`constitution.json` | 警察法規、憲法記憶樹原稿 | 手動維護 |
 | `data/memory/_extras.json` | 刑法、刑訴、勤務的口訣與易錯補充 | 手動維護 |
+| `data/memory/deadline.json`、`deadline_audit.json` | 期限時效科目、GPT 復核包精簡版 | `tools/build_deadline.py`（來源 `tools/deadline/總整理.md`、`curated.json`、`gpt/`） |
 | `data/memory/*.min.json`、`index.json` | App 實際讀的記憶庫 | `tools/build_data.py` |
 | `data/predict.json`、`data/english_exam.json` | 預測資料包的排名、回測、英文題；警佐班排名（zuo）、出題理由（reasons）、交互驗證（xval） | `tools/build_data.py` |
 | `tools/guess/*.json` | 116 年猜題原稿（四科×猜題／變化題）；每題 `id` 為固定編號，寫入後不要改、新題接在檔尾；`_retired.json` 列出已改寫的舊題幹（同步時刪除） | 手動維護 |
@@ -370,6 +373,12 @@
 
 ```bash
 python3 tools/build_data.py --promotion ../Promotion/data --pack 警大二技預測資料包_xxx.json
+```
+
+期限時效科目（改 `tools/deadline/總整理.md` 或 `curated.json` 後）：
+
+```bash
+cd tools && python3 build_deadline.py && python3 -c "import build_data; build_data.build_memory('../../Promotion/data')"
 ```
 
 改完 data/ 也要同步改版本號，快取才會更新。

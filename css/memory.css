@@ -166,3 +166,34 @@
 [data-theme="eink"] .pr-seg{border:1px solid #000;background:#fff}
 [data-theme="eink"] .pr-seg button.on{background:#000;color:#fff}
 .pr-bt > div.best{outline:2px solid var(--grn)}
+
+/* ── 📋 期限總表／📝 考古對照（期限時效科目）── */
+.mem-au-seg{display:flex;gap:4px;margin:10px 12px 2px;padding:3px;border-radius:9px;background:var(--bg2);overflow-x:auto}
+.mem-au-seg button{flex:1 0 auto;padding:6px 9px;border:none;border-radius:7px;background:none;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.mem-au-seg button.on{background:var(--bg1);color:var(--t0);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.mem-au-note > summary{cursor:pointer;font-weight:600;color:var(--t0)}
+.mem-au-note ul{margin:6px 0 4px;padding-left:18px}
+.mem-au-note li{margin:2px 0}
+.mem-au-h{font-size:11.5px;font-weight:700;color:var(--t2);margin:10px 0 4px}
+.mem-au-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.mem-au-kpi div{background:var(--bg2);border-radius:7px;padding:6px;text-align:center}
+.mem-au-kpi b{display:block;font-size:15px;color:var(--t0)}
+.mem-au-kpi span{font-size:10.5px;color:var(--t2)}
+.mem-au-find{margin:3px 0;font-size:12px}
+.mem-au-find span{display:block;color:var(--grn);font-size:11.5px}
+.mem-au-sum{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 14px 2px;font-size:12px;color:var(--t2)}
+.mem-au .mem-au-head{display:flex;flex-wrap:wrap;align-items:center;gap:5px;font-size:13px;color:var(--t0)}
+.mem-au-time{padding:1px 8px;border-radius:5px;background:var(--org2);color:var(--org);font-weight:700;font-size:12.5px}
+.mem-au-sub{font-size:11.5px;color:var(--t2)}
+.mem-au-text{margin-top:5px;font-size:13px;line-height:1.65;color:var(--t1)}
+.mem-au-warn{margin-top:5px;padding:4px 8px;border-radius:6px;background:var(--red2);color:var(--red);font-size:12px;line-height:1.55}
+.mem-au-meta{margin-top:4px;font-size:11px;color:var(--t2);line-height:1.5}
+.mem-au-acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
+.mem-au-go{padding:5px 10px;font-size:12px}
+.mem-au-miss{font-size:11px;color:var(--t2)}
+.mem-au-link{font-size:11.5px;color:var(--acc);text-decoration:none;margin-left:auto}
+.mem-au-det{margin-top:5px;font-size:12px;color:var(--t1);line-height:1.6}
+.mem-au-det > summary{cursor:pointer;color:var(--t2)}
+.mem-au-tbl{min-width:0}
+.mem-au-tbl td:first-child{white-space:nowrap}
+.mem-au-multi td{background:var(--org2)}

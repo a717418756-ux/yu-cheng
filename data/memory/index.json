@@ -1,1 +1,1 @@
-{"subjects":[{"id":"police","name":"警察法規"},{"id":"constitution","name":"憲法、法學緒論"},{"id":"criminal","name":"刑法"},{"id":"procedure","name":"刑事訴訟法"},{"id":"duty","name":"警察勤務"}]}
+{"subjects":[{"id":"police","name":"警察法規"},{"id":"constitution","name":"憲法、法學緒論"},{"id":"criminal","name":"刑法"},{"id":"procedure","name":"刑事訴訟法"},{"id":"duty","name":"警察勤務"},{"id":"deadline","name":"期限時效（警法＋行政法）","audit":true}]}

@@ -20,6 +20,7 @@ SUBJECTS = [  # 記憶庫顯示順序
     ('criminal', '刑法'),
     ('procedure', '刑事訴訟法'),
     ('duty', '警察勤務'),
+    ('deadline', '期限時效（警法＋行政法）'),   # tools/build_deadline.py 產生 deadline.json
 ]
 
 
@@ -56,7 +57,7 @@ def build_memory(promo_dir):
         else:
             d = load(os.path.join(MEM, sid + '.json'))
             dump(d, os.path.join(MEM, sid + '.min.json'))
-        index.append({'id': sid, 'name': name})
+        index.append({'id': sid, 'name': name, **({'audit': True} if d.get('audit') else {})})
     dump({'subjects': index}, os.path.join(MEM, 'index.json'))
 
 

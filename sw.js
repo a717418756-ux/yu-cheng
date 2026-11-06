@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.25.6';
+const APP_VERSION = '4.26.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
@@ -49,6 +49,7 @@ const CORE_ASSETS = [
   './data/memory/criminal.min.json',
   './data/memory/procedure.min.json',
   './data/memory/duty.min.json',
+  './data/memory/deadline.min.json',
   './data/predict.json',
   './data/variants.json',
   './data/english_exam.json',
@@ -63,6 +64,7 @@ const OPTIONAL_ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './splash-logo-icon.png',
+  './data/memory/deadline_audit.json',   // 期限總表／考古對照（較大，選用）
   'https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js',
   'https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;700&family=Dancing+Script:wght@600;700&family=Cormorant+Garamond:ital,wght@1,400;1,500&display=swap',
   './js/jszip.min.js',
