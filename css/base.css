@@ -1758,15 +1758,26 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 html[data-layout="desktop"] #fab-wrap{
   right:max(16px, calc((100vw - var(--layout-page-max-w)) / 2 + 16px));
 }
-/* 平板、電腦：做題字級放大、留白加寬，長題幹比較好讀 */
-html[data-layout="tablet"] .qstemb,
-html[data-layout="desktop"] .qstemb{ font-size:17.5px; }
-html[data-layout="tablet"] .qov,
-html[data-layout="desktop"] .qov{ font-size:15.5px; }
-html[data-layout="tablet"] .qbody,
-html[data-layout="desktop"] .qbody{ padding:18px 24px; }
-html[data-layout="tablet"] .qfoot,
-html[data-layout="desktop"] .qfoot{ padding:10px 24px; }
+/* 平板、電腦：做題字級放大、留白加寬，長題幹比較好讀。
+   限高度 600 以上：手機橫放（如 S23+ 寬 832、高約 340）維持手機字級，一屏才看得到選項 */
+/* 加 #qv 前綴：media.css 在 base.css 之後載入，同權重會被蓋掉 */
+@media (min-width:600px) and (min-height:600px){
+  #qv .qstemb{ font-size:17.5px; }
+  #qv .qov{ font-size:15.5px; }
+  #qv .qbody{ padding:18px 24px; }
+  #qv .qfoot{ padding:10px 24px; }
+}
+/* 手機橫放：上下空間很少，壓縮做題畫面的頂列、底列與題幹間距 */
+@media (max-height:500px) and (orientation:landscape){
+  #qv .qhd{ padding:6px 12px; }
+  #qv .qfoot{ padding:6px 12px; }
+  #qv .qfb{ padding:9px; }
+  #qv .qfb.qstar{ width:38px; height:38px; }
+  #qv .qbody{ padding:8px 16px; }
+  #qv .qstemb{ margin-bottom:10px; }
+  #qv .qos{ gap:6px; }
+  #qv .qopt{ padding:8px 10px; }
+}
 /* 滑鼠：選項有懸停回饋 */
 @media (hover:hover) and (pointer:fine){
   .qopt:hover{ border-color:var(--acc); }
