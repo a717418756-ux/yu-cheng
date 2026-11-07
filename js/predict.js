@@ -384,7 +384,7 @@ async function _rVariants(s){
     '<div class="pr-acts"><button class="go" data-vprev="guess">▶ 猜題（共 ' + g.length + '）</button><button class="go" data-vprev="vari">▶ 變化題（共 ' + va.length + '）</button>' +
     '<button data-vprev="all">▶ 兩種混合</button></div>' +
     _rvLine(v, items) +
-    '<div class="pr-acts"><button data-vimp="sub">⬇ 匯入本科 ' + items.length + ' 題</button><button data-vimp="*">⬇ 匯入四科全部 ' + v.items.length + ' 題</button></div></div>' +
+    '<div class="pr-acts"><button data-vimp="sub">⬇ 匯入本科 ' + items.length + ' 題</button><button data-vimp="*">⬇ 匯入全部 ' + v.items.length + ' 題</button></div></div>' +
     '<div class="mem-prog">「練習」不存題庫、不留紀錄；匯入後考試別為「116猜題」「116變化題」，會進入複習排程與統計。題目更新後再按一次匯入，會同步修正已匯入的題目。單選答錯倒扣 1/3 題分、多選每個選項 1/5 分，練習時照考試規則作答。</div>';
   if(old) h += '<div style="padding:0 12px 12px"><button class="btn bg" style="width:100%" data-act="delold">🗑 刪除舊的升官等猜題（' + old + ' 題）</button></div>';
   return h;
@@ -397,6 +397,7 @@ function _rvLine(v, items){
   const c = r.counts || {};
   return '<div class="pr-meta">🔍 GPT 第' + r.round + '輪覆核（' + esc(r.date) + '）：最後 77 題 R' + (c.R||0) + '・S' + (c.S||0) + '・U' + (c.U||0) + '・X' + (c.X||0) +
     '，其中 ' + (r.fixed||[]).length + ' 題已依建議修正。詳解最後附覆核等級：R 核心有官方依據、S 部分佐證、U 缺關鍵法源、X 題目須修正。</div>' +
+    (r.claude ? '<div class="pr-meta">✅ Claude 逐題核對（' + esc(r.claude.date) + '）：' + r.claude.checked + ' 題對照條文原文與大法官解釋、憲法判決全文，另修正 ' + r.claude.fixed.length + ' 題；警政署內規類題目無原文可對，只核對所引考題來源。' + (r.claude.added ? '依警佐二類題型補寫 ' + r.claude.added + ' 題（含國文 10 題，在「🧭 二類方向」練習）。' : '') + '</div>' : '') +
     (open.length ? '<div class="pr-acts"><button data-vgids="' + esc(open.map(it => it.gid).join(',')) + '" data-label="' + esc('本科未定案題') + '">▶ 本科未定案題 ' + open.length + ' 題</button></div>' : '');
 }
 // 🧭 二類方向：GPT 依 114、115 年警佐班第二類試題整理的 40 個題型（每科 10 個），對到猜題庫相關題目
@@ -414,7 +415,7 @@ async function _rZuo2(s){
       '<div class="pr-title">' + esc(t.t) + ' <span class="mem-tag ' + (t.p === 'A' ? 'must' : 'mn') + '">' + esc(t.p) + '</span></div>' +
       '<div class="pr-text open">變化方向：' + esc(t.d) + '</div><div class="pr-meta">依據：' + esc(t.s) + '</div>' +
       '<div class="pr-acts">' + (t.g.length ? '<button class="go" data-vgids="' + esc(t.g.join(',')) + '" data-label="' + esc(t.t) + '">▶ 相關猜題 ' + t.g.length + ' 題</button>'
-        : '<span class="pr-meta">' + (exam === '國文與憲法' && t.n <= 5 ? '國文題型：猜題庫沒有國文題，要另外準備' : '猜題庫暫無對應題目') + '</span>') + '</div></div></div>').join('') +
+        : '<span class="pr-meta">' + '猜題庫暫無對應題目' + '</span>') + '</div></div></div>').join('') +
     '</div>';
   return h;
 }

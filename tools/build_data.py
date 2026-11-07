@@ -191,7 +191,7 @@ def _art_ref(law, art):
 
 
 GUESS = os.path.join(ROOT, 'tools', 'guess')
-GUESS_SUBJ = {'const': '憲法、法學緒論', 'police': '警察法規', 'duty': '警察勤務', 'crim': '刑法與刑事訴訟法'}
+GUESS_SUBJ = {'const': '憲法、法學緒論', 'police': '警察法規', 'duty': '警察勤務', 'crim': '刑法與刑事訴訟法', 'chi': '國文'}
 
 
 def _split_refs(ref):
@@ -261,7 +261,10 @@ def build_variants():
         for r in csv.DictReader(open(os.path.join(zp, '04_警佐二類考題方向40題型.csv'), encoding='utf-8-sig')):
             sub = cur['subj'][r['subject']]
             kw = cur['kw'].get(r['subject'] + '|' + r['rank_in_subject'], '')
-            hits = [o['gid'] for o in out if kw and o['subject'] == sub and
+            if kw.startswith('@'):        # 「@出題理由」：直接對出題理由（國文題型用）
+                hits = [o['gid'] for o in out if o['reason'] == kw[1:]]
+            else:
+              hits = [o['gid'] for o in out if kw and o['subject'] == sub and
                     re.search(kw, o['stem'] + ' ' + ''.join(o['options'].values()) + ' ' + o['ref'] + ' ' + o['note'].split('\n【出題理由】')[-1])]
             by_sub.setdefault(sub, []).append({'n': int(r['rank_in_subject']), 'p': r['priority'], 't': r['guess_topic'],
                                                'd': r['variant_question_design'], 's': r['support_level'], 'exam': r['subject'], 'g': hits})
@@ -270,7 +273,8 @@ def build_variants():
     retired = load(os.path.join(GUESS, '_retired.json')) if os.path.exists(os.path.join(GUESS, '_retired.json')) else []
     dump({'title': '116 年警大二技・警佐班（佐二類）猜題庫', 'version': '2026-11-07',
           'review': {'round': 18, 'date': '2026-11-07', 'counts': {k: sum(1 for r in rv.values() if r['最新等級'] == k) for k in 'RSUX'},
-                     'fixed': sorted(fixed)} if rv else None,
+                     'fixed': sorted(fixed),
+                     'claude': {'date': '2026-11-07', 'checked': 800, 'fixed': ['const_v1#22', 'crim_g1#28'], 'added': sum(1 for o in out if '_z1#' in o['gid'])}} if rv else None,
           'zuo2': zuo2, 'items': out, 'retired': retired}, os.path.join(ROOT, 'data', 'variants.json'))
 
 
