@@ -2631,6 +2631,36 @@ async function rebuildLawIndex(){  try{
   }
   }catch(e){ logError('rebuildLawIndex',e); toast('重建失敗：'+e.message); }}
 
+// ── 考古題官方答案更正：data/exam_fixes.json（對照官方答案 PDF 與釋疑結果）──
+// 以 考試別＋年度＋科目＋題號（題組另加 groupId＋groupOrder）對應；
+// 答案只在目前答案等於「原答案」時才改（你自己改過的不動），詳解只附加或替換未改過的
+async function applyExamFixes(){  try{
+  const r = await fetch('data/exam_fixes.json', { cache:'no-store' });
+  if(!r.ok) throw new Error('exam_fixes.json ' + r.status);
+  const fx = await r.json();
+  const qs = await da('questions');
+  const h = s => { let x = 0; for(const c of (s||'')) x = (x * 31 + c.codePointAt(0)) >>> 0; return x; };
+  const upd = [], lines = [];
+  for(const f of fx.fixes){
+    const q = qs.find(q => q.exam === f.exam && String(q.year) === f.year && q.subject === f.subject &&
+      (f.groupId ? (q.groupId === f.groupId && q.groupOrder === f.groupOrder) : String(q.num) === f.num));
+    if(!q) continue;
+    const n = Object.assign({}, q); let changed = false;
+    if(f.answer && q.answer === f.from){ n.answer = f.answer; changed = true; lines.push(f.year + ' ' + f.exam + ' ' + f.subject + ' 第' + f.num + '題：答案 ' + f.from + ' → ' + f.answer); }
+    if(f.noteAdd && !(q.note||'').includes(f.noteAdd.slice(0, 12))){
+      n.note = (q.note ? q.note + '\n' : '') + f.noteAdd; changed = true;
+      if(!f.answer) lines.push(f.year + ' ' + f.exam + ' ' + f.subject + ' 第' + f.num + '題：補官方說明');
+    }
+    if(f.setNum && String(q.num) === (f.numFrom || '')){ n.num = f.setNum; changed = true; lines.push(f.year + ' ' + f.exam + ' ' + f.subject + '：補題號 ' + f.setNum); }
+    if(changed) upd.push(n);
+  }
+  if(!upd.length){ toast('題庫已是最新的官方答案，不需更正'); return; }
+  if(!await askConfirm('考古題答案更正（' + upd.length + ' 題）', '依官方答案與釋疑結果（' + (fx.date||'') + ' 核對）：\n' + lines.join('\n') + '\n\n作答紀錄保留；你自己改過答案的題目不會被覆蓋。', '套用')) return;
+  for(const q of upd) q.searchBlob = ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+(q.year||'')+' '+(q.exam||'')+' '+(q.num||'')+' '+(q.keywords||[]).join(' ')).toLowerCase();
+  await bulkPut('questions', upd);
+  toast('已更正 ' + upd.length + ' 題');
+  }catch(e){ logError('applyExamFixes', e); toast('更正失敗：' + e.message); }}
+
 async function quizFromLaw(){  try{
   const lawName=(S.curLawName||window.currentLawName||'').trim();
   if(!lawName){toast('請先開啟一個法規');return;}
@@ -3827,6 +3857,7 @@ const DataMod = {
   toggleStar,
   toggleLawSort,
   rebuildLawIndex,
+  applyExamFixes,
   formatYearInput,
   editQ, _lawBlob, ttsArt, ttsLawPop,
   changeLawCat, closeLawCat, _setLawCat, closeLawInfo, saveLawInfo, _linfoPrev,
