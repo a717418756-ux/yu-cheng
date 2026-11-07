@@ -1,0 +1,216 @@
+{
+  "date": "2026-11-07",
+  "grade_change_counts": {
+    "S": 61,
+    "X": 6,
+    "R": 8,
+    "U": 2
+  },
+  "source_rules": [
+    "法務部官方法規可證條文，但不能直接證內部作業程序。",
+    "政府答覆僅屬該地區實務，不等於全國法規。",
+    "考題轉載可支持考點，不能替代行政規則正式有效版。",
+    "補教解析的警署函引述未獲原件校核。"
+  ],
+  "entries": [
+    {
+      "id": "crim_v2#25",
+      "prior_grade": "X",
+      "new_grade": "X",
+      "urls": [],
+      "still_pending": "未描述完整罪數認定事實，僅以親屬及同居推論同一占有權有疑義。"
+    },
+    {
+      "id": "duty_g2#22",
+      "prior_grade": "U",
+      "new_grade": "U",
+      "urls": [],
+      "still_pending": "尚無114～115年正式附表及修正函。"
+    },
+    {
+      "id": "duty_g2#32",
+      "prior_grade": "X",
+      "new_grade": "X",
+      "urls": [
+        {
+          "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0090001",
+          "kind": "法務部全國法規資料庫",
+          "evidence": "就業服務法第48條第1項第2款"
+        }
+      ],
+      "still_pending": "題幹法律事實不足且存在免工作許可例外。"
+    },
+    {
+      "id": "duty_g2#38",
+      "prior_grade": "U",
+      "new_grade": "S",
+      "urls": [
+        {
+          "url": "https://www.moex.com.tw/leerushock/pdf/1140312-PB026-PoliceDuties-lee-final-new.pdf.pdf",
+          "kind": "補教解析（非考選部網站）",
+          "evidence": "引用111年警署函及114警佐第9題站位"
+        },
+        {
+          "url": "https://www.npa.gov.tw/ch/app/faq/view?id=2144&module=faq&serno=A1087140",
+          "kind": "警政署官方問答",
+          "evidence": "確認存在盤查盤檢作業程序，但不直接提供站位細節"
+        }
+      ],
+      "still_pending": "二手教材引111年警署函，未取得該函附件原文及115年最新訓練版；不可標官方完整版。"
+    },
+    {
+      "id": "duty_g2#39",
+      "prior_grade": "X",
+      "new_grade": "X",
+      "urls": [
+        {
+          "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080145",
+          "kind": "法務部全國法規資料庫",
+          "evidence": "警察職權行使法第4、6、7條"
+        },
+        {
+          "url": "https://www.npa.gov.tw/ch/app/faq/view?id=2144&module=faq&serno=A1087140",
+          "kind": "警政署官方問答",
+          "evidence": "存在攔檢盤查作業程序，但不能代替唯一時序法源"
+        }
+      ],
+      "still_pending": "把SOP示例當成法定不可變順序。"
+    },
+    {
+      "id": "duty_g2#40",
+      "prior_grade": "U",
+      "new_grade": "S",
+      "urls": [
+        {
+          "url": "https://yamol.tw/exam-114%2B%E4%B8%AD%E5%A4%AE%E8%AD%A6%E5%AF%9F%E5%A4%A7%E5%AD%B8_%E5%AD%B8%E5%A3%AB%E7%8F%AD%E4%BA%8C%E5%B9%B4%E5%88%B6%E6%8A%80%E8%A1%93%E7%B3%BB%E5%85%A5%E5%AD%B8%E8%80%83%E8%A9%A6_%E8%A1%8C%E6%94%BF%E8%AD%A6%E5%AF%9F%E5%AD%B8%E7%B3%BB%EF%BC%9A%E8%AD%A6%E5%AF%9F%E5%8B%A4%E5%8B%99-126998.htm",
+          "kind": "考古題民間轉載",
+          "evidence": "114警大二技第15題：30公尺以上並可延伸或縮減"
+        }
+      ],
+      "still_pending": "未得署頒新版SOP與附圖；受道路環境及風險條件影響。"
+    },
+    {
+      "id": "duty_g2#48",
+      "prior_grade": "X",
+      "new_grade": "X",
+      "urls": [
+        {
+          "url": "https://police.boston.gov/history/",
+          "kind": "Boston Police Department官方歷史",
+          "evidence": "1854由警夜巡／守望組織整併成立BPD"
+        }
+      ],
+      "still_pending": "沒有明確定義「最早現代化」，跨城市不同里程碑混用。"
+    },
+    {
+      "id": "duty_v1#38",
+      "prior_grade": "U",
+      "new_grade": "S",
+      "urls": [
+        {
+          "url": "https://www.moex.com.tw/leerushock/pdf/1140312-PB026-PoliceDuties-lee-final-new.pdf.pdf",
+          "kind": "補教解析（非官方原函）",
+          "evidence": "114警佐第9題詳解及111年函文號"
+        }
+      ],
+      "still_pending": "現行署頒「組合警力執行攔檢、盤查、逮捕、帶離等執勤安全觀念及執行要領」111年原函及最新修正未取回。"
+    },
+    {
+      "id": "duty_v1#40",
+      "prior_grade": "U",
+      "new_grade": "S",
+      "urls": [
+        {
+          "url": "https://www.police.ntpc.gov.tw/cp-3509-54872-1.html",
+          "kind": "新北市警局官方FAQ",
+          "evidence": "一般監視器1個月；車牌辨識錄影1個月，照片6個月"
+        },
+        {
+          "url": "https://laws.gov.taipei/law/LawSearch/LawExport/FL096672?type=0",
+          "kind": "臺北市政府警察局行政規則",
+          "evidence": "駐地安全監錄系統數位循環儲存影像至少1個月"
+        },
+        {
+          "url": "https://www.npa.gov.tw/ch/app/data/doc?detailNo=920167868618772480&module=wg031&type=s",
+          "kind": "警政署官方年報（109年）",
+          "evidence": "由地方政府就公共場所監錄保存期限訂定自治法規"
+        }
+      ],
+      "still_pending": "題幹未限定地方／設備類別，構成跨自治法規擬制全國一致的問題。"
+    },
+    {
+      "id": "duty_v2#2",
+      "prior_grade": "U",
+      "new_grade": "U",
+      "urls": [],
+      "still_pending": "缺新版正式作業規定與開設層級附表。"
+    },
+    {
+      "id": "duty_v2#37",
+      "prior_grade": "U",
+      "new_grade": "S",
+      "urls": [
+        {
+          "url": "https://yamol.tw/exam-115%E5%B9%B4%2B%2B115%2B%E4%B8%AD%E5%A4%AE%E8%AD%A6%E5%AF%9F%E5%A4%A7%E5%AD%B8_%E5%AD%B8%E5%A3%AB%E7%8F%AD%E4%BA%8C%E5%B9%B4%E5%88%B6%E6%8A%80%E8%A1%93%E7%B3%BB%E5%85%A5%E5%AD%B8%E8%80%83%E8%A9%A6%E8%A9%A6%E9%A1%8C_%E8%A1%8C%E6%94%BF%E8%AD%A6%E5%AF%9F%E5%AD%B8%E7%B3%BB%EF%BC%9A-139665.htm",
+          "kind": "115年考題民間轉載",
+          "evidence": "115警大二技第14題概括門檻及4小時傳真"
+        },
+        {
+          "url": "https://www.mjib.gov.tw/EditPage/?PageID=97208f51-5e56-49de-a4f7-32faaf00d740",
+          "kind": "法務部調查局官方網站",
+          "evidence": "其重大經濟犯罪認定要點是另一套制度，不能相互代用"
+        }
+      ],
+      "still_pending": "警大考題與法務部調查局另設「重大經濟犯罪認定要點」不可相互替代；警署是否仍使用傳真與4小時限制須正式文件確認。"
+    },
+    {
+      "id": "duty_v2#5",
+      "prior_grade": "U",
+      "new_grade": "S",
+      "urls": [
+        {
+          "url": "https://www.npa.gov.tw/ch/app/data/doc?detailNo=1407541190550622208&module=events&type=s",
+          "kind": "警政署官方大事記",
+          "evidence": "證實114.7.3修正函文與計畫名稱"
+        },
+        {
+          "url": "https://yamol.tw/item-6.%2B%E4%BE%9D%E6%93%9A%E3%80%8C%E5%90%84%E7%B4%9A%E8%AD%A6%E5%AF%9F%E6%A9%9F%E9%97%9C%E8%99%95%E7%90%86%E5%88%91%E6%A1%88%E9%80%90%E7%B4%9A%E5%A0%B1%E5%91%8A%E7%B4%80%E5%BE%8B%E8%A6%8F%E5%AE%9A%E3%80%8D%EF%BC%8C%E6%9C%89%E9%97%9C%E5%88%91%E6%A1%88%E5%8C%BF%E5%A0%B1%E3%80%81%E8%99%9B%E5%A0%B1%E3%80%81%E9%81%B2%E5%A0%B1%E4%B9%8B%E8%AA%8D-3213940.htm",
+          "kind": "非官方新版條文轉錄",
+          "evidence": "轉錄114年修正版重大／特殊刑案逾1小時遲報"
+        }
+      ],
+      "still_pending": "未取得1140010762號函完整核定附件，無法確定修正後官方逐字條文、最新有效版本及是否115後再修。"
+    },
+    {
+      "id": "police_v1#15",
+      "prior_grade": "X",
+      "new_grade": "X",
+      "urls": [
+        {
+          "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080002",
+          "kind": "法務部全國法規資料庫",
+          "evidence": "警察法施行細則第10條第1款"
+        }
+      ],
+      "still_pending": "複選D缺法條明確性。"
+    },
+    {
+      "id": "police_v2#29",
+      "prior_grade": "X",
+      "new_grade": "X",
+      "urls": [
+        {
+          "url": "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=D0080058",
+          "kind": "法務部全國法規資料庫",
+          "evidence": "集會遊行法第6、25、26條"
+        },
+        {
+          "url": "https://cons.judicial.gov.tw/docdata.aspx?fid=100&id=310899",
+          "kind": "憲法法庭釋字718號",
+          "evidence": "偶發性集會不得受不合比例的事前許可限制"
+        }
+      ],
+      "still_pending": "以「得」概括所有情況，造成答案非排他。"
+    }
+  ]
+}

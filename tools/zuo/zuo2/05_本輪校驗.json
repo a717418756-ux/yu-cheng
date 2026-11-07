@@ -1,0 +1,16 @@
+{
+  "base_filename": "116年四科800題_最新累積全資料包_第18輪_20261107.zip",
+  "base_entries": 76,
+  "base_size_bytes": 4321350,
+  "original_800_ids": 800,
+  "original_unique_ids": 800,
+  "original_grade_counts": {
+    "R": 8,
+    "S": 61,
+    "U": 2,
+    "X": 6
+  },
+  "new_guess_topic_count": 40,
+  "method": "preserve all entries, only add supplementary docs",
+  "no_historical_hit_rate_claim": true
+}

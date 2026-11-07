@@ -92,7 +92,7 @@ function _views(s){
   if(_isZuo()){
     v.push(['articles','⚖ 法條']);
     if(s.reasons || s.trend) v.push(['trend','📈 趨勢']);
-    if(_ZUO_SUBJ.includes(s.name)) v.push(['variants','🎲 猜題庫']);
+    if(_ZUO_SUBJ.includes(s.name)) v.push(['zuo2','🧭 二類方向'], ['variants','🎲 猜題庫']);
     return v;
   }
   if(s.articles) v.push(['articles','⚖ 法條'], ['laws','📚 法規']);
@@ -118,6 +118,7 @@ async function _rBody(){
   else if(_cur.view === 'topics') h += _rTopics(s);
   else if(_cur.view.startsWith('pt:')) h += await _rPoints(s, _cur.view.slice(3));
   else if(_cur.view === 'variants') h += await _rVariants(s);
+  else if(_cur.view === 'zuo2') h += await _rZuo2(s);
   else if(_cur.view === 'trend') h += await _rTrend(s);
   el.innerHTML = h;
 }
@@ -382,10 +383,49 @@ async function _rVariants(s){
     '<div class="mem-tools pr-k" style="padding:8px 0 0;align-items:center"><span class="pr-meta" style="margin:0">每次練習</span>' + [10,20,50,0].map(n => '<button class="chip' + (n===_cur.vn?' on':'') + '" data-vn="' + n + '">' + (n ? n + ' 題' : '全部') + '</button>').join('') + '</div>' +
     '<div class="pr-acts"><button class="go" data-vprev="guess">▶ 猜題（共 ' + g.length + '）</button><button class="go" data-vprev="vari">▶ 變化題（共 ' + va.length + '）</button>' +
     '<button data-vprev="all">▶ 兩種混合</button></div>' +
+    _rvLine(v, items) +
     '<div class="pr-acts"><button data-vimp="sub">⬇ 匯入本科 ' + items.length + ' 題</button><button data-vimp="*">⬇ 匯入四科全部 ' + v.items.length + ' 題</button></div></div>' +
     '<div class="mem-prog">「練習」不存題庫、不留紀錄；匯入後考試別為「116猜題」「116變化題」，會進入複習排程與統計。題目更新後再按一次匯入，會同步修正已匯入的題目。單選答錯倒扣 1/3 題分、多選每個選項 1/5 分，練習時照考試規則作答。</div>';
   if(old) h += '<div style="padding:0 12px 12px"><button class="btn bg" style="width:100%" data-act="delold">🗑 刪除舊的升官等猜題（' + old + ' 題）</button></div>';
   return h;
+}
+// GPT 覆核摘要：最後 77 題的等級，可只練本科尚未定案的題目
+function _rvLine(v, items){
+  const r = v.review;
+  if(!r) return '';
+  const open = items.filter(it => it.rv && it.rv !== 'R');
+  const c = r.counts || {};
+  return '<div class="pr-meta">🔍 GPT 第' + r.round + '輪覆核（' + esc(r.date) + '）：最後 77 題 R' + (c.R||0) + '・S' + (c.S||0) + '・U' + (c.U||0) + '・X' + (c.X||0) +
+    '，其中 ' + (r.fixed||[]).length + ' 題已依建議修正。詳解最後附覆核等級：R 核心有官方依據、S 部分佐證、U 缺關鍵法源、X 題目須修正。</div>' +
+    (open.length ? '<div class="pr-acts"><button data-vgids="' + esc(open.map(it => it.gid).join(',')) + '" data-label="' + esc('本科未定案題') + '">▶ 本科未定案題 ' + open.length + ' 題</button></div>' : '');
+}
+// 🧭 二類方向：GPT 依 114、115 年警佐班第二類試題整理的 40 個題型（每科 10 個），對到猜題庫相關題目
+async function _rZuo2(s){
+  const v = await _loadVariants();
+  const z = v.zuo2, ts = z && z.subjects[s.name];
+  if(!ts) return '<div class="mem-empty">沒有這科的二類題型資料</div>';
+  const exam = ts[0].exam, f = (z.format||[]).find(x => x[0] === exam) || [];
+  const all = new Set(ts.flatMap(t => t.g));
+  let h = '<div class="pr-note">🧭 <b>警佐班第二類「' + esc(exam) + '」</b>：' + esc(f[1]||'') + '。' + esc(f[2]||'') + '。<br>' + esc(z.scoring) + '<br><small>' + esc(z.eligibility) + '</small></div>' +
+    '<div class="cc"><div class="ct">10 個高效題型（GPT 整理，' + esc(z.date) + '）</div>' +
+    '<div class="pr-meta">依 114、115 年試題的人工比較排序，<b>A 優先、B 次之，排序不是機率</b>；GPT 尚未完成 111–115 年逐題回測，沒有命中率。「相關猜題」是用關鍵字從猜題庫找出的題目，可能有少數不完全對應。</div>' +
+    (all.size ? '<div class="pr-acts"><button class="go" data-vgids="' + esc([...all].join(',')) + '" data-label="' + esc(exam + ' 二類題型') + '">▶ 10 個題型相關猜題 ' + all.size + ' 題</button></div>' : '') +
+    ts.map(t => '<div class="pr-row"><div class="pr-rank' + (t.p === 'A' ? ' top' : '') + '">' + t.n + '</div><div class="pr-main">' +
+      '<div class="pr-title">' + esc(t.t) + ' <span class="mem-tag ' + (t.p === 'A' ? 'must' : 'mn') + '">' + esc(t.p) + '</span></div>' +
+      '<div class="pr-text open">變化方向：' + esc(t.d) + '</div><div class="pr-meta">依據：' + esc(t.s) + '</div>' +
+      '<div class="pr-acts">' + (t.g.length ? '<button class="go" data-vgids="' + esc(t.g.join(',')) + '" data-label="' + esc(t.t) + '">▶ 相關猜題 ' + t.g.length + ' 題</button>'
+        : '<span class="pr-meta">' + (exam === '國文與憲法' && t.n <= 5 ? '國文題型：猜題庫沒有國文題，要另外準備' : '猜題庫暫無對應題目') + '</span>') + '</div></div></div>').join('') +
+    '</div>';
+  return h;
+}
+async function _practiceGids(gids, label){
+  const v = await _loadVariants();
+  const want = new Set(gids);
+  const pool = v.items.filter(it => want.has(it.gid)).map((it, i) => Object.assign(_variantToQ(it), { id:'virt:var-g-' + i, num:String(i+1) }));
+  if(!pool.length){ toast('沒有對應的題目'); return; }
+  _shuffle(pool);
+  if(_cur.vn) pool.length = Math.min(pool.length, _cur.vn);
+  startQWithPool(pool, '🎲 ' + label);
 }
 function _variantToQ(it){
   const q = {
@@ -485,7 +525,7 @@ function _bind(){
   if(!page || page._prBound) return;
   page._prBound = true;
   page.addEventListener('click', e => {
-    const t = e.target.closest('[data-vn],[data-exam],[data-si],[data-view],[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem],[data-vimp],[data-vprev]');
+    const t = e.target.closest('[data-vn],[data-exam],[data-si],[data-view],[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem],[data-vimp],[data-vprev],[data-vgids]');
     if(!t) return;
     const ds = t.dataset;
     if(ds.vn != null){ _cur.vn = +ds.vn; _saveState(); _rBody(); }
@@ -500,6 +540,7 @@ function _bind(){
     else if(ds.mem) openMemoryAt(ds.mem);
     else if(ds.vimp) _importVariants(ds.vimp).catch(err => { logError('importVariants', err); toast('匯入失敗'); });
     else if(ds.vprev) _previewVariants(ds.vprev);
+    else if(ds.vgids) _practiceGids(ds.vgids.split(','), ds.label || '猜題');
     else if(ds.act === 'clamp') t.classList.toggle('open');
     else if(ds.act === 'wrong'){ _cur.onlyWrong = !_cur.onlyWrong; _rBody(); }
     else if(ds.act === 'goeng') goPage('engexam');

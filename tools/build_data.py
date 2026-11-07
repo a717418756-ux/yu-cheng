@@ -213,8 +213,15 @@ def _split_refs(ref):
 def build_variants():
     """tools/guess/*.json（116 年二技＋警佐班猜題：各科猜題 100＋變化題 100）→ 平台題目格式。
     來源檔欄位：k 猜/變、src 母題（變化題）、r 出題理由類別、w 理由說明、t s單選/m多選、q 題幹、o 選項、a 答案、e 詳解、ref 法條。"""
-    import glob, hashlib
+    import glob, hashlib, csv
     out, seen = [], set()
+    # GPT 第18輪覆核（最後 77 題的最新等級）：附在詳解後面，提醒尚未全部選項定案
+    rv = {}
+    rvp = os.path.join(GUESS, 'review18', '05_剩餘77題最新狀態.csv')
+    if os.path.exists(rvp):
+        for r in csv.DictReader(open(rvp, encoding='utf-8-sig')):
+            rv[r['題號']] = r
+    fixed = set(load(os.path.join(GUESS, 'review18', 'fixed.json'))) if os.path.exists(os.path.join(GUESS, 'review18', 'fixed.json')) else set()
     for f in sorted(glob.glob(os.path.join(GUESS, '[a-z]*.json'))):
         base = os.path.basename(f)[:-5]
         sub = GUESS_SUBJ[base.split('_')[0]]
@@ -224,6 +231,14 @@ def build_variants():
                 m = re.match(r'(警佐|警大)(\d+)-(\d+)', it['src'])
                 note += '\n【母題】' + ({'警佐': '警佐班', '警大': '警大二技'}[m.group(1)] + ' ' + m.group(2) + ' 年第 ' + m.group(3) + ' 題' if m else it['src'])
             gid = it.get('id') or base + '#' + str(idx)
+            g = rv.get(gid)
+            if g:
+                lv = {'R': 'R 核心有官方依據', 'S': 'S 部分佐證', 'U': 'U 缺關鍵正式法源', 'X': 'X 題目設計須修正'}.get(g['最新等級'], g['最新等級'])
+                note += '\n【GPT 第' + g['最新輪次'] + '輪覆核】' + lv + '：' + g['本輪結論摘要']
+                if gid in fixed:
+                    note += '（已依建議修正題目或詳解，2026-11-07）'
+                elif g['最新等級'] != 'R':
+                    note += '（尚未逐選項核到最新版規定）'
             if gid in seen:
                 sys.exit('猜題編號重複：' + gid)
             seen.add(gid)
@@ -235,11 +250,28 @@ def build_variants():
                 'subject': sub, 'variant': it['k'] == '變', 'reason': it['r'], 'src': it.get('src', ''),
                 'multi': it['t'] == 'm', 'stem': it['q'], 'options': {'ABCDE'[i]: o for i, o in enumerate(it['o'])},
                 'answer': it['a'], 'note': note, 'ref': it.get('ref', ''), 'laws': laws_,
+                **({'rv': g['最新等級']} if g else {}),
             })
+    # 警佐二類 40 題型方向（GPT 2026-11-07）：每題型對到猜題庫的相關題目
+    zuo2 = None
+    zp = os.path.join(ROOT, 'tools', 'zuo', 'zuo2')
+    if os.path.exists(os.path.join(zp, 'curated.json')):
+        cur = load(os.path.join(zp, 'curated.json'))
+        by_sub = {}
+        for r in csv.DictReader(open(os.path.join(zp, '04_警佐二類考題方向40題型.csv'), encoding='utf-8-sig')):
+            sub = cur['subj'][r['subject']]
+            kw = cur['kw'].get(r['subject'] + '|' + r['rank_in_subject'], '')
+            hits = [o['gid'] for o in out if kw and o['subject'] == sub and
+                    re.search(kw, o['stem'] + ' ' + ''.join(o['options'].values()) + ' ' + o['ref'] + ' ' + o['note'].split('\n【出題理由】')[-1])]
+            by_sub.setdefault(sub, []).append({'n': int(r['rank_in_subject']), 'p': r['priority'], 't': r['guess_topic'],
+                                               'd': r['variant_question_design'], 's': r['support_level'], 'exam': r['subject'], 'g': hits})
+        zuo2 = {'date': '2026-11-07', 'format': cur['format'], 'scoring': cur['scoring'], 'eligibility': cur['eligibility'], 'subjects': by_sub}
     # 改寫過題幹的舊版題目：使用者若已匯入，同步時刪除
     retired = load(os.path.join(GUESS, '_retired.json')) if os.path.exists(os.path.join(GUESS, '_retired.json')) else []
-    dump({'title': '116 年警大二技・警佐班（佐二類）猜題庫', 'version': '2026-11-06',
-          'items': out, 'retired': retired}, os.path.join(ROOT, 'data', 'variants.json'))
+    dump({'title': '116 年警大二技・警佐班（佐二類）猜題庫', 'version': '2026-11-07',
+          'review': {'round': 18, 'date': '2026-11-07', 'counts': {k: sum(1 for r in rv.values() if r['最新等級'] == k) for k in 'RSUX'},
+                     'fixed': sorted(fixed)} if rv else None,
+          'zuo2': zuo2, 'items': out, 'retired': retired}, os.path.join(ROOT, 'data', 'variants.json'))
 
 
 def _zuo(zpath):
