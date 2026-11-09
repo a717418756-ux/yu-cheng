@@ -947,6 +947,8 @@ async function saveQ(){
     // ★ 表單沒有的欄位（答題時的手寫標註 inkImg 等）要沿用舊資料；
     //   原本整筆覆蓋，編輯一次就把標註清掉（答題中按「編輯」更容易踩到）
     for(const k in ex||{}) if(!(k in data)) data[k]=ex[k];
+    // 自己改了正確答案：官方「或」的其他可接受答案是配原答案的，一併取消
+    if(ex && data.answerAlt && ex.answer !== data.answer) delete data.answerAlt;
   }
   try{
     // 建立搜尋索引（加速搜尋）
@@ -2640,20 +2642,42 @@ async function applyExamFixes(){  try{
   const fx = await r.json();
   const qs = await da('questions');
   const h = s => { let x = 0; for(const c of (s||'')) x = (x * 31 + c.codePointAt(0)) >>> 0; return x; };
-  const upd = [], lines = [];
+  const work = new Map(), lines = [];
   for(const f of fx.fixes){
     const q = qs.find(q => q.exam === f.exam && String(q.year) === f.year && q.subject === f.subject &&
       (f.groupId ? (q.groupId === f.groupId && q.groupOrder === f.groupOrder) : String(q.num) === f.num));
     if(!q) continue;
-    const n = Object.assign({}, q); let changed = false;
-    if(f.answer && q.answer === f.from){ n.answer = f.answer; changed = true; lines.push(f.year + ' ' + f.exam + ' ' + f.subject + ' 第' + f.num + '題：答案 ' + f.from + ' → ' + f.answer); }
-    if(f.noteAdd && !(q.note||'').includes(f.noteAdd.slice(0, 12))){
-      n.note = (q.note ? q.note + '\n' : '') + f.noteAdd; changed = true;
-      if(!f.answer) lines.push(f.year + ' ' + f.exam + ' ' + f.subject + ' 第' + f.num + '題：補官方說明');
+    // 同一題可能有好幾筆更正（換解析＋補法條…）：累加在同一份工作副本上，避免後一筆蓋掉前一筆
+    const n = work.get(q.id) || Object.assign({}, q); let changed = false;
+    const tag = f.year + ' ' + f.exam + ' ' + f.subject + ' 第' + (f.num || f.setNum || '') + '題：';
+    const ansFix = !!(f.answer && n.answer === f.from);
+    if(ansFix){ n.answer = f.answer; changed = true; lines.push(tag + '答案 ' + f.from + ' → ' + f.answer + (f.alt ? ' 或 ' + f.alt.join(' 或 ') : '')); }
+    // 官方「A或B」擇一給分：答案等於本更正的答案（或指定的原答案）時才補可接受答案
+    if(f.alt && n.answer === (f.answer || f.altFor) && JSON.stringify(n.answerAlt || []) !== JSON.stringify(f.alt)){
+      n.answerAlt = f.alt.slice(); changed = true;
+      if(!ansFix) lines.push(tag + '官方另接受 ' + f.alt.join('、'));
     }
-    if(f.setNum && String(q.num) === (f.numFrom || '')){ n.num = f.setNum; changed = true; lines.push(f.year + ' ' + f.exam + ' ' + f.subject + '：補題號 ' + f.setNum); }
-    if(changed) upd.push(n);
+    if(f.free && !n.answerFree){ n.answerFree = true; changed = true; lines.push(tag + '官方一律給分'); }
+    // 整段換新解析：只在解析仍是當初的原文時（你改過就改成附加說明）
+    let noteDone = false;
+    if(f.noteNew != null && h(n.note) === f.noteHash){
+      if(!f.answer) lines.push(tag + (n.note ? '更新解析' : '補上解析'));
+      n.note = f.noteNew; changed = noteDone = true;
+    }
+    // 用開頭一段比對是否已附加過（備份檔由工具套用時，結尾的核對日期寫法略有不同）
+    if(!noteDone && f.noteAdd && !(n.note||'').includes(f.noteAdd.slice(0, 24)) && n.note !== f.noteNew){
+      n.note = (n.note ? n.note + '\n' : '') + f.noteAdd; changed = true;
+      if(!f.answer && !f.alt && !f.free) lines.push(tag + '補官方說明');
+    }
+    if(f.addLaws){
+      const have = new Set((n.relatedLaws || []).map(l => typeof l === 'string' ? l : (l?.ref || '')));
+      const add = f.addLaws.filter(r => !have.has(r));
+      if(add.length){ n.relatedLaws = [...(n.relatedLaws || []), ...add.map(ref => ({ ref }))]; changed = true; lines.push(tag + '補關聯法條 ' + add.join('、')); }
+    }
+    if(f.setNum && String(n.num) === (f.numFrom || '')){ n.num = f.setNum; changed = true; lines.push(f.year + ' ' + f.exam + ' ' + f.subject + '：補題號 ' + f.setNum); }
+    if(changed) work.set(q.id, n);
   }
+  const upd = [...work.values()];
   if(!upd.length){ toast('題庫已是最新的官方答案，不需更正'); return; }
   if(!await askConfirm('考古題答案更正（' + upd.length + ' 題）', '依官方答案與釋疑結果（' + (fx.date||'') + ' 核對）：\n' + lines.join('\n') + '\n\n作答紀錄保留；你自己改過答案的題目不會被覆蓋。', '套用')) return;
   for(const q of upd) q.searchBlob = ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+(q.year||'')+' '+(q.exam||'')+' '+(q.num||'')+' '+(q.keywords||[]).join(' ')).toLowerCase();

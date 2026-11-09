@@ -1793,3 +1793,12 @@ html[data-layout="desktop"] #fab-wrap{
   .mem-ref{ min-height:28px; }
   .pr-acts button{ min-height:32px; }
 }
+
+/* 查證紀錄（作答後，解析下方） */
+#qv .qsrc{margin-top:8px;font-size:12px;color:var(--t2);line-height:1.6}
+#qv .qsrc a{color:var(--acc);word-break:break-all}
+#qv .qsrc-ok{color:var(--grn,#4caf7d)}
+#qv .qsrc-ok.warn,#qv .qsrc-gap{color:var(--ylw,#d4a438)}
+#qv .qsrc-det{margin-top:4px;background:var(--bg2);border-radius:8px;padding:6px 10px}
+#qv .qsrc-det summary{cursor:pointer;min-height:32px;display:flex;align-items:center;list-style-position:inside}
+#qv .qsrc-t{white-space:pre-line;padding:4px 0 2px;overflow-wrap:anywhere}

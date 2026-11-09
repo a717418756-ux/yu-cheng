@@ -218,6 +218,8 @@ function renderQCard(){
   document.getElementById('qres').textContent = '';
   const noteEl = document.getElementById('qnote');
   noteEl.style.display = 'none'; noteEl.textContent = ''; noteEl.style.borderLeft = '';
+  const srcEl = document.getElementById('qsrc');
+  if(srcEl){ srcEl.style.display = 'none'; srcEl.innerHTML = ''; }
 
   // 收藏
   const star = document.getElementById('qstar');
@@ -353,7 +355,10 @@ async function ansQ(sel){  try{
   //   導致 reviewLevel 升級、nextReview 延後，污染複習排程與統計。
   //   這種題目一律不計分、不影響遺忘曲線，並提示補答案。
   const noAnswerKey = !normAns;
-  const correct  = !noAnswerKey && normSel === normAns;
+  // 官方「A或B」擇一給分：answerAlt 列出其他可接受答案；官方「一律給分」：answerFree，有作答即算對
+  const altHit   = !noAnswerKey && normSel !== normAns && _altKeys(qu).includes(normSel);
+  const freeHit  = !noAnswerKey && !!qu.answerFree && !!normSel && normSel !== normAns && !altHit;
+  const correct  = !noAnswerKey && (normSel === normAns || altHit || freeHit);
   const hesitant = responseTime > 40000;
   if(noAnswerKey) toast('本題尚未設定正確答案，不計入複習進度');
 
@@ -421,7 +426,10 @@ async function ansQ(sel){  try{
   haptic(correct ? 'success' : 'error');
   resEl.classList.add(correct ? 'qres-pop' : 'qres-shake');
   const isMultiQ = qu.multiAnswer || (qu.answer && qu.answer.length>1 && /^[A-E]{2,}$/.test(qu.answer));
-  let msg = correct ? '✓ 正確！' : '✗ 正確答案：'+_ansText(qu, '')+(isMultiQ ? ' (多選)' : '');
+  let msg = freeHit ? '✓ 本題官方一律給分（參考答案：'+_ansText(qu, '')+'）'
+    : altHit ? '✓ 正確！（官方答案：'+_ansText(qu, '')+_altText(qu)+'）'
+    : correct ? '✓ 正確！'+(_altKeys(qu).length ? '（官方另接受'+_altText(qu).replace(/^ 或 /, ' ')+'）' : '')+(qu.answerFree ? '（本題官方一律給分）' : '')
+    : '✗ 正確答案：'+_ansText(qu, '')+_altText(qu)+(isMultiQ ? ' (多選)' : '');
   if(hesitant) msg += ' ⚠ 作答超過40秒，列入猶豫題';
   resEl.textContent = msg;
 
@@ -435,8 +443,16 @@ function _showMcKey(qu, prefix){
   document.querySelectorAll('.qopt').forEach(o => o.classList.add(keys.includes(o.dataset.key) ? 'correct' : 'dim'));
   const resEl = document.getElementById('qres');
   resEl.className = 'qres on r';
-  resEl.textContent = prefix + '正確答案：' + (_ansText(qu, '、') || '（未設定）');
+  resEl.textContent = prefix + '正確答案：' + (_ansText(qu, '、') || '（未設定）') + _altText(qu) + (qu.answerFree ? '（官方一律給分）' : '');
   _showQNote(qu);
+}
+// 官方其他可接受答案（原題字母，排序後）與顯示文字（換成本次選項順序）
+function _altKeys(qu){
+  return (Array.isArray(qu.answerAlt) ? qu.answerAlt : []).map(a => String(a).toUpperCase().replace(/[^A-E]/g, '').split('').sort().join('')).filter(Boolean);
+}
+function _altText(qu){
+  const a = _altKeys(qu);
+  return a.length ? ' 或 ' + a.map(s => _toDisp(s, qu).split('').sort().join('')).join(' 或 ') : '';
 }
 
 // ══ 選項隨機排列（設定開關，預設關閉）════════════════════════
@@ -515,6 +531,32 @@ function _afterAnswer(qu){
   setTimeout(_inkSync, 60);
   _updateNoteBtn();
   showQLawLinks(qu);
+  _showQResearch(qu);
+}
+
+// ── 查證紀錄（data/exam_research.json）：官方答案核對狀態＋GPT 整理的來源與限制，收合在解析下方 ──
+//   以題目 id 對應，並核對考試別｜年度｜科目，避免自建題或 id 不同時張冠李戴
+let _qResearch = null;
+function _loadQResearch(){
+  return _qResearch ||= fetch('data/exam_research.json').then(r => r.ok ? r.json() : { items:{} })
+    .then(d => d.items || {}).catch(() => { _qResearch = null; return {}; });
+}
+function _showQResearch(qu){
+  const el = document.getElementById('qsrc');
+  if(!el || qu.type !== 'mc' || !qu.exam) return;
+  _loadQResearch().then(items => {
+    if(S.quiz.q[S.quiz.idx] !== qu) return;
+    const it = items[qu.id];
+    if(!it || it.k !== qu.exam + '|' + qu.year + '|' + qu.subject) return;
+    const link = s => esc(s).replace(/https?:\/\/[^\s｜<]+/g, u => '<a href="' + u + '" target="_blank" rel="noopener">' + (u.length > 48 ? u.slice(0, 45) + '…' : u) + '</a>');
+    let h = '';
+    if(it.ok) h += '<div class="qsrc-ok' + (it.ok.startsWith('⚠') ? ' warn' : '') + '">' + esc(it.ok) + (it.u ? ' <a href="' + esc(it.u) + '" target="_blank" rel="noopener">來源</a>' : '') + '</div>';
+    if(it.gap) h += '<div class="qsrc-gap">' + esc(it.gap) + '</div>';
+    if(it.t) h += '<details class="qsrc-det"><summary>🔎 查證紀錄（GPT 整理，連結不等於逐字核證）</summary><div class="qsrc-t">' + link(it.t) + '</div></details>';
+    if(!h) return;
+    el.innerHTML = h;
+    el.style.display = 'block';
+  });
 }
 
 // ── 作答後編輯題目：題目已不符現行規定時，當場修正 ─────────────
@@ -1219,7 +1261,10 @@ function submitMulti(){
 async function ansQMulti(selected, correctStr, qu){  try{
   S.quiz.ans = true;
   const responseTime = Date.now() - _qStart;
-  const correct  = selected === correctStr;
+  // 官方可接受的其他組合（answerAlt，換成畫面字母比對）、官方一律給分（answerFree，有作答即算對）
+  const altHit   = selected !== correctStr && _altKeys(qu).some(a => _toDisp(a, qu).split('').sort().join('') === selected);
+  const freeHit  = !!qu.answerFree && !!selected && selected !== correctStr && !altHit;
+  const correct  = selected === correctStr || altHit || freeHit;
   const hesitant = responseTime > 40000;
   const curLevel = qu.reviewLevel || 0;
   const {level:newLevel, next:nextReview} = calcNextReview(curLevel, correct);
@@ -1250,7 +1295,10 @@ async function ansQMulti(selected, correctStr, qu){  try{
   resEl.className = 'qres on '+(correct ? 'c' : 'w');
   haptic(correct ? 'success' : 'error');
   resEl.classList.add(correct ? 'qres-pop' : 'qres-shake');
-  let msg = correct ? '✓ 完全正確！' : '✗ 正確答案：'+_ansText(qu, '、');
+  let msg = freeHit ? '✓ 本題官方一律給分（參考答案：'+_ansText(qu, '、')+'）'
+    : altHit ? '✓ 正確！（官方答案：'+_ansText(qu, '、')+_altText(qu)+'）'
+    : correct ? '✓ 完全正確！'+(_altKeys(qu).length ? '（官方另接受'+_altText(qu).replace(/^ 或 /, ' ')+'）' : '')+(qu.answerFree ? '（本題官方一律給分）' : '')
+    : '✗ 正確答案：'+_ansText(qu, '、')+_altText(qu);
   if(!correct && selected) msg += '（你選：'+selected.split('').join('、')+'）';
   if(hesitant) msg += ' ⚠ 超過40秒';
   resEl.textContent = msg;
