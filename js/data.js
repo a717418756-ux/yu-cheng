@@ -2658,6 +2658,12 @@ async function applyExamFixes(){  try{
       if(!ansFix) lines.push(tag + '官方另接受 ' + f.alt.join('、'));
     }
     if(f.free && !n.answerFree){ n.answerFree = true; changed = true; lines.push(tag + '官方一律給分'); }
+    // 解析中的特定句子更正（修法日期、「建議答案」改「已核對」等）：只換仍是原句的部分
+    if(Array.isArray(f.noteRep)){
+      let hit = 0;
+      for(const r of f.noteRep) if(r.a && (n.note||'').includes(r.a)){ n.note = n.note.split(r.a).join(r.b); hit++; }
+      if(hit){ changed = true; lines.push(tag + '解析更正 ' + hit + ' 處'); }
+    }
     // 整段換新解析：只在解析仍是當初的原文時（你改過就改成附加說明）
     let noteDone = false;
     if(f.noteNew != null && h(n.note) === f.noteHash){
@@ -2667,7 +2673,7 @@ async function applyExamFixes(){  try{
     // 用開頭一段比對是否已附加過（備份檔由工具套用時，結尾的核對日期寫法略有不同）
     if(!noteDone && f.noteAdd && !(n.note||'').includes(f.noteAdd.slice(0, 24)) && n.note !== f.noteNew){
       n.note = (n.note ? n.note + '\n' : '') + f.noteAdd; changed = true;
-      if(!f.answer && !f.alt && !f.free) lines.push(tag + '補官方說明');
+      if(!f.answer && !f.alt && !f.free) lines.push(tag + (f.noteAdd.startsWith('【解題補充') ? '補完整解題' : '補官方說明'));
     }
     if(f.addLaws){
       const have = new Set((n.relatedLaws || []).map(l => typeof l === 'string' ? l : (l?.ref || '')));
@@ -2679,7 +2685,7 @@ async function applyExamFixes(){  try{
   }
   const upd = [...work.values()];
   if(!upd.length){ toast('題庫已是最新的官方答案，不需更正'); return; }
-  if(!await askConfirm('考古題答案更正（' + upd.length + ' 題）', '依官方答案與釋疑結果（' + (fx.date||'') + ' 核對）：\n' + lines.join('\n') + '\n\n作答紀錄保留；你自己改過答案的題目不會被覆蓋。', '套用')) return;
+  if(!await askConfirm('考古題答案更正（' + upd.length + ' 題）', '依官方答案與釋疑結果（' + (fx.date||'') + ' 核對）：\n' + (lines.length > 40 ? lines.slice(0, 40).join('\n') + '\n…另 ' + (lines.length - 40) + ' 項' : lines.join('\n')) + '\n\n作答紀錄保留；你自己改過答案的題目不會被覆蓋。', '套用')) return;
   for(const q of upd) q.searchBlob = ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+(q.year||'')+' '+(q.exam||'')+' '+(q.num||'')+' '+(q.keywords||[]).join(' ')).toLowerCase();
   await bulkPut('questions', upd);
   toast('已更正 ' + upd.length + ' 題');

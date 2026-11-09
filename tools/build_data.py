@@ -171,7 +171,7 @@ def build_english(pack):
 
 
 _LAWS = {}
-_LAW_ALIAS = {'中華民國刑法': '刑法'}
+_LAW_ALIAS = {'中華民國刑法': '刑法', '憲法': '中華民國憲法', '憲法增修條文': '中華民國憲法增修條文'}
 
 
 def _law_text(law, n):
@@ -210,6 +210,55 @@ def _split_refs(ref):
     return out
 
 
+def _pick_lines(t, ctx, cut):
+    """長條文只留和題目最相關的幾行（依兩字詞重疊打分），保持原順序，中間省略處以「…」標示"""
+    big = lambda x: {x[i:i + 2] for i in range(len(x) - 1)}
+    cb = big(re.sub(r'\s', '', ctx))
+    lines = [l for l in t.split('\n') if l.strip()]
+    ranked = sorted(range(len(lines)), key=lambda i: -len(big(lines[i]) & cb))
+    keep, n = set(), 0
+    for i in ranked:
+        if n + len(lines[i]) > cut and keep:
+            break
+        keep.add(i); n += len(lines[i])
+    out, prev = [], -1
+    for i in sorted(keep):
+        if i != prev + 1:
+            out.append('…')
+        out.append(lines[i]); prev = i
+    if prev != len(lines) - 1:
+        out.append('…')
+    return '\n'.join(out)
+
+
+def _ref_texts(refs, limit=3, cut=320, ctx=''):
+    """['刑法第2條', '刑法第2條之1'] → ['刑法§2：條文…']；法規庫沒有的（作業規定、釋字）略過"""
+    if not _LAWS:
+        _LAWS.update(load(os.path.join(ROOT, '..', 'Promotion', 'data', 'laws.json'))['laws'])
+    out = []
+    for r in refs:
+        if re.fullmatch(r'釋字第\d+號|\d{3}年憲判字第\d+號', r):     # 大法官解釋、憲法判決：附解釋文／主文
+            t = _LAWS.get('大法官解釋及憲法判決', {}).get('a', {}).get(r, '')
+            m = re.search(r'(?:解釋文|主文)：\n?(.+?)(?:\n理由|$)', t, re.S)
+            if m:
+                t = m.group(1).strip()
+                out.append(r + '：' + (t if len(t) <= cut else t[:cut] + '…'))
+            if len(out) >= limit:
+                break
+            continue
+        m = re.fullmatch(r'(.+?)第(\d+)條(?:之(\d+))?', r)
+        if not m:
+            continue
+        t = _law_text(m.group(1), int(m.group(2)) * 1000 + int(m.group(3) or 0)).strip()
+        if t and len(t) > cut and ctx:
+            t = _pick_lines(t, ctx, cut)
+        if t:
+            out.append(m.group(1) + '§' + m.group(2) + ('-' + m.group(3) if m.group(3) else '') + '：' + (t if len(t) <= cut else t[:cut] + '…'))
+        if len(out) >= limit:
+            break
+    return out
+
+
 def build_variants():
     """tools/guess/*.json（116 年二技＋警佐班猜題：各科猜題 100＋變化題 100）→ 平台題目格式。
     來源檔欄位：k 猜/變、src 母題（變化題）、r 出題理由類別、w 理由說明、t s單選/m多選、q 題幹、o 選項、a 答案、e 詳解、ref 法條。"""
@@ -243,6 +292,11 @@ def build_variants():
                 sys.exit('猜題編號重複：' + gid)
             seen.add(gid)
             laws_ = _split_refs(it.get('ref', ''))
+            # 詳解只寫條號（如「§2Ⅲ。」）：補上法規庫條文原文，作答後不用再點開法條
+            if len(it['e']) < 40:
+                arts = _ref_texts(laws_, ctx=it['q'] + ' ' + it['e'] + ' ' + ' '.join(it['o'][('ABCDE'.index(c))] for c in it['a'] if c in 'ABCDE' and 'ABCDE'.index(c) < len(it['o'])))
+                if arts:
+                    note = it['e'] + '\n【條文】' + '\n'.join(arts) + note[len(it['e']):]
             h = hashlib.sha1(json.dumps([it['q'], it['o'], it['a'], note, laws_], ensure_ascii=False).encode()).hexdigest()[:12]
             out.append({
                 'gid': gid,     # 固定編號（來源檔的 id，寫入後不再變）：已匯入的題目靠它同步更新
