@@ -397,7 +397,7 @@ function _rvLine(v, items){
   const c = r.counts || {};
   return '<div class="pr-meta">🔍 GPT 第' + r.round + '輪覆核（' + esc(r.date) + '）：最後 77 題 R' + (c.R||0) + '・S' + (c.S||0) + '・U' + (c.U||0) + '・X' + (c.X||0) +
     '，其中 ' + (r.fixed||[]).length + ' 題已依建議修正。詳解最後附覆核等級：R 核心有官方依據、S 部分佐證、U 缺關鍵法源、X 題目須修正。</div>' +
-    (r.claude ? '<div class="pr-meta">✅ Claude 逐題核對（' + esc(r.claude.date) + '）：' + r.claude.checked + ' 題對照條文原文與大法官解釋、憲法判決全文，另修正 ' + r.claude.fixed.length + ' 題；警政署內規類題目無原文可對，只核對所引考題來源。' + (r.claude.added ? '依警佐二類題型補寫 ' + r.claude.added + ' 題（含國文 10 題，在「🧭 二類方向」練習）。' : '') + '</div>' : '') +
+    (r.claude ? '<div class="pr-meta">✅ Claude 逐題核對（' + esc(r.claude.date) + '）：' + r.claude.checked + ' 題對照條文原文與大法官解釋、憲法判決全文，另修正 ' + r.claude.fixed.length + ' 題；警政署內規類題目無原文可對，只核對所引考題來源。' + (r.claude.added ? '依警佐二類題型補寫 ' + r.claude.added + ' 題（社維法、刑法，併入各科 200 題，替換掉重複或冷門題）。' : '') + '</div>' : '') +
     (open.length ? '<div class="pr-acts"><button data-vgids="' + esc(open.map(it => it.gid).join(',')) + '" data-label="' + esc('本科未定案題') + '">▶ 本科未定案題 ' + open.length + ' 題</button></div>' : '');
 }
 // 🧭 二類方向：GPT 依 114、115 年警佐班第二類試題整理的 40 個題型（每科 10 個），對到猜題庫相關題目
@@ -415,7 +415,7 @@ async function _rZuo2(s){
       '<div class="pr-title">' + esc(t.t) + ' <span class="mem-tag ' + (t.p === 'A' ? 'must' : 'mn') + '">' + esc(t.p) + '</span></div>' +
       '<div class="pr-text open">變化方向：' + esc(t.d) + '</div><div class="pr-meta">依據：' + esc(t.s) + '</div>' +
       '<div class="pr-acts">' + (t.g.length ? '<button class="go" data-vgids="' + esc(t.g.join(',')) + '" data-label="' + esc(t.t) + '">▶ 相關猜題 ' + t.g.length + ' 題</button>'
-        : '<span class="pr-meta">' + '猜題庫暫無對應題目' + '</span>') + '</div></div></div>').join('') +
+        : '<span class="pr-meta">' + esc(t.x || '猜題庫暫無對應題目') + '</span>') + '</div></div></div>').join('') +
     '</div>';
   return h;
 }
@@ -478,7 +478,7 @@ async function _importVariants(sub){
   }
   const msg = [add.length && '新增 ' + add.length + ' 題',
     nChanged && '更新已匯入題目 ' + nChanged + ' 題（套用最新修正；作答紀錄保留，來源有改的題目會蓋過你自己的修改）',
-    gone.length && '移除已改寫的舊版題目 ' + gone.length + ' 題'].filter(Boolean).join('；');
+    gone.length && '移除已改寫或刪除的舊題 ' + gone.length + ' 題'].filter(Boolean).join('；');
   if(!await askConfirm('匯入猜題到題庫', msg, '確定')) return;
   if(add.length) await bulkPut('questions', add);
   if(upd.length) await bulkPut('questions', upd);

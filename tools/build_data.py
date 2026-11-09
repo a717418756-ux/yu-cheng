@@ -321,7 +321,8 @@ def build_variants():
               hits = [o['gid'] for o in out if kw and o['subject'] == sub and
                     re.search(kw, o['stem'] + ' ' + ''.join(o['options'].values()) + ' ' + o['ref'] + ' ' + o['note'].split('\n【出題理由】')[-1])]
             by_sub.setdefault(sub, []).append({'n': int(r['rank_in_subject']), 'p': r['priority'], 't': r['guess_topic'],
-                                               'd': r['variant_question_design'], 's': r['support_level'], 'exam': r['subject'], 'g': hits})
+                                               'd': r['variant_question_design'], 's': r['support_level'], 'exam': r['subject'], 'g': hits,
+                                               **({'x': '國文不做猜題，請練考古題'} if not kw and r['subject'].startswith('國文') and int(r['rank_in_subject']) <= 5 else {})})
         zuo2 = {'date': '2026-11-07', 'format': cur['format'], 'scoring': cur['scoring'], 'eligibility': cur['eligibility'], 'subjects': by_sub}
     # 改寫過題幹的舊版題目：使用者若已匯入，同步時刪除
     retired = load(os.path.join(GUESS, '_retired.json')) if os.path.exists(os.path.join(GUESS, '_retired.json')) else []
