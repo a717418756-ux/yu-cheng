@@ -557,6 +557,6 @@ function _bind(){
   });
 }
 
-const Predict = { renderPredict };
+const Predict = { renderPredict, variantToQ:_variantToQ };
 Object.assign(window, Predict);
 })();

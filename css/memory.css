@@ -199,3 +199,14 @@
 .mem-au-tbl{min-width:0}
 .mem-au-tbl td:first-child{white-space:nowrap}
 .mem-au-multi td{background:var(--org2)}
+
+/* 📝 篇章練習 */
+.mem-chp{margin:8px 12px;padding:12px 13px}
+.mem-chp-t{font-size:14.5px;font-weight:700;color:var(--t0);margin-bottom:2px}
+.mem-chp-stat{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:12px;color:var(--t2)}
+.mem-chp-stat b{color:var(--t0);font-size:13.5px;font-variant-numeric:tabular-nums}
+.mem-chp-stat .warn b{color:var(--red)}
+.mem-chp-bar{height:5px;border-radius:3px;background:var(--bg3);overflow:hidden;margin-top:7px}
+.mem-chp-bar i{display:block;height:100%;background:var(--grn);border-radius:3px}
+.mem-chp-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.mem-chp-acts .btn{padding:8px 12px;font-size:12.5px;min-height:36px}

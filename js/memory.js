@@ -2,7 +2,7 @@
 // 依賴：db.js(getSetting/setSetting/da), utils.js(esc/toast), data.js(showLawPop), quiz.js(startQWithPool)
 // 資料：data/memory/index.json ＋ 各科 *.min.json（tools/build_data.py 產生）
 //   刑法、刑訴、勤務取自 Promotion 升官等記憶樹；警察法規、憲法另行整理。
-// 六個分頁：🌳 法條樹｜📊 對照表｜⚠️ 易錯爭點｜🔢 數字口訣｜🃏 閃卡｜🆕 修法
+// 七個分頁：🌳 法條樹｜📝 篇章練習（考古題、猜題依關聯法條對到各章）｜📊 對照表｜⚠️ 易錯爭點｜🔢 數字口訣｜🃏 閃卡｜🆕 修法
 //   「期限時效」科目（index.json 標 audit）另有 📋 期限總表、📝 考古對照，讀 data/memory/deadline_audit.json（GPT 復核包）
 //   樹狀節點的法條標籤點下去開平台法條彈窗（showLawPop），並標示警大二技考過幾題（🔥，取自猜題庫資料）。
 // 閃卡熟練度存在 settings 'memProgress'（隨雲端／本機備份）。
@@ -14,6 +14,7 @@
 
 const TABS = [
   ['tree',  '🌳 法條樹'],
+  ['chap',  '📝 篇章練習'],
   ['cmp',   '📊 對照表'],
   ['trap',  '⚠️ 易錯爭點'],
   ['num',   '🔢 數字口訣'],
@@ -198,6 +199,15 @@ async function _renderBody(keep){
     }
     return;
   }
+  if(_cur.tab === 'chap'){
+    if(!_chap || _chap.sid !== d.id) el.innerHTML = '<div class="mem-empty">整理篇章題目…</div>';
+    const top = el.scrollTop;
+    _chap = await _chapData(d);
+    if(_cur.tab !== 'chap' || _cur.sid !== d.id) return;
+    el.innerHTML = _rChap(d, _chap);
+    el.scrollTop = keep ? top : 0;
+    return;
+  }
   const fn = { tree:_rTree, cmp:_rCmp, trap:_rTrap, num:_rNum, card:_rCard, upd:_rUpd }[_cur.tab];
   el.innerHTML = fn(d);
   el.scrollTop = 0;
@@ -229,6 +239,119 @@ function _rNodes(nodes, path){
     if(kids) return '<li><details class="mem-node" open><summary>' + head + '</summary>' + desc + refs + _rNodes(n.c, id) + '</details></li>';
     return '<li class="leaf">' + head + desc + refs + '</li>';
   }).join('') + '</ul>';
+}
+
+// ════════ 📝 篇章練習 ════════
+//   把題庫的考古題、猜題庫的題目，依「關聯法條」對到法條樹的每個篇章：讀完一章就練那一章。
+//   對應方式：篇章樹上出現的法條（法規全名|條號）、釋字／憲判字號，與題目的關聯法條有交集即歸入；
+//   一題可能同時屬於好幾章。沒有關聯法條、或法條不在任何一章的題目列在最後「未歸入篇章」。
+const _SUBJ_EXAM = { police:['警察法規'], constitution:['憲法、法學緒論'], criminal:['刑法與刑事訴訟法'], procedure:['刑法與刑事訴訟法'], duty:['警察勤務'], deadline:['警察法規', '行政法'] };
+const _plainKey = s => String(s||'').replace(/[第號\s　]/g, '').replace(/^司法院|^大法官/, '');
+function _refKeys(refs){
+  const keys = new Set();
+  (refs||[]).forEach(x => parseRefs(typeof x === 'string' ? x : (x && x.ref) || '').forEach(r => {
+    if(r.key) keys.add(r.key); else if(r.ref) keys.add('p:' + _plainKey(r.ref));
+  }));
+  return keys;
+}
+function _chKeys(ch){
+  const refs = [];
+  const walk = ns => (ns||[]).forEach(n => { if(n.ref) refs.push(n.ref); walk(n.c); });
+  walk(ch.tree);
+  return _refKeys(refs);
+}
+// 沒有關聯法條的題目（勤務、憲法學理題居多）：改用篇章樹的節點名稱當關鍵字比對題幹與選項，
+//   歸到命中最多的一章（至少命中一個 3 字以上的節點名稱）。太泛的詞不當關鍵字。
+const _KW_STOP = /^(其他|定義|種類|要件|程序|效果|原則|例外|救濟|目的|性質|對象|範圍|方式|期間|期限|內容|概念|意義|主體|客體|罰則|總則|分則|通則|說明|比較|注意|重點|補充)$/;
+function _chWords(ch){
+  const ws = new Set();
+  const add = t => String(t||'').replace(/[（(].*?[)）]/g, '').split(/[、，,／\/：:；;→＝=＋+\s]+/).forEach(w => {
+    w = w.replace(/[「」『』《》〈〉.。?？!！]/g, '').replace(/§.*$/, '');
+    if(w.length >= 3 && w.length <= 12 && !_KW_STOP.test(w) && !/^[\d.]+$/.test(w)) ws.add(w);
+  });
+  const walk = ns => (ns||[]).forEach(n => { add(n.t); walk(n.c); });
+  add(ch.title); walk(ch.tree);
+  return [...ws];
+}
+let _chap = null;      // 目前科目的篇章對應結果（切科目、重繪時重建）
+async function _chapData(d){
+  const names = _SUBJ_EXAM[d.id] || [d.name];
+  // 同一個考科拆成兩個記憶科目時（刑法＋刑訴），「未歸入」要兩邊都對不到才算
+  const sibs = (_index.subjects||[]).filter(s => s.id !== d.id && !s.audit && (_SUBJ_EXAM[s.id]||[]).some(n => names.includes(n)));
+  const sibKeys = new Set();
+  for(const s of sibs){ try{ (await _loadSubj(s.id)).chapters.forEach(ch => _chKeys(ch).forEach(k => sibKeys.add(k))); }catch(e){} }
+  const chs = d.chapters.map(ch => ({ ch, keys:_chKeys(ch), words:_chWords(ch), exam:[], guess:[], kw:0 }));
+  const byWord = text => {      // 關鍵字命中最多的一章（同分取字數較長者），沒命中回傳 null
+    let best = null, bs = 0;
+    chs.forEach(c => { let sc = 0; c.words.forEach(w => { if(text.includes(w)) sc += w.length; }); if(sc > bs){ bs = sc; best = c; } });
+    return best;
+  };
+  const hit = (set, ks) => { for(const k of ks) if(set.has(k)) return true; return false; };
+  const un = [];
+  let qs = []; try{ qs = await da('questions'); }catch(e){}
+  qs.filter(q => names.includes(q.subject) && !(q.tags||[]).includes('猜題')).forEach(q => {
+    const ks = _refKeys(q.relatedLaws);
+    let any = false;
+    if(ks.size) chs.forEach(c => { if(hit(c.keys, ks)){ c.exam.push(q); any = true; } });
+    if(any || (ks.size && hit(sibKeys, ks))) return;
+    const c = byWord((q.groupStem||'') + (q.stem||'') + Object.values(q.options||{}).join(''));
+    if(c){ c.exam.push(q); c.kw++; } else un.push(q);
+  });
+  let v = null; try{ v = await _json('data/variants.json'); }catch(e){}
+  ((v && v.items)||[]).filter(it => names.includes(it.subject)).forEach(it => {
+    const ks = _refKeys(it.laws);
+    let any = false;
+    if(ks.size) chs.forEach(c => { if(hit(c.keys, ks)){ c.guess.push(it.gid); any = true; } });
+    if(!any && !(ks.size && hit(sibKeys, ks))){ const c = byWord((it.stem||'') + Object.values(it.options||{}).join('')); if(c) c.guess.push(it.gid); }
+  });
+  return { sid:d.id, chs, un, v };
+}
+const _qDone = q => !!q.lastReview;
+const _qWeak = q => (q.wrongCount||0) > 0 && !((q.correctStreak||0) > 0);
+function _rChap(d, cd){
+  const row = (title, lead, exam, guess, i) => {
+    const done = exam.filter(_qDone).length, weak = exam.filter(_qWeak).length, todo = exam.filter(q => !_qDone(q) || _qWeak(q)).length;
+    const pct = exam.length ? Math.round(done / exam.length * 100) : 0;
+    return '<div class="cc mem-chp"><div class="mem-chp-t">' + esc(title) + '</div>' +
+      (lead ? '<div class="mem-ch-lead">' + esc(lead) + '</div>' : '') +
+      '<div class="mem-chp-stat"><span>考古題 <b>' + exam.length + '</b></span><span>已做 <b>' + done + '</b></span>' +
+        '<span' + (weak ? ' class="warn"' : '') + '>待加強 <b>' + weak + '</b></span>' + (guess.length ? '<span>猜題 <b>' + guess.length + '</b></span>' : '') + '</div>' +
+      (exam.length ? '<div class="mem-chp-bar" role="img" aria-label="已做 ' + pct + '%"><i style="width:' + pct + '%"></i></div>' : '') +
+      '<div class="mem-chp-acts">' +
+        (exam.length ? '<button class="btn bp" data-chq="' + i + '" data-kind="all">▶ 考古題 ' + exam.length + '</button>' : '<span class="mem-au-miss">本章沒有對到考古題</span>') +
+        (todo && todo < exam.length ? '<button class="btn bg" data-chq="' + i + '" data-kind="todo">沒做過＋錯題 ' + todo + '</button>' : '') +
+        (guess.length ? '<button class="btn bg" data-chq="' + i + '" data-kind="guess">🎲 猜題 ' + guess.length + '</button>' : '') +
+        (i >= 0 ? '<button class="btn bg" data-chq="' + i + '" data-kind="tree">🌳 看本章</button>' : '') +
+      '</div></div>';
+  };
+  const total = new Set(cd.chs.flatMap(c => c.exam.map(q => q.id))).size;
+  return '<div class="mem-intro">📝 <b>篇章練習</b>：讀完一章，直接練那一章的考古題和猜題。題目依「關聯法條」自動對到篇章（共對到 ' + total + ' 題），一題可能屬於好幾章；' +
+    '沒有關聯法條的題目改用篇章關鍵字對應（' + cd.chs.reduce((a, c) => a + c.kw, 0) + ' 題），可能有少數不完全對應。作答會照常記入複習進度；猜題是臨時練習，不存題庫。<div class="mem-src">「待加強」＝答錯過、之後還沒再答對的題目。</div></div>' +
+    cd.chs.map((c, i) => row(c.ch.title, c.ch.lead, c.exam, c.guess, i)).join('') +
+    (cd.un.length ? row('未歸入篇章', '沒有關聯法條，或法條不在上面任何一章的題目', cd.un, [], -1) : '');
+}
+async function _chapGo(i, kind){
+  const cd = _chap;
+  if(!cd) return;
+  const c = i < 0 ? { ch:{ title:'未歸入篇章' }, exam:cd.un, guess:[] } : cd.chs[i];
+  if(!c) return;
+  if(kind === 'tree'){
+    _cur.tab = 'tree'; _renderTabs(); await _renderBody();
+    const el = document.getElementById('mem-ch-' + c.ch.id);
+    if(el){ document.querySelectorAll('#mem-body details.mem-ch').forEach(x => x.open = x === el); el.scrollIntoView({ block:'start' }); }
+    return;
+  }
+  let pool;
+  if(kind === 'guess'){
+    const want = new Set(c.guess);
+    if(typeof variantToQ !== 'function'){ toast('猜題庫尚未載入'); return; }
+    pool = ((cd.v && cd.v.items)||[]).filter(it => want.has(it.gid)).map((it, n) => Object.assign(variantToQ(it), { id:'virt:ch-g-' + n, num:String(n + 1) }));
+  } else {
+    pool = (kind === 'todo' ? c.exam.filter(q => !_qDone(q) || _qWeak(q)) : c.exam).slice();
+  }
+  if(!pool.length){ toast('沒有對應的題目'); return; }
+  for(let k = pool.length - 1; k > 0; k--){ const j = Math.floor(Math.random() * (k + 1)); [pool[k], pool[j]] = [pool[j], pool[k]]; }
+  startQWithPool(pool, (kind === 'guess' ? '🎲 ' : '📝 ') + c.ch.title);
 }
 
 // ════════ 📊 對照表 ════════
@@ -653,6 +776,8 @@ function _initDelegation(){
       else _practiceQ(ds.qids.split(','), ds.label || '');
       return;
     }
+    const chq = e.target.closest('[data-chq]');
+    if(chq){ _chapGo(+chq.dataset.chq, chq.dataset.kind); return; }
     const act = e.target.closest('[data-act]');
     if(!act) return;
     const a = act.dataset.act;

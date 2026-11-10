@@ -39,6 +39,43 @@ async function _nextExam(){
 // ════════════════════════════════════════════════════════════
 // 【統計頁渲染】
 // ════════════════════════════════════════════════════════════
+// 錯因分布：答錯後在題目下方點選的原因（attempts.wrongReason），每種附對策與「練這類題」
+//   可練的題目＝目前標著這個錯因的題目（題目的 wrongWhy，以最後一次標記為準）
+const _WHY_TIP = {
+  '觀念不會':'回記憶庫讀那一章，再做「篇章練習」',
+  '記錯數字或要件':'用「數字魔鬼」和記憶庫的數字口訣',
+  '看錯題目':'作答前先圈出「不」「非」「錯誤」',
+  '二選一猜錯':'比對兩個選項差在哪個要件',
+  '粗心':'放慢，送出前再看一次題幹',
+};
+function _renderWhy(qs, ats){
+  const box = document.getElementById('why-box');
+  if(!box) return;
+  const list = Object.keys(_WHY_TIP);
+  const cnt = Object.fromEntries(list.map(w => [w, 0]));
+  ats.forEach(a => { if(a.correct === false && cnt[a.wrongReason] !== undefined) cnt[a.wrongReason]++; });
+  const total = list.reduce((s, w) => s + cnt[w], 0);
+  if(!total){
+    box.innerHTML = '<div style="font-size:12px;color:var(--t2);line-height:1.7">還沒有資料。選擇題答錯後，在解析上方點一下「這題錯在」的原因，這裡就會統計哪一種錯最多，並可以只練那一類的題目。</div>';
+    return;
+  }
+  const max = Math.max(...list.map(w => cnt[w]));
+  box.innerHTML = list.map(w => {
+    const n = qs.filter(q => q.wrongWhy === w).length;
+    return `<div class="why-row">
+      <span class="why-name">${esc(w)}<span class="why-tip">${esc(_WHY_TIP[w])}</span></span>
+      <span class="wl-bar"><i style="width:${max ? cnt[w] / max * 100 : 0}%;background:${cnt[w] === max ? 'var(--red)' : 'var(--org)'}"></i></span>
+      <span class="why-n">${cnt[w]}</span>
+      ${n ? `<button class="btn bg why-go" onclick="practiceWhy('${escJs(w)}')">▶ 練 ${n} 題</button>` : '<span></span>'}
+    </div>`;
+  }).join('') + '<div class="wl-hint">數字是標記次數。「練 N 題」是目前標著這個錯因的題目；重做答對後錯因仍保留，答錯時可以改標。</div>';
+}
+async function practiceWhy(w){  try{
+  const pool = (await da('questions')).filter(q => q.wrongWhy === w);
+  if(!pool.length){ toast('沒有標記這個錯因的題目'); return; }
+  startQWithPool(shuffleUnits(pool).flat(), '🧭 ' + w);
+  }catch(e){ logError('practiceWhy', e); }}
+
 async function _renderWeakLaws(){
   const el = document.getElementById('weak-laws');
   if(!el || typeof lawWeakRank !== 'function') return;
@@ -93,6 +130,7 @@ async function renderStats(){  try{
 
   // 弱點法條：題目的關聯法條＋題幹裡寫到的條號，彙整成「哪幾條最常錯」，點一下就練那條的題
   _renderWeakLaws().catch(e => logError('weakLaws', e));
+  try{ _renderWhy(qs, ats); }catch(e){ logError('renderWhy', e); }
 
   // 學習軌跡：最近 30 天，畫面顯示 7 天，左右滑動查看
   const totalDays = 30, visibleDays = 7;
@@ -429,7 +467,7 @@ async function exportAI(kind){  try{
   }catch(e){ logError('exportAI', e); }}
 
 // ════════ 公開 API ════════
-const Stats = { renderStats, clearWrongAts, buildAI, copyAI, dlAI, updateAIExport, exportAI };
+const Stats = { renderStats, practiceWhy, clearWrongAts, buildAI, copyAI, dlAI, updateAIExport, exportAI };
 window.Stats = Stats;
 Object.assign(window, Stats);
 

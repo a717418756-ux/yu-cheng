@@ -14,6 +14,8 @@ let _qStart = 0;            // 題目開始時間
 let _lastPool = [];         // 完成後供「再練習一次」用
 let _lastWrong = [];        // 完成後供「錯題重做」用
 let _lastMode = 'all';
+let _lastMine = null;         // 模擬考：qid → 當時選的答案（答對為 true、未答為 ''），檢討用
+let _lastMock = null;         // 模擬考設定（再考一次沿用）
 
 // ════════ 啟動入口 ════════
 // ════════════════════════════════════════════════════════════
@@ -63,71 +65,212 @@ let _mockTimer = null;      // 倒數計時器
 let _mockEndAt = 0;         // 結束時間戳
 let _mockExitConfirmed = false;   // 已確認放棄，避免確認框遞迴
 
+// 計分方式：neg＝警大二技／警佐班（單選答錯倒扣 1/3 題分；多選每個選項獨立計分，答錯一個選項扣 2/5 題分、扣到該題 0 分；未作答不給分不扣分）
+//           none＝不倒扣（答對才給分，升官等測驗題）
+const _MOCK_RULES = { neg:'倒扣（警大二技、警佐班）', none:'不倒扣（升官等）' };
+let _mockPapers = [];      // 可整份作答的考卷 [{exam, year, subject, n}]
+let _mockKind = 'paper';   // paper＝整份考古題 / rand＝隨機抽題
+
 function startMockExam(){  try{
+  document.getElementById('mock-ov')?.remove();
   const ov = document.createElement('div');
   ov.className = 'ov on';
   ov.id = 'mock-ov';
+  const opt = (arr, def, suf) => arr.map(n=>'<option value="'+n+'"'+(n===def?' selected':'')+'>'+n+(suf||'')+'</option>').join('');
   ov.innerHTML =
-    '<div class="sh" onclick="event.stopPropagation()" style="max-width:420px">'
+    '<div class="sh" onclick="event.stopPropagation()" style="max-width:460px">'
     + '<div class="shdl"></div>'
     + '<div class="sht"><span>限時模擬考</span>'
-    +   '<button class="hd-btn bg" onclick="document.getElementById(\'mock-ov\').remove()">✕</button></div>'
-    + '<div style="padding:4px 18px 20px">'
-    +   '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px">'
-    +     '模擬真實考試：<b>作答時不顯示對錯</b>，交卷後一次檢討。<br>只出選擇題。</div>'
-    +   '<div class="fg"><label class="fl">科目</label>'
-    +     '<select id="mk-sub"><option value="">全部科目</option></select></div>'
-    +   '<div class="fr fg">'
-    +     '<div><label class="fl">題數</label><select id="mk-n">'
-    +       [25,40,50,60].map(n=>'<option'+(n===40?' selected':'')+'>'+n+'</option>').join('')
-    +     '</select></div>'
-    +     '<div><label class="fl">時間（分鐘）</label><select id="mk-t">'
-    +       [30,45,60,90,120].map(n=>'<option'+(n===60?' selected':'')+'>'+n+'</option>').join('')
-    +     '</select></div>'
+    +   '<button class="hd-btn bg" onclick="document.getElementById(\'mock-ov\').remove()" aria-label="關閉">✕</button></div>'
+    + '<div class="mk-body">'
+    +   '<div class="mk-note">照正式考試進行：<b>作答時不顯示對錯</b>，可以略過不答，時間到自動交卷，交卷後給分數並逐題檢討。只出選擇題。</div>'
+    +   '<div class="mk-seg" id="mk-kind">'
+    +     '<button data-kind="paper" class="on" onclick="mockKind(\'paper\')">整份考古題</button>'
+    +     '<button data-kind="rand" onclick="mockKind(\'rand\')">隨機抽題</button></div>'
+    +   '<div id="mk-paper">'
+    +     '<div class="fr fg"><div><label class="fl">考試別</label><select id="mk-ex" onchange="mockFill(\'ex\')"></select></div>'
+    +       '<div><label class="fl">年度</label><select id="mk-yr" onchange="mockFill(\'yr\')"></select></div></div>'
+    +     '<div class="fg"><label class="fl">科目</label><select id="mk-ps" onchange="mockFill(\'ps\')"></select></div>'
     +   '</div>'
-    +   '<div id="mk-hint" style="font-size:11.5px;color:var(--t2);margin:2px 0 12px"></div>'
-    +   '<button class="btn bp bw" style="width:100%;padding:11px;font-size:14px;font-weight:600"'
-    +     ' onclick="beginMockExam()">開始作答</button>'
+    +   '<div id="mk-rand" style="display:none">'
+    +     '<div class="fg"><label class="fl">科目</label><select id="mk-sub"><option value="">全部科目</option></select></div>'
+    +     '<div class="fg"><label class="fl">題數</label><select id="mk-n">'+opt([20,25,40,50,60,80], 40, ' 題')+'</select></div>'
+    +   '</div>'
+    +   '<div class="fr fg">'
+    +     '<div><label class="fl">時間</label><select id="mk-t">'+opt([20,30,40,50,60,80,90,100,120], 60, ' 分鐘')+'</select></div>'
+    +     '<div><label class="fl">計分</label><select id="mk-rule">'
+    +       Object.entries(_MOCK_RULES).map(([k, t])=>'<option value="'+k+'">'+t+'</option>').join('')+'</select></div>'
+    +   '</div>'
+    +   '<div id="mk-hint" class="mk-hint"></div>'
+    +   '<button class="btn bp bw mk-go" onclick="beginMockExam()">開始作答</button>'
+    +   '<div id="mk-hist"></div>'
     + '</div></div>';
   document.body.appendChild(ov);
-  // 帶入科目清單與可用題數
-  da('questions').then(qs=>{
+  _mockKind = 'paper';
+  // 帶入考卷清單、科目清單與最近成績
+  Promise.all([da('questions'), getSetting('mock_history', [])]).then(([qs, hist])=>{
     const mc = qs.filter(q=>q.type==='mc' && (q.answer||'').trim());
     const subs=[...new Set(mc.map(q=>q.subject).filter(Boolean))].sort();
     const sel=document.getElementById('mk-sub');
     if(sel) sel.innerHTML='<option value="">全部科目（'+mc.length+' 題可用）</option>'
-      + subs.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'（'
-        + mc.filter(q=>q.subject===x).length+' 題）</option>').join('');
-    const hint=document.getElementById('mk-hint');
-    if(hint) hint.textContent='※ 只計入已填正確答案的選擇題';
-  }).catch(()=>{});
+      + subs.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'（'+mc.filter(q=>q.subject===x).length+' 題）</option>').join('');
+    // 整份考卷：考試別＋年度＋科目相同、選擇題 10 題以上（自建題、猜題不算）
+    const m = new Map();
+    mc.filter(q=>q.exam && q.year && q.subject && !(q.tags||[]).includes('猜題')).forEach(q=>{
+      const k = q.exam+'|'+q.year+'|'+q.subject;
+      const o = m.get(k) || m.set(k, {exam:q.exam, year:String(q.year), subject:q.subject, n:0}).get(k);
+      o.n++;
+    });
+    _mockPapers = [...m.values()].filter(x=>x.n >= 10);
+    if(!_mockPapers.length){ mockKind('rand'); document.querySelector('#mk-kind [data-kind="paper"]')?.setAttribute('disabled', ''); }
+    else mockFill('init');
+    const hb = document.getElementById('mk-hist');
+    if(hb && hist && hist.length) hb.innerHTML = '<div class="mk-hist-t">最近成績</div>' + hist.slice(-5).reverse().map(h=>
+      '<div class="mk-hist-r"><span class="mk-hist-d">'+esc(String(h.at||'').slice(5))+'</span><span class="mk-hist-n">'+esc(h.title||'')+'</span>'
+      + '<b>'+esc(String(h.score))+'</b><small>分</small></div>').join('');
+  }).catch(e=>logError('startMockExam.fill', e));
   }catch(e){ logError('startMockExam', e); }}
 
-async function beginMockExam(){  try{
-  const sub = document.getElementById('mk-sub')?.value || '';
-  const n   = parseInt(document.getElementById('mk-n')?.value) || 40;
-  const min = parseInt(document.getElementById('mk-t')?.value) || 60;
+// 整份考古題 ↔ 隨機抽題
+function mockKind(k){
+  _mockKind = k;
+  document.querySelectorAll('#mk-kind button').forEach(b=>b.classList.toggle('on', b.dataset.kind === k));
+  const pp = document.getElementById('mk-paper'), rd = document.getElementById('mk-rand');
+  if(pp) pp.style.display = k === 'paper' ? '' : 'none';
+  if(rd) rd.style.display = k === 'rand' ? '' : 'none';
+  _mockHint();
+}
+// 考試別 → 年度 → 科目 連動（年度新的排前面）
+function mockFill(from){
+  const ex = document.getElementById('mk-ex'), yr = document.getElementById('mk-yr'), ps = document.getElementById('mk-ps');
+  if(!ex || !yr || !ps) return;
+  const set = (el, list, keep, label) => {
+    const cur = keep ? el.value : '';
+    el.innerHTML = list.map(v=>'<option value="'+esc(v)+'">'+esc(label ? label(v) : v)+'</option>').join('');
+    if(cur && list.includes(cur)) el.value = cur;
+  };
+  let last = {};
+  try{ last = JSON.parse(localStorage.getItem('mockLast') || '{}'); }catch(e){}
+  if(from === 'init'){
+    const exs = [...new Set(_mockPapers.map(x=>x.exam))].sort();
+    set(ex, exs, false);
+    const want = exs.includes(last.ex) ? last.ex : exs.find(x=>/警佐/.test(x));
+    if(want) ex.value = want;
+  }
+  if(from === 'init' || from === 'ex')
+    set(yr, [...new Set(_mockPapers.filter(x=>x.exam === ex.value).map(x=>x.year))].sort((a, b)=>(+b||0) - (+a||0) || String(b).localeCompare(String(a))), from !== 'init', v=>v+' 年');
+  if(from !== 'ps'){
+    const list = _mockPapers.filter(x=>x.exam === ex.value && x.year === yr.value);
+    set(ps, list.map(x=>x.subject), true, v=>v+'（'+(list.find(x=>x.subject === v)||{}).n+' 題）');
+  }
+  if(from === 'init'){
+    if(last.yr && [...yr.options].some(o=>o.value === last.yr)){ yr.value = last.yr; mockFill('yr'); return; }
+    if(last.ps && [...ps.options].some(o=>o.value === last.ps)) ps.value = last.ps;
+    const t = document.getElementById('mk-t');
+    if(t && last.min && [...t.options].some(o=>+o.value === +last.min)) t.value = String(last.min);
+  }
+  if(from === 'yr' && last.ps && [...ps.options].some(o=>o.value === last.ps) && !ps.dataset.touched) ps.value = last.ps;
+  // 升官等測驗題不倒扣，其餘預設倒扣
+  const rule = document.getElementById('mk-rule');
+  if(rule && from !== 'ps') rule.value = /升官等/.test(ex.value) ? 'none' : 'neg';
+  _mockHint();
+}
+function _mockHint(){
+  const hint = document.getElementById('mk-hint');
+  if(!hint) return;
+  hint.textContent = _mockKind === 'paper'
+    ? '照原考卷題號順序出題；只收已有正確答案的選擇題。'
+    : '從題庫隨機抽題，題組不拆開；只收已有正確答案的選擇題。';
+}
 
+async function beginMockExam(){  try{
+  const min  = parseInt(document.getElementById('mk-t')?.value) || 60;
+  const rule = document.getElementById('mk-rule')?.value === 'none' ? 'none' : 'neg';
   const qs = await da('questions');
   // 只收「選擇題且已填答案」——沒答案的題目無法計分
   let pool = qs.filter(q=>q.type==='mc' && (q.answer||'').trim());
-  if(sub) pool = pool.filter(q=>q.subject===sub);
-  if(!pool.length){ toast('這個科目沒有可用的選擇題'); return; }
-
-  // 隨機抽題：題組整組取或不取（裝不下就跳過，換下一個單位），不會只抽到半組
-  const picked = [];
-  for(const u of shuffleUnits(pool)){
-    if(picked.length + u.length <= n) picked.push(...u);
-    if(picked.length === n) break;
+  let title;
+  if(_mockKind === 'paper'){
+    const ex = document.getElementById('mk-ex')?.value, yr = document.getElementById('mk-yr')?.value, sub = document.getElementById('mk-ps')?.value;
+    pool = pool.filter(q=>q.exam === ex && String(q.year) === yr && q.subject === sub && !(q.tags||[]).includes('猜題'));
+    if(!pool.length){ toast('找不到這份考卷的選擇題'); return; }
+    const no = q => parseFloat(String(q.num||'').replace(/[^\d.]/g, ' ')) || 9999;
+    pool.sort((a, b)=>no(a) - no(b) || (a.groupOrder||0) - (b.groupOrder||0));
+    title = yr + ' ' + ex + ' ' + sub;
+    try{ localStorage.setItem('mockLast', JSON.stringify({ ex, yr, ps:sub, min })); }catch(e){}
+  } else {
+    const sub = document.getElementById('mk-sub')?.value || '';
+    const n   = parseInt(document.getElementById('mk-n')?.value) || 40;
+    if(sub) pool = pool.filter(q=>q.subject===sub);
+    if(!pool.length){ toast('這個科目沒有可用的選擇題'); return; }
+    // 隨機抽題：題組整組取或不取（裝不下就跳過，換下一個單位），不會只抽到半組
+    const picked = [];
+    for(const u of shuffleUnits(pool)){
+      if(picked.length + u.length <= n) picked.push(...u);
+      if(picked.length === n) break;
+    }
+    if(pool.length < n) toast('可用題目僅 '+pool.length+' 題，已全數出題');
+    else if(picked.length < n) toast('題組不拆開，本次共 '+picked.length+' 題');
+    pool = picked;
+    title = (sub || '全部科目') + ' 隨機 ' + pool.length + ' 題';
   }
-  if(pool.length < n) toast('可用題目僅 '+pool.length+' 題，已全數出題');
-  else if(picked.length < n) toast('題組不拆開，本次共 '+picked.length+' 題');
-  pool = picked;
-
   document.getElementById('mock-ov')?.remove();
-  startQWithPool(pool, 'mock');
-  _startMockTimer(min);
+  _beginMock(pool, { rule, min, title });
   }catch(e){ logError('beginMockExam', e); toast('無法開始：'+e.message); }}
+
+function _beginMock(pool, cfg){
+  startQWithPool(pool, 'mock');
+  S.quiz.mock = Object.assign({}, cfg, { startAt:Date.now(), saved:false });
+  _startMockTimer(cfg.min);
+}
+
+// 計分：回傳總分（滿分 100）與逐題結果。單選、多選並存時題分比 2：3（警佐班二類每科單選 20 題 2 分、多選 20 題 3 分），否則各題等分。
+function _mockScore(){
+  const {q, res} = S.quiz;
+  const rule = (S.quiz.mock||{}).rule || 'neg';
+  const byId = new Map(res.map(r=>[r.qid, r]));
+  const letters = x => String(x||'').toUpperCase().replace(/[^A-E]/g, '');
+  const isM = x => letters(x.answer).length > 1 || !!x.multiAnswer;
+  const nS = q.filter(x=>!isM(x)).length, nM = q.length - nS;
+  const unit = 100 / ((nS*2 + nM*3) || 1);
+  const wOf = x => (nS && nM) ? (isM(x) ? 3 : 2) * unit : 100 / (q.length || 1);
+  let score = 0, lost = 0, ok = 0, ng = 0, blank = 0, time = 0;
+  const rows = q.map((x, i)=>{
+    const r = byId.get(x.id), wt = wOf(x);
+    let got = 0, st;
+    if(r) time += r.responseTime || 0;
+    if(!r || r.skipped || (!r.correct && !r.sel)){ blank++; st = 'b'; }
+    else if(r.correct){ got = wt; ok++; st = 'o'; }
+    else {
+      ng++; st = 'x';
+      if(rule === 'neg'){
+        if(isM(x)){
+          const keys = Object.keys(x.options||{}), A = new Set(letters(x.answer)), B = new Set(letters(r.sel));
+          const k = keys.filter(c=>A.has(c) !== B.has(c)).length, n = keys.length || 5;
+          got = Math.max(0, wt * (n - 2*k) / n);
+        } else got = -wt / 3;
+      }
+    }
+    if(got < 0) lost -= got;
+    score += got;
+    return { i, st, got, wt, sub:x.subject || '未分類', sel:r ? (r.sel||'') : '' };
+  });
+  const subs = {};
+  rows.forEach(r=>{ const d = subs[r.sub] || (subs[r.sub] = { got:0, full:0, n:0, ok:0 }); d.got += r.got; d.full += r.wt; d.n++; if(r.st === 'o') d.ok++; });
+  const r1 = v => Math.round(Math.max(0, v) * 10) / 10;
+  return { score:r1(score), lost:Math.round(lost*10)/10, ok, ng, blank, rows, subs, rule, avg:(ok+ng) ? Math.round(time/(ok+ng)/1000) : 0 };
+}
+
+// 交卷後檢討：錯題與未答直接看答案、解析，並標出自己當時選的答案（不再寫作答紀錄）
+function mockReview(){
+  const mine = _lastMine || {};
+  const pool = (_lastPool||[]).filter(q=>mine[q.id] !== true);
+  if(!pool.length){ toast('全部答對，沒有要檢討的題目'); return; }
+  startQWithPool(pool, 'speed');
+  S.quiz.myAns = mine;
+  S.quiz.ans = false;
+  renderQCard();
+}
 
 function _startMockTimer(min){
   _stopMockTimer();
@@ -144,7 +287,7 @@ function _startMockTimer(min){
     if(left <= 0){
       _stopMockTimer();
       toast('時間到，自動交卷');
-      endQuizNow();
+      if(S.quiz.res.length) showQDone(); else exitQ();
       return;
     }
     const m = Math.floor(left/60000), s = Math.floor(left%60000/1000);
@@ -264,7 +407,8 @@ function renderQCard(){
     // 速讀：不作答，題目一出來就公布答案與解析（不寫作答紀錄）
     if(S.quiz.mode === 'speed'){
       if(hintEl) hintEl.textContent = '⚡ 速讀・' + (isMulti ? '複選題' : '單選題');
-      _showMcKey(qu, '');
+      const mine = S.quiz.myAns && S.quiz.myAns[qu.id];
+      _showMcKey(qu, S.quiz.myAns ? (mine ? '你選：' + String(mine).split('').join('、') + '｜' : '未作答｜') : '');
       S.quiz.ans = true;
       _afterAnswer(qu);
     }
@@ -294,6 +438,14 @@ function renderQCard(){
       _afterAnswer(qu);
     }
   }
+  // 模擬考：可以不作答直接到下一題（未作答不給分、不倒扣）
+  if(S.quiz.mode === 'mock'){
+    document.getElementById('qnxt').classList.remove('hide');
+    const h = document.getElementById('q-type-hint');
+    if(h) h.textContent += '・不確定可直接按「下一題」略過';
+  }
+  const why = document.getElementById('qwhy');
+  if(why){ why.style.display = 'none'; why.innerHTML = ''; }
   // 換題：先存起上一題未存的標註，再載入本題的標註
   _inkFlushAndSync();
   _updateNoteBtn();
@@ -380,18 +532,20 @@ async function ansQ(sel){  try{
     await dp('questions', qu);
 
     // 記錄 attempt（含時間）
-    await dp('attempts', {
+    const at = {
       qid:qu.id, correct,
       date: today(),
       responseTime,
       hesitationFlag: hesitant,
       confidence: hesitant ? 'low' : 'normal',
       wrongReason: correct ? '' : '未知'
-    });
+    };
+    at.id = await dp('attempts', at);
+    S.quiz._at = at;
   }
 
   // ★ 先記成績再分流：原本記在最後，模擬考提前 return → 交卷顯示 0/0、中途離開也不會確認
-  S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
+  S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant, sel:normSel});
 
   // ── 模擬考：作答時不揭曉，只標記已選，直接進入下一題 ──
   //   這是模擬考與一般練習的核心差異：真實考試不會告訴你對錯。
@@ -435,6 +589,7 @@ async function ansQ(sel){  try{
 
   _showQNote(qu);
   _afterAnswer(qu);
+  if(!correct && !noAnswerKey) _showWhy(qu);
   }catch(e){ logError('ansQ', e); }}
 
 // 直接標出選擇題正確答案（速讀、答題中編輯後重畫共用）
@@ -533,6 +688,24 @@ function _afterAnswer(qu){
   showQLawLinks(qu);
   _showQResearch(qu);
 }
+
+// ── 錯因標記：答錯後點一下原因，寫回這次作答紀錄（attempts.wrongReason）與題目（wrongWhy，分析頁統計與分類練習用）──
+const WRONG_WHY = ['觀念不會', '記錯數字或要件', '看錯題目', '二選一猜錯', '粗心'];
+function _showWhy(qu){
+  const el = document.getElementById('qwhy');
+  if(!el || isVirtualQ(qu)) return;
+  el.style.display = '';
+  el.innerHTML = '<span class="qwhy-t">這題錯在</span>' + WRONG_WHY.map(w=>'<button class="qwhy-b" data-why="'+w+'">'+w+'</button>').join('');
+}
+async function setWhy(btn){  try{
+  const qu = S.quiz.q[S.quiz.idx], at = S.quiz._at, why = btn.dataset.why;
+  if(!qu || !why) return;
+  const on = !btn.classList.contains('on');
+  document.querySelectorAll('#qwhy .qwhy-b').forEach(b=>b.classList.toggle('on', on && b === btn));
+  if(at && at.qid === qu.id && at.id != null){ at.wrongReason = on ? why : '未知'; await dp('attempts', at); }
+  if(on) qu.wrongWhy = why; else delete qu.wrongWhy;
+  await dp('questions', qu);
+  }catch(e){ logError('setWhy', e); }}
 
 // ── 查證紀錄（data/exam_research.json）：官方答案核對狀態＋GPT 整理的來源與限制，收合在解析下方 ──
 //   以題目 id 對應，並核對考試別｜年度｜科目，避免自建題或 id 不同時張冠李戴
@@ -702,6 +875,11 @@ function ttsEssay(){
 // ════════════════════════════════════════════════════════════
 function nextQ(){
   _ttsStop();   // 換題：上一題的朗讀不再接著唸
+  // 模擬考略過不答：記一筆「未作答」，不寫作答紀錄、不影響複習排程
+  if(S.quiz.mode === 'mock' && !S.quiz.ans){
+    const qu = S.quiz.q[S.quiz.idx];
+    if(qu) S.quiz.res.push({qid:qu.id, correct:false, skipped:true, sel:'', responseTime:Date.now() - _qStart, hesitant:false});
+  }
   S.quiz.idx++;
   S.quiz.ans = false;
   renderQCard();
@@ -755,9 +933,20 @@ function showQDone(){
   // 保存 pool 供重播用（模組內部變數）
   _lastPool = [...S.quiz.q];
   _lastMode = S.quiz.mode;
+  const mk = _lastMode === 'mock' ? _mockScore() : null;
+  if(mk){
+    _lastMock = S.quiz.mock || null;
+    _lastMine = {};
+    mk.rows.forEach(r=>{ _lastMine[S.quiz.q[r.i].id] = r.st === 'o' ? true : r.sel; });
+    if(S.quiz.mock && !S.quiz.mock.saved && (mk.ok + mk.ng)){
+      S.quiz.mock.saved = true;
+      const rec = { at:today(), title:S.quiz.mock.title || '', score:mk.score, n:S.quiz.q.length, ok:mk.ok, ng:mk.ng, blank:mk.blank, rule:mk.rule, min:S.quiz.mock.min };
+      getSetting('mock_history', []).then(h=>setSetting('mock_history', (h||[]).concat(rec).slice(-30))).catch(e=>logError('mock_history', e));
+    }
+  }
 
   // 隱藏題目相關元素，顯示完成區塊（不覆蓋 qbody，保留所有子元素）
-  ['qbadge','qmeta','q-type-hint','qstem','qopts','qres','qnote','qes','qlaw']
+  ['qbadge','qmeta','q-type-hint','qstem','qopts','qres','qwhy','qnote','qes','qlaw']
     .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
   _inkTeardown();   // 結束畫面不該殘留上一題的手寫筆跡
 
@@ -779,6 +968,7 @@ function showQDone(){
       ? '<div style="font-size:48px">✍️</div>'+
         '<div style="font-size:22px;font-weight:700">練習結束</div>'+
         '<div style="font-size:14px;color:var(--t2)">共 '+S.quiz.q.length+' 題</div>'
+      : mk ? _mockReportHtml(mk)
       : '<div class="qd-ring" style="--p:'+pct+';--c:'+tone+'" role="img" aria-label="正確率 '+pct+'%">'+
           '<div class="qd-ring-in"><div class="qd-pct">'+pct+'<small>%</small></div><div class="qd-sub">正確率</div></div></div>'+
         '<div class="qd-verdict">'+emoji+' '+verdict+'</div>'+
@@ -789,7 +979,10 @@ function showQDone(){
           cell(hesitant, '猶豫 >40s', hesitant ? 'var(--org)' : '')+
         '</div>')+
       '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;width:100%">'+
-      (!browse && _lastWrong.length
+      (mk ? (mk.ng + mk.blank ? '<button class="btn bp bw" style="padding:14px;font-size:15px" data-action="mock-review">📋 檢討錯題與未答（'+(mk.ng + mk.blank)+' 題）</button>' : '')+
+          (_lastWrong.length ? '<button class="btn bg bw" style="padding:12px;font-size:14px" data-action="retry-wrong">✕ 重做答錯與略過的題（'+_lastWrong.length+' 題，會顯示對錯）</button>' : '')+
+          '<button class="btn bg bw" style="padding:12px;font-size:14px" data-action="replay">🔄 同一份再考一次</button>'
+      : !browse && _lastWrong.length
         ? '<button class="btn bp bw" style="padding:14px;font-size:15px" data-action="retry-wrong">✕ 錯題重做（'+_lastWrong.length+' 題）</button>'+
           '<button class="btn bg bw" style="padding:12px;font-size:14px" data-action="replay">🔄 全部再練一次</button>'
         : '<button class="btn bp bw" style="padding:14px;font-size:15px" data-action="replay">🔄 '+(browse ? '再看一次' : '再練習一次')+'</button>')+
@@ -802,7 +995,32 @@ function showQDone(){
 function retryWrongQuiz(){
   const pool = _lastWrong || [];
   if(!pool.length){ replayQuiz(); return; }
-  startQWithPool(shuffleUnits(pool).flat(), _lastMode || 'all');
+  // 模擬考的錯題改用一般練習重做（要看得到對錯與解析）
+  startQWithPool(shuffleUnits(pool).flat(), _lastMode === 'mock' ? 'all' : (_lastMode || 'all'));
+}
+
+// 模擬考成績單：分數環、答對／答錯／未答／倒扣、各科得分、逐題作答狀況
+function _mockReportHtml(mk){
+  const tone = mk.score>=80 ? 'var(--grn)' : mk.score>=60 ? 'var(--acc)' : mk.score>=40 ? 'var(--org)' : 'var(--red)';
+  const cell = (n, l, c) => '<div class="qd-cell"><div class="qd-n"'+(c?' style="color:'+c+'"':'')+'>'+n+'</div><div class="qd-l">'+l+'</div></div>';
+  const subs = Object.entries(mk.subs);
+  const f1 = v => Math.round(Math.max(0, v) * 10) / 10;
+  return '<div class="qd-title">'+esc((S.quiz.mock||{}).title || '模擬考')+'</div>'+
+    '<div class="qd-ring" style="--p:'+Math.min(100, mk.score)+';--c:'+tone+'" role="img" aria-label="得分 '+mk.score+' 分">'+
+      '<div class="qd-ring-in"><div class="qd-pct">'+mk.score+'</div><div class="qd-sub">分（滿分 100）</div></div></div>'+
+    '<div class="qd-grid">'+
+      cell(mk.ok, '答對', 'var(--grn)')+
+      cell(mk.ng, '答錯', mk.ng ? 'var(--red)' : '')+
+      cell(mk.blank, '未作答')+
+      cell(mk.rule !== 'neg' ? '—' : mk.lost ? '−'+mk.lost : '0', '倒扣失分', mk.lost ? 'var(--org)' : '')+
+    '</div>'+
+    (subs.length > 1 ? '<div class="qd-subs">'+subs.map(([n, d])=>
+      '<div class="qd-subrow"><span>'+esc(n)+'</span><span>'+d.ok+'／'+d.n+' 題</span><b>'+f1(d.got)+'</b><small>／'+f1(d.full)+'</small></div>').join('')+'</div>' : '')+
+    '<div class="qd-map" aria-label="逐題作答狀況">'+mk.rows.map(r=>'<i class="'+r.st+'">'+(r.i+1)+'</i>').join('')+'</div>'+
+    '<div class="qd-legend"><i class="o"></i>答對<i class="x"></i>答錯<i class="b"></i>未作答・平均每題 '+mk.avg+' 秒</div>'+
+    '<div class="qd-rule">計分：'+(mk.rule === 'neg'
+      ? '單選答錯倒扣 1/3 題分；多選每個選項獨立計分，答錯一個選項扣 2/5 題分，扣到該題 0 分；未作答不給分也不扣分。依 115 年警佐班簡章文字推算，正式計分以當年簡章為準。'
+      : '答對才給分，不倒扣。')+'</div>';
 }
 
 function replayQuiz(){
@@ -810,6 +1028,7 @@ function replayQuiz(){
   const pool = _lastPool || [];
   const mode = _lastMode || 'all';
   if(!pool.length){ exitQ(); return; }
+  if(mode === 'mock' && _lastMock){ _beginMock(pool.slice(), { rule:_lastMock.rule, min:_lastMock.min, title:_lastMock.title }); return; }   // 同一份、同順序、重新計時
   startQWithPool(shuffleUnits(pool).flat(), mode);   // 題組不拆開
 }
 
@@ -1273,8 +1492,10 @@ async function ansQMulti(selected, correctStr, qu){  try{
   qu.correctStreak = correct ? (qu.correctStreak||0)+1 : 0;
   qu.difficultyScore = Math.min(10, (qu.difficultyScore||5) + (correct ? (hesitant?0:-0.5) : 1.5));
   await dp('questions', qu);
-  await dp('attempts', {qid:qu.id, correct, date:today(), responseTime, hesitationFlag:hesitant, confidence:hesitant?'low':'normal', wrongReason:correct?'':''});
-  S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant});
+  const at = {qid:qu.id, correct, date:today(), responseTime, hesitationFlag:hesitant, confidence:hesitant?'low':'normal', wrongReason:correct?'':'未知'};
+  at.id = await dp('attempts', at);
+  S.quiz._at = at;
+  S.quiz.res.push({qid:qu.id, correct, responseTime, hesitant, sel:_toOrig(selected, qu).split('').sort().join('')});
   // 模擬考：與單選相同，不揭曉對錯（原本複選題會直接公布答案）
   if(S.quiz.mode === 'mock'){
     document.getElementById('qmulti-confirm')?.classList.add('hide');
@@ -1304,6 +1525,7 @@ async function ansQMulti(selected, correctStr, qu){  try{
   resEl.textContent = msg;
   _showQNote(qu);
   _afterAnswer(qu);
+  if(!correct) _showWhy(qu);
   }catch(e){ logError('ansQMulti', e); }}
 
 function submitAnswer(){
@@ -1332,6 +1554,12 @@ function _initDelegation(){
       const opt = e.target.closest('.qopt');
       if(opt && opt.dataset.key) selectOpt(opt, opt.dataset.key);
     });
+  }
+  // 錯因標記
+  const whyEl = document.getElementById('qwhy');
+  if(whyEl && !whyEl._qBound){
+    whyEl._qBound = true;
+    whyEl.addEventListener('click', e=>{ const b = e.target.closest('.qwhy-b'); if(b) setWhy(b); });
   }
   // 相關法條標籤
   const lawList = document.getElementById('qlaw-list');
@@ -1362,7 +1590,9 @@ function _initDelegation(){
       }
       if(k === 'Enter' || k === 'ArrowRight'){
         const nx = document.getElementById('qnxt');
-        if(nx && !nx.classList.contains('hide') && nx.offsetParent){ e.preventDefault(); nextQ(); }
+        const pending = S.quiz.mode === 'mock' && !S.quiz.ans && k === 'Enter' && S.quiz._selected && S.quiz._selected.size;
+        if(pending){ e.preventDefault(); submitAnswer(); }
+        else if(nx && !nx.classList.contains('hide') && nx.offsetParent){ e.preventDefault(); nextQ(); }
         else if(k === 'Enter' && !S.quiz.ans){ e.preventDefault(); submitAnswer(); }
       }
     });
@@ -1376,6 +1606,7 @@ function _initDelegation(){
       if(!btn) return;
       if(btn.dataset.action === 'replay') replayQuiz();
       else if(btn.dataset.action === 'retry-wrong') retryWrongQuiz();
+      else if(btn.dataset.action === 'mock-review') mockReview();
       else if(btn.dataset.action === 'exit') exitQ();
     });
   }
@@ -1389,7 +1620,7 @@ function _initDelegation(){
 const Quiz = { startQ, startQWithPool, startQPick,
                toggleSubj, subjSelAll, closeSubjPick, confirmSubjPick,
                toggleInk, inkUndo, inkClear, inkColor, inkCustomColor, inkSize, inkMode,
-               startMockExam, beginMockExam,
+               startMockExam, beginMockExam, mockKind, mockFill, mockReview, WRONG_WHY,
                openQNote, closeQNote, saveQNote, endQuizNow,
                submitAnswer, nextQ, exitQ, revealES, toggleQStar, editQInQuiz, _quizRefreshQ, _esPaperHtml, ttsEssay,
                openSpeed, spdToggle, spdClear, closeSpeed, startSpeed, setOptShuffle };

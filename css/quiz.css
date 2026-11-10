@@ -723,3 +723,60 @@
 .wl-meta{font-size:10.5px;color:var(--t2);white-space:nowrap}
 .wl-hint{font-size:10.5px;color:var(--t2);margin-top:8px;line-height:1.6}
 [data-theme="eink"] .wl-bar{border:1px solid #000;background:#fff}
+
+/* ══ 限時模擬考：設定畫面 ═══════════════════════════════════ */
+.mk-body{padding:4px 18px 20px}
+.mk-note{font-size:12.5px;color:var(--t2);line-height:1.7;margin-bottom:12px}
+.mk-note b{color:var(--t0)}
+.mk-seg{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:12px;border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+.mk-seg button{padding:10px 6px;font-size:13.5px;font-weight:600;background:var(--bg2);color:var(--t2);border:none;min-height:40px;font-family:inherit;cursor:pointer}
+.mk-seg button.on{background:var(--acc);color:#fff}
+.mk-seg button[disabled]{opacity:.4}
+.mk-hint{font-size:11.5px;color:var(--t2);margin:2px 0 12px;line-height:1.6}
+.mk-go{width:100%;padding:12px;font-size:15px;font-weight:700}
+.mk-hist-t{font-size:11.5px;color:var(--t2);margin:16px 0 4px;letter-spacing:.06em}
+.mk-hist-r{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-top:1px solid var(--bd);font-size:12.5px;color:var(--t0)}
+.mk-hist-d{color:var(--t2);font-variant-numeric:tabular-nums;flex:none}
+.mk-hist-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mk-hist-r b{font-size:15px;font-variant-numeric:tabular-nums}
+.mk-hist-r small{color:var(--t2);font-size:11px}
+[data-theme="eink"] .mk-seg{border:1.5px solid #000}
+[data-theme="eink"] .mk-seg button{background:#fff;color:#000}
+[data-theme="eink"] .mk-seg button.on{background:#000;color:#fff}
+
+/* ── 模擬考成績單 ───────────────────────────────────────── */
+.qd-title{font-size:14px;font-weight:700;color:var(--t0);text-align:center}
+.qd-subs{width:100%;background:var(--bg1);border:1px solid var(--bd);border-radius:var(--r);padding:4px 12px}
+.qd-subrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--bd);font-size:12.5px;color:var(--t2)}
+.qd-subrow:last-child{border-bottom:none}
+.qd-subrow span:first-child{color:var(--t0);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qd-subrow b{color:var(--t0);font-size:15px;font-variant-numeric:tabular-nums;text-align:right}
+.qd-subrow small{font-size:11px}
+.qd-map{display:grid;grid-template-columns:repeat(auto-fill,minmax(30px,1fr));gap:5px;width:100%}
+.qd-map i,.qd-legend i{font-style:normal;border-radius:6px;font-size:11.5px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+.qd-map i{padding:6px 0;line-height:1.2}
+.qd-map i.o,.qd-legend i.o{background:rgba(76,175,125,.18);color:var(--grn)}
+.qd-map i.x,.qd-legend i.x{background:rgba(224,92,87,.18);color:var(--red)}
+.qd-map i.b,.qd-legend i.b{background:var(--bg3);color:var(--t2)}
+.qd-legend{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11.5px;color:var(--t2);width:100%}
+.qd-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:8px}
+.qd-legend i:first-child{margin-left:0}
+.qd-rule{font-size:11px;color:var(--t2);line-height:1.6;width:100%}
+[data-theme="eink"] .qd-map i{border:1px solid #000;background:#fff;color:#000}
+[data-theme="eink"] .qd-map i.x{background:#000;color:#fff}
+[data-theme="eink"] .qd-map i.b{border-style:dashed}
+
+/* ── 錯因標記 ───────────────────────────────────────────── */
+.qwhy{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+.qwhy-t{font-size:12px;color:var(--t2);margin-right:2px}
+.qwhy-b{padding:7px 12px;min-height:34px;border-radius:18px;font-size:12.5px;font-weight:600;background:var(--bg2);color:var(--t2);border:1px solid var(--bd);font-family:inherit;cursor:pointer}
+.qwhy-b.on{background:rgba(224,92,87,.14);color:var(--red);border-color:var(--red)}
+[data-theme="eink"] .qwhy-b{background:#fff;color:#000;border:1.5px solid #000}
+[data-theme="eink"] .qwhy-b.on{background:#000;color:#fff}
+/* 分析頁：錯因分布 */
+.why-row{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) 34px auto;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd)}
+.why-row:last-of-type{border-bottom:none}
+.why-name{font-size:12.5px;font-weight:600;color:var(--t0)}
+.why-tip{display:block;font-size:10.5px;font-weight:400;color:var(--t2);margin-top:1px}
+.why-n{font-size:12px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.why-go{padding:6px 10px;font-size:11.5px;white-space:nowrap}

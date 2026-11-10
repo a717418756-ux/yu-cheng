@@ -219,7 +219,7 @@
         <button class="zqb" onclick="startQPick('focus')"><span class="zqb-icon">🔥</span><div class="zqb-label">加強複習</div><div class="zqb-desc">危險題＋收藏題</div></button>
         <button class="zqb" onclick="startQPick('essay')"><span class="zqb-icon">✍️</span><div class="zqb-label">申論練習</div><div class="zqb-desc">申論題專區</div></button>
         <button class="zqb" onclick="startQPick('esview')"><span class="zqb-icon">📖</span><div class="zqb-label">申論瀏覽</div><div class="zqb-desc">題目＋參考答案直接看</div></button>
-        <button class="zqb" onclick="startMockExam()"><span class="zqb-icon">⏱️</span><div class="zqb-label">限時模擬考</div><div class="zqb-desc">選擇題・計時・交卷後檢討</div></button>
+        <button class="zqb" onclick="startMockExam()"><span class="zqb-icon">⏱️</span><div class="zqb-label">限時模擬考</div><div class="zqb-desc">整份考古題・倒扣計分・成績單</div></button>
         <button class="zqb" onclick="openSpeed()"><span class="zqb-icon">⚡</span><div class="zqb-label">速讀</div><div class="zqb-desc">選擇題・直接看答案解析</div></button>
         <button class="zqb" onclick="startNumberMode()"><span class="zqb-icon">🔢</span><div class="zqb-label">數字魔鬼</div><div class="zqb-desc">數字記憶訓練</div></button>
       </div>
@@ -460,6 +460,7 @@
   <div class="cc"><div class="ct">📊 各科正確率</div><div id="subj-bars"></div></div>
   <div class="cc"><div class="ct">📅 近30天練習量（左右滑動）</div><canvas id="dchart" height="110"></canvas></div>
   <div class="cc"><div class="ct">🚦 危險等級分佈</div><div id="wrong-subs"></div></div>
+  <div class="cc"><div class="ct">🧭 錯因分布（答錯後點選的原因）</div><div id="why-box"></div></div>
   <div class="cc"><div class="ct">⚖ 弱點法條（相關考題答對率最低）</div><div id="weak-laws"></div></div>
   <div class="cc"><div class="ct">🏷 高頻關鍵概念</div><div id="kw-cloud" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
   <div class="sec">AI 分析</div>
@@ -833,6 +834,7 @@
     <div class="qstemb" id="qstem"></div>
     <div class="qos" id="qopts"></div>
     <div class="qres" id="qres"></div>
+    <div class="qwhy" id="qwhy" style="display:none"></div>
     <div id="qnote" style="display:none;margin-top:11px;padding:10px;background:var(--bg2);border-radius:8px;font-size:13px;color:var(--t2);line-height:1.7;white-space:pre-line"></div>
     <div id="qsrc" class="qsrc" style="display:none"></div>
     <div id="qes" style="display:none"><textarea id="qes-input" rows="4" placeholder="輸入你的答案重點（可選）..." style="width:100%;margin-top:8px;padding:10px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;color:var(--t1);font-size:14px;resize:vertical;box-sizing:border-box"></textarea><button id="qrevbtn" class="btn bg bw" style="margin-top:10px;padding:14px;font-size:14px;width:100%" onclick="revealES()">顯示參考答案 / 解析</button></div>
