@@ -87,13 +87,6 @@ async function renderHome(){  try{
   // 考試倒數
   renderCountdown();
 
-  // datalist 科目
-  const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
-  ['bi-subs','f-subs'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el)el.innerHTML=subs.map(s=>`<option value="${esc(s)}">`).join('');
-  });
-
   // ── 三大區即時資料（儀表板化）─────────────────────────────
   // 混合風格：考試看進度、休閒看最近閱讀、學習看今日時間
   renderZoneStats(qs, ats, reviewDue, todayAts_, todayStr).catch(()=>{});
@@ -616,7 +609,7 @@ async function openYearGroup(year){  try{
 // ── 題目群組詳細頁 ────────────────────────────────────────────
 let _qGroupYear='', _qGroupSubject='', _qGroupExam='';
 // ── 考試別分組頁（第三層：年度→考科→考試別）─────────────────
-const _EXAM_TYPES_ALL = ['警佐班','升官等','警大二技','三等考試','其他'];
+//   考試別由使用者自訂（新增題目時輸入），只列題庫裡有題目的考試別
 let _examGroupYear='', _examGroupSubject='';
 async function openExamGroup(year, subject){  try{
   _examGroupYear=year; _examGroupSubject=subject;
@@ -663,9 +656,7 @@ async function openExamGroup(year, subject){  try{
   backDiv.appendChild(backBtn);
   el.appendChild(backDiv);
 
-  // 已知考試別（有題的）+ 標準考試別（未建題標示）合併顯示
-  const examOrder = [..._EXAM_TYPES_ALL];
-  Object.keys(byExam).forEach(e=>{ if(!examOrder.includes(e)) examOrder.push(e); });
+  const examOrder = Object.keys(byExam).sort((a,b)=>byExam[b].length-byExam[a].length || a.localeCompare(b,'zh-Hant'));
 
   examOrder.forEach(ex=>{
     const eqs = byExam[ex] || [];
@@ -805,12 +796,8 @@ function showAdd(q){
   set('f-group-id',   q?.groupId||'');
   set('f-group-order', q?.groupOrder||'');
   setQT(S.qType, q?.options);
-  // 更新科目 datalist
-  da('questions').then(qs=>{
-    const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
-    const dl=document.getElementById('f-subs');
-    if(dl){ dl.innerHTML=subs.map(s=>`<option value="${esc(s)}">`).join(''); }
-  }).catch(()=>{});
+  // 科目、考試別：可輸入新名稱，也可從題庫已有的名稱挑（utils.js comboAttach）
+  comboAttach('f-sub', 'subject'); comboAttach('f-ex', 'exam');
   document.getElementById('add-ov').classList.add('on');
 }
 
@@ -908,7 +895,7 @@ async function saveQ(){
     answerEs:document.getElementById('f-es')?.value.trim()||'',
     subject:document.getElementById('f-sub').value.trim(),
     year:document.getElementById('f-yr').value.trim(),
-    exam:document.getElementById('f-ex').value,
+    exam:document.getElementById('f-ex').value.trim(),
     num:document.getElementById('f-num').value.trim(),
     keywords:kwArr(document.getElementById('f-kw').value),
     mustKeywords,
@@ -1049,7 +1036,7 @@ async function saveQAndContinue(){  try{
     answerEs:document.getElementById('f-es')?.value.trim()||'',
     subject:document.getElementById('f-sub').value.trim(),
     year:document.getElementById('f-yr').value.trim(),
-    exam:document.getElementById('f-ex').value,
+    exam:document.getElementById('f-ex').value.trim(),
     num:document.getElementById('f-num').value.trim(),
     note:document.getElementById('f-note').value.trim(),
     hlColor:document.querySelector('#f-mark-row .note-mark-dot.sel')?.dataset.color||'',
@@ -1185,29 +1172,23 @@ function openBatchEdit(){  try{
     +   '<div style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px">'
     +     '只填要修改的欄位，<b>留空的欄位不會變動</b>。</div>'
     +   '<div class="fg"><label class="fl">科目</label>'
-    +     '<input id="be-sub" list="be-subs" placeholder="不修改"><datalist id="be-subs"></datalist></div>'
+    +     '<input id="be-sub" placeholder="不修改"></div>'
     +   '<div class="fg"><label class="fl">年度</label>'
     +     '<input id="be-yr" placeholder="不修改（例：113）"></div>'
     +   '<div class="fg"><label class="fl">考試別</label>'
-    +     '<select id="be-ex"><option value="">不修改</option>'
-    +     ['警佐班','升官等','警大二技','三等考試','其他'].map(e=>'<option>'+e+'</option>').join('')
-    +     '</select></div>'
+    +     '<input id="be-ex" placeholder="不修改（可輸入新的考試別）"></div>'
     +   '<button class="btn bp bw" style="width:100%;padding:11px;font-size:14px;font-weight:600;margin-top:6px"'
     +     ' onclick="applyBatchEdit()">套用修改</button>'
     + '</div></div>';
   document.body.appendChild(ov);
-  // 科目候選清單（沿用題庫既有科目，避免打錯字產生新分類）
-  da('questions').then(qs=>{
-    const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))].sort();
-    const dl=document.getElementById('be-subs');
-    if(dl) dl.innerHTML=subs.map(x=>'<option value="'+esc(x)+'">').join('');
-  }).catch(()=>{});
+  // 候選清單沿用題庫既有的科目、考試別（避免打錯字產生新分類），也可輸入新的
+  comboAttach('be-sub', 'subject'); comboAttach('be-ex', 'exam');
   }catch(e){ logError('openBatchEdit', e); }}
 
 async function applyBatchEdit(){  try{
   const sub = document.getElementById('be-sub')?.value.trim() || '';
   const yr  = document.getElementById('be-yr')?.value.trim()  || '';
-  const ex  = document.getElementById('be-ex')?.value || '';
+  const ex  = document.getElementById('be-ex')?.value.trim() || '';
   if(!sub && !yr && !ex){ toast('請至少填寫一個要修改的欄位'); return; }
 
   const ids=[..._listSelected];
@@ -3028,12 +3009,8 @@ async function saveLaw(){  try{
 }
 
 function openBulkQ(){
-  // 填入科目 datalist（與逐一新增共用來源）
-  da('questions').then(qs=>{
-    const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
-    const dl=document.getElementById('bi-subs');
-    if(dl) dl.innerHTML=subs.map(s=>`<option value="${s}">`).join('');
-  }).catch(()=>{});
+  // 科目、考試別：可輸入新名稱，也可從題庫已有的名稱挑（與逐一新增相同）
+  comboAttach('bi-sub', 'subject'); comboAttach('bi-ex', 'exam');
   document.getElementById('bulk-ov').classList.add('on');
   // overlay 動畫完成後 focus textarea（延遲確保 IME 正確初始化）
   setTimeout(()=>{
@@ -3776,9 +3753,9 @@ function parseBulk(){
 
 async function importBulk(){
   if(!S.bulkParsed.length){toast('請先解析題目');return;}
-  const sub=(document.getElementById('bi-sub')||{}).value||'';
-  const yr=(document.getElementById('bi-yr')||{}).value||'';
-  const ex=(document.getElementById('bi-ex')||{}).value||'';
+  const sub=((document.getElementById('bi-sub')||{}).value||'').trim();
+  const yr=((document.getElementById('bi-yr')||{}).value||'').trim();
+  const ex=((document.getElementById('bi-ex')||{}).value||'').trim();
   const items=S.bulkParsed.map(q=>({
     ...q,
     subject: sub||q.subject||'',

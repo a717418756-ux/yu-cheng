@@ -379,7 +379,22 @@ function _rememberFeat(url, json){
   else delete all[url];   // 換回舊版程式碼：不再送 info／list
   _ls.set(_GAS_FEAT_KEY, all);
 }
-const _parseBk = json => (typeof json.data === 'string') ? JSON.parse(json.data) : json.data;
+// 雲端備份壓縮（v4.33）：備份內容 gzip 後轉 base64，前面加「gz1:」，Apps Script 照樣存成一個字串檔，不用更新部署。
+//   中文 JSON 壓縮後約剩 4 成（18MB → 約 7MB），上傳、下載都快很多。
+//   還原時看開頭：有「gz1:」就先解壓；舊的未壓縮備份照舊讀。瀏覽器不支援壓縮時改傳未壓縮的內容。
+const _GZ = 'gz1:';
+async function _gzPack(str){
+  if(typeof CompressionStream === 'undefined') return str;
+  const blob = await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'))).blob();
+  return _GZ + await _blobToBase64(blob);
+}
+async function _gzUnpack(s){
+  if(typeof s !== 'string' || !s.startsWith(_GZ)) return s;
+  if(typeof DecompressionStream === 'undefined') throw new Error('這個瀏覽器無法解壓縮雲端備份，請改用 Chrome 或 Edge');
+  const bin = await (await fetch('data:application/octet-stream;base64,' + s.slice(_GZ.length))).blob();
+  return await new Response(bin.stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
+const _parseBk = async json => (typeof json.data === 'string') ? JSON.parse(await _gzUnpack(json.data)) : json.data;
 // 讀雲端那份的摘要：{ sum, bk(完整資料，只有完整下載時才有), none(雲端沒有檔案), error }
 async function _cloudRead(url, pwd, full, fileId){
   if(!full && !fileId && _gasFeat(url).includes('info')){
@@ -393,7 +408,7 @@ async function _cloudRead(url, pwd, full, fileId){
   _rememberFeat(url, j);
   if(!j.ok) return /找不到|not\s*found|no\s*file|不存在|沒有備份/i.test(j.error || '') ? { none:true } : { error: j.error || '未知錯誤' };
   if(!j.data) return { none:true };
-  const bk = _parseBk(j);
+  const bk = await _parseBk(j);
   if(!bk || typeof bk !== 'object') return { error:'備份資料格式錯誤' };
   return { sum: _summ(bk), bk };
 }
@@ -452,8 +467,10 @@ async function gdriveBackup(){ try{
           // 資料量遠小於題庫，納入雲端備份不會造成負擔
           englishMaterials: engMats
       });
+      const raw = new Blob([body]).size;
+      const packed = await _gzPack(body);
       // info：新版 Apps Script 會存成檔案說明，之後不用下載整份就能看備份時間與裝置（舊版忽略此欄）
-      const payload = JSON.stringify({ password: pwd, action: 'backup', filename: GAS_BACKUP_FILE, data: body,
+      const payload = JSON.stringify({ password: pwd, action: 'backup', filename: GAS_BACKUP_FILE, data: packed,
                                        info: { exportedAt, meta } });
       // 大小以實際送出的內容計算（備份字串再包一層，引號會被跳脫，比原檔大）
       const size = new Blob([payload]).size;
@@ -469,7 +486,7 @@ async function gdriveBackup(){ try{
         '備份時間：' + _fmtAt(exportedAt),
         '裝置：' + meta.device,
         '題目 ' + qs.length + '、法條 ' + ls.length + '、作答紀錄 ' + ats.length,
-        '大小：' + _mb(size),
+        '大小：' + _mb(size) + (packed !== body ? '（壓縮前 ' + _mb(raw) + '）' : ''),
         _gasFeat(url).includes('history') ? '雲端已自動保留前幾份備份，可在還原時選擇。' : '',
       ]);
       renderSet();
@@ -608,8 +625,32 @@ async function copyGasScript(){
 // ════════════════════════════════════════════════════════════
 // 【設定頁渲染】
 // ════════════════════════════════════════════════════════════
+// 移除題庫裡的猜題（v4.33 起不再提供猜題庫）：以前從猜題庫匯入的題目都帶「猜題」標籤
+//   （考試別 116猜題、116變化題，或舊版的 猜題（原題）、猜題（變化題））。連同這些題目的作答紀錄一起刪，
+//   避免統計還算到已不存在的題目。刪除前先存快照，可在設定頁「復原」。
+const _isGuessQ = q => (q.tags||[]).includes('猜題');
+async function removeGuessQs(){ try{
+  const qs = (await da('questions')).filter(_isGuessQ);
+  if(!qs.length){ toast('題庫裡沒有猜題'); return; }
+  const ids = new Set(qs.map(q => q.id));
+  const ats = (await da('attempts')).filter(a => ids.has(a.qid));
+  const ex = [...new Set(qs.map(q => q.exam || '未分類'))].join('、');
+  if(!await askConfirm('移除題庫裡的猜題', '刪除 ' + qs.length + ' 題猜題（考試別：' + ex + '）' + (ats.length ? '與它們的 ' + ats.length + ' 筆作答紀錄' : '') +
+      '。\n考古題不受影響。刪除前會存快照，需要時可到「雲端同步」的「復原」找回。', '刪除')) return;
+  if(!await _snapOrAsk('移除猜題')) return;
+  await _db.transaction('rw', _db.questions, _db.attempts, async () => {
+    await _db.questions.bulkDelete([...ids]);
+    if(ats.length) await _db.attempts.bulkDelete(ats.map(a => a.id));
+  });
+  _cacheInvalidate();
+  toast('已移除 ' + qs.length + ' 題猜題');
+  renderSet();
+}catch(e){ logError('removeGuessQs', e); toast('移除失敗：' + e.message); }}
+
 async function renderSet(){  _renderAzureKey().catch(()=>{}); try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
+  const gRow = document.getElementById('guess-row'), gN = qs.filter(_isGuessQ).length;
+  if(gRow){ gRow.style.display = gN ? '' : 'none'; const b = document.getElementById('guess-n'); if(b) b.textContent = gN; }
   const subs=[...new Set(qs.map(q=>q.subject).filter(Boolean))];
   document.getElementById('db-info').innerHTML=`總題數：${qs.length}<br>法條數：${ls.length}<br>作答記錄：${ats.length}<br>科目：${esc(subs.join('、'))||'無'}<br>題型：選擇 ${qs.filter(q=>q.type==='mc').length} / 申論 ${qs.filter(q=>q.type==='es').length}`;
   renderSetCountdown();
@@ -818,6 +859,7 @@ async function localBackup(){
         _setAnchor('local', _summ({ exportedAt, meta }), 'backup');
 
         // ── 書庫、影音、學習區（參考書／教材影音）：每筆一個說明檔＋實際檔案 ──
+        _skipN = 0;
         const count = 1
           + await _backupDir(dirHandle, 'ebooks',     ebooks,     _EXT.ebooks)
           + await _backupDir(dirHandle, 'media',      media,      _EXT.leisuremedia)
@@ -830,6 +872,7 @@ async function localBackup(){
           '備份時間：' + _fmtAt(exportedAt),
           '裝置：' + meta.device,
           '內容：exam_data.json（' + _mb(new Blob([examBody]).size) + '）＋ ebooks／media／refbooks／learnmedia 四個資料夾',
+          _skipN ? '其中 ' + _skipN + ' 個書籍、影音檔與資料夾裡的相同，沒有重寫。' : '',
           existing ? '上一份已移到 history 資料夾保留。' : '',
         ]);
         _renderSyncStatus().catch(()=>{});
@@ -889,6 +932,13 @@ async function _writeFile(dir, name, data){
 }
 
 // 備份一類檔案到子資料夾：{id}.meta.json（不含檔案本體）＋ {id}.{副檔名}（檔案本體）
+//   v4.33：資料夾裡已有同名、同大小的檔案本體就不再重寫（書、影音動輒幾十 MB，每次全部重寫是本機備份慢的主因）；
+//   說明檔很小，照樣每次重寫（書籤、進度等會變）。
+let _skipN = 0;
+async function _sameFile(dir, name, blob){
+  try{ return (await (await dir.getFileHandle(name)).getFile()).size === blob.size; }
+  catch(e){ return false; }
+}
 async function _backupDir(dirHandle, dirName, rows, extOf){
   const dir = await dirHandle.getDirectoryHandle(dirName, { create:true });
   for(const r of rows){
@@ -896,7 +946,10 @@ async function _backupDir(dirHandle, dirName, rows, extOf){
     for(const f of _THUMBS)
       if(meta[f] instanceof Blob){ meta[f] = await _blobToBase64(meta[f]); meta['_' + f + 'IsBase64'] = true; }
     await _writeFile(dir, r.id + '.meta.json', JSON.stringify(meta));
-    if(blob) await _writeFile(dir, r.id + '.' + extOf(r), blob);
+    if(!blob) continue;
+    const name = r.id + '.' + extOf(r);
+    if(await _sameFile(dir, name, blob)){ _skipN++; continue; }
+    await _writeFile(dir, name, blob);
   }
   return rows.length;
 }
@@ -1179,7 +1232,7 @@ const Settings = {
   saveGasConfig, gdriveBackup, gdriveRestore, gdriveCheck, renameDevice, restoreSnapshot, copyGasScript,
   renderSet, openExport, closeExportOv, doExport, _expSet, _expToggleSubj,
   clearAts, delAll, toggleGasHelp,
-  localBackup, localRestore, saveAzureKey, openDebugPanel
+  localBackup, localRestore, saveAzureKey, openDebugPanel, removeGuessQs
 };
 window.Settings = Settings;
 Object.assign(window, Settings);

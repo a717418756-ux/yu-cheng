@@ -697,3 +697,69 @@ function showSkeleton(containerId, rows){
   html += '</div>';
   el.innerHTML = html;
 }
+
+// ── 可輸入也可挑選的欄位（考試別、科目）──────────────────────
+//   點欄位或右側 ▾：列出題庫已有的名稱（題數多的在前，附題數）；打字即時篩選；
+//   清單沒有的名稱直接打完就是新的一類（最上面顯示「＋ 新增」）。
+//   取代原生 datalist：手機上 datalist 會被已填的字篩掉、看不到全部，也無法顯示題數。
+const _CMB_FIELD = { exam:'exam', subject:'subject' };
+async function _cmbItems(kind){
+  const f = _CMB_FIELD[kind], m = new Map();
+  (await da('questions')).forEach(q => { const v = String(q[f] || '').trim(); if(v) m.set(v, (m.get(v) || 0) + 1); });
+  return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-Hant')).map(([v, n]) => ({ v, n }));
+}
+function comboAttach(id, kind){
+  const inp = typeof id === 'string' ? document.getElementById(id) : id;
+  if(!inp || inp.dataset.cmb) return;
+  inp.dataset.cmb = kind;
+  inp.removeAttribute('list');
+  inp.setAttribute('autocomplete', 'off');
+  const wrap = document.createElement('div');
+  wrap.className = 'cmb';
+  inp.parentNode.insertBefore(wrap, inp);
+  wrap.appendChild(inp);
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'cmb-btn'; btn.tabIndex = -1;
+  btn.setAttribute('aria-label', '展開清單');
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+  const pop = document.createElement('div');
+  pop.className = 'cmb-pop';
+  pop.setAttribute('role', 'listbox');
+  wrap.append(btn, pop);
+  let items = [], open = false;
+  const label = kind === 'exam' ? '考試別' : '科目';
+  const draw = all => {
+    const t = inp.value.trim();
+    const list = (all || !t) ? items : items.filter(x => x.v.toLowerCase().includes(t.toLowerCase()));
+    let h = '';
+    if(t && !items.some(x => x.v === t)) h += '<button type="button" class="cmb-it cmb-new" data-v="' + esc(t) + '"><span>＋ 新增' + label + '「' + esc(t) + '」</span></button>';
+    h += list.map(x => '<button type="button" class="cmb-it' + (x.v === t ? ' on' : '') + '" data-v="' + esc(x.v) + '"><span>' + esc(x.v) + '</span><i>' + x.n + ' 題</i></button>').join('');
+    if(!h) h = '<div class="cmb-empty">題庫還沒有' + label + '，直接輸入名稱即可</div>';
+    pop.innerHTML = h;
+  };
+  const onDoc = e => { if(!wrap.contains(e.target)) hide(); };
+  const show = async all => {
+    try{ items = await _cmbItems(kind); }catch(e){ items = []; }
+    draw(all);
+    if(!open){ open = true; wrap.classList.add('open'); document.addEventListener('pointerdown', onDoc, true); }
+    requestAnimationFrame(() => { try{ pop.scrollIntoView({ block:'nearest' }); }catch(e){} });
+  };
+  function hide(){
+    if(!open) return;
+    open = false; wrap.classList.remove('open');
+    document.removeEventListener('pointerdown', onDoc, true);
+  }
+  inp.addEventListener('focus', () => show(true));
+  inp.addEventListener('input', () => show(false));
+  inp.addEventListener('keydown', e => { if(e.key === 'Escape' || e.key === 'Enter' || e.key === 'Tab') hide(); });
+  btn.addEventListener('pointerdown', e => e.preventDefault());
+  btn.addEventListener('click', () => { if(open) hide(); else show(true); });
+  pop.addEventListener('pointerdown', e => e.preventDefault());   // 點清單不讓欄位失焦
+  pop.addEventListener('click', e => {
+    const b = e.target.closest('.cmb-it');
+    if(!b) return;
+    inp.value = b.dataset.v;
+    inp.dispatchEvent(new Event('change', { bubbles:true }));
+    hide(); inp.blur();
+  });
+}

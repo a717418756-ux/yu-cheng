@@ -1160,25 +1160,48 @@ function startSpeed(){
 // ════════════════════════════════════════════════════════════
 let _pickMode = 'review';
 let _pickSel  = new Set();
+let _pickEx   = new Set();   // 考試別（v4.33）：空＝全部考試別
 
 async function startQPick(mode){  try{
   _pickMode = mode || 'review';
   if(await _resumeIfAny(_pickMode)) return;
   const isEssay = _pickMode === 'essay' || _pickMode === 'esview';
-  const list = await getSubjectList(isEssay ? 'es' : 'mc');
-  if(!list.length){
+  const type = isEssay ? 'es' : 'mc';
+  const exams = await getExamList(type);
+  if(!exams.length){
     toast(isEssay ? '目前沒有申論題' : '目前沒有選擇題');
     return;
   }
-  // 沿用上次選擇（僅保留仍存在的科目）
+  // 考試別：題庫有兩種以上才顯示；沿用上次選擇（只保留仍存在的）
+  const savedEx = await getSetting('quiz_exams_' + _pickMode, []);
+  const exNames = new Set(exams.map(x => x.name));
+  _pickEx = new Set((Array.isArray(savedEx) ? savedEx : []).filter(n => exNames.has(n)));
+  const exBox = document.getElementById('subj-exams');
+  if(exBox){
+    exBox.style.display = exams.length > 1 ? '' : 'none';
+    exBox.innerHTML = '<div class="subj-ex-t">考試別<span>不選＝全部</span></div><div class="subj-ex-chips">' +
+      exams.map(x => '<button class="subj-ex' + (_pickEx.has(x.name) ? ' on' : '') + '" data-n="' + esc(x.name) + '" onclick="toggleExamPick(this)">' +
+        esc(x.name) + ' <span class="subj-cnt">' + x.n + '</span></button>').join('') + '</div>';
+  }
+  // 沿用上次選擇的科目（僅保留仍存在的科目）
   const saved = await getSetting('quiz_subjects_' + _pickMode, []);
-  const names = new Set(list.map(x => x.name));
-  _pickSel = new Set((Array.isArray(saved) ? saved : []).filter(n => names.has(n)));
+  _pickSel = new Set(Array.isArray(saved) ? saved : []);
+  const list = await _renderSubjList();
 
   const sub = document.getElementById('subj-sub');
   if(sub) sub.textContent = _pickMode === 'esview' ? '申論瀏覽・可複選，不選則看全部'
                           : isEssay ? '申論練習・可複選，不選則測全部'
                                     : '選擇題・可複選，不選則測全部';
+  if(!list.length) return;
+  document.getElementById('subj-ov')?.classList.add('on');
+  }catch(e){ logError('startQPick', e); }}
+
+// 依目前勾的考試別重畫科目清單（題數只算這些考試別的題目；不在清單內的已選科目自動取消）
+async function _renderSubjList(){
+  const isEssay = _pickMode === 'essay' || _pickMode === 'esview';
+  const list = await getSubjectList(isEssay ? 'es' : 'mc', [..._pickEx]);
+  const names = new Set(list.map(x => x.name));
+  _pickSel = new Set([..._pickSel].filter(n => names.has(n)));
   const box = document.getElementById('subj-list');
   if(box){
     box.innerHTML = list.map(x => {
@@ -1187,10 +1210,16 @@ async function startQPick(mode){  try{
                 <span class="subj-name">${esc(x.name)}</span>
                 <span class="subj-cnt">${x.n}</span>
               </button>`;
-    }).join('');
+    }).join('') || '<div style="padding:10px;font-size:12.5px;color:var(--t2)">這個考試別沒有題目</div>';
   }
-  document.getElementById('subj-ov')?.classList.add('on');
-  }catch(e){ logError('startQPick', e); }}
+  return list;
+}
+function toggleExamPick(btn){
+  const n = btn.dataset.n;
+  if(_pickEx.has(n)){ _pickEx.delete(n); btn.classList.remove('on'); }
+  else { _pickEx.add(n); btn.classList.add('on'); }
+  _renderSubjList().catch(e => logError('toggleExamPick', e));
+}
 
 function toggleSubj(btn){
   const n = btn.dataset.n;
@@ -1209,10 +1238,11 @@ function subjSelAll(on){
 function closeSubjPick(){ document.getElementById('subj-ov')?.classList.remove('on'); }
 
 async function confirmSubjPick(){  try{
-  const subjects = [...(_pickSel || [])];
+  const subjects = [...(_pickSel || [])], exams = [...(_pickEx || [])];
   setSetting('quiz_subjects_' + _pickMode, subjects).catch(()=>{});
+  setSetting('quiz_exams_' + _pickMode, exams).catch(()=>{});
   closeSubjPick();
-  const pool = await getPriorityPool(_pickMode === 'esview' ? 'essay' : _pickMode, subjects);
+  const pool = await getPriorityPool(_pickMode === 'esview' ? 'essay' : _pickMode, subjects, exams);
   if(!pool.length){
     toast(_pickMode === 'review' ? '今日沒有到期的題目'
         : _pickMode === 'focus'  ? '沒有危險題或收藏題'
@@ -1681,7 +1711,7 @@ function _initDelegation(){
 //   IIFE 就中斷，整個模組的函式全掛不上 window，畫面上所有 onclick 都會變成
 //   "xxx is not defined"（例如 inkMode is not defined）。
 const Quiz = { startQ, startQWithPool, startQPick,
-               toggleSubj, subjSelAll, closeSubjPick, confirmSubjPick,
+               toggleSubj, toggleExamPick, subjSelAll, closeSubjPick, confirmSubjPick,
                toggleInk, inkUndo, inkClear, inkColor, inkCustomColor, inkSize, inkMode,
                startMockExam, beginMockExam, mockKind, mockFill, mockReview, WRONG_WHY,
                openQNote, closeQNote, saveQNote, endQuizNow,

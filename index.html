@@ -252,24 +252,15 @@
         </div>
         <span class="zpanel-main-arrow" style="margin-left:auto">›</span>
       </button>
-      <!-- 猜題庫：預測資料包排名、押題練習、猜題變化題 -->
+      <!-- 考古題排名：依歷屆考古題統計的高頻法條、趨勢與練習 -->
       <button class="zpanel-row" onclick="fabGo('predict')">
-        <span class="zpanel-row-icon">🎯</span>
+        <span class="zpanel-row-icon">📈</span>
         <div class="zpanel-row-text">
-          <div class="t">猜題庫</div>
-          <div class="s">高頻法條排名・押題練習・變化題</div>
+          <div class="t">考古題排名</div>
+          <div class="s">歷屆高頻法條・趨勢・練對應考古題</div>
         </div>
         <span class="zpanel-main-arrow" style="margin-left:auto">›</span>
       </button>
-      <!-- 升官等記憶樹（另一個 PWA；已安裝成 App 時，Android 通常會直接用該 App 開啟） -->
-      <a class="zpanel-row" href="https://a717418756-ux.github.io/Promotion/" target="_blank" rel="noopener">
-        <span class="zpanel-row-icon">🌳</span>
-        <div class="zpanel-row-text">
-          <div class="t">升官等記憶樹</div>
-          <div class="s">申論記憶樹・劇情闖關（另開）</div>
-        </div>
-        <span class="zpanel-main-arrow" style="margin-left:auto">↗</span>
-      </a>
       <!-- AI 分析匯出 -->
       <button class="zpanel-row" onclick="fabGo('stats')">
         <span class="zpanel-row-icon">📊</span>
@@ -427,11 +418,11 @@
     <div style="padding:0 0 16px">
       <div style="font-size:12px;color:var(--t2);line-height:1.65;padding:0 0 8px">💡 <b>建議流程</b>：PDF → 貼到 Word → 從 Word 複製 → 貼在此處，選項符號 <span class="tag">(A)</span><span class="tag">A.</span><span class="tag">■▪</span><span class="tag">PDF方塊符號</span> 均支援</div>
       <div class="fr fg">
-        <div><label class="fl">科目</label><input id="bi-sub" placeholder="警察法規" list="bi-subs"><datalist id="bi-subs"></datalist></div>
+        <div><label class="fl">科目</label><input id="bi-sub" placeholder="例：警察法規"></div>
         <div><label class="fl">年度</label><input id="bi-yr" placeholder="民國113年"></div>
       </div>
       <div class="fr fg">
-        <div><label class="fl">考試別</label><select id="bi-ex"><option value="">選擇考試</option><option>警佐班</option><option>升官等</option><option>警大二技</option><option>三等考試</option><option>其他</option></select></div>
+        <div><label class="fl">考試別</label><input id="bi-ex" placeholder="例：警佐班"></div>
         <div><label class="fl">答案列（可空）</label><input id="bi-ans" placeholder="1.D 2.A 3.C（需帶題號）"></div>
       </div>
       <div class="fg"><label class="fl">貼入考題文字</label>
@@ -567,9 +558,9 @@
   <div id="mem-body"></div>
 </div>
 
-<!-- PREDICT 猜題庫（考試區） -->
+<!-- PREDICT 考古題排名（考試區） -->
 <div id="pg-predict" class="page hide">
-  <div class="hd"><div class="hdt">猜題庫</div></div>
+  <div class="hd"><div class="hdt">考古題排名</div></div>
   <div class="pr-seg" id="pr-exam" role="tablist" aria-label="考試別"></div>
   <div class="chips" id="pr-subj"></div>
   <div id="pr-body"></div>
@@ -759,6 +750,8 @@
   <button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="rebuildLawIndex()">重建</button></div>
   <div class="srow"><div><div class="slb">考古題答案更正</div><div class="ssb">依官方答案與釋疑結果，把題庫裡仍是舊公告答案的考古題改成官方更正答案並補說明；作答紀錄保留，你自己改過的答案不動</div></div>
   <button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="applyExamFixes()">檢查</button></div>
+  <div class="srow" id="guess-row" style="display:none"><div><div class="slb">移除題庫裡的猜題</div><div class="ssb">以前從猜題庫匯入的 <b id="guess-n"></b> 題（猜題庫已停用）。考古題不受影響，刪除前會存快照</div></div>
+  <button class="btn br" style="padding:6px 10px;font-size:12px" onclick="removeGuessQs()">移除</button></div>
 
   <div class="sec" style="color:var(--red)">危險操作</div>
   <div class="srow"><div><div class="slb" style="color:var(--red)">清除作答記錄</div><div class="ssb">保留題目</div></div>
@@ -963,11 +956,11 @@
         </div>
       </div>
       <div class="fr fg">
-        <div><label class="fl">科目</label><input id="f-sub" placeholder="警察法規" list="f-subs"><datalist id="f-subs"></datalist></div>
+        <div><label class="fl">科目</label><input id="f-sub" placeholder="例：警察法規"></div>
         <div><label class="fl">年度</label><input id="f-yr" placeholder="113" onblur="formatYearInput(this)"></div>
       </div>
       <div class="fr fg">
-        <div><label class="fl">考試別</label><select id="f-ex"><option value="">選擇</option><option>警佐班</option><option>升官等</option><option>警大二技</option><option>三等考試</option><option>其他</option></select></div>
+        <div><label class="fl">考試別</label><input id="f-ex" placeholder="例：警佐班"></div>
         <div><label class="fl">題號</label><input id="f-num" placeholder="1"></div>
       </div>
       <!-- 題組共同題幹（選填，有填才顯示為題組題） -->
@@ -1177,6 +1170,7 @@
   <div class="cbox" style="max-width:420px">
     <div class="cbt">選擇科目</div>
     <div class="cbs" id="subj-sub">可複選，不選則測全部</div>
+    <div id="subj-exams" class="subj-exams" style="display:none"></div>
     <div style="display:flex;gap:6px;margin-top:8px">
       <button class="btn br bw" style="flex:1;padding:6px;font-size:12px" onclick="subjSelAll(true)">全選</button>
       <button class="btn br bw" style="flex:1;padding:6px;font-size:12px" onclick="subjSelAll(false)">清除</button>

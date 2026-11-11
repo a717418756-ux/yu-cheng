@@ -2,7 +2,7 @@
 // 依賴：db.js(getSetting/setSetting/da), utils.js(esc/toast), data.js(showLawPop), quiz.js(startQWithPool)
 // 資料：data/memory/index.json ＋ 各科 *.min.json（tools/build_data.py 產生）
 //   刑法、刑訴、勤務取自 Promotion 升官等記憶樹；警察法規、憲法另行整理。
-// 七個分頁：🌳 法條樹｜📝 篇章練習（考古題、猜題依關聯法條對到各章）｜📊 對照表｜⚠️ 易錯爭點｜🔢 數字口訣｜🃏 閃卡｜🆕 修法
+// 七個分頁：🌳 法條樹｜📝 篇章練習（考古題依關聯法條對到各章）｜📊 對照表｜⚠️ 易錯爭點｜🔢 數字口訣｜🃏 閃卡｜🆕 修法
 //   「期限時效」科目（index.json 標 audit）另有 📋 期限總表、📝 考古對照，讀 data/memory/deadline_audit.json（GPT 復核包）
 //   樹狀節點的法條標籤點下去開平台法條彈窗（showLawPop），並標示警大二技考過幾題（🔥，取自猜題庫資料）。
 // 閃卡熟練度存在 settings 'memProgress'（隨雲端／本機備份）。
@@ -242,7 +242,7 @@ function _rNodes(nodes, path){
 }
 
 // ════════ 📝 篇章練習 ════════
-//   把題庫的考古題、猜題庫的題目，依「關聯法條」對到法條樹的每個篇章：讀完一章就練那一章。
+//   把題庫的考古題，依「關聯法條」對到法條樹的每個篇章：讀完一章就練那一章。
 //   對應方式：篇章樹上出現的法條（法規全名|條號）、釋字／憲判字號，與題目的關聯法條有交集即歸入；
 //   一題可能同時屬於好幾章。沒有關聯法條的觀念題、學理題，或法條不在任何一章的題目，一律列在最後的「其他」（不用關鍵字硬猜，免得歸錯章）。
 const _SUBJ_EXAM = { police:['警察法規'], constitution:['憲法、法學緒論'], criminal:['刑法與刑事訴訟法'], procedure:['刑法與刑事訴訟法'], duty:['警察勤務'], deadline:['警察法規', '行政法'] };
@@ -267,9 +267,9 @@ async function _chapData(d){
   const sibs = (_index.subjects||[]).filter(s => s.id !== d.id && !s.audit && (_SUBJ_EXAM[s.id]||[]).some(n => names.includes(n)));
   const sibKeys = new Set();
   for(const s of sibs){ try{ (await _loadSubj(s.id)).chapters.forEach(ch => _chKeys(ch).forEach(k => sibKeys.add(k))); }catch(e){} }
-  const chs = d.chapters.map(ch => ({ ch, keys:_chKeys(ch), exam:[], guess:[] }));
+  const chs = d.chapters.map(ch => ({ ch, keys:_chKeys(ch), exam:[] }));
   const hit = (set, ks) => { for(const k of ks) if(set.has(k)) return true; return false; };
-  const un = [], ung = [];
+  const un = [];
   let qs = []; try{ qs = await da('questions'); }catch(e){}
   qs.filter(q => names.includes(q.subject) && !(q.tags||[]).includes('猜題')).forEach(q => {
     const ks = _refKeys(q.relatedLaws);
@@ -278,43 +278,35 @@ async function _chapData(d){
     if(any || (ks.size && hit(sibKeys, ks))) return;
     un.push(q);
   });
-  let v = null; try{ v = await _json('data/variants.json'); }catch(e){}
-  ((v && v.items)||[]).filter(it => names.includes(it.subject)).forEach(it => {
-    const ks = _refKeys(it.laws);
-    let any = false;
-    if(ks.size) chs.forEach(c => { if(hit(c.keys, ks)){ c.guess.push(it.gid); any = true; } });
-    if(!any && !(ks.size && hit(sibKeys, ks))) ung.push(it.gid);
-  });
-  return { sid:d.id, chs, un, ung, v };
+  return { sid:d.id, chs, un };
 }
 const _qDone = q => !!q.lastReview;
 const _qWeak = q => (q.wrongCount||0) > 0 && !((q.correctStreak||0) > 0);
 function _rChap(d, cd){
-  const row = (title, lead, exam, guess, i) => {
+  const row = (title, lead, exam, i) => {
     const done = exam.filter(_qDone).length, weak = exam.filter(_qWeak).length, todo = exam.filter(q => !_qDone(q) || _qWeak(q)).length;
     const pct = exam.length ? Math.round(done / exam.length * 100) : 0;
     return '<div class="cc mem-chp"><div class="mem-chp-t">' + esc(title) + '</div>' +
       (lead ? '<div class="mem-ch-lead">' + esc(lead) + '</div>' : '') +
       '<div class="mem-chp-stat"><span>考古題 <b>' + exam.length + '</b></span><span>已做 <b>' + done + '</b></span>' +
-        '<span' + (weak ? ' class="warn"' : '') + '>待加強 <b>' + weak + '</b></span>' + (guess.length ? '<span>猜題 <b>' + guess.length + '</b></span>' : '') + '</div>' +
+        '<span' + (weak ? ' class="warn"' : '') + '>待加強 <b>' + weak + '</b></span></div>' +
       (exam.length ? '<div class="mem-chp-bar" role="img" aria-label="已做 ' + pct + '%"><i style="width:' + pct + '%"></i></div>' : '') +
       '<div class="mem-chp-acts">' +
         (exam.length ? '<button class="btn bp" data-chq="' + i + '" data-kind="all">▶ 考古題 ' + exam.length + '</button>' : '<span class="mem-au-miss">本章沒有對到考古題</span>') +
         (todo && todo < exam.length ? '<button class="btn bg" data-chq="' + i + '" data-kind="todo">沒做過＋錯題 ' + todo + '</button>' : '') +
-        (guess.length ? '<button class="btn bg" data-chq="' + i + '" data-kind="guess">🎲 猜題 ' + guess.length + '</button>' : '') +
         (i >= 0 ? '<button class="btn bg" data-chq="' + i + '" data-kind="tree">🌳 看本章</button>' : '') +
       '</div></div>';
   };
   const total = new Set(cd.chs.flatMap(c => c.exam.map(q => q.id))).size;
-  return '<div class="mem-intro">📝 <b>篇章練習</b>：讀完一章，直接練那一章的考古題和猜題。題目依「關聯法條」自動對到篇章（共對到 ' + total + ' 題），一題可能屬於好幾章；' +
-    '沒有關聯法條的觀念題、學理題歸在最後的「其他」。作答會照常記入複習進度；猜題是臨時練習，不存題庫。<div class="mem-src">「待加強」＝答錯過、之後還沒再答對的題目。</div></div>' +
-    cd.chs.map((c, i) => row(c.ch.title, c.ch.lead, c.exam, c.guess, i)).join('') +
-    (cd.un.length || cd.ung.length ? row('其他', '觀念題、學理題等沒有關聯法條的題目，或法條不在上面任何一章', cd.un, cd.ung, -1) : '');
+  return '<div class="mem-intro">📝 <b>篇章練習</b>：讀完一章，直接練那一章的考古題。題目依「關聯法條」自動對到篇章（共對到 ' + total + ' 題），一題可能屬於好幾章；' +
+    '沒有關聯法條的觀念題、學理題歸在最後的「其他」。作答會照常記入複習進度。<div class="mem-src">「待加強」＝答錯過、之後還沒再答對的題目。</div></div>' +
+    cd.chs.map((c, i) => row(c.ch.title, c.ch.lead, c.exam, i)).join('') +
+    (cd.un.length ? row('其他', '觀念題、學理題等沒有關聯法條的題目，或法條不在上面任何一章', cd.un, -1) : '');
 }
 async function _chapGo(i, kind){
   const cd = _chap;
   if(!cd) return;
-  const c = i < 0 ? { ch:{ title:'其他' }, exam:cd.un, guess:cd.ung } : cd.chs[i];
+  const c = i < 0 ? { ch:{ title:'其他' }, exam:cd.un } : cd.chs[i];
   if(!c) return;
   if(kind === 'tree'){
     _cur.tab = 'tree'; _renderTabs(); await _renderBody();
@@ -322,17 +314,10 @@ async function _chapGo(i, kind){
     if(el){ document.querySelectorAll('#mem-body details.mem-ch').forEach(x => x.open = x === el); el.scrollIntoView({ block:'start' }); }
     return;
   }
-  let pool;
-  if(kind === 'guess'){
-    const want = new Set(c.guess);
-    if(typeof variantToQ !== 'function'){ toast('猜題庫尚未載入'); return; }
-    pool = ((cd.v && cd.v.items)||[]).filter(it => want.has(it.gid)).map((it, n) => Object.assign(variantToQ(it), { id:'virt:ch-g-' + n, num:String(n + 1) }));
-  } else {
-    pool = (kind === 'todo' ? c.exam.filter(q => !_qDone(q) || _qWeak(q)) : c.exam).slice();
-  }
+  const pool = (kind === 'todo' ? c.exam.filter(q => !_qDone(q) || _qWeak(q)) : c.exam).slice();
   if(!pool.length){ toast('沒有對應的題目'); return; }
   for(let k = pool.length - 1; k > 0; k--){ const j = Math.floor(Math.random() * (k + 1)); [pool[k], pool[j]] = [pool[j], pool[k]]; }
-  startQWithPool(pool, (kind === 'guess' ? '🎲 ' : '📝 ') + c.ch.title);
+  startQWithPool(pool, '📝 ' + c.ch.title);
 }
 
 // ════════ 📊 對照表 ════════

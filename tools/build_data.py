@@ -373,7 +373,7 @@ if __name__ == '__main__':
     a = ap.parse_args()
     _LAWS.update(load(os.path.join(a.promotion, 'laws.json'))['laws'])
     build_memory(a.promotion)
-    build_variants()
+    # build_variants()   # v4.33.0：猜題庫停用，App 不再讀 data/variants.json
     pack = load(a.pack)
     if pack['meta'].get('schema_version') != '2':
         sys.exit('預測資料包格式版本不符（需要 schema_version 2）')

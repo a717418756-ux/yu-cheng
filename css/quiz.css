@@ -821,3 +821,14 @@
 [data-theme="eink"] :is(.qamend,.bk-hint){background:#fff;border:1.5px solid #000;color:#000}
 [data-theme="eink"] :is(.qamend b,.cram-cat b,.cram-law b,.wk-weak b,.wk-d.up,.wk-d.dn){color:#000}
 [data-theme="eink"] :is(.cram-cat,.cram-law,.wk-cell,.rule-sel){background:#fff;border-color:#000;color:#000}
+
+/* ── v4.33：選科目畫面的考試別篩選 ── */
+.subj-exams{margin-top:10px;text-align:left}
+.subj-ex-t{font-size:12px;font-weight:700;color:var(--t1);margin-bottom:5px}
+.subj-ex-t span{font-weight:400;color:var(--t2);margin-left:6px;font-size:11px}
+.subj-ex-chips{display:flex;flex-wrap:wrap;gap:6px}
+.subj-ex-chips::-webkit-scrollbar{display:none}
+.subj-ex{flex:none;padding:6px 11px;min-height:34px;border-radius:16px;border:1px solid var(--bd);background:var(--bg2);color:var(--t0);font-size:12.5px;font-family:inherit;cursor:pointer;white-space:nowrap}
+.subj-ex.on{background:rgba(110,168,254,.16);border-color:var(--acc);color:var(--acc)}
+[data-theme="eink"] .subj-ex{background:#fff;border-color:#000;color:#000}
+[data-theme="eink"] .subj-ex.on{background:#000;color:#fff}

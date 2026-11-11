@@ -1812,3 +1812,21 @@ html[data-layout="desktop"] #fab-wrap{
 .srow > .btn, .srow > button{ flex:none; white-space:nowrap; }
 /* 太小的說明字放大到 11px */
 .heatmap-legend-l, .dtask-ring-sub, .dtask-noauto{ font-size:11px; }
+
+/* ── 可輸入也可挑選的欄位（考試別、科目）── */
+.cmb{position:relative}
+.cmb > input{padding-right:38px}
+.cmb-btn{position:absolute;top:0;right:0;bottom:0;width:38px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--t2);cursor:pointer;padding:0}
+.cmb.open .cmb-btn svg{transform:rotate(180deg)}
+.cmb-pop{display:none;position:absolute;left:0;right:0;min-width:min(240px,calc(100vw - 40px));top:calc(100% + 4px);z-index:30;max-height:min(260px,44vh);overflow-y:auto;overscroll-behavior:contain;background:var(--bg1);border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);padding:4px}
+.cmb.open .cmb-pop{display:block}
+.cmb-it{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:8px 10px;background:none;border:none;border-radius:7px;color:var(--t0);font-size:14px;font-family:inherit;text-align:left;cursor:pointer}
+.cmb-it span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmb-it i{flex:none;font-style:normal;font-size:11.5px;color:var(--t2);font-variant-numeric:tabular-nums}
+.cmb-it:hover,.cmb-it:active{background:var(--bg2)}
+.cmb-it.on{background:rgba(110,168,254,.13);color:var(--acc)}
+.cmb-new{color:var(--acc);font-weight:600}
+.cmb-empty{padding:10px;font-size:12.5px;color:var(--t2)}
+[data-theme="eink"] .cmb-pop{background:#fff;border:1.5px solid #000;box-shadow:none}
+[data-theme="eink"] .cmb-it{color:#000}
+[data-theme="eink"] .cmb-it.on{background:#000;color:#fff}
