@@ -1521,6 +1521,95 @@ function _lawBody(text, fmt){
     return '<div class="law-ln" style="padding-left:' + stack.length + 'em"><span class="law-mk">' + fmt(m) + '</span><span>' + fmt(t.slice(m.length)) + '</span></div>';
   }).join('');
 }
+// ══ SOP 文字排版（v4.34）══════════════════════════════════════
+//   SOP 用純文字輸入（可搜尋、可備份），顯示時排成接近實際標準作業程序的樣子：
+//   【標題】          → 段落標題（例：【依據】【流程】【作業內容】【注意事項】【使用表單】）
+//   ○ 開始／○ 結束    → 起訖（圓角）
+//   ◇ 是否……？       → 判斷（六角框），下面接「是：……」「否：……」分支，並排顯示
+//   □ 或一般行（在【…流程…】段落內）→ 步驟方框，步驟之間自動畫箭頭；開頭的「1.」「(1)」當步驟編號
+//   甲 | 乙 | 丙      → 表格（連續幾行有「|」；第一行是表頭）。手機上每列改成一張卡片，表頭變成每格的小標
+//   其餘文字照法條排版（一、（一）1. 會依層級內縮）
+const _SOP_TERM = /^[○◯⭕]\s*/, _SOP_DEC = /^[◇◆]\s*/, _SOP_BOX = /^[□■]\s*/, _SOP_BR = /^(是|否|Y|N|yes|no|有|無|符合|不符合)\s*[：:→]\s*/i;
+const _SOP_NUM = /^(\d+[.．、]|[（(]\d+[)）])\s*/;
+function _isSopText(t){
+  return /^\s*【[^】]+】\s*$/m.test(t||'') || /^\s*[○◯⭕◇◆□■]/m.test(t||'') || /^[^\n|]*\|[^\n]*\n[^\n|]*\|/.test(t||'');
+}
+function _sopBody(text, fmt){
+  const lines = String(text||'').split('\n').map(s => s.trim());
+  const out = [];
+  let flowMode = false, plain = [], flow = [], table = [];
+  const flushPlain = () => { if(plain.length){ out.push(_lawBody(plain.join('\n'), fmt)); plain = []; } };
+  const flushTable = () => {
+    if(!table.length) return;
+    const rows = table.map(r => r.replace(/^\||\|$/g, '').split('|').map(c => c.trim()))
+      .filter(r => !r.every(c => /^:?-{2,}:?$/.test(c) || c === ''));   // 略過 Markdown 的 |---| 分隔列
+    table = [];
+    if(!rows.length) return;
+    const head = rows[0], n = Math.max(...rows.map(r => r.length));
+    out.push('<div class="sop-tw"><table class="sop-t"><thead><tr>' +
+      Array.from({ length:n }, (_, i) => '<th>' + fmt(head[i] || '') + '</th>').join('') + '</tr></thead><tbody>' +
+      rows.slice(1).map(r => '<tr>' + Array.from({ length:n }, (_, i) =>
+        '<td data-l="' + esc(head[i] || '') + '">' + fmt(r[i] || '') + '</td>').join('') + '</tr>').join('') +
+      '</tbody></table></div>');
+  };
+  const flushFlow = () => {
+    if(!flow.length) return;
+    let h = '<div class="sop-flow">', first = true;
+    for(const nd of flow){
+      if(!first) h += '<div class="sop-arr" aria-hidden="true"></div>';
+      first = false;
+      const num = nd.num ? '<i class="sop-num">' + fmt(nd.num.replace(/[.．、\s]/g, '')) + '</i>' : '';
+      h += '<div class="sop-n ' + nd.k + '">' + num + '<span>' + fmt(nd.t) + '</span></div>';
+      if(nd.br.length) h += '<div class="sop-arr" aria-hidden="true"></div><div class="sop-brs">' + nd.br.map(b =>
+        '<div class="sop-b"><b>' + fmt(b.l) + '</b><span>' + fmt(b.t) + '</span></div>').join('') + '</div>';
+    }
+    out.push(h + '</div>');
+    flow = [];
+  };
+  const flushAll = () => { flushPlain(); flushTable(); flushFlow(); };
+  for(const t of lines){
+    if(!t){ flushTable(); continue; }
+    const hm = t.match(/^【([^】]+)】$/);
+    if(hm){ flushAll(); flowMode = /流程/.test(hm[1]); out.push('<div class="sop-h">' + fmt(hm[1]) + '</div>'); continue; }
+    if(t.includes('|')){ flushPlain(); flushFlow(); table.push(t); continue; }
+    flushTable();
+    const br = t.match(_SOP_BR);
+    if(br && flow.length && flow[flow.length - 1].k === 'dec'){ flow[flow.length - 1].br.push({ l:br[1], t:t.slice(br[0].length) }); continue; }
+    let k = '';
+    if(_SOP_TERM.test(t)) k = 'term';
+    else if(_SOP_DEC.test(t)) k = 'dec';
+    else if(_SOP_BOX.test(t) || flowMode) k = 'box';
+    if(!k){ flushFlow(); plain.push(t); continue; }
+    flushPlain();
+    let s = t.replace(_SOP_TERM, '').replace(_SOP_DEC, '').replace(_SOP_BOX, '');
+    const nm = k === 'box' ? s.match(_SOP_NUM) : null;
+    if(nm) s = s.slice(nm[0].length);
+    flow.push({ k, t:s, num:nm ? nm[1] : '', br:[] });
+  }
+  flushAll();
+  return '<div class="sop">' + out.join('') + '</div>';
+}
+// 條文內容 → HTML：SOP 類別且有 SOP 標記時排成流程圖／表格，其餘照法條排版
+function _lawContentHtml(l, fmt){
+  return (l && l.category === 'sop' && _isSopText(l.content)) ? _sopBody(l.content, fmt) : _lawBody(l && l.content, fmt);
+}
+// 新增資料表單：SOP 範本、預覽
+const _SOP_TPL = '【依據】\n（例：警察職權行使法第6條至第8條）\n\n【流程】\n○ 開始\n1. 受理報案、確認地點與事由\n◇ 是否有立即危險？\n是：通報勤務指揮中心請求支援\n否：派員前往處理\n2. 到場查證身分\n3. 製作紀錄並回報\n○ 結束\n\n【作業內容】\n流程 | 權責人員 | 作業內容\n受理報案 | 值班人員 | 詢問報案人姓名、地點、事由並登記\n到場處理 | 巡邏人員 | 依法查證身分，注意比例原則\n\n【注意事項】\n一、……\n二、……\n\n【使用表單】\n（例：員警工作紀錄簿）';
+async function sopTemplate(){
+  const ta = document.getElementById('l-content');
+  if(!ta) return;
+  if(ta.value.trim() && !await askConfirm('插入範本', '內容已有文字，範本會加在最後面。', '加入')) return;
+  ta.value = (ta.value.trim() ? ta.value.trimEnd() + '\n\n' : '') + _SOP_TPL;
+  sopPreview(true);
+}
+function sopPreview(force){
+  const box = document.getElementById('l-sop-prev'), ta = document.getElementById('l-content');
+  if(!box || !ta) return;
+  if(!force && box.dataset.on){ box.dataset.on = ''; box.innerHTML = ''; box.classList.add('hide'); return; }
+  box.dataset.on = '1'; box.classList.remove('hide');
+  box.innerHTML = ta.value.trim() ? _sopBody(ta.value, esc) : '<div class="ssb">還沒有內容</div>';
+}
+
 // 法條搜尋索引（存檔、匯入、重建索引、備份還原共用這一份）；圖片內容（data:）不納入
 const _lawBlob = l => [l.lawName, l.article, String(l.articleNumber||''), l.title,
   (l.keywords||[]).join(' '), (l.content||'').startsWith('data:') ? '' : (l.content||'')]
@@ -2095,7 +2184,7 @@ async function openLawGroup(lawName, full){  try{
   };
   const renderArtCard = (l) => {
     const isImg=l.content&&l.content.startsWith('data:image');
-    const contentHtml=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px;cursor:zoom-in" onclick="openImgViewer(this.src)" title="點擊放大">':_lawBody(l.content, _hl);
+    const contentHtml=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px;cursor:zoom-in" onclick="openImgViewer(this.src)" title="點擊放大">':_lawContentHtml(l, _hl);
     const kwHtml=(l.keywords||[]).length?'<div style="margin-top:8px">'+l.keywords.map(k=>'<span class="tag">'+esc(k)+'</span>').join('')+'</div>':'';
     // 關聯法條 = 手動填的 ＋ 本條內文引用到的 ＋ 引用到本條的（三者合一，不分方向）。
     //   使用者在意的是「這條跟哪些法規有關」，誰引用誰是法制作業的事；母法、子法標明排最前
@@ -2912,13 +3001,12 @@ function toggleSOPMode(){
   const tw=document.getElementById('l-img-toggle-wrap');
   const hasImg=window._sopImgData!=null;
 
-  if(cat==='sop'){
-    // SOP：預設圖片模式
-    if(cw)cw.classList.add('hide');
-    if(iw)iw.classList.remove('hide');
-    if(tw)tw.style.display='none';
-  } else if(cat==='supplement'||cat==='interpretation'){
-    // 補充資料／法律解釋與裁判：可選文字或圖片，預設文字（有圖片資料則預設圖片）
+  // SOP 文字工具（範本、預覽、格式說明）只在 SOP 類別顯示
+  const st=document.getElementById('l-sop-tools');
+  if(st) st.classList.toggle('hide', cat!=='sop');
+  if(cat!=='sop'){ const pv=document.getElementById('l-sop-prev'); if(pv){ pv.dataset.on=''; pv.innerHTML=''; pv.classList.add('hide'); } }
+  if(cat==='sop'||cat==='supplement'||cat==='interpretation'){
+    // SOP（v4.34 起可打字，排成流程圖／表格）、補充資料、法律解釋與裁判：可選文字或圖片，預設文字（有圖片資料則預設圖片）
     if(tw)tw.style.display='block';
     if(hasImg){
       if(cw)cw.classList.add('hide');
@@ -2953,7 +3041,9 @@ async function saveLaw(){  try{
   let content='';
   // sop / supplement / interpretation 都可選擇圖片或文字
   const canUseImg=(cat_==='sop'||cat_==='supplement'||cat_==='interpretation');
-  if(canUseImg && window._sopImgData){
+  // 圖片欄位顯示中才用圖片；切回「文字」就存文字（原本只要上傳過圖片，切回文字仍會存圖片）
+  const imgShown=!document.getElementById('l-img-wrap')?.classList.contains('hide');
+  if(canUseImg && window._sopImgData && imgShown){
     // 有上傳圖片，直接用圖片
     content=window._sopImgData;
   } else {
@@ -3435,7 +3525,7 @@ async function showLawPop(ref){  try{
   const isImg=l.content&&l.content.startsWith('data:image');
   _setLawPopCur(l);
   document.getElementById('lawpop-title').textContent=(l.lawName||'')+' '+(l.article||'');
-  document.getElementById('lawpop-body').innerHTML=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px">':_lawBody(l.content, esc);
+  document.getElementById('lawpop-body').innerHTML=isImg?'<img src="'+l.content+'" style="max-width:100%;border-radius:8px">':_lawContentHtml(l, esc);
   // 與法規頁同一套關聯（手動＋內文引用＋被引用），再加上「這條考過哪些題」
   _setLawNames(laws);
   const rl=_lawRelChips(_lawRelRefs(l, laws));
@@ -3817,7 +3907,7 @@ const DataMod = {
   saveQ,
   saveQAndContinue,
   toggleListSelectMode,
-  confirmListSelDel, openBatchEdit, applyBatchEdit, openOfficialLaw,
+  confirmListSelDel, openBatchEdit, applyBatchEdit, openOfficialLaw, sopTemplate, sopPreview,
   dupAction,
   openLawSortMenu,
   closeLawSortMenu,

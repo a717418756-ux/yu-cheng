@@ -618,6 +618,7 @@ function _altText(qu){
 // ══ 選項隨機排列（設定開關，預設關閉）════════════════════════
 //   只換畫面上的順序，題目資料不動：S.quiz.ord[題目id] = 畫面上第 1、2…個位置放的「原題字母」。
 //   判分一律換回原題字母；答案列、解析裡的 (A)(B) 換成本次順序。作答紀錄只存對錯，不受影響。
+//   v4.34：畫面上不再顯示「原題字母」與換算對照，解析直接用本次順序（_mapNote）。
 let _optShuffle = false;
 getSetting('quiz_shuffle_opts', false).then(v => {
   _optShuffle = !!v;
@@ -633,11 +634,39 @@ function _shufOk(qu){
 const _ordOf  = qu => S.quiz.ord?.[qu.id];
 const _toOrig = (s, qu) => { const o = _ordOf(qu); return o ? [...s].map(c => o['ABCDE'.indexOf(c)] || c).join('') : s; };
 const _toDisp = (s, qu) => { const o = _ordOf(qu); return o ? [...s].map(c => o.includes(c) ? 'ABCDE'[o.indexOf(c)] : c).join('') : s; };
-// 答案文字：打亂時附上原題字母，方便對照紙本
+// 答案文字（本次選項順序）
 function _ansText(qu, sep){
   const a = (qu.answer||'').toUpperCase().replace(/[^A-E]/g, '');
-  const d = _toDisp(a, qu).split('').sort().join(sep);
-  return _ordOf(qu) ? d + '（原題 ' + a.split('').join(sep) + '）' : d;
+  return _toDisp(a, qu).split('').sort().join(sep);
+}
+// 解析文字裡的選項字母換成本次順序（沒打亂時原樣傳回）。只換明確指選項的寫法，
+//   人名代號（「甲殺害A」「誤B為A」）不動：
+//   ①(A)、（A）及連寫 (A)(B)(E) → 換算後依字母排序；「(A)至(E)」先展開成 (A)(B)(C)(D)(E)
+//   ②「選項A」「A選項」「答案為B」「官方答案：A、C」
+//   ③每行開頭都是選項（(A)錯：…⏎(B)錯：…）的連續幾行，照本次 A→E 的順序重排，讀起來和畫面一致
+function _mapNote(s, qu){
+  const o = _ordOf(qu);
+  if(!o || !s) return s || '';
+  const d = c => _toDisp(c, qu);
+  const group = m => d(m.replace(/[^A-E]/g, '')).split('').sort().map(c => '(' + c + ')').join('');
+  let t = String(s)
+    .replace(/[(（]([A-E])[)）]\s*[~～至到－—-]\s*[(（]([A-E])[)）]/g,
+      (m, x, y) => 'ABCDE'.slice('ABCDE'.indexOf(x), 'ABCDE'.indexOf(y) + 1).replace(/./g, '($&)') || m)
+    .replace(/(?:[(（][A-E][)）])+/g, group)
+    .replace(/(選項\s*)([A-E])(?![A-Za-z])/g, (m, p, c) => p + d(c))
+    .replace(/(?<![A-Za-z])([A-E])(\s*選項)/g, (m, c, p) => d(c) + p)
+    .replace(/((?:官方)?答案\s*(?:為|是|[：:])\s*)([A-E](?:\s*[、,，/／]?\s*[A-E])*)(?![A-Za-z])/g,
+      (m, p, L) => { const ls = L.match(/[A-E]/g); const sep = L.replace(/[A-E\s]/g, '').charAt(0); return p + d(ls.join('')).split('').sort().join(sep); });
+  // ③ 連續的「選項開頭」行依本次字母重排
+  const lines = t.split('\n'), out = [];
+  const head = ln => (ln.match(/^\s*\(([A-E])\)/) || [])[1];
+  for(let i = 0; i < lines.length;){
+    if(!head(lines[i])){ out.push(lines[i++]); continue; }
+    let j = i; while(j < lines.length && head(lines[j])) j++;
+    out.push(...lines.slice(i, j).map((ln, k) => [ln, k]).sort((a, b) => head(a[0]).localeCompare(head(b[0])) || a[1] - b[1]).map(x => x[0]));
+    i = j;
+  }
+  return out.join('\n');
 }
 function _drawOpts(qu){
   const o = _ordOf(qu);
@@ -661,17 +690,9 @@ function _showQNote(qu){
   const hlC=qu.hlColor&&hlMap[qu.hlColor]?hlMap[qu.hlColor]:'';
   noteEl.style.display = 'block';
   noteEl.style.borderLeft = hlC ? ('3px solid '+hlC) : '';
-  const o = _ordOf(qu);
-  // 「(A)至(E)」先展開成 (A)(B)(C)(D)(E)（只換兩端會變成看不懂的範圍）；
-  // 連續的 (A)(B)(E) 換算後重新排序，讀起來仍是 (A)(B)(C) 的習慣順序
-  const note = o && qu.note ? qu.note
-    .replace(/[(（]([A-E])[)）]\s*[~～至到－—-]\s*[(（]([A-E])[)）]/g,
-      (m, x, y) => 'ABCDE'.slice('ABCDE'.indexOf(x), 'ABCDE'.indexOf(y) + 1).replace(/./g, '($&)') || m)
-    .replace(/(?:[(（][A-E][)）])+/g,
-    m => _toDisp(m.replace(/[^A-E]/g, ''), qu).split('').sort().map(c => '(' + c + ')').join('')) : qu.note;
-  noteEl.textContent = (o && qu.note ? '🔀 選項已重新排列，解析字母已換成本次順序（原題→本次：'
-      + o.map((k, i) => k + '→' + 'ABCDE'[i]).sort().join('、') + '）\n' : '')
-    + (note ? ('📝 '+note) : '🖍 已標記');
+  // 選項打亂時，解析裡的選項字母直接換成本次順序（_mapNote），不另外顯示原題字母
+  const note = _mapNote(qu.note, qu);
+  noteEl.textContent = note ? ('📝 '+note) : '🖍 已標記';
 }
 
 // 公布答案後（單選、複選、申論共用）：開放下一題、筆記、標註、編輯題目，並列出關聯法條
@@ -779,9 +800,11 @@ function _showQResearch(qu){
     if(!it || it.k !== qu.exam + '|' + qu.year + '|' + qu.subject) return;
     const link = s => esc(s).replace(/https?:\/\/[^\s｜<]+/g, u => '<a href="' + u + '" target="_blank" rel="noopener">' + (u.length > 48 ? u.slice(0, 45) + '…' : u) + '</a>');
     let h = '';
-    if(it.ok) h += '<div class="qsrc-ok' + (it.ok.startsWith('⚠') ? ' warn' : '') + '">' + esc(it.ok) + (it.u ? ' <a href="' + esc(it.u) + '" target="_blank" rel="noopener">來源</a>' : '') + '</div>';
-    if(it.gap) h += '<div class="qsrc-gap">' + esc(it.gap) + '</div>';
-    if(it.t) h += '<details class="qsrc-det"><summary>🔎 查證紀錄（GPT 整理，連結不等於逐字核證）</summary><div class="qsrc-t">' + link(it.t) + '</div></details>';
+    if(it.ok) h += '<div class="qsrc-ok' + (it.ok.startsWith('⚠') ? ' warn' : '') + '">' + esc(_mapNote(it.ok, qu)) + (it.u ? ' <a href="' + esc(it.u) + '" target="_blank" rel="noopener">來源</a>' : '') + '</div>';
+    if(it.gap) h += '<div class="qsrc-gap">' + esc(_mapNote(it.gap, qu)) + '</div>';
+    // 查證紀錄是 GPT 的原始筆記，字母寫法不一（還有「證據分級 B」這類非選項字母），不自動換算
+    if(it.t) h += '<details class="qsrc-det"><summary>🔎 查證紀錄（GPT 整理，連結不等於逐字核證）</summary><div class="qsrc-t">' +
+      (_ordOf(qu) ? '<div class="qsrc-gap">紀錄裡的選項字母是原題順序。</div>' : '') + link(it.t) + '</div></details>';
     if(!h) return;
     el.innerHTML = h;
     el.style.display = 'block';

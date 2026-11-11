@@ -889,7 +889,8 @@ const _LOCAL_KEEP = 10;
 async function _readExamFile(dir, name){
   const file = await (await dir.getFileHandle(name)).getFile();
   let data;
-  try{ data = JSON.parse(await file.text()); }
+  // 從 Google Drive 下載的雲端備份（v4.33 起開頭是 gz1: 的壓縮字串）放進資料夾也能直接還原
+  try{ data = JSON.parse(await _gzUnpack((await file.text()).trim())); }
   catch(e){ throw new Error(name + ' 內容損毀，無法讀取（' + e.message + '）'); }
   return { file, data, name };
 }

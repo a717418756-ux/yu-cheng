@@ -1024,7 +1024,23 @@
       <div class="fr fg">
         <div><label class="fl">類別</label><select id="l-cat" onchange="toggleSOPMode()"><option value="statute">法規條文</option><option value="admin">行政規則</option><option value="sop">SOP</option><option value="supplement">補充資料</option><option value="interpretation">法律解釋與裁判</option></select></div>
       </div>
-      <div class="fg" id="l-content-wrap"><label class="fl">內容 *</label><textarea id="l-content" rows="6" placeholder="法條文字..."></textarea></div>
+      <div class="fg" id="l-content-wrap"><label class="fl">內容 *</label><textarea id="l-content" rows="6" placeholder="法條文字..."></textarea>
+        <div id="l-sop-tools" class="hide">
+          <div class="sop-tools">
+            <button type="button" class="btn bg" onclick="sopTemplate()">📋 插入範本</button>
+            <button type="button" class="btn bg" onclick="sopPreview()">👁 預覽</button>
+          </div>
+          <details class="sop-help"><summary>SOP 文字格式</summary>
+            <div>【依據】【流程】【作業內容】這類一行的標題 → 段落標題<br>
+            ○ 開始、○ 結束 → 起訖<br>
+            ◇ 是否……？ → 判斷，下一行起寫「是：……」「否：……」<br>
+            【流程】段落裡每一行 → 一個步驟方框，自動畫箭頭（也可用 □ 開頭）<br>
+            甲 | 乙 | 丙 → 表格，第一行是表頭<br>
+            其他文字照條文排版。全部都是文字，搜尋得到。</div>
+          </details>
+          <div id="l-sop-prev" class="sop-prev hide"></div>
+        </div>
+      </div>
       <div id="l-img-toggle-wrap" style="display:none;margin-bottom:8px">
         <div style="display:flex;gap:6px">
           <button class="btn bg" style="flex:1;padding:8px;font-size:12px" onclick="switchLawMode('text')">📝 文字</button>
@@ -1032,7 +1048,7 @@
         </div>
       </div>
       <div class="fg hide" id="l-img-wrap">
-        <label class="fl">圖片（SOP 流程圖、表格截圖）</label>
+        <label class="fl">圖片（流程圖、表格截圖；圖片無法搜尋文字，SOP 建議改用文字）</label>
         <div id="l-img-prev" style="min-height:100px;border:2px dashed var(--bd);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);font-size:13px" onclick="document.getElementById('l-img-file').click()">點擊上傳圖片</div>
         <input type="file" id="l-img-file" accept="image/*" style="display:none" onchange="onLawImgSelect(event)">
       </div>
