@@ -1532,7 +1532,7 @@ function _lawBody(text, fmt){
 const _SOP_TERM = /^[○◯⭕]\s*/, _SOP_DEC = /^[◇◆]\s*/, _SOP_BOX = /^[□■]\s*/, _SOP_BR = /^(是|否|Y|N|yes|no|有|無|符合|不符合)\s*[：:→]\s*/i;
 const _SOP_NUM = /^(\d+[.．、]|[（(]\d+[)）])\s*/;
 function _isSopText(t){
-  return /^\s*【[^】]+】\s*$/m.test(t||'') || /^\s*[○◯⭕◇◆□■]/m.test(t||'') || /^[^\n|]*\|[^\n]*\n[^\n|]*\|/.test(t||'');
+  return /^\s*【[^】]+】\s*$/m.test(t||'') || /^\s*[○◯⭕◇◆□■]/m.test(t||'') || /^[^\n|]*\|[^\n]*\n[^\n|]*\|/m.test(t||'');
 }
 function _sopBody(text, fmt){
   const lines = String(text||'').split('\n').map(s => s.trim());

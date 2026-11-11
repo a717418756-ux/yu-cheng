@@ -625,10 +625,13 @@ getSetting('quiz_shuffle_opts', false).then(v => {
   const c = document.getElementById('set-shuffle'); if(c) c.checked = _optShuffle;
 }).catch(()=>{});
 function setOptShuffle(on){ _optShuffle = !!on; setSetting('quiz_shuffle_opts', _optShuffle); }
-// 不打亂：速讀／申論瀏覽、英文與國文、題幹或選項引用其他選項（以上皆是、(A)選項之但書…）
+// 不打亂：速讀／申論瀏覽、英文與國文、題幹或選項引用其他選項（以上皆是、(A)選項之但書…）、
+//   有手寫標註的題目（標註是照原題版面畫的，公布答案時必須回到原順序才對得上；
+//   v4.34.1 起這類題目一開始就不打亂，免得選完答案選項又跳回原順序）
 const _NO_SHUF = /以上(皆|均|都|全)|(其餘|其他)選項|[(（][A-E][)）]/;
 function _shufOk(qu){
   if(!_optShuffle || S.quiz.mode === 'speed' || S.quiz.mode === 'esview' || ['英文','國文'].includes(qu.subject)) return false;
+  if(qu.inkImg && S.quiz.mode !== 'mock') return false;
   return ![qu.stem, qu.groupStem, ...Object.values(qu.options||{})].some(t => _NO_SHUF.test(String(t||'')));
 }
 const _ordOf  = qu => S.quiz.ord?.[qu.id];
@@ -652,11 +655,14 @@ function _mapNote(s, qu){
   let t = String(s)
     .replace(/[(（]([A-E])[)）]\s*[~～至到－—-]\s*[(（]([A-E])[)）]/g,
       (m, x, y) => 'ABCDE'.slice('ABCDE'.indexOf(x), 'ABCDE'.indexOf(y) + 1).replace(/./g, '($&)') || m)
-    .replace(/(?:[(（][A-E][)）])+/g, group)
-    .replace(/(選項\s*)([A-E])(?![A-Za-z])/g, (m, p, c) => p + d(c))
-    .replace(/(?<![A-Za-z])([A-E])(\s*選項)/g, (m, c, p) => d(c) + p)
-    .replace(/((?:官方)?答案\s*(?:為|是|[：:])\s*)([A-E](?:\s*[、,，/／]?\s*[A-E])*)(?![A-Za-z])/g,
-      (m, p, L) => { const ls = L.match(/[A-E]/g); const sep = L.replace(/[A-E\s]/g, '').charAt(0); return p + d(ls.join('')).split('').sort().join(sep); });
+    // 四種寫法放在同一次掃描：每個字母只換一次（分開換的話「答案為A選項」的 A 會被換兩次）
+    .replace(/(?:[(（][A-E][)）])+|((?:官方)?答案\s*(?:為|是|[：:])\s*)([A-E](?:\s*[、,，/／]?\s*[A-E])*)(?![A-Za-z])|(選項\s*)([A-E])(?![A-Za-z])|(?<![A-Za-z])([A-E])(\s*選項)/g,
+      (m, ap, L, sp, sc, oc, os) => {
+        if(ap != null){ const sep = L.replace(/[A-E\s]/g, '').charAt(0); return ap + d(L.match(/[A-E]/g).join('')).split('').sort().join(sep); }
+        if(sp != null) return sp + d(sc);
+        if(oc != null) return d(oc) + os;
+        return group(m);
+      });
   // ③ 連續的「選項開頭」行依本次字母重排
   const lines = t.split('\n'), out = [];
   const head = ln => (ln.match(/^\s*\(([A-E])\)/) || [])[1];
