@@ -172,7 +172,7 @@ function mockFill(from){
   if(from === 'yr' && last.ps && [...ps.options].some(o=>o.value === last.ps) && !ps.dataset.touched) ps.value = last.ps;
   // 升官等測驗題不倒扣，其餘預設倒扣
   const rule = document.getElementById('mk-rule');
-  if(rule && from !== 'ps') rule.value = /升官等/.test(ex.value) ? 'none' : 'neg';
+  if(rule && from !== 'ps') rule.value = window.examRule ? examRule(ex.value) : (/升官等/.test(ex.value) ? 'none' : 'neg');   // 可在設定頁「考試規則」調整
   _mockHint();
 }
 function _mockHint(){
@@ -419,6 +419,7 @@ function renderQCard(){
     document.getElementById('qes').style.display = 'block';
     document.getElementById('qrevbtn').textContent = '顯示參考答案 / 解析';
     document.getElementById('qrevbtn').disabled = false;
+    if(S.quiz.mode !== 'esview' && !S.quiz.ans) _esTimerStart(qu);
     // 申論題：隱藏「確認答案」，等 revealES 後才顯示「下一題」
     const cfmBtnEs = document.getElementById('qmulti-confirm');
     if(cfmBtnEs) cfmBtnEs.classList.add('hide');
@@ -446,6 +447,8 @@ function renderQCard(){
   }
   const why = document.getElementById('qwhy');
   if(why){ why.style.display = 'none'; why.innerHTML = ''; }
+  const amd = document.getElementById('qamend');
+  if(amd) amd.style.display = 'none';
   // 換題：先存起上一題未存的標註，再載入本題的標註
   _inkFlushAndSync();
   _updateNoteBtn();
@@ -525,6 +528,7 @@ async function ansQ(sel){  try{
     qu.lastReview  = Date.now();
     qu.wrongCount    = (qu.wrongCount||0) + (correct ? 0 : 1);
     qu.correctStreak = correct ? (qu.correctStreak||0)+1 : 0;
+    delete qu.guessed;
     // 難度分數（答錯或猶豫提高）
     qu.difficultyScore = Math.min(10,
       (qu.difficultyScore||5) + (correct ? (hesitant ? 0 : -0.5) : 1.5)
@@ -590,6 +594,7 @@ async function ansQ(sel){  try{
   _showQNote(qu);
   _afterAnswer(qu);
   if(!correct && !noAnswerKey) _showWhy(qu);
+  else if(correct && !noAnswerKey && !freeHit) _showSure(qu);
   }catch(e){ logError('ansQ', e); }}
 
 // 直接標出選擇題正確答案（速讀、答題中編輯後重畫共用）
@@ -686,6 +691,7 @@ function _afterAnswer(qu){
   setTimeout(_inkSync, 60);
   _updateNoteBtn();
   showQLawLinks(qu);
+  if(window.showAmendNote) showAmendNote(qu);   // 修法提醒（coach.js）
   _showQResearch(qu);
 }
 
@@ -697,9 +703,59 @@ function _showWhy(qu){
   el.style.display = '';
   el.innerHTML = '<span class="qwhy-t">這題錯在</span>' + WRONG_WHY.map(w=>'<button class="qwhy-b" data-why="'+w+'">'+w+'</button>').join('');
 }
+// 信心標記：答對後可標「猜對的」→ 寫入這次作答（confidence:'guess'）與題目（guessed），排進考前衝刺清單
+function _showSure(qu){
+  const el = document.getElementById('qwhy');
+  if(!el || isVirtualQ(qu)) return;
+  el.style.display = '';
+  el.innerHTML = '<span class="qwhy-t">這題是</span><button class="qwhy-b" data-guess="1">🎲 猜對的</button><span class="qwhy-n">標記後會排進「考前衝刺」再練一次</span>';
+}
+// 申論自評：看完參考答案後自己評掌握程度（attempts.selfScore、題目 esSelf：2 掌握／1 部分／0 不會）
+const ES_SELF = [[2,'掌握'],[1,'部分'],[0,'不會']];
+function _showEsSelf(qu){
+  const el = document.getElementById('qwhy');
+  if(!el || isVirtualQ(qu)) return;
+  el.style.display = '';
+  el.innerHTML = '<span class="qwhy-t">對照參考答案，自評</span>' + ES_SELF.map(([v, t])=>'<button class="qwhy-b'+(qu.esSelf === v ? ' on' : '')+'" data-es="'+v+'">'+t+'</button>').join('');
+}
+// 申論作答計時：題目出來就開始算，顯示在題型列；看答案、換題或離開時停止
+let _esTick = null;
+function _esTimerStop(){ if(_esTick){ clearInterval(_esTick); _esTick = null; } }
+function _esTimerStart(qu){
+  _esTimerStop();
+  const t0 = Date.now(), h = document.getElementById('q-type-hint');
+  const fmt = ms => { const s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  const draw = () => {
+    if(S.quiz.q[S.quiz.idx] !== qu || document.getElementById('qrevbtn')?.disabled || !document.getElementById('qstem')?.offsetParent){
+      _esTimerStop();
+      if(h && S.quiz.q[S.quiz.idx] === qu) h.textContent = '✍️ 申論題・作答 ' + fmt(Date.now() - t0);
+      return;
+    }
+    if(h) h.textContent = '✍️ 申論題・已用 ' + fmt(Date.now() - t0);
+  };
+  draw(); _esTick = setInterval(draw, 1000);
+}
 async function setWhy(btn){  try{
   const qu = S.quiz.q[S.quiz.idx], at = S.quiz._at, why = btn.dataset.why;
-  if(!qu || !why) return;
+  if(!qu) return;
+  const mine = at && at.qid === qu.id && at.id != null;
+  if(btn.dataset.guess){
+    const on = !btn.classList.contains('on');
+    btn.classList.toggle('on', on);
+    if(mine){ at.confidence = on ? 'guess' : 'normal'; await dp('attempts', at); }
+    if(on) qu.guessed = true; else delete qu.guessed;
+    await dp('questions', qu);
+    return;
+  }
+  if(btn.dataset.es != null){
+    const v = +btn.dataset.es, on = !btn.classList.contains('on');
+    document.querySelectorAll('#qwhy .qwhy-b').forEach(b=>b.classList.toggle('on', on && b === btn));
+    if(mine){ if(on) at.selfScore = v; else delete at.selfScore; await dp('attempts', at); }
+    if(on) qu.esSelf = v; else delete qu.esSelf;
+    await dp('questions', qu);
+    return;
+  }
+  if(!why) return;
   const on = !btn.classList.contains('on');
   document.querySelectorAll('#qwhy .qwhy-b').forEach(b=>b.classList.toggle('on', on && b === btn));
   if(at && at.qid === qu.id && at.id != null){ at.wrongReason = on ? why : '未知'; await dp('attempts', at); }
@@ -775,7 +831,13 @@ function revealES(){
   _afterAnswer(qu);
 
   const responseTime = Date.now() - _qStart;
-  dp('attempts', {qid:qu.id, correct:null, date:today(), responseTime, hesitationFlag:responseTime>40000});
+  const at = {qid:qu.id, correct:null, date:today(), responseTime, hesitationFlag:responseTime>40000};
+  S.quiz._at = at;
+  if(!isVirtualQ(qu)){
+    dp('attempts', at).then(id => { at.id = id; }).catch(e => logError('revealES', e));
+    if(!qu.lastReview){ qu.lastReview = Date.now(); dp('questions', qu).catch(()=>{}); }
+    _showEsSelf(qu);
+  }
 }
 
 // 申論參考答案卷＋關鍵概念檢測的 HTML
@@ -946,7 +1008,7 @@ function showQDone(){
   }
 
   // 隱藏題目相關元素，顯示完成區塊（不覆蓋 qbody，保留所有子元素）
-  ['qbadge','qmeta','q-type-hint','qstem','qopts','qres','qwhy','qnote','qes','qlaw']
+  ['qbadge','qmeta','q-type-hint','qstem','qopts','qres','qwhy','qamend','qnote','qes','qlaw']
     .forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
   _inkTeardown();   // 結束畫面不該殘留上一題的手寫筆跡
 
@@ -1489,7 +1551,7 @@ async function ansQMulti(selected, correctStr, qu){  try{
   const {level:newLevel, next:nextReview} = calcNextReview(curLevel, correct);
   qu.reviewLevel = newLevel; qu.nextReview = nextReview; qu.lastReview = Date.now();
   qu.wrongCount    = (qu.wrongCount||0) + (correct ? 0 : 1);
-  qu.correctStreak = correct ? (qu.correctStreak||0)+1 : 0;
+  qu.correctStreak = correct ? (qu.correctStreak||0)+1 : 0; delete qu.guessed;
   qu.difficultyScore = Math.min(10, (qu.difficultyScore||5) + (correct ? (hesitant?0:-0.5) : 1.5));
   await dp('questions', qu);
   const at = {qid:qu.id, correct, date:today(), responseTime, hesitationFlag:hesitant, confidence:hesitant?'low':'normal', wrongReason:correct?'':'未知'};
@@ -1526,6 +1588,7 @@ async function ansQMulti(selected, correctStr, qu){  try{
   _showQNote(qu);
   _afterAnswer(qu);
   if(!correct) _showWhy(qu);
+  else if(!freeHit) _showSure(qu);
   }catch(e){ logError('ansQMulti', e); }}
 
 function submitAnswer(){

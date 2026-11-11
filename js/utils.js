@@ -46,6 +46,8 @@ function toast(m,d=2200){ const e=document.getElementById('toast');if(!e)return;
 // 本地日期 YYYY-MM-DD（不可用 toISOString：那是 UTC，台灣 00:00~08:00 會記成前一天）
 function ymd(d=new Date()){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function today(){ return ymd(); }
+// 截短文字：超過 n 個字就截斷並補「……」（題目卡片用，讓人知道後面還有）
+function clip(s, n){ s = String(s||'').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n).trimEnd() + '……' : s; }
 // 下載檔案：連結先放進頁面再點（未掛上 DOM 的連結，部分瀏覽器會忽略檔名），用完釋放 blob 網址
 function dl(c,fn,t='text/plain'){
   const u=URL.createObjectURL(c instanceof Blob?c:new Blob([c],{type:t}));
@@ -135,7 +137,9 @@ function cfm(t,s,cb,okText,cnText){
   const prev=_cfmCancel; _cfmCancel=null; prev?.();   // 前一個還沒回覆的確認視窗視為取消
   _cfmCb=cb;
   document.getElementById('cfm-t').textContent=t;
-  document.getElementById('cfm-s').textContent=s;
+  const body=document.getElementById('cfm-s');
+  body.textContent=s; body.scrollTop=0;
+  body.parentElement.classList.toggle('long', String(s||'').split('\n').length > 6);   // 多行內容：靠左、加寬、內文可捲
   const ok=document.getElementById('cfm-ok');
   ok.textContent=okText||'確認';
   ok.onclick=()=>{_cfmCancel=null;closeCfm();_cfmCb?.();};

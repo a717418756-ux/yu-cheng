@@ -644,7 +644,7 @@
 /* 子選單項目數為奇數時，最後一格橫跨兩欄，不留空洞 */
 .zqb:last-child:nth-child(odd){grid-column:1/-1}
 .zqb-label{font-size:11.5px;font-weight:700;color:var(--t0);letter-spacing:.01em}
-.zqb-desc{font-size:9.5px;color:var(--t2);margin-top:2px;line-height:1.3}
+.zqb-desc{font-size:11px;color:var(--t2);margin-top:2px;line-height:1.3}
 
 /* 面板次要列（題目閱覽） */
 .zpanel-row{
@@ -723,9 +723,15 @@ a.zpanel-row{text-decoration:none;color:inherit}
 
 .cov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:center;justify-content:center;padding:16px}
 .cov.on{display:flex}
-.cbox{background:var(--bg1);border:1px solid var(--bd);border-radius:13px;padding:20px 17px;width:100%;max-width:290px;text-align:center}
+.cbox{background:var(--bg1);border:1px solid var(--bd);border-radius:13px;padding:20px 17px;width:100%;max-width:290px;text-align:center;max-height:100%;overflow-y:auto}
+#cfm-ov .cbox{display:flex;flex-direction:column;overflow:hidden}
+/* 內容很長時（例如答案更正清單）：視窗不超出螢幕，只有內文捲動，按鈕固定在下方 */
+#cfm-ov .cbox.long{max-width:420px}
+#cfm-ov .cbox.long .cbs{text-align:left;line-height:1.65;border:1px solid var(--bd);border-radius:9px;padding:9px 11px;background:var(--bg2)}
 .cbt{font-size:15px;font-weight:700;margin-bottom:6px}
 .cbs{font-size:13px;color:var(--t2);margin-bottom:16px}
+#cfm-ov .cbs{max-height:min(46vh,400px);overflow-y:auto;min-height:0;flex:0 1 auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#cfm-ov :is(.cbt,.cbn){flex:none}
 .cbn{display:flex;gap:7px}
 
 /* ── Google Drive 同步 UI ─── */

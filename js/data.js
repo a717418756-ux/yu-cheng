@@ -494,7 +494,7 @@ async function renderList(){  try{
           '<span style="font-size:13px;margin-left:auto">'+danger+'</span>'+
           '<span style="font-size:15px;margin-left:4px">'+(q.starred?'★':'☆')+'</span>'+
         '</div>'+
-        '<div class="qst">'+esc((q.stem||'').slice(0,100))+'</div>'+
+        '<div class="qst">'+esc(clip(q.stem,100))+'</div>'+
         '<div class="qa">'+
           '<button class="qabn" onclick="editQ('+q.id+')">✏ 編輯</button>'+
           '<button class="qabn" data-qid="'+q.id+'" onclick="startSingleQ(this)">▶ 練習</button>'+
@@ -739,7 +739,7 @@ async function openQGroup(year, subject, examType){  try{
         '<span style="font-size:13px;margin-left:auto">'+danger+'</span>'+
         '<span style="font-size:15px;margin-left:4px">'+(q.starred?'★':'☆')+'</span>'+
       '</div>'+
-      '<div class="qst">'+esc((q.stem||'').slice(0,100))+'</div>'+
+      '<div class="qst">'+esc(clip(q.stem,100))+'</div>'+
       '<div class="qa">'+
         '<button class="qabn" onclick="editQ('+q.id+')">✏ 編輯</button>'+
         '<button class="qabn" data-qid="'+q.id+'" onclick="startSingleQ(this)">▶ 練習</button>'+
@@ -2685,7 +2685,15 @@ async function applyExamFixes(){  try{
   }
   const upd = [...work.values()];
   if(!upd.length){ toast('題庫已是最新的官方答案，不需更正'); return; }
-  if(!await askConfirm('考古題答案更正（' + upd.length + ' 題）', '依官方答案與釋疑結果（' + (fx.date||'') + ' 核對）：\n' + (lines.length > 40 ? lines.slice(0, 40).join('\n') + '\n…另 ' + (lines.length - 40) + ' 項' : lines.join('\n')) + '\n\n作答紀錄保留；你自己改過答案的題目不會被覆蓋。', '套用')) return;
+  // 先給分類統計，再列細項：答案有變的排最前面（最需要看），補解析、補法條排後面；視窗內文可捲
+  const kind = l => /：答案 /.test(l) ? 0 : /官方另接受|一律給分/.test(l) ? 1 : /補關聯法條/.test(l) ? 3 : /補題號/.test(l) ? 4 : 2;
+  const kn = ['答案更正', '官方另接受答案／一律給分', '解析更新或補充', '補關聯法條', '補題號'];
+  const cnt = kn.map((_, i) => lines.filter(l => kind(l) === i).length);
+  const sorted = lines.map((l, i) => [kind(l), i, l]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
+  const msg = '依官方答案與釋疑結果（' + (fx.date||'') + ' 核對），共 ' + upd.length + ' 題、' + lines.length + ' 項：\n'
+    + kn.map((k, i) => cnt[i] ? '・' + k + ' ' + cnt[i] + ' 項' : '').filter(Boolean).join('\n')
+    + '\n作答紀錄保留；你自己改過答案的題目不會被覆蓋。\n\n── 細項（可往下捲）──\n' + sorted.join('\n');
+  if(!await askConfirm('考古題答案更正（' + upd.length + ' 題）', msg, '套用')) return;
   for(const q of upd) q.searchBlob = ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+(q.year||'')+' '+(q.exam||'')+' '+(q.num||'')+' '+(q.keywords||[]).join(' ')).toLowerCase();
   await bulkPut('questions', upd);
   toast('已更正 ' + upd.length + ' 題');

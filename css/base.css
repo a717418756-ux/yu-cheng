@@ -1802,3 +1802,13 @@ html[data-layout="desktop"] #fab-wrap{
 #qv .qsrc-det{margin-top:4px;background:var(--bg2);border-radius:8px;padding:6px 10px}
 #qv .qsrc-det summary{cursor:pointer;min-height:32px;display:flex;align-items:center;list-style-position:inside}
 #qv .qsrc-t{white-space:pre-line;padding:4px 0 2px;overflow-wrap:anywhere}
+
+/* 設定頁：頂端分區快速跳轉（頁面很長，免得一直往下滑找） */
+.set-jump{ position:sticky; top:52px; z-index:6; background:var(--bg0); padding:7px 12px; border-bottom:1px solid var(--bd); }
+.set-jump .chip{ flex:none; cursor:pointer; }
+#pg-set .sec{ scroll-margin-top:100px; }
+/* 設定列右側按鈕不被擠成兩行 */
+.srow{ gap:10px; }
+.srow > .btn, .srow > button{ flex:none; white-space:nowrap; }
+/* 太小的說明字放大到 11px */
+.heatmap-legend-l, .dtask-ring-sub, .dtask-noauto{ font-size:11px; }

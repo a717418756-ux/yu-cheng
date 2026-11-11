@@ -1185,3 +1185,19 @@ window.Settings = Settings;
 Object.assign(window, Settings);
 
 })();
+
+// 設定頁頂端的分區跳轉：依頁面上的 .sec 標題產生，點了捲到該區
+function buildSetJump(){
+  const pg = document.getElementById('pg-set'), box = document.getElementById('set-jump');
+  if(!pg || !box) return;
+  const short = t => t.replace(/（.*?）/g, '').replace(/^本地完整/, '').trim();
+  box.innerHTML = '';
+  pg.querySelectorAll('.sec').forEach(sec => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.textContent = short(sec.textContent);
+    b.onclick = () => sec.scrollIntoView({ block:'start' });
+    box.appendChild(b);
+  });
+}
+document.addEventListener('DOMContentLoaded', buildSetJump);
+if(document.readyState !== 'loading') buildSetJump();

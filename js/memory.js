@@ -244,7 +244,7 @@ function _rNodes(nodes, path){
 // ════════ 📝 篇章練習 ════════
 //   把題庫的考古題、猜題庫的題目，依「關聯法條」對到法條樹的每個篇章：讀完一章就練那一章。
 //   對應方式：篇章樹上出現的法條（法規全名|條號）、釋字／憲判字號，與題目的關聯法條有交集即歸入；
-//   一題可能同時屬於好幾章。沒有關聯法條、或法條不在任何一章的題目列在最後「未歸入篇章」。
+//   一題可能同時屬於好幾章。沒有關聯法條的觀念題、學理題，或法條不在任何一章的題目，一律列在最後的「其他」（不用關鍵字硬猜，免得歸錯章）。
 const _SUBJ_EXAM = { police:['警察法規'], constitution:['憲法、法學緒論'], criminal:['刑法與刑事訴訟法'], procedure:['刑法與刑事訴訟法'], duty:['警察勤務'], deadline:['警察法規', '行政法'] };
 const _plainKey = s => String(s||'').replace(/[第號\s　]/g, '').replace(/^司法院|^大法官/, '');
 function _refKeys(refs){
@@ -260,19 +260,6 @@ function _chKeys(ch){
   walk(ch.tree);
   return _refKeys(refs);
 }
-// 沒有關聯法條的題目（勤務、憲法學理題居多）：改用篇章樹的節點名稱當關鍵字比對題幹與選項，
-//   歸到命中最多的一章（至少命中一個 3 字以上的節點名稱）。太泛的詞不當關鍵字。
-const _KW_STOP = /^(其他|定義|種類|要件|程序|效果|原則|例外|救濟|目的|性質|對象|範圍|方式|期間|期限|內容|概念|意義|主體|客體|罰則|總則|分則|通則|說明|比較|注意|重點|補充)$/;
-function _chWords(ch){
-  const ws = new Set();
-  const add = t => String(t||'').replace(/[（(].*?[)）]/g, '').split(/[、，,／\/：:；;→＝=＋+\s]+/).forEach(w => {
-    w = w.replace(/[「」『』《》〈〉.。?？!！]/g, '').replace(/§.*$/, '');
-    if(w.length >= 3 && w.length <= 12 && !_KW_STOP.test(w) && !/^[\d.]+$/.test(w)) ws.add(w);
-  });
-  const walk = ns => (ns||[]).forEach(n => { add(n.t); walk(n.c); });
-  add(ch.title); walk(ch.tree);
-  return [...ws];
-}
 let _chap = null;      // 目前科目的篇章對應結果（切科目、重繪時重建）
 async function _chapData(d){
   const names = _SUBJ_EXAM[d.id] || [d.name];
@@ -280,31 +267,25 @@ async function _chapData(d){
   const sibs = (_index.subjects||[]).filter(s => s.id !== d.id && !s.audit && (_SUBJ_EXAM[s.id]||[]).some(n => names.includes(n)));
   const sibKeys = new Set();
   for(const s of sibs){ try{ (await _loadSubj(s.id)).chapters.forEach(ch => _chKeys(ch).forEach(k => sibKeys.add(k))); }catch(e){} }
-  const chs = d.chapters.map(ch => ({ ch, keys:_chKeys(ch), words:_chWords(ch), exam:[], guess:[], kw:0 }));
-  const byWord = text => {      // 關鍵字命中最多的一章（同分取字數較長者），沒命中回傳 null
-    let best = null, bs = 0;
-    chs.forEach(c => { let sc = 0; c.words.forEach(w => { if(text.includes(w)) sc += w.length; }); if(sc > bs){ bs = sc; best = c; } });
-    return best;
-  };
+  const chs = d.chapters.map(ch => ({ ch, keys:_chKeys(ch), exam:[], guess:[] }));
   const hit = (set, ks) => { for(const k of ks) if(set.has(k)) return true; return false; };
-  const un = [];
+  const un = [], ung = [];
   let qs = []; try{ qs = await da('questions'); }catch(e){}
   qs.filter(q => names.includes(q.subject) && !(q.tags||[]).includes('猜題')).forEach(q => {
     const ks = _refKeys(q.relatedLaws);
     let any = false;
     if(ks.size) chs.forEach(c => { if(hit(c.keys, ks)){ c.exam.push(q); any = true; } });
     if(any || (ks.size && hit(sibKeys, ks))) return;
-    const c = byWord((q.groupStem||'') + (q.stem||'') + Object.values(q.options||{}).join(''));
-    if(c){ c.exam.push(q); c.kw++; } else un.push(q);
+    un.push(q);
   });
   let v = null; try{ v = await _json('data/variants.json'); }catch(e){}
   ((v && v.items)||[]).filter(it => names.includes(it.subject)).forEach(it => {
     const ks = _refKeys(it.laws);
     let any = false;
     if(ks.size) chs.forEach(c => { if(hit(c.keys, ks)){ c.guess.push(it.gid); any = true; } });
-    if(!any && !(ks.size && hit(sibKeys, ks))){ const c = byWord((it.stem||'') + Object.values(it.options||{}).join('')); if(c) c.guess.push(it.gid); }
+    if(!any && !(ks.size && hit(sibKeys, ks))) ung.push(it.gid);
   });
-  return { sid:d.id, chs, un, v };
+  return { sid:d.id, chs, un, ung, v };
 }
 const _qDone = q => !!q.lastReview;
 const _qWeak = q => (q.wrongCount||0) > 0 && !((q.correctStreak||0) > 0);
@@ -326,14 +307,14 @@ function _rChap(d, cd){
   };
   const total = new Set(cd.chs.flatMap(c => c.exam.map(q => q.id))).size;
   return '<div class="mem-intro">📝 <b>篇章練習</b>：讀完一章，直接練那一章的考古題和猜題。題目依「關聯法條」自動對到篇章（共對到 ' + total + ' 題），一題可能屬於好幾章；' +
-    '沒有關聯法條的題目改用篇章關鍵字對應（' + cd.chs.reduce((a, c) => a + c.kw, 0) + ' 題），可能有少數不完全對應。作答會照常記入複習進度；猜題是臨時練習，不存題庫。<div class="mem-src">「待加強」＝答錯過、之後還沒再答對的題目。</div></div>' +
+    '沒有關聯法條的觀念題、學理題歸在最後的「其他」。作答會照常記入複習進度；猜題是臨時練習，不存題庫。<div class="mem-src">「待加強」＝答錯過、之後還沒再答對的題目。</div></div>' +
     cd.chs.map((c, i) => row(c.ch.title, c.ch.lead, c.exam, c.guess, i)).join('') +
-    (cd.un.length ? row('未歸入篇章', '沒有關聯法條，或法條不在上面任何一章的題目', cd.un, [], -1) : '');
+    (cd.un.length || cd.ung.length ? row('其他', '觀念題、學理題等沒有關聯法條的題目，或法條不在上面任何一章', cd.un, cd.ung, -1) : '');
 }
 async function _chapGo(i, kind){
   const cd = _chap;
   if(!cd) return;
-  const c = i < 0 ? { ch:{ title:'未歸入篇章' }, exam:cd.un, guess:[] } : cd.chs[i];
+  const c = i < 0 ? { ch:{ title:'其他' }, exam:cd.un, guess:cd.ung } : cd.chs[i];
   if(!c) return;
   if(kind === 'tree'){
     _cur.tab = 'tree'; _renderTabs(); await _renderBody();
