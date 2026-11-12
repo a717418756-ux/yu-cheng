@@ -1625,12 +1625,66 @@ const _lawBlob = l => [l.lawName, l.article, String(l.articleNumber||''), l.titl
   .filter(Boolean).join(' ').toLowerCase();
 // 法規類別：儲存值 → 畫面名稱（儲存值寫進備份與桌面工具，不可改；名稱可改）
 const _LAW_CAT = { statute:'法規條文', admin:'行政規則', sop:'SOP', supplement:'補充資料', interpretation:'法律解釋與裁判' };
+// v4.37：類別可自訂（與題庫的考試別一樣）：內建 5 類固定在前，後面接資料庫裡用過的自訂類別。
+//   自訂類別直接以名稱存（例：「勤務規範」）；顯示、排版比照補充資料（可用圖片、【標題】與表格排版）
+const _lawCatName = c => _LAW_CAT[c] || c || _LAW_CAT.statute;
+const _lawCatIcon = c => c==='sop'?'📋':c==='supplement'?'📄':c==='admin'?'📑':(!c||c==='statute'||c==='interpretation')?'⚖':'📁';
+const _lawCatImg = c => !!c && c !== 'statute' && c !== 'admin';   // 可選擇以圖片存內容的類別
+let _lawCatExtra = [];   // 這次新增、還沒有資料使用的自訂類別（存了資料後就會從資料庫列出）
+function _lawCatsOf(ls, dataOnly){   // dataOnly：只列資料庫裡有資料的（篩選列用）
+  const out = Object.keys(_LAW_CAT), seen = new Set(out);
+  for(const c of [...(ls||[]).map(l => l.category), ...(dataOnly ? [] : _lawCatExtra)]) if(c && !seen.has(c)){ seen.add(c); out.push(c); }
+  return out;
+}
+async function _askNewLawCat(){
+  const v = ((await askInput('新增類別', '輸入新的類別名稱（例：勤務規範、函釋）', '', { placeholder:'類別名稱', okText:'新增' })) || '').trim();
+  if(!v) return null;
+  const k = Object.keys(_LAW_CAT).find(k => k === v || _LAW_CAT[k] === v);   // 打的是內建類別名稱 → 用內建的
+  if(k) return k;
+  if(v === '__new' || v === 'all' || v.length > 20){ toast('類別名稱請在 20 字以內'); return null; }
+  if(!_lawCatExtra.includes(v)) _lawCatExtra.push(v);
+  return v;
+}
+// 類別下拉選單（新增資料、批次匯入共用）：最後一項「＋ 新增類別…」
+async function _fillLawCatSel(id, cur){
+  const sel = document.getElementById(id);
+  if(!sel) return;
+  cur = cur || 'statute';
+  const list = _lawCatsOf(await da('laws'));
+  if(!list.includes(cur)) list.push(cur);
+  sel.innerHTML = list.map(c => '<option value="' + esc(c) + '">' + esc(_lawCatName(c)) + '</option>').join('')
+    + '<option value="__new">＋ 新增類別…</option>';
+  sel.value = cur;
+  sel.dataset.prev = cur;
+}
+async function _lawCatSelChange(sel){  try{
+  if(sel.value === '__new'){
+    const c = await _askNewLawCat();
+    if(!c){ sel.value = sel.dataset.prev || 'statute'; return; }
+    await _fillLawCatSel(sel.id, c);
+  }
+  sel.dataset.prev = sel.value;
+  if(sel.id === 'l-cat') toggleSOPMode();
+  }catch(e){ logError('_lawCatSelChange', e); }}
+// 資料庫頁的類別篩選列：內建類別＋資料庫裡有的自訂類別（類別有變才重畫）
+function _renderLawChips(ls){
+  const box = document.getElementById('lchips');
+  if(!box) return;
+  const cats = _lawCatsOf(ls, true);
+  if(S.lawCat !== 'all' && !cats.includes(S.lawCat)) S.lawCat = 'all';
+  const key = cats.join('\n') + '\n' + S.lawCat;
+  if(box.dataset.k === key) return;
+  box.dataset.k = key;
+  box.innerHTML = ['all', ...cats].map(c => '<button class="chip' + (c === S.lawCat ? ' on' : '') + '" data-c="' + esc(c)
+    + '" onclick="setLC(this,this.dataset.c)">' + esc(c === 'all' ? '全部' : _lawCatName(c)) + '</button>').join('');
+}
 // 條文的計數單位：行政規則以「點」分（第 3 點），其餘以「條」分
 const _lawUnit = laws => /點/.test(((laws||[])[0]||{}).article||'') ? '點' : '條';
 
 async function renderDB(){  try{
   const ls=await da('laws');
   _setLawNames(ls);   // 供 _autoCites 比對用（列表頁也要顯示自動連結）
+  _renderLawChips(ls);
   const kw=_kwNorm(document.getElementById('lsi')?.value);
   const kwField=document.getElementById('lsf')?.value||'all';   // 搜尋範圍
   // 條號精準搜尋（法規名§N、法規名第N條）；其餘分詞搜尋（規則見 _lawHit）
@@ -1685,9 +1739,9 @@ async function renderDB(){  try{
 
   const _mkCard = ([name, laws]) => {
     const cat=laws[0].category||'statute';
-    const catLabel=_LAW_CAT[cat]||cat;
+    const catLabel=_lawCatName(cat);
     const favCount=laws.filter(l=>l.favorite).length;
-    const icon=cat==='sop'?'📋':cat==='supplement'?'📄':cat==='admin'?'📑':'⚖';
+    const icon=_lawCatIcon(cat);
     const _li=_lawInfo(laws);
     const orgLine=(_li.org||_li.amendDate)
       ?('<div style="font-size:10px;color:var(--t2);margin-top:1px">'
@@ -2163,7 +2217,7 @@ async function openLawGroup(lawName, full){  try{
   }
   const others=[...new Set(allLaws.map(l=>l.lawName).filter(Boolean))].filter(n=>n!==lawName).slice(0,8);
   const cat=laws[0].category||'statute';
-  const icon=cat==='sop'?'📋':cat==='supplement'?'📄':cat==='admin'?'📑':'⚖';
+  const icon=_lawCatIcon(cat);
   const lvName=document.getElementById('lv-name'); if(lvName) lvName.textContent=icon+' '+lawName;
   // 顯示法規機關/日期資訊
   const lvInfo=document.getElementById('lv-info');
@@ -2551,12 +2605,15 @@ async function changeLawCat(){  try{
   if(!lawName){toast('請先開啟法規');return;}
   const cur=((await da('laws')).find(l=>l.lawName===lawName)||{}).category||'statute';
   document.getElementById('lcat-name').textContent=lawName;
-  document.getElementById('lcat-list').innerHTML=Object.entries(_LAW_CAT).map(([v,n])=>
-    '<button class="subj-item'+(v===cur?' on':'')+'" onclick="_setLawCat(\''+v+'\')"><span class="subj-name">'+n+'</span>'
-    +(v===cur?'<span class="subj-cnt">目前</span>':'')+'</button>').join('');
+  const cats=_lawCatsOf(await da('laws'));
+  document.getElementById('lcat-list').innerHTML=cats.map(v=>
+    '<button class="subj-item'+(v===cur?' on':'')+'" data-c="'+esc(v)+'" onclick="_setLawCat(this.dataset.c)"><span class="subj-name">'+esc(_lawCatName(v))+'</span>'
+    +(v===cur?'<span class="subj-cnt">目前</span>':'')+'</button>').join('')
+    +'<button class="subj-item" onclick="_newLawCatFor()"><span class="subj-name">＋ 新增類別…</span></button>';
   document.getElementById('lcat-ov').classList.add('on');
   }catch(e){ logError('changeLawCat',e); }}
 function closeLawCat(){ document.getElementById('lcat-ov')?.classList.remove('on'); }
+async function _newLawCatFor(){ const c=await _askNewLawCat(); if(c) _setLawCat(c); }
 async function _setLawCat(cat){  try{
   const lawName=S.curLawName;
   const targets=(await da('laws')).filter(l=>l.lawName===lawName && l.category!==cat);
@@ -2564,7 +2621,7 @@ async function _setLawCat(cat){  try{
   if(!targets.length){ toast('類別沒有變動'); return; }
   targets.forEach(l=>{ l.category=cat; });
   await bulkPut('laws',targets);
-  toast('已改為「'+_LAW_CAT[cat]+'」（'+targets.length+' '+_lawUnit(targets)+'）✓');
+  toast('已改為「'+_lawCatName(cat)+'」（'+targets.length+' '+_lawUnit(targets)+'）✓');
   openLawGroup(lawName);
   }catch(e){ logError('_setLawCat',e); }}
 
@@ -2723,7 +2780,7 @@ async function applyExamFixes(){  try{
   const h = s => { let x = 0; for(const c of (s||'')) x = (x * 31 + c.codePointAt(0)) >>> 0; return x; };
   const work = new Map(), lines = [], skipped = [], lawFx = [];
   for(const f of fx.fixes){
-    if(f.lawContent){ lawFx.push(f); continue; }
+    if(f.lawContent || f.lawNew){ lawFx.push(f); continue; }
     const q = qs.find(q => q.exam === f.exam && String(q.year) === f.year && q.subject === f.subject &&
       (f.groupId ? (q.groupId === f.groupId && q.groupOrder === f.groupOrder) : String(q.num) === f.num));
     if(!q) continue;
@@ -2768,10 +2825,26 @@ async function applyExamFixes(){  try{
   }
   const upd = [...work.values()];
   // 法規資料庫：以圖片存的表格改成可搜尋的文字。只換仍是原本那張圖的（你換過圖或改過字就不動）
-  const lawUpd = [];
+  const lawUpd = [], lawAdd = [];
   if(lawFx.length){
     const laws = await da('laws');
-    for(const f of lawFx) for(const l of laws){
+    for(const f of lawFx){
+      // v4.37 lawNew：法規資料庫新增一筆（例：SOP）。資料庫還沒有這個名稱才新增；
+      //   已有的只在內容仍是先前版本（lawHash）時更新，你自己改過的不動
+      if(!f.lawNew) continue;
+      const nl = f.lawNew, ex = laws.filter(l => l.lawName === nl.lawName);
+      if(!ex.length){
+        const o = Object.assign({ article:'', part:'', chapter:'', section:'', articleNumber:0, title:'', keywords:[], relatedLaws:[],
+          source:'', org:'', amendDate:'', note:'', hlColor:'' }, nl, { favorite:false, createdAt:Date.now() });
+        o.searchBlob = _lawBlob(o); lawAdd.push(o);
+        lines.push('法規資料庫新增「' + nl.lawName + '」（' + _lawCatName(nl.category) + '）');
+      } else for(const l of ex){
+        if(l.content === nl.content || ![].concat(f.lawHash || []).includes(h(l.content))) continue;
+        Object.assign(l, nl); l.searchBlob = _lawBlob(l); lawUpd.push(l);
+        lines.push('法規資料庫「' + nl.lawName + '」更新為新版');
+      }
+    }
+    for(const f of lawFx) if(f.lawContent) for(const l of laws){
       // lawHash：可接受的原內容（原本的圖，或上一版套用的文字）；舊格式只有 lawImgHash
       if(l.lawName !== f.lawName || l.content === f.lawContent || ![].concat(f.lawHash ?? f.lawImgHash).includes(h(l.content))) continue;
       const wasImg = (l.content || '').startsWith('data:');
@@ -2779,22 +2852,22 @@ async function applyExamFixes(){  try{
       lines.push('法規「' + f.lawName + '」：' + (wasImg ? '圖片' : '') + '改為文字表格（可搜尋）');
     }
   }
-  if(!upd.length && !lawUpd.length){ toast('題庫已是最新的官方答案，不需更正'); return; }
+  if(!upd.length && !lawUpd.length && !lawAdd.length){ toast('題庫已是最新的官方答案，不需更正'); return; }
   // 先給分類統計，再列細項：答案有變的排最前面（最需要看），補解析、補法條排後面；視窗內文可捲
-  const kind = l => /：答案 /.test(l) ? 0 : /官方另接受|一律給分/.test(l) ? 1 : /補關聯法條/.test(l) ? 3 : /補題號/.test(l) ? 4 : /改為文字表格/.test(l) ? 5 : 2;
-  const kn = ['答案更正', '官方另接受答案／一律給分', '解析更新或補充', '補關聯法條', '補題號', '法規改為文字表格'];
+  const kind = l => /：答案 /.test(l) ? 0 : /官方另接受|一律給分/.test(l) ? 1 : /補關聯法條/.test(l) ? 3 : /補題號/.test(l) ? 4 : /改為文字表格|法規資料庫/.test(l) ? 5 : 2;
+  const kn = ['答案更正', '官方另接受答案／一律給分', '解析更新或補充', '補關聯法條', '補題號', '法規資料庫（新增、改為文字）'];
   const cnt = kn.map((_, i) => lines.filter(l => kind(l) === i).length);
   const sorted = lines.map((l, i) => [kind(l), i, l]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
-  const msg = '依官方答案、釋疑結果與解析覆核（' + (fx.date||'') + ' 核對），共 ' + upd.length + ' 題' + (lawUpd.length ? '、' + lawUpd.length + ' 筆法規' : '') + '、' + lines.length + ' 項：\n'
+  const msg = '依官方答案、釋疑結果與解析覆核（' + (fx.date||'') + ' 核對），共 ' + upd.length + ' 題' + (lawUpd.length + lawAdd.length ? '、' + (lawUpd.length + lawAdd.length) + ' 筆法規' : '') + '、' + lines.length + ' 項：\n'
     + kn.map((k, i) => cnt[i] ? '・' + k + ' ' + cnt[i] + ' 項' : '').filter(Boolean).join('\n')
     + '\n作答紀錄保留；你自己改過的答案、解析不會被覆蓋。套用前會先存快照。\n\n── 細項（可往下捲）──\n' + sorted.join('\n')
     + (skipped.length ? '\n\n── 解析你改過、未覆蓋（' + skipped.length + ' 題）──\n' + skipped.join('\n') : '');
-  if(!await askConfirm('考古題答案更正（' + (upd.length + lawUpd.length) + ' 筆）', msg, '套用')) return;
+  if(!await askConfirm('考古題答案更正（' + (upd.length + lawUpd.length + lawAdd.length) + ' 筆）', msg, '套用')) return;
   if(window._snapOrAsk && !await window._snapOrAsk('考古題更正')) return;
   for(const q of upd) q.searchBlob = ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+(q.year||'')+' '+(q.exam||'')+' '+(q.num||'')+' '+(q.keywords||[]).join(' ')).toLowerCase();
   if(upd.length) await bulkPut('questions', upd);
-  if(lawUpd.length) await bulkPut('laws', lawUpd);
-  toast('已更正 ' + upd.length + ' 題' + (lawUpd.length ? '、' + lawUpd.length + ' 筆法規' : ''));
+  if(lawUpd.length || lawAdd.length) await bulkPut('laws', [...lawUpd, ...lawAdd]);
+  toast('已更正 ' + upd.length + ' 題' + (lawUpd.length + lawAdd.length ? '、' + (lawUpd.length + lawAdd.length) + ' 筆法規' : ''));
   }catch(e){ logError('applyExamFixes', e); toast('更正失敗：' + e.message); }}
 
 async function quizFromLaw(){  try{
@@ -2863,7 +2936,7 @@ async function showAddLaw(l){
   _setMarkRow('l-mark-row', l?.hlColor||'');
   const tiEl=document.getElementById('l-title');
   if(tiEl)tiEl.value=l?.title||'';
-  document.getElementById('l-cat').value=l?.category||'statute';
+  await _fillLawCatSel('l-cat', l?.category||'statute');   // 內建＋自訂類別
   document.getElementById('l-content').value=(l?.content&&!l.content.startsWith('data:image'))?l.content:'';
   document.getElementById('l-kw').value=(l?.keywords||[]).join(',');
   const relEl=document.getElementById('l-related');
@@ -3033,7 +3106,7 @@ function toggleSOPMode(){
   const st=document.getElementById('l-sop-tools');
   if(st) st.classList.toggle('hide', cat!=='sop');
   if(cat!=='sop'){ const pv=document.getElementById('l-sop-prev'); if(pv){ pv.dataset.on=''; pv.innerHTML=''; pv.classList.add('hide'); } }
-  if(cat==='sop'||cat==='supplement'||cat==='interpretation'){
+  if(_lawCatImg(cat)){
     // SOP（v4.34 起可打字，排成流程圖／表格）、補充資料、法律解釋與裁判：可選文字或圖片，預設文字（有圖片資料則預設圖片）
     if(tw)tw.style.display='block';
     if(hasImg){
@@ -3065,10 +3138,11 @@ function loadSOPImg(e){
 }
 
 async function saveLaw(){  try{
-  const cat_=document.getElementById('l-cat').value;
+  const cv=document.getElementById('l-cat').value;
+  const cat_=cv&&cv!=='__new'?cv:'statute';
   let content='';
-  // sop / supplement / interpretation 都可選擇圖片或文字
-  const canUseImg=(cat_==='sop'||cat_==='supplement'||cat_==='interpretation');
+  // 法規條文、行政規則以外（SOP、補充資料、法律解釋與裁判、自訂類別）都可選擇圖片或文字
+  const canUseImg=_lawCatImg(cat_);
   // 圖片欄位顯示中才用圖片；切回「文字」就存文字（原本只要上傳過圖片，切回文字仍會存圖片）
   const imgShown=!document.getElementById('l-img-wrap')?.classList.contains('hide');
   if(canUseImg && window._sopImgData && imgShown){
@@ -3141,7 +3215,7 @@ function openBulkQ(){
 }
 function closeBulkQ(){ document.getElementById('bulk-ov').classList.remove('on'); }
 
-function showBulkLaw(){ document.getElementById('blaw-ov').classList.add('on'); }
+async function showBulkLaw(){ await _fillLawCatSel('bl-cat', document.getElementById('bl-cat')?.value||'statute'); document.getElementById('blaw-ov').classList.add('on'); }
 function closeBulkLaw(){ document.getElementById('blaw-ov').classList.remove('on'); }
 
 function parseLawText(rawText, lawName, category, source){
@@ -3993,7 +4067,7 @@ const DataMod = {
   applyExamFixes,
   formatYearInput,
   editQ, _lawBlob, ttsArt, ttsLawPop,
-  changeLawCat, closeLawCat, _setLawCat, closeLawInfo, saveLawInfo, _linfoPrev,
+  changeLawCat, closeLawCat, _setLawCat, _newLawCatFor, _lawCatSelChange, closeLawInfo, saveLawInfo, _linfoPrev,
   toggleLvFind, closeLvFind, _lvFindInput, lvFindStep, openLawTitles, closeLawTitles, saveLawTitles,
   _flInput, _flPick, _flHide, _flBlur,
   showSearchHelp,

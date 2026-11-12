@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.36.0';
+const APP_VERSION = '4.37.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
@@ -136,6 +136,19 @@ self.addEventListener('fetch', e => {
         return (await caches.match('./index.html')) || fetchPromise;
       }
     })());
+    return;
+  }
+
+  // 程式要求最新版的請求（fetch 帶 cache:'no-store'／'reload'，例：考古題答案更正讀 data/exam_fixes.json）
+  //   → 網路優先、順便更新快取，離線才用快取。v4.37 前一律 Cache First，只改資料不升版號時手機讀不到新資料
+  if (e.request.cache === 'no-store' || e.request.cache === 'reload') {
+    e.respondWith(fetch(e.request).then(res => {
+      if (res && res.status === 200 && res.type !== 'opaque') {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
+      return res;
+    }).catch(() => caches.match(e.request)));
     return;
   }
 
