@@ -2712,8 +2712,9 @@ async function applyExamFixes(){  try{
   const fx = await r.json();
   const qs = await da('questions');
   const h = s => { let x = 0; for(const c of (s||'')) x = (x * 31 + c.codePointAt(0)) >>> 0; return x; };
-  const work = new Map(), lines = [];
+  const work = new Map(), lines = [], skipped = [], lawFx = [];
   for(const f of fx.fixes){
+    if(f.lawContent){ lawFx.push(f); continue; }
     const q = qs.find(q => q.exam === f.exam && String(q.year) === f.year && q.subject === f.subject &&
       (f.groupId ? (q.groupId === f.groupId && q.groupOrder === f.groupOrder) : String(q.num) === f.num));
     if(!q) continue;
@@ -2734,11 +2735,14 @@ async function applyExamFixes(){  try{
       for(const r of f.noteRep) if(r.a && (n.note||'').includes(r.a)){ n.note = n.note.split(r.a).join(r.b); hit++; }
       if(hit){ changed = true; lines.push(tag + '解析更正 ' + hit + ' 處'); }
     }
-    // 整段換新解析：只在解析仍是當初的原文時（你改過就改成附加說明）
+    // 整段換新解析：只在解析仍是當初的原文時（noteHash 可列多個可接受的原文）；
+    //   你自己改過的不覆蓋，列在確認視窗最後
     let noteDone = false;
-    if(f.noteNew != null && h(n.note) === f.noteHash){
-      if(!f.answer) lines.push(tag + (n.note ? '更新解析' : '補上解析'));
-      n.note = f.noteNew; changed = noteDone = true;
+    if(f.noteNew != null){
+      if([].concat(f.noteHash).includes(h(n.note))){
+        if(!f.answer) lines.push(tag + (n.note ? '更新解析' : '補上解析'));
+        n.note = f.noteNew; changed = noteDone = true;
+      } else if(n.note !== f.noteNew && !f.noteAdd && f.round === fx.date) skipped.push(tag.slice(0, -1));  // 只列最新一批（舊批次的解析可能已被後來的更正換掉）
     }
     // 用開頭一段比對是否已附加過（備份檔由工具套用時，結尾的核對日期寫法略有不同）
     if(!noteDone && f.noteAdd && !(n.note||'').includes(f.noteAdd.slice(0, 24)) && n.note !== f.noteNew){
@@ -2754,19 +2758,32 @@ async function applyExamFixes(){  try{
     if(changed) work.set(q.id, n);
   }
   const upd = [...work.values()];
-  if(!upd.length){ toast('題庫已是最新的官方答案，不需更正'); return; }
+  // 法規資料庫：以圖片存的表格改成可搜尋的文字。只換仍是原本那張圖的（你換過圖或改過字就不動）
+  const lawUpd = [];
+  if(lawFx.length){
+    const laws = await da('laws');
+    for(const f of lawFx) for(const l of laws){
+      if(l.lawName !== f.lawName || h(l.content) !== f.lawImgHash) continue;
+      l.content = f.lawContent; l.searchBlob = _lawBlob(l); lawUpd.push(l);
+      lines.push('法規「' + f.lawName + '」：圖片改為文字（可搜尋）');
+    }
+  }
+  if(!upd.length && !lawUpd.length){ toast('題庫已是最新的官方答案，不需更正'); return; }
   // 先給分類統計，再列細項：答案有變的排最前面（最需要看），補解析、補法條排後面；視窗內文可捲
-  const kind = l => /：答案 /.test(l) ? 0 : /官方另接受|一律給分/.test(l) ? 1 : /補關聯法條/.test(l) ? 3 : /補題號/.test(l) ? 4 : 2;
-  const kn = ['答案更正', '官方另接受答案／一律給分', '解析更新或補充', '補關聯法條', '補題號'];
+  const kind = l => /：答案 /.test(l) ? 0 : /官方另接受|一律給分/.test(l) ? 1 : /補關聯法條/.test(l) ? 3 : /補題號/.test(l) ? 4 : /圖片改為文字/.test(l) ? 5 : 2;
+  const kn = ['答案更正', '官方另接受答案／一律給分', '解析更新或補充', '補關聯法條', '補題號', '法規圖片改文字'];
   const cnt = kn.map((_, i) => lines.filter(l => kind(l) === i).length);
   const sorted = lines.map((l, i) => [kind(l), i, l]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
-  const msg = '依官方答案與釋疑結果（' + (fx.date||'') + ' 核對），共 ' + upd.length + ' 題、' + lines.length + ' 項：\n'
+  const msg = '依官方答案、釋疑結果與解析覆核（' + (fx.date||'') + ' 核對），共 ' + upd.length + ' 題' + (lawUpd.length ? '、' + lawUpd.length + ' 筆法規' : '') + '、' + lines.length + ' 項：\n'
     + kn.map((k, i) => cnt[i] ? '・' + k + ' ' + cnt[i] + ' 項' : '').filter(Boolean).join('\n')
-    + '\n作答紀錄保留；你自己改過答案的題目不會被覆蓋。\n\n── 細項（可往下捲）──\n' + sorted.join('\n');
-  if(!await askConfirm('考古題答案更正（' + upd.length + ' 題）', msg, '套用')) return;
+    + '\n作答紀錄保留；你自己改過的答案、解析不會被覆蓋。套用前會先存快照。\n\n── 細項（可往下捲）──\n' + sorted.join('\n')
+    + (skipped.length ? '\n\n── 解析你改過、未覆蓋（' + skipped.length + ' 題）──\n' + skipped.join('\n') : '');
+  if(!await askConfirm('考古題答案更正（' + (upd.length + lawUpd.length) + ' 筆）', msg, '套用')) return;
+  if(window._snapOrAsk && !await window._snapOrAsk('考古題更正')) return;
   for(const q of upd) q.searchBlob = ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+(q.year||'')+' '+(q.exam||'')+' '+(q.num||'')+' '+(q.keywords||[]).join(' ')).toLowerCase();
-  await bulkPut('questions', upd);
-  toast('已更正 ' + upd.length + ' 題');
+  if(upd.length) await bulkPut('questions', upd);
+  if(lawUpd.length) await bulkPut('laws', lawUpd);
+  toast('已更正 ' + upd.length + ' 題' + (lawUpd.length ? '、' + lawUpd.length + ' 筆法規' : ''));
   }catch(e){ logError('applyExamFixes', e); toast('更正失敗：' + e.message); }}
 
 async function quizFromLaw(){  try{

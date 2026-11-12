@@ -1233,7 +1233,8 @@ const Settings = {
   saveGasConfig, gdriveBackup, gdriveRestore, gdriveCheck, renameDevice, restoreSnapshot, copyGasScript,
   renderSet, openExport, closeExportOv, doExport, _expSet, _expToggleSubj,
   clearAts, delAll, toggleGasHelp,
-  localBackup, localRestore, saveAzureKey, openDebugPanel, removeGuessQs
+  localBackup, localRestore, saveAzureKey, openDebugPanel, removeGuessQs,
+  _snapOrAsk   // data.js 的考古題更正套用前也要存快照
 };
 window.Settings = Settings;
 Object.assign(window, Settings);
