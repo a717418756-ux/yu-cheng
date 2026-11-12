@@ -48,7 +48,7 @@ async function _resumeIfAny(mode){
   if(!s?.ids?.length) return false;
   if(!await askConfirm('接續上次的進度？',
       '已完成 ' + s.idx + '／' + s.ids.length + ' 題，接著從第 ' + (s.idx + 1) + ' 題開始\n（' + new Date(s.at).toLocaleDateString('zh-TW') + ' 離開）',
-      '接續', '重新開始')) return false;
+      '接續', '重新開始', 'primary')) return false;
   // 期間刪掉的題目略過，進度跟著往前算
   const byId = new Map((await da('questions')).map(q => [q.id, q]));
   const done = s.ids.slice(0, s.idx).map(id => byId.get(id)).filter(Boolean);

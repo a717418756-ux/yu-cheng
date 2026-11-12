@@ -1219,7 +1219,7 @@ function openDebugPanel(){
       div.style.cssText =
         (l.level==='error' ? 'background:rgba(200,50,50,0.12);color:#f87171;' : 'color:#fbbf24;');
       div.innerHTML = '<span style="opacity:.5;margin-right:8px">' + l.t + '</span>'
-        + '<span style="opacity:.6;margin-right:8px;font-size:10px;text-transform:uppercase">[' + l.level + ']</span>'
+        + '<span style="opacity:.6;margin-right:8px;font-size:11px;text-transform:uppercase">[' + l.level + ']</span>'
         + esc(l.msg).replace(/\n/g,'<br>');
       list.appendChild(div);
     });

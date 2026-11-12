@@ -616,7 +616,7 @@
 .zpanel-main:active{background:rgba(255,255,255,0.05)}
 .zpanel-main-icon{font-size:22px;flex-shrink:0;width:28px;text-align:center}
 .zpanel-main-text .t{font-size:13.5px;font-weight:700;color:var(--t0);letter-spacing:.01em}
-.zpanel-main-text .s{font-size:10.5px;color:var(--t2);margin-top:2px}
+.zpanel-main-text .s{font-size:11px;color:var(--t2);margin-top:2px}
 .zpanel-main-arrow{margin-left:auto;font-size:13px;color:var(--t2);transition:transform .28s;flex-shrink:0}
 .zpanel-main-arrow.open{transform:rotate(90deg)}
 
@@ -658,7 +658,7 @@
 a.zpanel-row{text-decoration:none;color:inherit}
 .zpanel-row-icon{font-size:19px;flex-shrink:0;width:28px;text-align:center}
 .zpanel-row-text .t{font-size:13px;font-weight:600;color:var(--t0);letter-spacing:.01em}
-.zpanel-row-text .s{font-size:10.5px;color:var(--t2);margin-top:1px}
+.zpanel-row-text .s{font-size:11px;color:var(--t2);margin-top:1px}
 
 /* 學習區 wip */
 
@@ -673,7 +673,7 @@ a.zpanel-row{text-decoration:none;color:inherit}
 
 
 .zpanel-browse-opt-text .t{font-size:12.5px;font-weight:600;color:var(--t0)}
-.zpanel-browse-opt-text .s{font-size:10.5px;color:var(--t2);margin-top:1px}
+.zpanel-browse-opt-text .s{font-size:11px;color:var(--t2);margin-top:1px}
 
 /* ── 7. 測驗 ─────────────────────────────────────────────────── */
 #qv{display:none;position:fixed;inset:0;background:var(--bg0);z-index:200;flex-direction:column;max-width:520px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom,0)}
@@ -1002,7 +1002,7 @@ a.zpanel-row{text-decoration:none;color:inherit}
 
 /* 電子紙：hd-home 無邊框無背景 */
 [data-theme="eink"] .hd-home{
-  background:transparent !important;
+  background:var(--bg0) !important;   /* 置頂標題要不透明，否則往下捲時內容會透出來疊字 */
   border:none !important;
   box-shadow:none !important;
 }

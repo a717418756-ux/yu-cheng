@@ -19,7 +19,7 @@
 .mem-trail{font-size:11px;color:var(--t2);margin-bottom:3px}
 
 /* ── 標籤 ── */
-.mem-tag{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:4px;font-size:10.5px;font-weight:700;vertical-align:1px;white-space:nowrap}
+.mem-tag{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;vertical-align:1px;white-space:nowrap}
 .mem-tag.must{background:var(--red2);color:var(--red)}
 .mem-tag.trap{background:var(--org2);color:var(--org)}
 .mem-tag.mn{background:var(--pur2);color:var(--pur)}
@@ -79,7 +79,7 @@
 /* ── 🔢 數字口訣 ── */
 .mem-mn-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}
 .mem-mn-t{font-size:14px;font-weight:700;color:var(--t0)}
-.mem-kind{font-size:10.5px;color:var(--pur);background:var(--pur2);padding:1px 7px;border-radius:10px;white-space:nowrap}
+.mem-kind{font-size:11px;color:var(--pur);background:var(--pur2);padding:1px 7px;border-radius:10px;white-space:nowrap}
 .mem-code{font-size:15.5px;font-weight:700;color:var(--org);line-height:1.6;padding:6px 10px;border-radius:6px;background:var(--org2);margin-bottom:6px}
 .mem-items{margin:0 0 6px;padding-left:22px;font-size:12.8px;color:var(--t1);line-height:1.65}
 .mem-logic{font-size:12.3px;color:var(--t2);line-height:1.65}
@@ -109,7 +109,7 @@
 .pr-bt{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
 .pr-bt > div{background:var(--bg2);border-radius:8px;padding:7px 6px;text-align:center}
 .pr-bt b{display:block;font-size:17px;color:var(--grn)}
-.pr-bt span{font-size:10.5px;color:var(--t2)}
+.pr-bt span{font-size:11px;color:var(--t2)}
 .pr-row{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--bd);align-items:flex-start}
 .pr-row:last-child{border-bottom:none}
 .pr-rank{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--bg3);color:var(--t1);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
@@ -180,7 +180,7 @@
 .mem-au-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
 .mem-au-kpi div{background:var(--bg2);border-radius:7px;padding:6px;text-align:center}
 .mem-au-kpi b{display:block;font-size:15px;color:var(--t0)}
-.mem-au-kpi span{font-size:10.5px;color:var(--t2)}
+.mem-au-kpi span{font-size:11px;color:var(--t2)}
 .mem-au-find{margin:3px 0;font-size:12px}
 .mem-au-find span{display:block;color:var(--grn);font-size:11.5px}
 .mem-au-sum{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 14px 2px;font-size:12px;color:var(--t2)}

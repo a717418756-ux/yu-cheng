@@ -41,8 +41,9 @@ async function renderHome(){  try{
 
   // 統計數據（合併數據橫條）
   const ws=getWrong(qs,ats);
-  const totalAts_=ats.length;
-  const correctAts_=ats.filter(a=>a.correct).length;
+  // 正確率只算有判對錯的作答（申論、略過的紀錄 correct 不是 true/false），與分析頁同一算法
+  const totalAts_=ats.filter(a=>a.correct===true||a.correct===false).length;
+  const correctAts_=ats.filter(a=>a.correct===true).length;
   const todayAts_=ats.filter(a=>a.date===todayStr).length;
   const _set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   _set('hdb-rate', totalAts_?Math.round(correctAts_/totalAts_*100)+'%':'—');
@@ -1744,7 +1745,7 @@ async function renderDB(){  try{
     const icon=_lawCatIcon(cat);
     const _li=_lawInfo(laws);
     const orgLine=(_li.org||_li.amendDate)
-      ?('<div style="font-size:10px;color:var(--t2);margin-top:1px">'
+      ?('<div style="font-size:11px;color:var(--t2);margin-top:1px">'
         +(_li.org?'🏛 '+esc(_li.org):'')
         +(_li.org&&_li.amendDate?' · ':'')
         +(_li.amendDate?'📅 '+esc(_li.amendDate):'')
@@ -2293,7 +2294,7 @@ async function openLawGroup(lawName, full){  try{
       +'display:flex;align-items:center;gap:6px;'
       +'letter-spacing:.4px;line-height:1.4'
       +'">'
-      +'<span style="opacity:.7;font-size:10px;font-weight:400;'
+      +'<span style="opacity:.7;font-size:11px;font-weight:400;'
         +'border:1px solid '+s.border+';border-radius:3px;'
         +'padding:0 4px;margin-right:2px">'+s.label+'</span>'
       +esc(text)
@@ -2385,7 +2386,7 @@ async function openLawGroup(lawName, full){  try{
       const btnStyle = 'flex-shrink:0;background:'+s.bg+';border:1px solid '+s.border
         +';color:'+s.color+';border-radius:20px;padding:3px 10px;font-size:11px;'
         +'cursor:pointer;white-space:nowrap;font-weight:600';
-      const tagStyle = 'opacity:.65;margin-right:4px;font-size:9px;background:'+s.border
+      const tagStyle = 'opacity:.65;margin-right:4px;font-size:11px;background:'+s.border
         +';border-radius:3px;padding:0 3px;color:#0d1117';
       return '<button onclick="scrollToChapter(this,\''+encodeURIComponent(val)+'\',\''+type+'\')"'
         +' style="'+btnStyle+'">'
@@ -3923,9 +3924,9 @@ function parseBulk(){
       const optLabel=q.type==='mc'?'<div class="pi-o">選項：'+Object.keys(q.options).join(' ')+'</div>':'';
       const cls=q.answer||q.type==='es'?'ok':'warn';
       const hierLabel=
-        (q.part   ?'<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--org2);color:var(--org)">📙'+esc(q.part)+'</span> ':'')+
-        (q.chapter?'<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--pur2);color:var(--pur)">📗'+esc(q.chapter)+'</span> ':'')+
-        (q.section?'<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(31,111,235,0.15);color:var(--acc)">📘'+esc(q.section)+'</span> ':'');
+        (q.part   ?'<span style="font-size:11px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--org2);color:var(--org)">📙'+esc(q.part)+'</span> ':'')+
+        (q.chapter?'<span style="font-size:11px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--pur2);color:var(--pur)">📗'+esc(q.chapter)+'</span> ':'')+
+        (q.section?'<span style="font-size:11px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(31,111,235,0.15);color:var(--acc)">📘'+esc(q.section)+'</span> ':'');
       return '<div class="pi '+cls+'">'+
         '<div class="pi-n">第'+q.num+'題 · '+typeLabel+ansLabel+'</div>'+
         (hierLabel?'<div style="margin-top:2px">'+hierLabel+'</div>':'')+

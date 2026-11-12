@@ -26,7 +26,11 @@ function _daysUntil(dateStr){
 async function renderCountdown(){
   const el = document.getElementById('h-countdown');
   if(!el) return;
-  const list = (await getCountdowns()).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  // 還沒到的考試排前面（近的在上），已過的排最後
+  const list = (await getCountdowns()).sort((a,b)=>{
+    const pa = _daysUntil(a.date) < 0, pb = _daysUntil(b.date) < 0;
+    return pa !== pb ? (pa ? 1 : -1) : new Date(a.date) - new Date(b.date);
+  });
 
   if(!list.length){
     el.innerHTML = '<button type="button" class="hcd-hint hcd-hint-btn" onclick="openCountdownMgr()">＋ 新增考試倒數，掌握備考節奏 →</button>';
@@ -39,7 +43,7 @@ async function renderCountdown(){
     const isToday = days === 0;
     const col  = isPast ? 'var(--t2)' : isToday ? 'var(--red)' : days<=7 ? 'var(--org)' : 'var(--acc)';
     const icon = isPast ? '📋' : isToday ? '🎯' : days<=7 ? '🔥' : '📅';
-    const dayNum = isPast ? `−${Math.abs(days)}` : isToday ? '0' : String(days);
+    const dayNum = isPast ? String(Math.abs(days)) : isToday ? '0' : String(days);
     const unit = isPast ? '天前' : isToday ? '今天' : '天';
 
     return `<div class="hcd-row">

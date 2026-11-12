@@ -123,7 +123,7 @@ async function renderStats(){  try{
         <div class="sn" title="${esc(s)}">${esc(s)}</div>
         <div class="sbw"><div class="sbar" style="width:${r}%;background:${color}"></div></div>
         <div class="sp">${r}%</div>
-        <div style="font-size:10px;color:var(--t2);width:40px;text-align:right">${avgT}s</div>
+        <div style="font-size:11px;color:var(--t2);width:40px;text-align:right">${avgT}s</div>
       </div>`;
     }).join('')
     : '<div style="font-size:12px;color:var(--t2)">尚無作答記錄</div>';
@@ -141,6 +141,7 @@ async function renderStats(){  try{
     data.push(ats.filter(a => a.date === ds).length);
   }
   const ctx = document.getElementById('dchart');
+  document.getElementById('dchart-note')?.classList.toggle('hide', data.slice(-visibleDays).some(n => n > 0));
   if(_dchart) _dchart.destroy();
   const chartWrap = ctx?.parentElement;
   if(chartWrap){

@@ -100,6 +100,7 @@ function toggleZone(zone){
     // 展開：隱藏數據橫條 + 熱力圖（考試區顯示考試數據橫條）
     _setHomeWidgets(false, zone);
   }
+  _syncNav();
 }
 
 function toggleZoneQuiz(){
@@ -108,6 +109,7 @@ function toggleZoneQuiz(){
   const arrow = document.getElementById('zone-quiz-arrow');
   if(menu)  menu.classList.toggle('open', _zoneQuizOpen);
   if(arrow) arrow.classList.toggle('open', _zoneQuizOpen);
+  _syncNav();
 }
 
 function _closeZoneQuiz(){
@@ -150,19 +152,41 @@ function _closeAddLawOutside(e){
 // ── FAB 導覽 ─────────────────────────────────────────────────
 let _fabOpen = false;
 
-const _F_HOME  = {pg:'home',  icon:'🏠', label:'首頁'};
-const _F_SET   = {pg:'set',   icon:'⚙️', label:'設定'};
-
-// FAB 規則：題庫/資料庫已移至主選單，FAB 只保留導航和設定
+// v4.38：改為底部導覽列（首頁／測驗／題庫／資料庫／更多）。原本的圓形選單鈕隱藏，
+//   它的彈出清單改由「更多」開啟，列出導覽列上沒有的考試區頁面與設定
+const _F_MORE = [
+  {pg:'memory',  icon:'🧠', label:'記憶庫'},
+  {pg:'predict', icon:'📈', label:'考古題排名'},
+  {pg:'stats',   icon:'📊', label:'分析'},
+  {pg:'set',     icon:'⚙️', label:'設定'},
+];
+const _NAV_OF = { home:'home', list:'list', db:'db', laws:'db' };   // 其餘頁面一律亮「更多」
 // ════════════════════════════════════════════════════════════
 // 【浮動按鈕（FAB）】
 // ════════════════════════════════════════════════════════════
 function _fabItemsForPage(pg){
-  switch(pg){
-    case 'home':   return [_F_SET];
-    case 'set':    return [_F_HOME];
-    default:       return [_F_HOME,_F_SET];
-  }
+  return _F_MORE.filter(it => it.pg !== pg);
+}
+
+// 導覽列亮哪一格：首頁展開「測驗專區」時亮測驗，其餘依頁面
+function _syncNav(){
+  const pg = S.page || 'home';
+  const key = pg === 'home' ? (_activeZone === 'exam' && _zoneQuizOpen ? 'quiz' : 'home') : (_NAV_OF[pg] || 'more');
+  document.querySelectorAll('.nb').forEach(b => {
+    const on = b.dataset.nav === key;
+    b.classList.toggle('on', on);
+    if(on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+}
+
+// 「測驗」：回首頁並直接展開考試區的測驗專區（今日複習、加強複習、模擬考…）
+function navQuiz(){
+  closeFab();
+  if(S.page !== 'home') goPage('home', null);
+  if(_activeZone !== 'exam') toggleZone('exam');
+  if(!_zoneQuizOpen) toggleZoneQuiz();
+  _syncNav();
+  setTimeout(() => document.getElementById('zone-quiz-menu')?.scrollIntoView({ block:'nearest', behavior:'smooth' }), 120);
 }
 
 function _buildFabItems(curPg){
@@ -193,6 +217,7 @@ function toggleFab(){
   const overlay = document.getElementById('fab-overlay');
   main.classList.toggle('open', _fabOpen);
   overlay.classList.toggle('open', _fabOpen);
+  document.getElementById('nav-more')?.classList.toggle('open', _fabOpen);
   if(_fabOpen){
     _buildFabItems(S.page||'home');
     requestAnimationFrame(()=>{
@@ -210,6 +235,7 @@ function closeFab(){
   _fabOpen = false;
   document.getElementById('fab-main').classList.remove('open');
   document.getElementById('fab-overlay').classList.remove('open');
+  document.getElementById('nav-more')?.classList.remove('open');
   _clearFabItems();
 }
 
@@ -284,6 +310,7 @@ function goPage(pg, btn, fromBack){
     predict:renderPredict,
     engexam:renderEngExam,
   })[pg]?.();
+  _syncNav();
 }
 
 // 頁面背景/關閉時停止計時
@@ -544,7 +571,7 @@ init().then(()=>{
   if(verEl){
     const av = typeof APP_VERSION  !== 'undefined' ? APP_VERSION  : '';
     const dv = typeof DATA_VERSION !== 'undefined' ? DATA_VERSION : '';
-    verEl.innerHTML = `v${av} <span style="color:var(--t2);font-size:10px">題庫 ${dv}</span>`;
+    verEl.innerHTML = `v${av} <span style="color:var(--t2);font-size:11px">題庫 ${dv}</span>`;
   }
   // 關閉載入畫面（至少顯示 2.6 秒讓動畫完整播完）
   const elapsed = Date.now() - _splashStart;
@@ -623,7 +650,7 @@ function _showUpdateBanner(reg){
 const App = {
   toggleZone, toggleZoneQuiz,
   toggleAddQMenu, closeAddQMenu, toggleAddLawMenu, closeAddLawMenu,
-  toggleFab, closeFab, fabGo, goPage, setTheme
+  toggleFab, closeFab, fabGo, navQuiz, goPage, setTheme
 };
 window.App = App;
 Object.assign(window, App);

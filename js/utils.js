@@ -133,7 +133,8 @@ function debounce(fn, delay=200){
 // Confirm dialog
 let _cfmCb=null;
 let _cfmCancel=null;   // 取消（按取消、返回鍵）時要通知的對象（askConfirm 用）
-function cfm(t,s,cb,okText,cnText){
+// tone='primary'：確認鈕用主色（藍），給「接續」這類不是刪除的確認；預設維持紅色
+function cfm(t,s,cb,okText,cnText,tone){
   const prev=_cfmCancel; _cfmCancel=null; prev?.();   // 前一個還沒回覆的確認視窗視為取消
   _cfmCb=cb;
   document.getElementById('cfm-t').textContent=t;
@@ -142,6 +143,7 @@ function cfm(t,s,cb,okText,cnText){
   body.parentElement.classList.toggle('long', String(s||'').split('\n').length > 6);   // 多行內容：靠左、加寬、內文可捲
   const ok=document.getElementById('cfm-ok');
   ok.textContent=okText||'確認';
+  ok.classList.toggle('br', tone!=='primary'); ok.classList.toggle('bp', tone==='primary');
   ok.onclick=()=>{_cfmCancel=null;closeCfm();_cfmCb?.();};
   const cn=document.getElementById('cfm-cn');
   cn.textContent=cnText||'取消';
@@ -186,8 +188,8 @@ function askInput(t, s, def='', opts={}){
     setTimeout(()=>{ const i = ov.querySelector('#ask-in-val'); i?.focus(); i?.select?.(); }, 60);
   });
 }
-function askConfirm(t,s,okText,cnText){
-  return new Promise(r=>{ cfm(t,s,()=>r(true),okText,cnText); _cfmCancel=()=>r(false); });
+function askConfirm(t,s,okText,cnText,tone){
+  return new Promise(r=>{ cfm(t,s,()=>r(true),okText,cnText,tone); _cfmCancel=()=>r(false); });
 }
 
 const OCR_FIX = {

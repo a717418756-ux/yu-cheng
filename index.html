@@ -452,7 +452,7 @@
   </div>
   <div class="cc"><div class="ct">📆 本週學習報告</div><div id="week-box"></div></div>
   <div class="cc"><div class="ct">📊 各科正確率</div><div id="subj-bars"></div></div>
-  <div class="cc"><div class="ct">📅 近30天練習量（左右滑動）</div><canvas id="dchart" height="110"></canvas></div>
+  <div class="cc"><div class="ct">📅 近30天練習量（每天作答題數，左右滑動）</div><div id="dchart-note" class="dchart-note hide">近 7 天沒有作答，往左滑可以看更早的紀錄。</div><div class="dchart-wrap"><canvas id="dchart" height="110"></canvas></div></div>
   <div class="cc"><div class="ct">🚦 危險等級分佈</div><div id="wrong-subs"></div></div>
   <div class="cc"><div class="ct">🧭 錯因分布（答錯後點選的原因）</div><div id="why-box"></div></div>
   <div class="cc"><div class="ct">⚖ 弱點法條（相關考題答對率最低）</div><div id="weak-laws"></div></div>
@@ -664,7 +664,7 @@
       需先建立 Apps Script 網路應用程式並貼入網址。
       <span style="color:var(--acc);cursor:pointer;margin-left:4px" onclick="toggleGasHelp()">說明 ▾</span>
     </div>
-    <div id="gas-help" style="display:none;font-size:10.5px;color:var(--t2);margin-bottom:10px;line-height:1.8;padding:9px 11px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.07)">
+    <div id="gas-help" style="display:none;font-size:11px;color:var(--t2);margin-bottom:10px;line-height:1.8;padding:9px 11px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.07)">
       1. 前往 <span style="color:var(--acc)">script.google.com</span> → 建立新專案<br>
       2. 貼上備份程式碼 <button class="ss-btn" onclick="copyGasScript()">📋 複製程式碼</button>，把第一行的密碼改成你自己的<br>
       3. 部署 → 新增部署 → 網路應用程式<br>
@@ -698,7 +698,7 @@
       🔍 檢查同步狀態（只比較雲端與這台，不會變更資料）
     </button>
     <div id="sync-status" class="sync-status"></div>
-    <div style="font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.5">
+    <div style="font-size:11px;color:var(--t2);margin-top:7px;line-height:1.5">
       ☁️ 備份範圍：<b>題庫</b>（含手寫標註、複習進度）、<b>法條</b>、<b>答題記錄</b>、<b>設定</b>、<b>倒數日</b>、<b>使用統計</b>、<b>英語教材</b>、<b>單字本</b>、<b>健康數據</b><br>
       <span style="color:var(--org)">不含</span>電子書、影音、學習教材等大型檔案（請用下方本地完整備份）｜檔名：<code style="color:var(--acc)">YC_Platform_backup.json</code>
     </div>
@@ -719,7 +719,7 @@
         <span style="font-size:14px">📂</span> 從資料夾還原
       </button>
     </div>
-    <div style="font-size:10.5px;color:var(--t2);margin-top:7px;line-height:1.5">
+    <div style="font-size:11px;color:var(--t2);margin-top:7px;line-height:1.5">
       備份內容：<code style="color:var(--acc)">exam_data.json</code>（題庫、法條、答題記錄、設定、倒數日、統計、英語教材、單字本、健康數據）<br>
       ＋ <code style="color:var(--acc)">ebooks/</code>（休閒書庫）、<code style="color:var(--acc)">media/</code>（休閒影音）、<code style="color:var(--acc)">refbooks/</code>（學習參考書）、<code style="color:var(--acc)">learnmedia/</code>（學習教材影音）
     </div>
@@ -762,13 +762,12 @@
     
 </div>
 </div>
-
-<nav class="nav">
-  <button class="nb on" onclick="goPage('home',this)"><span class="ic">🏠</span>首頁</button>
-  <button class="nb" onclick="goPage('list',this)"><span class="ic">📚</span>題目</button>
-  <button class="nb" onclick="goPage('db',this)"><span class="ic">🗃</span>資料庫</button>
-  <button class="nb" onclick="goPage('stats',this)"><span class="ic">📊</span>分析</button>
-  <button class="nb" onclick="goPage('set',this)"><span class="ic">⚙️</span>設定</button>
+<nav class="nav" id="nav" aria-label="主要導覽">
+  <button class="nb on" data-nav="home" onclick="goPage('home',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg><span>首頁</span></button>
+  <button class="nb" data-nav="quiz" onclick="navQuiz()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>測驗</span></button>
+  <button class="nb" data-nav="list" onclick="goPage('list',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg><span>題庫</span></button>
+  <button class="nb" data-nav="db" onclick="goPage('db',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14a3 3 0 0 0 6 0Z"/><path d="m19 7-3 7a3 3 0 0 0 6 0Z"/><path d="M8 21h8"/></svg><span>資料庫</span></button>
+  <button class="nb" data-nav="more" id="nav-more" onclick="toggleFab()" aria-label="更多功能"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>更多</span></button>
 </nav>
 
 <!-- 資料庫排序選單 -->
@@ -783,7 +782,7 @@
 <div id="fab-overlay" onclick="closeFab()"></div>
 <div id="fab-wrap">
   <div id="fab-items"></div>
-  <button id="fab-main" onclick="toggleFab()" aria-label="快速功能選單">☰</button>
+  <button id="fab-main" onclick="toggleFab()" aria-label="快速功能選單" hidden>☰</button>
 </div>
 <!-- QUIZ -->
 <div id="qv" style="display:none;position:fixed;inset:0;z-index:400;background:var(--bg0);flex-direction:column;max-width:var(--layout-page-max-w);margin:0 auto">
@@ -875,7 +874,7 @@
     <div style="flex:1;padding-left:6px;overflow:hidden;display:flex;align-items:center;gap:6px;min-width:0">
       <div style="min-width:0;flex:1">
         <div style="font-size:15px;font-weight:700;color:var(--t0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="lv-name"></div>
-        <div id="lv-info" style="font-size:10px;color:var(--t2);display:none;margin-top:1px"></div>
+        <div id="lv-info" style="font-size:11px;color:var(--t2);display:none;margin-top:1px"></div>
       </div>
       <div id="lv-count" style="font-size:11px;color:var(--t2);flex-shrink:0;white-space:nowrap"></div>
     </div>
