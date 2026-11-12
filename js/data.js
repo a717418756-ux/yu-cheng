@@ -1534,7 +1534,7 @@ const _SOP_NUM = /^(\d+[.．、]|[（(]\d+[)）])\s*/;
 function _isSopText(t){
   return /^\s*【[^】]+】\s*$/m.test(t||'') || /^\s*[○◯⭕◇◆□■]/m.test(t||'') || /^[^\n|]*\|[^\n]*\n[^\n|]*\|/m.test(t||'');
 }
-function _sopBody(text, fmt){
+function _sopBody(text, fmt, noFlow){
   const lines = String(text||'').split('\n').map(s => s.trim());
   const out = [];
   let flowMode = false, plain = [], flow = [], table = [];
@@ -1546,7 +1546,9 @@ function _sopBody(text, fmt){
     table = [];
     if(!rows.length) return;
     const head = rows[0], n = Math.max(...rows.map(r => r.length));
-    out.push('<div class="sop-tw"><table class="sop-t"><thead><tr>' +
+    // 兩欄的表手機上仍維持表格；第一欄都是短名稱（種類、級別）時當成標題欄加粗
+    const key = n === 2 && rows.slice(1).every(r => (r[0] || '').length <= 12);
+    out.push('<div class="sop-tw"><table class="sop-t' + (n <= 2 ? ' sop-t2' : '') + (key ? ' sop-tk' : '') + '"><thead><tr>' +
       Array.from({ length:n }, (_, i) => '<th>' + fmt(head[i] || '') + '</th>').join('') + '</tr></thead><tbody>' +
       rows.slice(1).map(r => '<tr>' + Array.from({ length:n }, (_, i) =>
         '<td data-l="' + esc(head[i] || '') + '">' + fmt(r[i] || '') + '</td>').join('') + '</tr>').join('') +
@@ -1570,12 +1572,13 @@ function _sopBody(text, fmt){
   for(const t of lines){
     if(!t){ flushTable(); continue; }
     const hm = t.match(/^【([^】]+)】$/);
-    if(hm){ flushAll(); flowMode = /流程/.test(hm[1]); out.push('<div class="sop-h">' + fmt(hm[1]) + '</div>'); continue; }
+    if(hm){ flushAll(); flowMode = !noFlow && /流程/.test(hm[1]); out.push('<div class="sop-h">' + fmt(hm[1]) + '</div>'); continue; }
     if(t.includes('|')){ flushPlain(); flushFlow(); table.push(t); continue; }
     flushTable();
     const br = t.match(_SOP_BR);
     if(br && flow.length && flow[flow.length - 1].k === 'dec'){ flow[flow.length - 1].br.push({ l:br[1], t:t.slice(br[0].length) }); continue; }
     let k = '';
+    if(noFlow){ flushFlow(); plain.push(t); continue; }
     if(_SOP_TERM.test(t)) k = 'term';
     else if(_SOP_DEC.test(t)) k = 'dec';
     else if(_SOP_BOX.test(t) || flowMode) k = 'box';
@@ -1590,8 +1593,14 @@ function _sopBody(text, fmt){
   return '<div class="sop">' + out.join('') + '</div>';
 }
 // 條文內容 → HTML：SOP 類別且有 SOP 標記時排成流程圖／表格，其餘照法條排版
+// v4.36：「法規條文」以外的類別（補充資料、行政規則…）有【標題】或「|」表格時也照這套排版（不畫流程圖），
+//   讓以文字輸入的附表（警勤加給表、特種工商業範圍表等）能顯示成表格
+const _isTblText = t => /^\s*【[^】]+】\s*$/m.test(t||'') || /^[^\n|]*\|[^\n]*\n[^\n|]*\|/m.test(t||'');
 function _lawContentHtml(l, fmt){
-  return (l && l.category === 'sop' && _isSopText(l.content)) ? _sopBody(l.content, fmt) : _lawBody(l && l.content, fmt);
+  if(!l) return _lawBody('', fmt);
+  if(l.category === 'sop' && _isSopText(l.content)) return _sopBody(l.content, fmt);
+  if(l.category !== 'statute' && _isTblText(l.content)) return _sopBody(l.content, fmt, true);
+  return _lawBody(l.content, fmt);
 }
 // 新增資料表單：SOP 範本、預覽
 const _SOP_TPL = '【依據】\n（例：警察職權行使法第6條至第8條）\n\n【流程】\n○ 開始\n1. 受理報案、確認地點與事由\n◇ 是否有立即危險？\n是：通報勤務指揮中心請求支援\n否：派員前往處理\n2. 到場查證身分\n3. 製作紀錄並回報\n○ 結束\n\n【作業內容】\n流程 | 權責人員 | 作業內容\n受理報案 | 值班人員 | 詢問報案人姓名、地點、事由並登記\n到場處理 | 巡邏人員 | 依法查證身分，注意比例原則\n\n【注意事項】\n一、……\n二、……\n\n【使用表單】\n（例：員警工作紀錄簿）';
@@ -2763,15 +2772,17 @@ async function applyExamFixes(){  try{
   if(lawFx.length){
     const laws = await da('laws');
     for(const f of lawFx) for(const l of laws){
-      if(l.lawName !== f.lawName || h(l.content) !== f.lawImgHash) continue;
+      // lawHash：可接受的原內容（原本的圖，或上一版套用的文字）；舊格式只有 lawImgHash
+      if(l.lawName !== f.lawName || l.content === f.lawContent || ![].concat(f.lawHash ?? f.lawImgHash).includes(h(l.content))) continue;
+      const wasImg = (l.content || '').startsWith('data:');
       l.content = f.lawContent; l.searchBlob = _lawBlob(l); lawUpd.push(l);
-      lines.push('法規「' + f.lawName + '」：圖片改為文字（可搜尋）');
+      lines.push('法規「' + f.lawName + '」：' + (wasImg ? '圖片' : '') + '改為文字表格（可搜尋）');
     }
   }
   if(!upd.length && !lawUpd.length){ toast('題庫已是最新的官方答案，不需更正'); return; }
   // 先給分類統計，再列細項：答案有變的排最前面（最需要看），補解析、補法條排後面；視窗內文可捲
-  const kind = l => /：答案 /.test(l) ? 0 : /官方另接受|一律給分/.test(l) ? 1 : /補關聯法條/.test(l) ? 3 : /補題號/.test(l) ? 4 : /圖片改為文字/.test(l) ? 5 : 2;
-  const kn = ['答案更正', '官方另接受答案／一律給分', '解析更新或補充', '補關聯法條', '補題號', '法規圖片改文字'];
+  const kind = l => /：答案 /.test(l) ? 0 : /官方另接受|一律給分/.test(l) ? 1 : /補關聯法條/.test(l) ? 3 : /補題號/.test(l) ? 4 : /改為文字表格/.test(l) ? 5 : 2;
+  const kn = ['答案更正', '官方另接受答案／一律給分', '解析更新或補充', '補關聯法條', '補題號', '法規改為文字表格'];
   const cnt = kn.map((_, i) => lines.filter(l => kind(l) === i).length);
   const sorted = lines.map((l, i) => [kind(l), i, l]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
   const msg = '依官方答案、釋疑結果與解析覆核（' + (fx.date||'') + ' 核對），共 ' + upd.length + ' 題' + (lawUpd.length ? '、' + lawUpd.length + ' 筆法規' : '') + '、' + lines.length + ' 項：\n'

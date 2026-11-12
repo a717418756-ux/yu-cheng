@@ -1850,14 +1850,19 @@ html[data-layout="desktop"] #fab-wrap{
 .sop-t{width:100%;border-collapse:collapse;font-size:13px}
 .sop-t th,.sop-t td{border:1px solid var(--bd);padding:6px 8px;vertical-align:top;text-align:left}
 .sop-t th{background:var(--bg2);font-weight:700;white-space:nowrap}
+/* 兩欄的表（名稱｜說明）手機上照樣是表格，第一欄窄一點；三欄以上才改成卡片 */
+.sop-tk td:first-child{width:32%;font-weight:600}
 @media (max-width:560px){
-  .sop-t thead{display:none}
-  .sop-t,.sop-t tbody,.sop-t tr,.sop-t td{display:block;width:100%}
-  .sop-t tr{border:1px solid var(--bd);border-radius:8px;margin-bottom:7px;overflow:hidden}
-  .sop-t td{border:none;border-bottom:1px solid var(--bd);padding:5px 9px}
-  .sop-t td:last-child{border-bottom:none}
-  .sop-t td::before{content:attr(data-l);display:block;font-size:11px;color:var(--t2);font-weight:700}
-  .sop-t td[data-l=""]::before{display:none}
+  .sop-t:not(.sop-t2) thead{display:none}
+  .sop-t:not(.sop-t2),.sop-t:not(.sop-t2) tbody,.sop-t:not(.sop-t2) tr,.sop-t:not(.sop-t2) td{display:block;width:100%}
+  .sop-t:not(.sop-t2) tr{border:1px solid var(--bd);border-radius:8px;margin-bottom:7px;overflow:hidden}
+  .sop-t:not(.sop-t2) td{border:none;border-bottom:1px solid var(--bd);padding:5px 9px}
+  .sop-t:not(.sop-t2) td:last-child{border-bottom:none}
+  .sop-t:not(.sop-t2) td::before{content:attr(data-l);display:block;font-size:11px;color:var(--t2);font-weight:700}
+  .sop-t:not(.sop-t2) td[data-l=""]::before{display:none}
+  .sop-t2{font-size:12.5px}
+  .sop-t2 th,.sop-t2 td{padding:5px 6px}
+  .sop-t2 th{white-space:normal}
 }
 .sop-tools{display:flex;gap:7px;margin-top:7px}
 .sop-tools .btn{flex:1;padding:8px;font-size:12.5px}

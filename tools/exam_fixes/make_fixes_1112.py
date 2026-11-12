@@ -10,12 +10,14 @@ Claude 複核後整合規則：
    不補回已證實錯誤的內容（例：97年12月決議的舊見解當現行法、§17Ⅱ→應為§18Ⅲ、平均地權條例§60-3（現行無此條）、
    989「現行法應改為(C)」、1761「受傷人數通報門檻非15人」）。
 3. 2687 舊解析「登記報到改列§31」更正為§41、法源改為施測時的§23（全國法規資料庫現行性侵害犯罪防治法：§41 登記報到、§31 為身心治療）。
-4. 法規 4 筆：圖片改文字。已對照 GPT 附的原始 PDF/DOC（與舊圖）核對；特種工商業範圍表「播放」依原表改為「播映」。
+4. 法規 4 筆：圖片改文字（11-12 第二版：GPT 重排後，Claude 再排成表格，見 law_tables_1112.py）。已對照 GPT 附的原始 PDF/DOC（與舊圖）核對；特種工商業範圍表「播放」依原表改為「播映」。
    只在資料庫裡仍是原本那張圖時才換。
 
-輸出：data/exam_fixes.json 新增 round=2026-11-12（noteNew＋noteHash；lawFix），由 App「考古題答案更正」套用。
+輸出：data/exam_fixes.json 新增 round=2026-11-12（noteNew＋noteHash；lawContent＋lawHash），由 App「考古題答案更正」套用。
 用法：python make_fixes_1112.py <平台備份 exam_data.json> <GPT 覆核 json> [輸出修正後備份路徑]"""
 import json, sys, os, collections
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import law_tables_1112
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..', '..')
@@ -76,7 +78,7 @@ def merge(qid, old, new):
         add.append((OLDTAG + l) if tag else l)
     out = '\n'.join(B + add)
     for a, b in NOTE_REP.get(qid, []):
-        assert out.count(a) == 1, (qid, a)
+        assert out.count(a) <= 1, (qid, a)   # GPT 新版若已自行更正就不必再換
         out = out.replace(a, b)
     return out
 
@@ -103,9 +105,9 @@ def build(P, G):
         assert (o.get('content') or '').startswith('data:image'), l['id']
         c = l['content']
         for a, b in LAW_REP.get(l['id'], []):
-            assert a in c, (l['id'], a)
-            c = c.replace(a, b)
-        fixes.append(dict(lawName=o['lawName'], lawId=o['id'], lawImgHash=h(o['content']), lawContent=c))
+            c = c.replace(a, b)   # GPT 新版若已改正就沒有原字串
+        c = law_tables_1112.fmt(l['id'], c)   # Claude 表格排版（內容不改，只重排；見 law_tables_1112.py）
+        fixes.append(dict(lawName=o['lawName'], lawId=o['id'], lawHash=[h(o['content'])], lawContent=c))
     return fixes, merged
 
 
@@ -114,7 +116,7 @@ def apply(P, fixes):
     for f in fixes:
         if 'lawContent' in f:
             for l in P['laws']:
-                if l['lawName'] == f['lawName'] and h(l['content']) == f['lawImgHash']:
+                if l['lawName'] == f['lawName'] and h(l['content']) in f['lawHash']:
                     l['content'] = f['lawContent']; n += 1
             continue
         for q in P['questions']:
@@ -138,6 +140,17 @@ if __name__ == '__main__':
         f['round'] = ROUND
     fx_path = os.path.join(ROOT, 'data', 'exam_fixes.json')
     FX = json.load(open(fx_path, encoding='utf8'))
+    # 同一輪重跑（GPT 更新檔案）：手機可能已套用上一版，把上一版的結果與可接受原文也列入可接受的原文
+    prev = {(f.get('qid') or ('law', f.get('lawId'))): f for f in FX['fixes'] if f.get('round') == ROUND}
+    for f in new:
+        p = prev.get(f.get('qid') or ('law', f.get('lawId')))
+        if not p:
+            continue
+        if 'noteNew' in f:
+            f['noteHash'] = sorted(set(f['noteHash']) | set(p.get('noteHash', [])) | {h(p['noteNew'])} - {h(f['noteNew'])})
+        else:
+            old = p.get('lawHash') or [p['lawImgHash']]
+            f['lawHash'] = sorted(set(f['lawHash']) | set(old) | {h(p['lawContent'])} - {h(f['lawContent'])})
     FX['fixes'] = [f for f in FX['fixes'] if f.get('round') != ROUND] + new
     FX['date'] = '2026-11-12'
     if '11-12' not in FX['source']:
