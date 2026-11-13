@@ -762,13 +762,8 @@
     
 </div>
 </div>
-<nav class="nav" id="nav" aria-label="主要導覽">
-  <button class="nb on" data-nav="home" onclick="goPage('home',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg><span>首頁</span></button>
-  <button class="nb" data-nav="quiz" onclick="navQuiz()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>測驗</span></button>
-  <button class="nb" data-nav="list" onclick="goPage('list',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg><span>題庫</span></button>
-  <button class="nb" data-nav="db" onclick="goPage('db',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14a3 3 0 0 0 6 0Z"/><path d="m19 7-3 7a3 3 0 0 0 6 0Z"/><path d="M8 21h8"/></svg><span>資料庫</span></button>
-  <button class="nb" data-nav="more" id="nav-more" onclick="toggleFab()" aria-label="更多功能"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>更多</span></button>
-</nav>
+<!-- 導覽列內容由 js/app.js _buildNav() 依目前所在的區產生（首頁三區未選時只有「設定」） -->
+<nav class="nav" id="nav" aria-label="主要導覽"></nav>
 
 <!-- 資料庫排序選單 -->
 <div id="law-sort-menu" onclick="closeLawSortMenu()" style="display:none;position:fixed;inset:0;z-index:250"></div>

@@ -160,7 +160,6 @@ const _F_MORE = [
   {pg:'stats',   icon:'📊', label:'分析'},
   {pg:'set',     icon:'⚙️', label:'設定'},
 ];
-const _NAV_OF = { home:'home', list:'list', db:'db', laws:'db' };   // 其餘頁面一律亮「更多」
 // ════════════════════════════════════════════════════════════
 // 【浮動按鈕（FAB）】
 // ════════════════════════════════════════════════════════════
@@ -168,10 +167,69 @@ function _fabItemsForPage(pg){
   return _F_MORE.filter(it => it.pg !== pg);
 }
 
-// 導覽列亮哪一格：首頁展開「測驗專區」時亮測驗，其餘依頁面
+// v4.39：導覽列跟著「區」變。首頁三區都沒選時只留「設定」；選了某一區（或進到該區的頁面）
+//   就換成該區的選項。設定頁等不屬於任何區的頁面，沿用剛才那一區的導覽列
+const _SVG = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const _NAV_ICON = {
+  home:  '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>',
+  quiz:  '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  list:  '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>',
+  db:    '<path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14a3 3 0 0 0 6 0Z"/><path d="m19 7-3 7a3 3 0 0 0 6 0Z"/><path d="M8 21h8"/>',
+  more:  '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  set:   '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
+  books: '<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2Z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7Z"/>',
+  media: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="m10 9 5 3-5 3Z"/>',
+  english:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/><path d="M8 9h8"/><path d="M8 13h5"/>',
+  fitness:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+};
+const _NAV_SETS = {
+  none:    [['set','設定']],
+  exam:    [['home','首頁'],['quiz','測驗'],['list','題庫'],['db','資料庫'],['more','更多']],
+  leisure: [['home','首頁'],['books','書庫'],['media','影音庫'],['set','設定']],
+  study:   [['home','首頁'],['english','英語'],['fitness','運動'],['set','設定']],
+};
+// 頁面屬於哪一區（沒列出的頁面，例如設定，沿用目前那一區）
+const _PAGE_ZONE = { list:'exam', db:'exam', laws:'exam', memory:'exam', predict:'exam', stats:'exam',
+                     books:'leisure', media:'leisure', english:'study', fitness:'study' };
+let _navZone = null;     // 導覽列目前顯示哪一區
+let _navBuilt = '';
+
+function _navClick(key){
+  if(key === 'quiz') return navQuiz();
+  if(key === 'more') return toggleFab();
+  closeFab();
+  if(key === 'home'){
+    // 首頁：已在首頁就收回三區；在該區的頁面就回首頁並展開這一區
+    const z = _navZone, away = S.page !== 'home';
+    goPage('home', null);
+    if(away && z) toggleZone(z);
+    return;
+  }
+  goPage(key, null);
+}
+
+function _buildNav(zone){
+  const id = zone || 'none';
+  if(_navBuilt === id) return;
+  const nav = document.getElementById('nav');
+  if(!nav) return;
+  nav.innerHTML = _NAV_SETS[id].map(([k,label]) =>
+    `<button class="nb" data-nav="${k}"${k==='more' ? ' id="nav-more" aria-label="更多功能"' : ''} onclick="_navClick('${k}')">${_SVG(_NAV_ICON[k])}<span>${label}</span></button>`
+  ).join('');
+  nav.classList.toggle('nav-single', id === 'none');
+  _navBuilt = id;
+}
+
+// 導覽列：先決定顯示哪一區的選項，再決定亮哪一格
 function _syncNav(){
   const pg = S.page || 'home';
-  const key = pg === 'home' ? (_activeZone === 'exam' && _zoneQuizOpen ? 'quiz' : 'home') : (_NAV_OF[pg] || 'more');
+  if(pg === 'home') _navZone = _activeZone;
+  else if(_PAGE_ZONE[pg]) _navZone = _PAGE_ZONE[pg];
+  _buildNav(_navZone);
+  let key;
+  if(pg === 'home') key = (_activeZone === 'exam' && _zoneQuizOpen) ? 'quiz' : 'home';
+  else if(_navZone === 'exam') key = ({ list:'list', db:'db', laws:'db', set:'more' })[pg] || 'more';
+  else key = pg;
   document.querySelectorAll('.nb').forEach(b => {
     const on = b.dataset.nav === key;
     b.classList.toggle('on', on);
@@ -650,7 +708,7 @@ function _showUpdateBanner(reg){
 const App = {
   toggleZone, toggleZoneQuiz,
   toggleAddQMenu, closeAddQMenu, toggleAddLawMenu, closeAddLawMenu,
-  toggleFab, closeFab, fabGo, navQuiz, goPage, setTheme
+  toggleFab, closeFab, fabGo, navQuiz, _navClick, goPage, setTheme
 };
 window.App = App;
 Object.assign(window, App);

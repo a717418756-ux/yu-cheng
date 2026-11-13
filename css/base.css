@@ -131,6 +131,9 @@ textarea{resize:vertical;line-height:1.7}
   width:28px;height:3px;border-radius:0 0 3px 3px;background:var(--acc);
 }
 .nb.open{color:var(--t0)}
+/* 首頁三區都沒選時，導覽列只有「設定」一格：置中、不拉滿整列 */
+.nav.nav-single{justify-content:center}
+.nav.nav-single .nb{flex:0 0 120px}
 /* 手機橫放（高度很矮）：圖示和文字排成一列，導覽列變矮，內容多一點高度 */
 @media (max-height:420px){
   .nb{flex-direction:row;height:40px;gap:6px}
