@@ -12,7 +12,8 @@
   用法：python import_sop_pdf.py            （只處理新的或內容有變的 PDF）
         python import_sop_pdf.py --all      （全部重做）
 """
-import fitz, glob, hashlib, io, json, os, re, sys
+import collections, fitz, glob, hashlib, io, json, os, re, sys
+from sop_svg import flow_svg, elements, can_join, joined_svg
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,7 +23,7 @@ OUT = os.path.join(ROOT, 'data', 'sop')
 PAGES_JSON = os.path.join(HERE, 'sop', '_pages.json')
 REPORT = os.path.join(HERE, 'sop', '_匯入核對表.md')
 WIDTH = 1400
-VER = 3   # 產出格式版本：改了切版規則就加一，舊的會自動重做
+VER = 5   # 產出格式版本：改了切版規則就加一，舊的會自動重做
 PAGE_MARK = '〔原檔第 %d 頁〕'
 
 
@@ -51,7 +52,7 @@ def render(pg, path, clip=None):
 #   警政署 SOP 的版型：左邊「流程」＋「權責人員」，右邊一個長框「作業內容」，同一列擠在 A4 上，手機看不清楚。
 #   整理版用程式切開，不經人工改寫：
 #     ・右邊長框裡的字 → 逐字抽出，接成完整的「作業內容」文字（跨頁接起來）
-#     ・左邊流程＋權責人員 → 原樣裁成一張圖（箭頭、判斷框都是原檔的）
+#     ・左邊流程＋權責人員 → v4.43 轉成 SVG（sop_svg.py：原檔線條＋真文字，照座標搬，不重畫），另裁一張 PNG 當備援
 #     ・標題列以上的字（名稱、依據…）、沒有圖的純文字頁 → 逐字文字
 #     ・表單頁（附表）→ 整頁圖
 #   斷行規則：PDF 每行在欄寬處斷開，這裡只把同一段的行接回去——遇到「一、」「(一)」「1.」「(1)」「甲、」開頭才換段。不增刪任何字。
@@ -90,7 +91,7 @@ def lines_of(pg, clip=None):
 
 def build_layout(doc, code, d):
     """回傳 (content 文字, 核對列表)；版型對不上時回傳 (None, 原因)"""
-    out, body, tbuf, checks, flow_n, flow_started, forms = [], [], [], [], 0, False, []
+    out, body, tbuf, checks, flow_n, flow_started, forms, svgc = [], [], [], [], 0, False, [], 0
     def emit_text(lines, target, title=False):
         for t in join_lines(lines, title):
             m = TOP.match(t)
@@ -121,7 +122,7 @@ def build_layout(doc, code, d):
             hdr = [w for w in pg.get_text('words') if w[4] in ('流程', '權責人員', '作業內容')]
             hy = min([w[1] for w in hdr] + [box.y0]) - 3
             flush_text()
-            top, inimg, drop, btxt, flab = [], 0, 0, [], []
+            top, inimg, drop, btxt, flab, ingrid = [], 0, 0, [], [], []
             for bb, t in lines_of(pg):
                 cx, cy = (bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2
                 if box.x0 - 3 <= cx <= box.x1 + 3 and box.y0 - 3 <= cy <= box.y1 + 3:
@@ -134,7 +135,7 @@ def build_layout(doc, code, d):
                 elif TOP.match(t.strip()):   # 寫在流程區裡的小標（例：三、分局流程：）也拿出來當文字
                     flab.append(t)
                 else:
-                    inimg += len(norm(t))
+                    inimg += len(norm(t)); ingrid.append(t)
             emit_text(top, out, title=(i == 1))
             emit_text(flab, out)
             left = [r['rect'] for r in draws if r['rect'].x1 < box.x0 and r['rect'].y0 > hy]
@@ -142,10 +143,13 @@ def build_layout(doc, code, d):
                 if not flow_started:
                     out.append(''); out.append('【流程圖】'); flow_started = True
                 x0 = max(0, min(r.x0 for r in left) - 14); y1 = min(pg.rect.height, max(r.y1 for r in left) + 14)
-                fn = 'f%02d.png' % i
-                render(pg, os.path.join(d, fn), clip=fitz.Rect(x0, hy, box.x0 - 4, y1))
+                cr = fitz.Rect(x0, hy, box.x0 - 4, y1)
+                # 單頁裁圖 fNN.png：v4.42 的內容引用它，手機還沒套用新版前要看得到，所以照樣產生（新版不引用）
+                render(pg, os.path.join(d, 'f%02d.png' % i), clip=cr)
+                # v4.43：流程圖用 SVG（原檔的線條＋真文字），可選字、可搜尋。
+                # v4.43：先放一個記號，全部頁面跑完再決定哪幾頁要用 A／B／C 接點連成一張（finish_flows）
                 flow_n += 1
-                out.append('![流程圖（原檔第 %d 頁）](data/sop/%s/%s)' % (i, code, fn))
+                out.append(('FLOW', i, pg, cr, ingrid))
             else:
                 drop += inimg; inimg = 0   # 這一頁左邊沒有流程圖，只剩欄位標題
             body += btxt
@@ -171,10 +175,69 @@ def build_layout(doc, code, d):
     flush_text()
     if not flow_n:
         return None, '找不到「流程｜權責人員｜作業內容」版型'
+    out = finish_flows(out, code, d)
     if forms:
         out += ['', '【附表】']
         out += ['![原檔第 %d 頁](data/sop/%s/%02d.png)' % (i, code, i) for i in forms]
     return chr(10).join(out).strip(), checks
+
+
+JOIN_NOTES = []   # 給核對表：哪幾頁接成一張、拿掉了什麼；哪裡沒接、為什麼
+
+
+def _write_svg(d, code, first, svg):
+    # 檔名帶內容 hash：手機的 SOP 快取是「看過就不再抓」，內容變了檔名也要變
+    sfn = 'f%02d-%s.svg' % (first, hashlib.sha1(svg.encode('utf8')).hexdigest()[:6])
+    open(os.path.join(d, sfn), 'w', encoding='utf8', newline=chr(10)).write(svg)
+    return 'data/sop/%s/%s' % (code, sfn)
+
+
+def finish_flows(out, code, d):
+    """把 build_layout 留下的 FLOW 記號換成 SVG 圖片行。
+    緊鄰的流程圖頁（中間沒有其他文字）若底部／頂部的 A、B、C 圓圈能一一對上，就疊成一張、圓圈改成直接連線（sop_svg.joined_svg）；
+    對不上就照原樣一頁一張。不論哪種，每頁流程區的字都必須出現在 SVG 裡（或是被拿掉的圓圈字母、頁首、續下頁、頁碼）。"""
+    res, k = [], 0
+    while k < len(out):
+        if not isinstance(out[k], tuple):
+            res.append(out[k]); k += 1; continue
+        grp = [out[k]]; k += 1
+        while k < len(out) and isinstance(out[k], tuple):
+            grp.append(out[k]); k += 1
+        # 切成可以接起來的段落
+        segs, cur = [], [grp[0]]
+        for a, b in zip(grp, grp[1:]):
+            pr, why = can_join(elements(a[2], a[3]), elements(b[2], b[3]))
+            if pr:
+                cur.append(b)
+            else:
+                if why != '沒有跨頁圓圈':
+                    JOIN_NOTES.append('第 %d、%d 頁沒有接起來：%s（照原樣分開顯示）' % (a[1], b[1], why))
+                segs.append(cur); cur = [b]
+        segs.append(cur)
+        for sg in segs:
+            want = collections.Counter(''.join(norm(t) for f in sg for t in f[4]))
+            if len(sg) == 1:
+                _, i, pg, cr, _ = sg[0]
+                svg, sch = flow_svg(pg, cr); removed = []
+                cap = '流程圖（原檔第 %d 頁）' % i
+            else:
+                try:
+                    svg, sch, removed = joined_svg([(f[2], f[3]) for f in sg])
+                except AssertionError as e:   # 切掉的範圍裡有不該拿掉的東西 → 不接，照原樣分頁
+                    JOIN_NOTES.append('第 %s 頁沒有接起來：%s（照原樣分開顯示）' % ('、'.join(str(f[1]) for f in sg), e))
+                    for f in sg:
+                        svg1, sch1 = flow_svg(f[2], f[3])
+                        miss = collections.Counter(''.join(norm(t) for t in f[4])) - collections.Counter(sch1)
+                        assert not miss, '第 %d 頁流程圖 SVG 少了字：%s' % (f[1], ''.join(miss.elements()))
+                        res.append('![流程圖（原檔第 %d 頁）](%s)' % (f[1], _write_svg(d, code, f[1], svg1)))
+                    continue
+                pg_ = '、'.join(str(f[1]) for f in sg)
+                cap = '流程圖（原檔第 %d–%d 頁，跨頁接點已直接連線）' % (sg[0][1], sg[-1][1])
+                JOIN_NOTES.append('第 %s 頁接成一張流程圖；拿掉：%s' % (pg_, '、'.join(removed)))
+            miss = want - collections.Counter(sch + ''.join(norm(x) for x in removed))
+            assert not miss, '第 %s 頁流程圖 SVG 少了字：%s' % ('、'.join(str(f[1]) for f in sg), ''.join(miss.elements()))
+            res.append('![%s](%s)' % (cap, _write_svg(d, code, sg[0][1], svg)))
+    return res
 
 
 def main():
@@ -200,7 +263,7 @@ def main():
         doc = fitz.open(pdf)
         d = os.path.join(OUT, code)
         os.makedirs(d, exist_ok=True)
-        for f in glob.glob(os.path.join(d, '*.png')):
+        for f in glob.glob(os.path.join(d, '*.png')) + glob.glob(os.path.join(d, '*.svg')):
             os.remove(f)
         pages, texts, sizes, no_text, per = [], [], 0, [], []
         for i, pg in enumerate(doc, 1):
@@ -217,6 +280,7 @@ def main():
             texts.append(PAGE_MARK % i + '\n' + t)
         text = '\n\n'.join(texts)
         amend = '民國%s年%s月%s日' % (ymd[:3], ymd[3:5], ymd[5:]) if ymd else ''
+        JOIN_NOTES.clear()
         content, checks = build_layout(doc, code, d)
         db[name] = dict(v=VER, pages=pages, pagesText=text, amendDate=amend, file=os.path.basename(pdf), sha1=sha, noText=no_text)
         if content:
@@ -227,8 +291,10 @@ def main():
         detail += ['', '## ' + name, '', '每頁字數：' + '、'.join('p%d %d' % (i + 1, n) for i, n in enumerate(per))]
         if content:
             detail += ['', '整理版（流程圖＋完整文字）逐頁核對：每頁「放進文字＋留在圖裡＋略去的頁首頁尾」＝該頁全部字數', '',
-                       '| 頁 | 類型 | 全部字數 | 放進文字 | 留在圖裡 | 略去（頁首、頁碼、續下頁） |', '|---|---|---|---|---|---|']
+                       '| 頁 | 類型 | 全部字數 | 放進文字 | 在流程圖裡（SVG 文字） | 略去（頁首、頁碼、續下頁） |', '|---|---|---|---|---|---|']
             detail += ['| %d | %s | %d | %d | %d | %d |' % c for c in checks]
+            if JOIN_NOTES:
+                detail += ['', '跨頁接點（A／B／C 圓圈）：'] + ['- ' + x for x in JOIN_NOTES]
         else:
             detail += ['', '⚠ 沒有產生整理版：' + checks + '。App 只顯示原檔整頁。']
         if no_text:

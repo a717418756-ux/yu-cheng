@@ -1975,3 +1975,11 @@ html[data-layout="desktop"] #fab-wrap{
 .sop-img.err .sopp-miss{display:inline}
 .sop-img.err figcaption{padding:18px 8px;border:1px dashed var(--bd);border-radius:6px}
 [data-theme="eink"] .sop-img-sc{border-color:#000}
+/* v4.43 SOP 流程圖 SVG（原檔線條＋真文字）：黑→文字色、白→底色，跟著主題；字可選取 */
+.sop-vec .sop-img-sc{background:var(--bg2)}
+.sop-vec svg{display:block;width:100%;min-width:500px;height:auto;padding:4px;box-sizing:border-box;-webkit-user-select:text;user-select:text}
+.sop-vec img{cursor:default}
+.sop-vec text{fill:var(--t1);font-family:"DFKai-SB","BiauKai","標楷體","Kaiti TC","STKaiti",serif}
+.sop-vec .fk{fill:var(--t1)} .sop-vec .fw{fill:var(--bg2)} .sop-vec .fg{fill:var(--bd)} .sop-vec .fn{fill:none}
+.sop-vec .sk{stroke:var(--t1)} .sop-vec .sw{stroke:var(--bg2)} .sop-vec .sn{stroke:none}
+.sop-zoom{font-size:11px;padding:1px 8px;border:1px solid var(--bd);border-radius:10px;background:none;color:var(--t2);cursor:pointer}

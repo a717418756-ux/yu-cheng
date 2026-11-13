@@ -1616,6 +1616,12 @@ function _sopBody(text, fmt, noFlow){
     // v4.42 圖片行：![說明](data/sop/…png)——SOP 整理版的流程圖、附表（由 import_sop_pdf.py 從原檔裁出）
     //   手機上圖寬至少 500px、可左右滑動（整張縮到螢幕寬字會太小），點圖放大
     const im = t.match(/^!\[([^\]]*)\]\((data\/sop\/[\w\-./]+)\)$/);
+    // v4.43 .svg：流程圖是原檔的線條＋真文字（import_sop_pdf.py 照座標搬，不重畫）。先用 <img> 載入，
+    //   載到後 _sopVec 換成內嵌 SVG，字才能選取、頁內搜尋。v4.43：跨頁的 A／B／C 接點已在匯入時直接連線
+    if(im && /\.svg$/.test(im[2])){ flushAll(); out.push('<figure class="sop-img sop-vec"><div class="sop-img-sc"><img src="' + esc(im[2]) + '" alt="' + esc(im[1]) + '" decoding="async" '
+      + 'onload="_sopVec(this)" onerror="_sopVecErr(this)"></div><figcaption>' + fmt(im[1])
+      + '　<button type="button" class="sop-zoom" onclick="openImgViewer(&quot;' + esc(im[2]) + '&quot;)">🔍 放大</button><span class="sop-img-tip">　左右滑動</span>'
+      + '<span class="sopp-miss">　這張圖還沒下載，連上網路後再開一次</span></figcaption></figure>'); continue; }
     if(im){ flushAll(); out.push('<figure class="sop-img"><div class="sop-img-sc"><img src="' + esc(im[2]) + '" alt="' + esc(im[1]) + '" decoding="async" onclick="openImgViewer(this.src)" '
       + 'onerror="this.closest(&quot;.sop-img&quot;).classList.add(&quot;err&quot;)"></div><figcaption>' + fmt(im[1]) + '<span class="sop-img-tip">　左右滑動・點圖放大</span>'
       + '<span class="sopp-miss">　這張圖還沒下載，連上網路後再開一次</span></figcaption></figure>'); continue; }
@@ -1688,6 +1694,28 @@ function soppView(btn, v){
 }
 // 內容是不是 import_sop_pdf.py 產生的整理版（有 data/sop 的圖片行）
 const _isSopImport = t => /^!\[[^\]]*\]\(data\/sop\//m.test(t || '');
+// v4.43 SOP 流程圖 SVG → 內嵌（只留 svg／g／path／text，拿掉其他元素與事件、連結屬性；g 是跨頁接成一張時每頁的位移群組）
+const _SVG_OK = { svg:1, g:1, path:1, text:1 };
+async function _sopVec(img){
+  try{
+    if(!img.isConnected || img.dataset.vec) return;
+    img.dataset.vec = '1';
+    const r = await fetch(img.getAttribute('src'));
+    if(!r.ok) return;
+    const doc = new DOMParser().parseFromString(await r.text(), 'image/svg+xml');
+    const svg = doc.documentElement;
+    if(!svg || svg.nodeName !== 'svg' || doc.querySelector('parsererror')) return;
+    for(const el of [svg, ...svg.querySelectorAll('*')]){
+      if(!_SVG_OK[el.nodeName]){ el.remove(); continue; }
+      for(const a of [...el.attributes]) if(/^on|href$/i.test(a.name)) el.removeAttribute(a.name);
+    }
+    svg.removeAttribute('width'); svg.removeAttribute('height');
+    svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', img.alt || '流程圖');
+    if(img.isConnected) img.replaceWith(document.importNode(svg, true));
+  }catch(e){ /* 留著 <img>，照樣看得到 */ }
+}
+// 載不到（離線且沒看過）：顯示「連上網路後再開一次」。（v4.43 起流程圖可能是好幾頁接成一張，沒有對應的單頁裁圖可替代）
+function _sopVecErr(img){ img.closest('.sop-img').classList.add('err'); }
 function _lawContentText(l, fmt){
   if(!l) return _lawBody('', fmt);
   // 整理版的文字是原檔逐字，不能套流程圖語法（「流程」標題下的行會被畫成步驟方框）→ 只排標題、圖片、分層文字
@@ -4151,7 +4179,7 @@ const DataMod = {
   delLaw,
   editLawInView,
   openHeatmapOv,
-  openImgViewer,
+  openImgViewer, _sopVec, _sopVecErr,
   previewBulkDelLaw,
   previewBulkDelQ,
   openBulkDelQ,
