@@ -1613,6 +1613,12 @@ function _sopBody(text, fmt, noFlow){
     if(!t){ flushTable(); continue; }
     const hm = t.match(/^【([^】]+)】$/);
     if(hm){ flushAll(); flowMode = !noFlow && /流程/.test(hm[1]); heads.push(hm[1]); out.push('<div class="sop-h" data-h="' + (heads.length - 1) + '">' + fmt(hm[1]) + '</div>'); continue; }
+    // v4.42 圖片行：![說明](data/sop/…png)——SOP 整理版的流程圖、附表（由 import_sop_pdf.py 從原檔裁出）
+    //   手機上圖寬至少 500px、可左右滑動（整張縮到螢幕寬字會太小），點圖放大
+    const im = t.match(/^!\[([^\]]*)\]\((data\/sop\/[\w\-./]+)\)$/);
+    if(im){ flushAll(); out.push('<figure class="sop-img"><div class="sop-img-sc"><img src="' + esc(im[2]) + '" alt="' + esc(im[1]) + '" decoding="async" onclick="openImgViewer(this.src)" '
+      + 'onerror="this.closest(&quot;.sop-img&quot;).classList.add(&quot;err&quot;)"></div><figcaption>' + fmt(im[1]) + '<span class="sop-img-tip">　左右滑動・點圖放大</span>'
+      + '<span class="sopp-miss">　這張圖還沒下載，連上網路後再開一次</span></figcaption></figure>'); continue; }
     if(t.includes('|')){ flushPlain(); flushFlow(); table.push(t); continue; }
     flushTable();
     const br = t.match(_SOP_BR);
@@ -1645,7 +1651,7 @@ function sopJump(btn, i){
 const _isTblText = t => /^\s*【[^】]+】\s*$/m.test(t||'') || /^[^\n|]*\|[^\n]*\n[^\n|]*\|/m.test(t||'');
 // 可搜尋的內文：文字內容（圖片不算）＋原檔逐字文字（v4.41 pagesText；和內容相同時不重複）
 function _lawText(l){
-  const c = (l.content||'').startsWith('data:') ? '' : (l.content||'');
+  const c = (l.content||'').startsWith('data:') ? '' : (l.content||'').replace(/^!\[[^\]]*\]\([^)]*\)$/gm, '');   // 圖片行不算文字
   return l.pagesText && l.pagesText !== c ? c + ' ' + l.pagesText : c;
 }
 // ══ SOP 原檔頁面（v4.41）══════════════════════════════════════
@@ -1661,9 +1667,14 @@ function _lawContentHtml(l, fmt){
       + '<span class="sopp-miss">　這一頁還沒下載，連上網路後再開一次</span></figcaption></figure>').join('');
     const txt = l.pagesText ? '<details class="sopp-txt"><summary>原檔文字（逐字抽出，搜尋用）</summary><div>'
       + fmt(l.pagesText).split('\n').join('<br>') + '</div></details>' : '';
-    return '<div class="sopp" data-v="orig">'
-      + (hasFmt ? '<div class="sopp-tabs"><button type="button" class="on" onclick="soppView(this,&quot;orig&quot;)">📄 原檔（' + l.pages.length + ' 頁）</button>'
-          + '<button type="button" onclick="soppView(this,&quot;fmt&quot;)">📝 文字排版</button></div>' : '')
+    // v4.42 整理版（import_sop_pdf.py 切出的「流程圖＋完整作業內容」，content 裡有 ![…](data/sop/…) 圖片行）排第一、預設顯示；
+    //   「原檔整頁」留在第二個分頁對照。舊的手動排版（沒有圖片行）維持預設原檔
+    const imp = hasFmt && _isSopImport(l.content), dv = imp ? 'fmt' : 'orig';
+    const tab = (v, label) => '<button type="button"' + (v === dv ? ' class="on"' : '') + ' onclick="soppView(this,&quot;' + v + '&quot;)">' + label + '</button>';
+    return '<div class="sopp" data-v="' + dv + '">'
+      + (hasFmt ? '<div class="sopp-tabs">' + (imp
+          ? tab('fmt', '📑 流程圖＋作業內容') + tab('orig', '📄 原檔整頁（' + l.pages.length + '）')
+          : tab('orig', '📄 原檔（' + l.pages.length + ' 頁）') + tab('fmt', '📝 文字排版')) + '</div>' : '')
       + '<div class="sopp-orig">' + imgs + txt + '</div>'
       + (hasFmt ? '<div class="sopp-fmt">' + _lawContentText(l, fmt) + '</div>' : '')
       + '</div>';
@@ -1675,8 +1686,12 @@ function soppView(btn, v){
   box.dataset.v = v;
   box.querySelectorAll('.sopp-tabs button').forEach(b => b.classList.toggle('on', b === btn));
 }
+// 內容是不是 import_sop_pdf.py 產生的整理版（有 data/sop 的圖片行）
+const _isSopImport = t => /^!\[[^\]]*\]\(data\/sop\//m.test(t || '');
 function _lawContentText(l, fmt){
   if(!l) return _lawBody('', fmt);
+  // 整理版的文字是原檔逐字，不能套流程圖語法（「流程」標題下的行會被畫成步驟方框）→ 只排標題、圖片、分層文字
+  if(_isSopImport(l.content)) return _sopBody(l.content, fmt, true);
   if(l.category === 'sop' && _isSopText(l.content)) return _sopBody(l.content, fmt);
   if(l.category !== 'statute' && _isTblText(l.content)) return _sopBody(l.content, fmt, true);
   return _lawBody(l.content, fmt);
@@ -3724,7 +3739,7 @@ async function showLawPop(ref){  try{
 function _lawSpeechSegs(l){
   if(!l || (l.content||'').startsWith('data:image')) return [];
   return [((l.article||'')+' '+(l.title||'')).trim(),
-          ...(l.content||'').split('\n').map(t=>t.trim()).filter(t=>t.length>1)].filter(Boolean);
+          ...(l.content||'').split('\n').map(t=>t.trim()).filter(t=>t.length>1 && !/^!\[[^\]]*\]\([^)]*\)$/.test(t))].filter(Boolean);   // 圖片行不唸
 }
 function _ttsLaw(l, el){
   const segs = _lawSpeechSegs(l);

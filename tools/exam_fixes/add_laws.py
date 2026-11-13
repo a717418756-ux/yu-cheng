@@ -53,7 +53,12 @@ if __name__ == '__main__':
         pg = PAGES.get(law['lawName'])
         if pg:
             law['pages'], law['pagesText'] = pg['pages'], pg['pagesText']
-        law['content'] = open(os.path.join(HERE, it['file']), encoding='utf8').read().strip() if it['file'] else pg['pagesText']
+        # v4.42：有整理版（import_sop_pdf.py 從原檔切出的「流程圖＋完整作業內容」）就用它；
+        #   手動重排的 .txt 會漏字、邏輯會跑掉，只留在 tools 當存檔，不再放進 App
+        if pg and pg.get('content'):
+            law['content'] = pg['content']
+        else:
+            law['content'] = open(os.path.join(HERE, it['file']), encoding='utf8').read().strip() if it['file'] else pg['pagesText']
         assert '|' not in law['lawName']
         old = next((f for f in FX['fixes'] if f.get('lawNew', {}).get('lawName') == law['lawName']), None)
         prev = set(old.get('lawHash', [])) | {h(old['lawNew']['content'])} if old else set()

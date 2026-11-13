@@ -1963,3 +1963,15 @@ html[data-layout="desktop"] #fab-wrap{
 [data-theme="eink"] .sopp-tabs button{background:#fff;border:1.5px solid #000;color:#000}
 [data-theme="eink"] .sopp-tabs button.on{background:#000;color:#fff}
 [data-theme="eink"] .sopp-pg img{border-color:#000}
+
+/* ── SOP 整理版的圖（v4.42）：流程圖、附表。手機上至少 500px 寬、可左右滑動，字才看得清楚 ── */
+.sop-img{margin:8px 0 16px}
+.sop-img-sc{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--bd);border-radius:6px;background:#fff}
+.sop-img img{display:block;width:100%;min-width:500px;height:auto;cursor:zoom-in}
+.sop-img figcaption{margin-top:4px;text-align:center;font-size:11px;color:var(--t2)}
+.sop-img-tip{display:none}
+@media (max-width:620px){ .sop-img-tip{display:inline} }
+.sop-img.err .sop-img-sc,.sop-img.err .sop-img-tip{display:none}
+.sop-img.err .sopp-miss{display:inline}
+.sop-img.err figcaption{padding:18px 8px;border:1px dashed var(--bd);border-radius:6px}
+[data-theme="eink"] .sop-img-sc{border-color:#000}
