@@ -1944,3 +1944,22 @@ html[data-layout="desktop"] #fab-wrap{
 [data-theme="eink"] .sop-n,[data-theme="eink"] .sop-b{background:#fff;border-color:#000;color:#000}
 [data-theme="eink"] .sop-n.dec span{background:#fff;box-shadow:inset 0 0 0 2px #000}
 [data-theme="eink"] .sop-num,[data-theme="eink"] .sop-b b{background:#000;color:#fff}
+
+/* ── SOP 原檔頁面（v4.41）：PDF 每頁一張圖，和原檔一模一樣；可切換到文字排版 ── */
+.sopp-tabs{display:flex;gap:6px;margin:0 0 10px}
+.sopp-tabs button{flex:1;min-height:40px;border-radius:8px;border:1px solid var(--bd);background:var(--bg2);color:var(--t1);font-size:13px;font-weight:600}
+.sopp-tabs button.on{background:var(--acc2);border-color:var(--acc2);color:#fff}
+.sopp[data-v="orig"] .sopp-fmt,.sopp[data-v="fmt"] .sopp-orig{display:none}
+.sopp-pg{margin:0 0 14px}
+.sopp-pg img{display:block;width:100%;height:auto;background:#fff;border:1px solid var(--bd);border-radius:6px;cursor:zoom-in}
+.sopp-pg figcaption{margin-top:4px;text-align:center;font-size:11px;color:var(--t2)}
+.sopp-miss{display:none;color:var(--org)}
+.sopp-pg.err img{display:none}
+.sopp-pg.err .sopp-miss{display:inline}
+.sopp-pg.err figcaption{padding:18px 8px;border:1px dashed var(--bd);border-radius:6px}
+.sopp-txt{margin-top:4px;border:1px solid var(--bd);border-radius:8px;padding:8px 10px;font-size:13px}
+.sopp-txt summary{cursor:pointer;color:var(--t1);font-weight:600}
+.sopp-txt div{margin-top:8px;line-height:1.75;color:var(--t1);word-break:break-all}
+[data-theme="eink"] .sopp-tabs button{background:#fff;border:1.5px solid #000;color:#000}
+[data-theme="eink"] .sopp-tabs button.on{background:#000;color:#fff}
+[data-theme="eink"] .sopp-pg img{border-color:#000}

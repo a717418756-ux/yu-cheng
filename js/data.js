@@ -1511,8 +1511,7 @@ function _lawArtHay(l){
     const head = [l.lawName, l.article, String(l.articleNumber||'')].filter(Boolean).join(' ').toLowerCase();
     if(b.startsWith(head)) return (l.article||'').toLowerCase() + b.slice(head.length);
   }
-  const c = (l.content||'').startsWith('data:') ? '' : (l.content||'');
-  return [l.article, l.title, (l.keywords||[]).join(' '), c].filter(Boolean).join(' ').toLowerCase();
+  return [l.article, l.title, (l.keywords||[]).join(' '), _lawText(l)].filter(Boolean).join(' ').toLowerCase();
 }
 // 回傳 'law'（法規命中）、'art'（條文命中）或 ''（不符）
 function _lawHit(l, toks, field){
@@ -1534,7 +1533,7 @@ const _secHit = (l, sec) => (!sec.names || sec.names.includes((l.lawName||'').tr
 //   預設比對全欄位，資料一多就太雜；選定範圍後只比對該欄位。
 function _fieldValue(l, f){
   if(f === 'keywords') return (l.keywords||[]).join(' ');
-  if(f === 'content')  return (l.content||'').startsWith('data:') ? '' : (l.content||'');
+  if(f === 'content')  return _lawText(l);
   return l[f] || '';
 }
 
@@ -1644,7 +1643,39 @@ function sopJump(btn, i){
 // v4.36：「法規條文」以外的類別（補充資料、行政規則…）有【標題】或「|」表格時也照這套排版（不畫流程圖），
 //   讓以文字輸入的附表（警勤加給表、特種工商業範圍表等）能顯示成表格
 const _isTblText = t => /^\s*【[^】]+】\s*$/m.test(t||'') || /^[^\n|]*\|[^\n]*\n[^\n|]*\|/m.test(t||'');
+// 可搜尋的內文：文字內容（圖片不算）＋原檔逐字文字（v4.41 pagesText；和內容相同時不重複）
+function _lawText(l){
+  const c = (l.content||'').startsWith('data:') ? '' : (l.content||'');
+  return l.pagesText && l.pagesText !== c ? c + ' ' + l.pagesText : c;
+}
+// ══ SOP 原檔頁面（v4.41）══════════════════════════════════════
+//   l.pages：PDF 每一頁轉成的圖（tools/exam_fixes/import_sop_pdf.py），樣式、流程、箭頭和原檔完全一樣；
+//   l.pagesText：程式從 PDF 逐字抽出的文字，給搜尋用，可展開對照。兩者都不經人工重排。
+//   有手動排版的內容（content 與 pagesText 不同）時可切換「原檔／文字排版」，預設原檔。
 function _lawContentHtml(l, fmt){
+  if(l && Array.isArray(l.pages) && l.pages.length){
+    const hasFmt = !!l.content && l.content !== l.pagesText && !l.content.startsWith('data:');
+    const imgs = l.pages.map((src, i) =>
+      '<figure class="sopp-pg"><img src="' + esc(src) + '" alt="原檔第 ' + (i + 1) + ' 頁" decoding="async" onclick="openImgViewer(this.src)" '
+      + 'onerror="this.parentNode.classList.add(&quot;err&quot;)"><figcaption>第 ' + (i + 1) + '／' + l.pages.length + ' 頁'
+      + '<span class="sopp-miss">　這一頁還沒下載，連上網路後再開一次</span></figcaption></figure>').join('');
+    const txt = l.pagesText ? '<details class="sopp-txt"><summary>原檔文字（逐字抽出，搜尋用）</summary><div>'
+      + fmt(l.pagesText).split('\n').join('<br>') + '</div></details>' : '';
+    return '<div class="sopp" data-v="orig">'
+      + (hasFmt ? '<div class="sopp-tabs"><button type="button" class="on" onclick="soppView(this,&quot;orig&quot;)">📄 原檔（' + l.pages.length + ' 頁）</button>'
+          + '<button type="button" onclick="soppView(this,&quot;fmt&quot;)">📝 文字排版</button></div>' : '')
+      + '<div class="sopp-orig">' + imgs + txt + '</div>'
+      + (hasFmt ? '<div class="sopp-fmt">' + _lawContentText(l, fmt) + '</div>' : '')
+      + '</div>';
+  }
+  return _lawContentText(l, fmt);
+}
+function soppView(btn, v){
+  const box = btn.closest('.sopp'); if(!box) return;
+  box.dataset.v = v;
+  box.querySelectorAll('.sopp-tabs button').forEach(b => b.classList.toggle('on', b === btn));
+}
+function _lawContentText(l, fmt){
   if(!l) return _lawBody('', fmt);
   if(l.category === 'sop' && _isSopText(l.content)) return _sopBody(l.content, fmt);
   if(l.category !== 'statute' && _isTblText(l.content)) return _sopBody(l.content, fmt, true);
@@ -1669,7 +1700,7 @@ function sopPreview(force){
 
 // 法條搜尋索引（存檔、匯入、重建索引、備份還原共用這一份）；圖片內容（data:）不納入
 const _lawBlob = l => [l.lawName, l.article, String(l.articleNumber||''), l.title,
-  (l.keywords||[]).join(' '), (l.content||'').startsWith('data:') ? '' : (l.content||'')]
+  (l.keywords||[]).join(' '), _lawText(l)]
   .filter(Boolean).join(' ').toLowerCase();
 // 法規類別：儲存值 → 畫面名稱（儲存值寫進備份與桌面工具，不可改；名稱可改）
 const _LAW_CAT = { statute:'法規條文', admin:'行政規則', sop:'SOP', supplement:'補充資料', interpretation:'法律解釋與裁判' };
@@ -2887,9 +2918,12 @@ async function applyExamFixes(){  try{
         o.searchBlob = _lawBlob(o); lawAdd.push(o);
         lines.push('法規資料庫新增「' + nl.lawName + '」（' + _lawCatName(nl.category) + '）');
       } else for(const l of ex){
-        if(l.content === nl.content || ![].concat(f.lawHash || []).includes(h(l.content))) continue;
+        // v4.41：內容沒變、只是補上原檔頁面（pages／pagesText）也要更新
+        const samePg = JSON.stringify(l.pages || []) === JSON.stringify(nl.pages || []) && (l.pagesText || '') === (nl.pagesText || '');
+        if(l.content === nl.content ? samePg : ![].concat(f.lawHash || []).includes(h(l.content))) continue;
+        const onlyPg = l.content === nl.content;
         Object.assign(l, nl); l.searchBlob = _lawBlob(l); lawUpd.push(l);
-        lines.push('法規資料庫「' + nl.lawName + '」更新為新版');
+        lines.push('法規資料庫「' + nl.lawName + '」' + (onlyPg ? '加上原檔頁面（' + (nl.pages || []).length + ' 頁）' : '更新為新版'));
       }
     }
     for(const f of lawFx) if(f.lawContent) for(const l of laws){
@@ -4045,7 +4079,7 @@ function clearBulk(){
 // ════════ 公開 API ════════
 // 新程式碼請使用 DataMod.xxx；window 別名供 index.html 與動態 onclick 相容
 const DataMod = {
-  renderHome, openLawSearch, sopJump,
+  renderHome, openLawSearch, sopJump, soppView,
   practiceLawQs, qLawRefs, ensureLawNames, lawWeakRank,
   closeHeatmapOv,
   setF,

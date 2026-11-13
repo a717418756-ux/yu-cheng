@@ -2,7 +2,13 @@
 
 每筆的內容放在 tools/exam_fixes/sop/ 的 .txt（App 的 SOP 文字格式：【標題】、□ 步驟、◇ 判斷＋是：/否：、甲 | 乙 表格），
 原始 PDF 存在 Desktop\\Y.C\\原始資料庫。資料庫已有同名資料時不新增；若內容仍是先前版本（PREV 的 hash）才換成新版。
-用法：python add_laws.py"""
+
+v4.41 原檔頁面：先跑 import_sop_pdf.py（PDF → 每頁一張圖＋逐字文字，存在 sop/_pages.json），這裡再併進每筆資料：
+  pages（每頁圖片的路徑）、pagesText（逐字文字，搜尋用）。App 預設顯示原檔頁面。
+  ・LAWS 裡有手動排版的（.txt）：content 維持排版版，App 可切換「原檔／文字排版」
+  ・_pages.json 有、LAWS 沒有的：自動建一筆，content 就是逐字文字（不重排、不改寫）
+  ・LAWS_META 可替自動建立的補關鍵字、關聯法條、來源
+用法：python import_sop_pdf.py && python add_laws.py"""
 import json, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -27,19 +33,34 @@ LAWS = [
 ]
 
 
+# 自動建立的 SOP（只有 PDF、沒有手動排版）可在這裡補資料：名稱 → dict(keywords=[...], relatedLaws=[...], source='...')
+LAWS_META = {}
+
 if __name__ == '__main__':
     fx_path = os.path.join(ROOT, 'data', 'exam_fixes.json')
     FX = json.load(open(fx_path, encoding='utf8'))
-    for it in LAWS:
+    pj = os.path.join(HERE, 'sop', '_pages.json')
+    PAGES = json.load(open(pj, encoding='utf8')) if os.path.exists(pj) else {}
+    items = list(LAWS)
+    for name, pg in PAGES.items():
+        if any(it['law']['lawName'] == name for it in LAWS):
+            continue
+        items.append(dict(file=None, round='', law=dict(dict(
+            lawName=name, category='sop', org='內政部警政署', amendDate=pg.get('amendDate', ''),
+            source='原檔：' + pg.get('file', '')), **LAWS_META.get(name, {}))))
+    for it in items:
         law = dict(it['law'])
-        law['content'] = open(os.path.join(HERE, it['file']), encoding='utf8').read().strip()
+        pg = PAGES.get(law['lawName'])
+        if pg:
+            law['pages'], law['pagesText'] = pg['pages'], pg['pagesText']
+        law['content'] = open(os.path.join(HERE, it['file']), encoding='utf8').read().strip() if it['file'] else pg['pagesText']
         assert '|' not in law['lawName']
         old = next((f for f in FX['fixes'] if f.get('lawNew', {}).get('lawName') == law['lawName']), None)
         prev = set(old.get('lawHash', [])) | {h(old['lawNew']['content'])} if old else set()
         prev.discard(h(law['content']))
-        new = dict(round=it['round'], lawNew=law)
+        new = dict(round=it['round'] or (old or {}).get('round', ''), lawNew=law)
         if prev:
             new['lawHash'] = sorted(prev)
         FX['fixes'] = [f for f in FX['fixes'] if f is not old] + [new]
-        print(('更新 ' if old else '新增 ') + law['lawName'], len(law['content']), '字')
+        print(('更新 ' if old else '新增 ') + law['lawName'], len(law['content']), '字', ('＋原檔 %d 頁' % len(law['pages'])) if pg else '')
     json.dump(FX, open(fx_path, 'w', encoding='utf8', newline='\n'), ensure_ascii=False, indent=1)

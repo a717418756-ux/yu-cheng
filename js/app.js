@@ -476,6 +476,11 @@ function _handleBackLayer(){
   const askIn = document.getElementById('ask-in-ov');   // askInput 輸入視窗（永遠在最上層）
   if(askIn){ askIn._close ? askIn._close() : askIn.remove(); return true; }
 
+  // 1-0) 圖片放大檢視（SOP 原檔頁面、圖片條文點了放大）：全螢幕蓋在最上層，返回先關它
+  //      ★ 原本沒攔：按返回會關掉底下的法規頁，放大的圖卻還留在畫面上（v4.41）
+  const imgV = document.getElementById('img-viewer');
+  if(imgV){ imgV.remove(); return true; }
+
   // 1-1) 法條小視窗（疊在答題、法規頁之上）：從清單點進來的先回清單，與按 ✕ 相同
   //      ★ 原本沒攔，答題中看法條按返回會直接離開測驗
   if(_isShown(document.getElementById('lawpop-ov'))){ _callIf('closeLawPop'); return true; }

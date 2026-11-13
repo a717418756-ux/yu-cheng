@@ -7,8 +7,9 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.40.0';
+const APP_VERSION = '4.41.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
+const PAGES_CACHE = 'yc-pages-v1';   // SOP 原檔頁面圖：不跟版本走，更新 App 不清
 
 // ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
 const CORE_ASSETS = [
@@ -130,6 +131,19 @@ self.addEventListener('fetch', e => {
       if (res && res.status === 200) cache.put('./index.html', res.clone());
       return res;
     })());
+    return;
+  }
+
+  // v4.41 SOP 原檔頁面圖（data/sop/…）：放在獨立、不跟版本走的快取 yc-pages-v1。
+  //   看過一次就留在裝置裡，App 更新版本時不會被清掉重抓（每份 SOP 約 1–2 MB，不預先全部下載）
+  if (url.includes('/data/sop/')) {
+    e.respondWith(caches.open(PAGES_CACHE).then(async c => {
+      const hit = await c.match(e.request);
+      if (hit) return hit;
+      const res = await fetch(e.request);
+      if (res && res.status === 200) c.put(e.request, res.clone());
+      return res;
+    }));
     return;
   }
 
