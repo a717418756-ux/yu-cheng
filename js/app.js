@@ -19,6 +19,8 @@ function _setHomeWidgets(show, zone){
   const heatmap = document.getElementById('heatmap-wrap');
   const dtask   = document.getElementById('dtask-wrap');
   const plan    = document.getElementById('plan-wrap');
+  const cta     = document.getElementById('h-cta');
+  if(cta) cta.style.display = show ? '' : 'none';   // 展開某一區時收起主要操作，區內選項緊接在三區下方
   if(!dataBar || !heatmap) return;
   if(show){
     dataBar.style.display = 'none';
@@ -371,6 +373,16 @@ function goPage(pg, btn, fromBack){
   _syncNav();
 }
 
+// 鍵盤操作：用 role="button" 的非按鈕元素（首頁標籤、數據橫條等）按 Enter／空白鍵也能觸發，與滑鼠點擊一致
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target;
+  if(!el || el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) return;
+  if(el.getAttribute?.('role') !== 'button') return;
+  e.preventDefault();
+  el.click();
+});
+
 // 頁面背景/關閉時停止計時
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden) _stopZoneTimer();
@@ -609,6 +621,7 @@ async function init(){  try{
   _initFabDelegation();
   goPage('home', document.querySelector('.nb'));
   _initBackHandler();
+  setTimeout(() => { try{ window.checkRestoreInterrupted?.(); }catch(e){} }, 1500);   // 上次還原途中被關掉 → 告知哪幾類完成
   }catch(e){
     logError('init', e);
     // 顯示錯誤提示但不讓畫面全黑，仍顯示 FAB
@@ -673,8 +686,20 @@ if('serviceWorker' in navigator){
 // ════════════════════════════════════════════════════════════
 // 【版本更新橫幅】
 // ════════════════════════════════════════════════════════════
+// v4.40：作答中（含限時模擬考）不跳更新通知——原本橫幅會蓋在題目選項上，按「立即更新」整頁重新整理，
+//   正在做的那一題、模擬考計時都會中斷。改成等離開作答畫面再顯示（每 3 秒看一次）
+let _updWait = null;
+const _quizOnScreen = () => { const qv = document.getElementById('qv'); return !!qv && getComputedStyle(qv).display !== 'none'; };
 function _showUpdateBanner(reg){
   if(document.getElementById('sw-update-banner')) return;
+  if(_quizOnScreen()){
+    if(!_updWait) _updWait = setInterval(() => {
+      if(_quizOnScreen()) return;
+      clearInterval(_updWait); _updWait = null;
+      _showUpdateBanner(reg);
+    }, 3000);
+    return;
+  }
   const banner = document.createElement('div');
   banner.id = 'sw-update-banner';
   banner.innerHTML = `

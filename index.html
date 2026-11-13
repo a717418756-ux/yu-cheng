@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="考題庫、法條資料庫、影音庫與電子書閱讀器，離線可用的個人學習平台">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121212">
@@ -88,6 +88,9 @@
   <div id="bk-hint"></div>
   <div id="h-countdown" class="home-countdown"></div>
 
+  <!-- 主要操作（v4.40）：有未完成的一回 → 繼續練習；否則 → 開始今日複習；下方保留模擬考、法規搜尋捷徑。內容由 data.js renderHomeCta() 產生 -->
+  <div id="h-cta" class="home-cta"></div>
+
 
   <!-- 今日任務 badges -->
   <div class="plan-strip">
@@ -130,11 +133,11 @@
       <div class="hdb-n" id="hdb-rate" style="color:var(--acc)">—</div>
       <div class="hdb-l">正確率</div>
     </div>
-    <div class="hdb-cell">
+    <div class="hdb-cell" role="button" tabindex="0" onclick="startQ('danger')" title="只練危險題">
       <div class="hdb-n" id="hdb-danger" style="color:var(--red)">0</div>
       <div class="hdb-l">危險題</div>
     </div>
-    <div class="hdb-cell">
+    <div class="hdb-cell" role="button" tabindex="0" onclick="startQ('review')" title="開始今日複習">
       <div class="hdb-n" id="hdb-review" style="color:var(--org)">0</div>
       <div class="hdb-l">待複習</div>
     </div>

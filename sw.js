@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.39.0';
+const APP_VERSION = '4.40.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 
 // ── 核心本地資源（必須快取成功，任一失敗 SW 安裝即失敗重試）──
@@ -56,6 +56,11 @@ const CORE_ASSETS = [
   './data/exam_research.json',
   './data/english_exam.json',
   './data/english_police.json',
+  // v4.40：Dexie（IndexedDB 存取，少了它整個 App 打不開）與 Chart.js 改列必要資源。
+  //   原本是「可選」：安裝當下 CDN 剛好連不上就沒快取，之後也補不回來（script 標籤的回應是 opaque，下面不存），
+  //   離線開啟就整個壞掉。列為必要後，CDN 連不上時新版先不安裝、繼續用舊版，下次再試
+  'https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
 ];
 
 // ── 可選資源（快取失敗不影響 SW 安裝）──────────────────────
@@ -67,11 +72,9 @@ const OPTIONAL_ASSETS = [
   './icons/icon-512.png',
   './splash-logo-icon.png',
   './data/memory/deadline_audit.json',   // 期限總表／考古對照（較大，選用）
-  'https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js',
   'https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;700&family=Dancing+Script:wght@600;700&family=Cormorant+Garamond:ital,wght@1,400;1,500&display=swap',
   './js/jszip.min.js',
   './js/epub.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
 ];
 
 /* ── 安裝：預快取核心資源 ── */
@@ -112,29 +115,20 @@ self.addEventListener('fetch', e => {
   const url = e.request.url;
   if (!url.startsWith('http')) return;
 
-  // 頁面導覽（index.html）→ Network First，並更新快取副本
+  // 頁面導覽（index.html）→ 用「這一版」快取裡的 index.html（v4.40 起）
+  //   ★ 原本網路優先：部署新版後第一次開啟，舊 SW 從網路拿到新版 index.html，JS／CSS 卻還是舊快取
+  //     → 新 HTML 配舊 JS（按鈕呼叫不存在的函式、版面錯亂），還把新 HTML 存進舊版快取。
+  //   現在 HTML 和 JS／CSS 一律來自同一版快取；新版由瀏覽器比對 sw.js 發現，裝好後跳「發現新版本」，
+  //   按「立即更新」才整套換新。也順便解決慢速網路的白畫面：不必等網路。
+  //   快取裡沒有（第一次安裝還沒完成）才走網路，離線又沒有快取時回傳錯誤頁由瀏覽器處理。
   if (e.request.mode === 'navigate') {
-    // 網路優先 + 逾時保底：
-    //   網路正常 → 跟原本一樣拿最新版（更新機制不變）
-    //   網路慢   → 2.5 秒內改用快取直接開，避免長時間白畫面；
-    //              背景的 fetch 仍會完成並更新快取，下次開啟就是新版
-    //   離線     → fetch 立即失敗 → 用快取
-    const fetchPromise = fetch(e.request).then(res => {
-      if (res && res.status === 200) {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(c => c.put('./index.html', clone));
-      }
-      return res;
-    });
     e.respondWith((async () => {
-      try {
-        return await Promise.race([
-          fetchPromise,
-          new Promise((_, rej) => setTimeout(rej, 2500, 'timeout'))
-        ]);
-      } catch (err) {
-        return (await caches.match('./index.html')) || fetchPromise;
-      }
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cache.match('./index.html');
+      if (cached) return cached;
+      const res = await fetch(e.request);
+      if (res && res.status === 200) cache.put('./index.html', res.clone());
+      return res;
     })());
     return;
   }
@@ -157,7 +151,9 @@ self.addEventListener('fetch', e => {
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(res => {
-        if (!res || res.status !== 200 || res.type === 'opaque') return res;
+        // opaque（跨網域、沒有 CORS）一般不存；cdnjs 的程式庫例外——固定版本號、內容不會變，存起來離線才開得了
+        const cdn = url.startsWith('https://cdnjs.cloudflare.com/');
+        if (!res || (res.type === 'opaque' ? !cdn : res.status !== 200)) return res;
         const clone = res.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         return res;

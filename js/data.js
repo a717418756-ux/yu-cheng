@@ -50,9 +50,10 @@ async function renderHome(){  try{
   _set('hdb-q',    qs.length);
 
   // 今日任務
-  const reviewDue=qs.filter(q=>(q.nextReview||0)<=now&&q.reviewLevel!==undefined).length;
-  const newQ=qs.filter(q=>q.reviewLevel===undefined||q.reviewLevel===null).length;
-  const dangerQ=qs.filter(q=>getDangerLevel(q,ats)==='🔴').length;
+  // 待複習、危險與出題用同一個判斷（db.js isReviewDue／isDangerQ），首頁數字＝點下去的題數
+  const reviewDue=qs.filter(q=>isReviewDue(q,now)).length;
+  const newQ=qs.filter(q=>q.type==='mc'&&(q.reviewLevel===undefined||q.reviewLevel===null)).length;
+  const dangerQ=qs.filter(q=>isDangerQ(q,ats)).length;
   const avgTime=ats.length?Math.round(ats.reduce((s,a)=>s+(a.responseTime||0),0)/ats.length/1000):0;
   const estMin=Math.ceil((reviewDue*avgTime||reviewDue*45)/60);
 
@@ -68,7 +69,7 @@ async function renderHome(){  try{
   if(planEl){
     const badges=[];
     if(reviewDue>0) badges.push(`<span class="plan-badge review" role="button" tabindex="0" onclick="startQ('review')" title="開始複習">待複習 ${reviewDue}</span>`);
-    if(dangerQ>0)   badges.push(`<span class="plan-badge danger" role="button" tabindex="0" onclick="startQ('all')" title="從危險題開始">危險 ${dangerQ}</span>`);
+    if(dangerQ>0)   badges.push(`<span class="plan-badge danger" role="button" tabindex="0" onclick="startQ('danger')" title="只練危險題">危險 ${dangerQ}</span>`);
     const nq=Math.min(newQ,10);
     if(nq>0)        badges.push(`<span class="plan-badge newq" role="button" tabindex="0" onclick="startQ('new')" title="練習新題">新題 ${nq}</span>`);
     if(estMin>0)    badges.push(`<span class="plan-badge time">約 ${estMin} 分鐘</span>`);
@@ -78,6 +79,7 @@ async function renderHome(){  try{
   // 數據橫條（危險題、待複習）
   _set('hdb-danger',  dangerQ);
   _set('hdb-review',  reviewDue);
+  renderHomeCta(reviewDue, dangerQ, estMin).catch(e=>logError('renderHomeCta',e));
 
   // 熱力圖
   renderHeatmap();
@@ -92,6 +94,43 @@ async function renderHome(){  try{
   // 混合風格：考試看進度、休閒看最近閱讀、學習看今日時間
   renderZoneStats(qs, ats, reviewDue, todayAts_, todayStr).catch(()=>{});
   }catch(e){ logError('renderHome',e); }}
+
+// ── 首頁主要操作（v4.40）────────────────────────────────────
+//   手機打開首頁第一眼就有一顆大按鈕：有沒做完的一回 → 「繼續練習」（直接接續，不再問）；
+//   否則有到期題 → 「開始今日複習」；都沒有 → 危險題或加強複習。下方固定兩個捷徑：限時模擬考、法規搜尋。
+const _RESUME_LABEL = { review:'今日複習', focus:'加強複習', danger:'危險題', wrong:'錯題', star:'收藏題', all:'全部題目',
+  new:'新題', essay:'申論練習', esview:'申論瀏覽', cram:'考前衝刺' };
+async function renderHomeCta(reviewDue, dangerQ, estMin){
+  const el = document.getElementById('h-cta');
+  if(!el) return;
+  const res = (await da('settings')).filter(s => /^quiz_resume_/.test(s.key) && s.value?.ids?.length && s.value.idx < s.value.ids.length)
+    .sort((a, b) => (b.value.at || 0) - (a.value.at || 0))[0];
+  let main;
+  if(res){
+    const mode = res.key.slice('quiz_resume_'.length), v = res.value;
+    main = `<button class="hcta-main" onclick="resumeQuiz('${esc(mode)}')">
+      <span class="hcta-t">▶ 繼續練習・${esc(_RESUME_LABEL[mode] || mode)}</span>
+      <span class="hcta-s">已完成 ${v.idx}／${v.ids.length} 題，從第 ${v.idx + 1} 題接著做</span></button>`;
+  } else if(reviewDue > 0){
+    main = `<button class="hcta-main" onclick="startQ('review')">
+      <span class="hcta-t">▶ 開始今日複習</span>
+      <span class="hcta-s">到期 ${reviewDue} 題${estMin ? `・約 ${estMin} 分鐘` : ''}</span></button>`;
+  } else if(dangerQ > 0){
+    main = `<button class="hcta-main" onclick="startQ('danger')">
+      <span class="hcta-t">▶ 練危險題</span><span class="hcta-s">今日沒有到期題・危險題 ${dangerQ} 題</span></button>`;
+  } else {
+    main = `<button class="hcta-main" onclick="startQPick('focus')">
+      <span class="hcta-t">▶ 加強複習</span><span class="hcta-s">今日沒有到期題・練收藏與錯題</span></button>`;
+  }
+  el.innerHTML = main + `<div class="hcta-quick">
+      <button class="hcta-q" onclick="startMockExam()">⏱️ 限時模擬考</button>
+      <button class="hcta-q" onclick="openLawSearch()">🔍 法規搜尋</button></div>`;
+}
+// 法規搜尋捷徑：到資料庫並把游標放進搜尋框
+function openLawSearch(){
+  goPage('db', null);
+  setTimeout(() => { const i = document.getElementById('lsi'); if(i){ i.focus(); i.select?.(); } }, 60);
+}
 
 // ── 三大區 zone-desc 即時資料 ──────────────────────────────
 async function renderZoneStats(qs, ats, reviewDue, todayAts, todayStr){
@@ -1539,6 +1578,7 @@ function _sopBody(text, fmt, noFlow){
   const lines = String(text||'').split('\n').map(s => s.trim());
   const out = [];
   let flowMode = false, plain = [], flow = [], table = [];
+  const heads = [];   // 【標題】清單：3 個以上時在最上面列「跳到」各段（v4.40）
   const flushPlain = () => { if(plain.length){ out.push(_lawBody(plain.join('\n'), fmt)); plain = []; } };
   const flushTable = () => {
     if(!table.length) return;
@@ -1573,7 +1613,7 @@ function _sopBody(text, fmt, noFlow){
   for(const t of lines){
     if(!t){ flushTable(); continue; }
     const hm = t.match(/^【([^】]+)】$/);
-    if(hm){ flushAll(); flowMode = !noFlow && /流程/.test(hm[1]); out.push('<div class="sop-h">' + fmt(hm[1]) + '</div>'); continue; }
+    if(hm){ flushAll(); flowMode = !noFlow && /流程/.test(hm[1]); heads.push(hm[1]); out.push('<div class="sop-h" data-h="' + (heads.length - 1) + '">' + fmt(hm[1]) + '</div>'); continue; }
     if(t.includes('|')){ flushPlain(); flushFlow(); table.push(t); continue; }
     flushTable();
     const br = t.match(_SOP_BR);
@@ -1591,7 +1631,14 @@ function _sopBody(text, fmt, noFlow){
     flow.push({ k, t:s, num:nm ? nm[1] : '', br:[] });
   }
   flushAll();
-  return '<div class="sop">' + out.join('') + '</div>';
+  const jump = heads.length >= 3 ? '<nav class="sop-jump" aria-label="段落跳轉"><span>跳到</span>' + heads.map((h, i) =>
+    '<button type="button" onclick="sopJump(this,' + i + ')">' + fmt(h) + '</button>').join('') + '</nav>' : '';
+  return '<div class="sop">' + jump + out.join('') + '</div>';
+}
+// 段落跳轉：捲到同一份內容裡的第 i 個【標題】（同一畫面可能同時有好幾份，所以從按鈕往上找自己的那份）
+function sopJump(btn, i){
+  const eink = document.documentElement.getAttribute('data-theme') === 'eink';   // 電子紙不做捲動動畫（殘影）
+  btn.closest('.sop')?.querySelector('.sop-h[data-h="' + i + '"]')?.scrollIntoView({ block:'start', behavior: eink ? 'auto' : 'smooth' });
 }
 // 條文內容 → HTML：SOP 類別且有 SOP 標記時排成流程圖／表格，其餘照法條排版
 // v4.36：「法規條文」以外的類別（補充資料、行政規則…）有【標題】或「|」表格時也照這套排版（不畫流程圖），
@@ -3998,7 +4045,7 @@ function clearBulk(){
 // ════════ 公開 API ════════
 // 新程式碼請使用 DataMod.xxx；window 別名供 index.html 與動態 onclick 相容
 const DataMod = {
-  renderHome,
+  renderHome, openLawSearch, sopJump,
   practiceLawQs, qLawRefs, ensureLawNames, lawWeakRank,
   closeHeatmapOv,
   setF,

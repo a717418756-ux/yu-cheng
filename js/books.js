@@ -155,7 +155,7 @@ function _renderBooksPage(){
     const emptyDiv = document.createElement('div');
     emptyDiv.className='empty books-empty';
     emptyDiv.innerHTML='<span class="ic">📚</span><span>' +
-      (_B.filter==='fav' ? '尚未收藏任何書籍' : '尚無書籍') + '</span>';
+      (_B.filter==='fav' ? '尚未收藏任何書籍' : '尚無書籍，點右上角＋新增（epub、PDF、txt）') + '</span>';
     el.appendChild(emptyDiv);
     return;
   }
@@ -217,7 +217,7 @@ function _mkRecentSection(books){
       _fillThumb(cover, b.id, 'cover');
     } else {
       cover.innerHTML=`<div class="shelf-recent-cover-placeholder">${esc(b.title||'')}</div>`;
-      const t = _SPINE_THEMES[(b.id||0) % _SPINE_THEMES.length];
+      const t = _SPINE_THEMES[_spineSeed(b.id) % _SPINE_THEMES.length];
       cover.style.background=`linear-gradient(160deg,${t.bg},${t.dark})`;
     }
     const name = document.createElement('div');
@@ -356,6 +356,11 @@ function _mkShelf(books, total){
   return shelf;
 }
 
+// 書背配色編號：id 一般是自動編號的數字；萬一是文字（手動編輯過的備份）就用字元碼加總，避免 NaN 讓整個書架畫不出來
+function _spineSeed(id){
+  const n = Number(id);
+  return Number.isFinite(n) ? Math.abs(n) : [...String(id || '')].reduce((s, c) => s + c.charCodeAt(0), 0);
+}
 function _mkSpine(b, dispW, dispH){
   const div = document.createElement('div');
   div.className = 'book-spine';
@@ -364,7 +369,7 @@ function _mkSpine(b, dispW, dispH){
   div.title = b.title||'';
   div.dataset.bid  = b.id||'';
 
-  const t = _SPINE_THEMES[(b.id||0) % _SPINE_THEMES.length];
+  const t = _SPINE_THEMES[_spineSeed(b.id) % _SPINE_THEMES.length];
 
   // 底層：純色漸層+書名（當作佔位，有書背圖時 lazy 覆蓋）
   div.style.background =
@@ -1030,7 +1035,7 @@ async function _attachBookFile(id){
 
 async function downloadBook(id){
   const book=await dg('ebooks',id);
-  if(!book?.blob){toast('無附加檔案');return;}
+  if(!book?.blob){toast('這本書沒有檔案本體（可能是備份缺檔），請在書籍詳情按「📎 附加檔案以閱讀」');return;}
   const url=URL.createObjectURL(book.blob);
   const a=document.createElement('a');
   a.href=url; a.download=(book.title||'book')+'.'+(book.fileType||'pdf');
@@ -1077,7 +1082,7 @@ function _fmtSize(bytes){
 // ════════════════════════════════════════════════════════════
 async function openBookReader(id){
   const book = await dg('ebooks', id);
-  if(!book?.blob){toast('無附加檔案');return;}
+  if(!book?.blob){toast('這本書沒有檔案本體（可能是備份缺檔），請在書籍詳情按「📎 附加檔案以閱讀」');return;}
 
   const url = URL.createObjectURL(book.blob);
   const ext  = (book.fileType||'').toLowerCase();

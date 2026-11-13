@@ -24,7 +24,7 @@ let _lastMock = null;         // 模擬考設定（再考一次沿用）
 async function startQ(mode){  try{
   if(await _resumeIfAny(mode)) return;
   const pool = await getPriorityPool(mode);
-  if(!pool.length){ toast(mode==='wrong' ? '目前沒有錯題' : '目前沒有題目'); return; }
+  if(!pool.length){ toast(mode==='wrong' ? '目前沒有錯題' : mode==='danger' ? '目前沒有危險題' : mode==='review' ? '今日沒有到期的題目' : '目前沒有題目'); return; }
   startQWithPool(pool, mode);
   }catch(e){ logError('startQ', e); }}
 
@@ -49,6 +49,14 @@ async function _resumeIfAny(mode){
   if(!await askConfirm('接續上次的進度？',
       '已完成 ' + s.idx + '／' + s.ids.length + ' 題，接著從第 ' + (s.idx + 1) + ' 題開始\n（' + new Date(s.at).toLocaleDateString('zh-TW') + ' 離開）',
       '接續', '重新開始', 'primary')) return false;
+  return _doResume(mode, s);
+}
+// 首頁「繼續練習」：使用者已經明確選了接續，直接開始，不再問
+async function resumeQuiz(mode){  try{
+  const s = await getSetting(_resumeKey(mode), null);
+  if(!s?.ids?.length || !await _doResume(mode, s)) startQ(mode === 'esview' ? 'essay' : mode);
+  }catch(e){ logError('resumeQuiz', e); }}
+async function _doResume(mode, s){
   // 期間刪掉的題目略過，進度跟著往前算
   const byId = new Map((await da('questions')).map(q => [q.id, q]));
   const done = s.ids.slice(0, s.idx).map(id => byId.get(id)).filter(Boolean);
@@ -1232,12 +1240,19 @@ async function _renderSubjList(){
   const names = new Set(list.map(x => x.name));
   _pickSel = new Set([..._pickSel].filter(n => names.has(n)));
   const box = document.getElementById('subj-list');
+  // 今日複習：每科顯示「到期幾題／全部幾題」，和首頁「待複習」同一判斷（isReviewDue），加總就是首頁的數字
+  let due = null;
+  if(_pickMode === 'review'){
+    due = {}; const now = Date.now(), exs = _pickEx.size ? _pickEx : null;
+    for(const q of await da('questions'))
+      if(isReviewDue(q, now) && (!exs || exs.has(q.exam || '未分類'))) due[q.subject || '未分類'] = (due[q.subject || '未分類'] || 0) + 1;
+  }
   if(box){
     box.innerHTML = list.map(x => {
       const on = _pickSel.has(x.name) ? ' on' : '';
       return `<button class="subj-item${on}" data-n="${esc(x.name)}" onclick="toggleSubj(this)">
                 <span class="subj-name">${esc(x.name)}</span>
-                <span class="subj-cnt">${x.n}</span>
+                <span class="subj-cnt">${due ? '到期 ' + (due[x.name] || 0) + '／' + x.n : x.n}</span>
               </button>`;
     }).join('') || '<div style="padding:10px;font-size:12.5px;color:var(--t2)">這個考試別沒有題目</div>';
   }
@@ -1739,7 +1754,7 @@ function _initDelegation(){
 //   原順序是先跑 _initDelegation() 再匯出，只要初始化在某環境拋出例外，
 //   IIFE 就中斷，整個模組的函式全掛不上 window，畫面上所有 onclick 都會變成
 //   "xxx is not defined"（例如 inkMode is not defined）。
-const Quiz = { startQ, startQWithPool, startQPick,
+const Quiz = { startQ, startQWithPool, startQPick, resumeQuiz,
                toggleSubj, toggleExamPick, subjSelAll, closeSubjPick, confirmSubjPick,
                toggleInk, inkUndo, inkClear, inkColor, inkCustomColor, inkSize, inkMode,
                startMockExam, beginMockExam, mockKind, mockFill, mockReview, WRONG_WHY,

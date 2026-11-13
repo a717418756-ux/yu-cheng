@@ -49,8 +49,15 @@ const _blobQ = q => ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+
 // 還原一個資料表：檔案「有這個表」就以檔案為準，空陣列也會清空；
 // 檔案「沒有這個表」（舊版備份、雲端備份沒有學習區）才略過，保留手機現有資料。
 // ★ 原本空陣列也略過：備份時是空的表，還原後手機上的舊資料仍留著，與備份不一致。
+// 檔案類資料表：備份裡缺檔案本體的那一筆，若這台同一筆還有檔案就沿用，不因還原而變成「無附加檔案」
+//   （exam_data.json 裡的參考書、教材只有說明沒有檔案；資料夾裡少了某個檔案也一樣）
+const _FILE_TABLES = ['ebooks', 'leisuremedia', 'refbooks', 'learnmedia'];
 async function _restoreTable(name, rows){
   if(!Array.isArray(rows)) return 0;
+  if(_FILE_TABLES.includes(name)){
+    const old = new Map((await da(name)).filter(r => r.blob).map(r => [r.id, r.blob]));
+    rows = rows.map(r => (!r.blob && old.has(r.id)) ? { ...r, blob: old.get(r.id) } : r);
+  }
   if(name === 'questions') rows = rows.map(q => ({ ...q, searchBlob: _blobQ(q) }));
   if(name === 'laws')      rows = rows.map(l => {   // 條號一律以 art2n 為準（舊備份、桌面版寫回的可能是舊格式）
     const r = { ...l, articleNumber: art2n(l.article) || l.articleNumber || 0 };
@@ -83,15 +90,51 @@ const _mb = n => (n / 1048576).toFixed(n < 10485760 ? 2 : 1) + ' MB';
 // 整批還原資料表＋設定：包在同一個資料庫交易裡，全部寫入成功才生效；
 //   中途失敗（空間不足、資料有誤）會整批復原成還原前的樣子。
 //   ★ 原本逐表「先清空再寫入」，寫到一半失敗就留下被清空的表，資料等於消失。
-async function _restoreAll(bk, tables){
+//   per（選填）：回填各資料表還原的筆數，給完成視窗逐項列出
+async function _restoreAll(bk, tables, per){
   const names = tables.filter(t => Array.isArray(bk[t]) && _db.tables.some(x => x.name === t));
   let n = 0;
+  const got = {};
   await _db.transaction('rw', [...names, 'settings'].map(t => _db[t]), async () => {
-    for(const t of names) n += await _restoreTable(t, bk[t]);
+    for(const t of names){ got[t] = await _restoreTable(t, bk[t]); n += got[t]; }
     n += await _restoreSettings(bk.settings);
   });
+  if(per) Object.assign(per, got);
   _cacheInvalidate();
   return n;
+}
+
+// ══ 還原結果逐項回報（v4.40）══════════════════════════════════════
+//   原本只說「共 N 個項目已還原」，缺檔、讀取失敗都看不出來；中途出錯時又只說「還原失敗」，
+//   其實前面的題庫早已換成備份。改成每一類各自回報：已還原幾筆／備份沒有這類（保留原本）／缺檔／失敗（維持原本）
+const _TBL_LABEL = { questions:'題庫', laws:'法規', attempts:'作答紀錄', countdowns:'倒數日', usageLogs:'使用統計',
+  englishMaterials:'英語教材', englishVocab:'單字本', healthLogs:'健康數據',
+  ebooks:'電子書', leisuremedia:'影音', refbooks:'參考書', learnmedia:'教材影音' };
+function _reportLines(tables, bk, per){
+  return tables.map(t => {
+    const lb = _TBL_LABEL[t] || t;
+    if(per[t] != null) return '✓ ' + lb + '：' + per[t].toLocaleString() + ' 筆';
+    if(!bk || !Array.isArray(bk[t])) return '－ ' + lb + '：備份沒有這一類，維持這台原本的資料';
+    return '－ ' + lb + '：未還原';
+  });
+}
+// 還原進度記在 localStorage：還原途中關掉 App、手機沒電，下次開啟時告訴使用者哪幾類已換成備份、哪幾類沒有
+const _RS_KEY = 'yc_restore_progress';
+const _rsSet = v => _ls.set(_RS_KEY, v);
+function _rsStep(step, status){ const p = _ls.get(_RS_KEY); if(!p) return; p.steps[step] = status; _rsSet(p); }
+async function checkRestoreInterrupted(){
+  const p = _ls.get(_RS_KEY);
+  if(!p || p.finished) return;
+  _ls.set(_RS_KEY, null);
+  const lab = { exam:'題庫、法規、作答紀錄等', ebooks:'電子書', media:'影音', refbooks:'參考書', learnmedia:'教材影音' };
+  const lines = Object.entries(p.steps || {}).map(([k, s]) =>
+    (s === 'done' ? '✓ ' : s === 'failed' ? '✗ ' : '－ ') + (lab[k] || k) + '：'
+    + (s === 'done' ? '已換成備份' : s === 'failed' ? '失敗，維持原本' : '沒有完成，維持原本'));
+  _showDoneDialog('上次還原沒有完成 ⚠', [
+    _fmtAt(new Date(p.at).toISOString()) + ' 從' + (p.src || '備份') + '還原時中斷（例如 App 被關閉、手機沒電）。', '',
+    ...lines, '',
+    '每一類都是整批寫入，不會只寫一半。建議再還原一次；或到設定頁「復原」回到還原前的快照。',
+  ]);
 }
 
 // 備份、還原期間保持螢幕常亮：手機關螢幕或切到背景，上傳／下載會被系統中斷（常見的失敗原因）
@@ -552,18 +595,22 @@ async function gdriveRestore(){ try{
   await _keepAwake(async()=>{ try{
       toast('還原中…請保持畫面開啟');
       if(!await _snapOrAsk('雲端還原')) return;
+      const per = {};
       await _restoreAll(bk, ['questions','laws','attempts','countdowns','usageLogs',
-                             'englishVocab','healthLogs','englishMaterials']);
+                             'englishVocab','healthLogs','englishMaterials'], per);
       if(!fileId) _setAnchor('cloud', cloud.sum, 'restore');   // 還原舊版本不算同步到最新
       _showDoneDialog('雲端還原完成 ✓', [
-        '已還原「' + (cloud.sum.device || '未記錄裝置') + '」在 ' + _fmtAt(cloud.sum.at) + ' 的備份。',
+        '已還原「' + (cloud.sum.device || '未記錄裝置') + '」在 ' + _fmtAt(cloud.sum.at) + ' 的備份：',
+        '',
+        ..._reportLines(['questions','laws','attempts','englishMaterials'], bk, per),
+        '－ 電子書、影音：雲端備份不含檔案，維持這台原本的書與影音',
         '',
         '還原前的資料已存成快照，需要時可到設定頁「復原」。',
         '按「知道了」後會重新整理頁面。',
       ], ()=> location.reload());
     } catch(innerErr){
       logError('gdriveRestore-inner', innerErr);
-      toast('還原失敗：'+innerErr.message+'（手機資料維持原樣）');
+      _showDoneDialog('雲端還原失敗 ✗', ['寫入失敗：' + innerErr.message, '', '這台的題庫、法規、作答紀錄維持原樣（整批寫入，失敗會整批復原）。', '電子書、影音不受雲端還原影響。']);
     }
   });
 }catch(e){ logError('gdriveRestore',e); toast('還原失敗：'+e.message); }}
@@ -957,25 +1004,52 @@ async function _backupDir(dirHandle, dirName, rows, extOf){
 
 // 從子資料夾還原一類檔案：先把每一筆都讀好，再一次換掉資料表。
 //   ★ 原本先清空資料表再逐筆讀檔寫入，讀到一半出錯，手機上原有的書、影音就沒了。
+//   v4.40：回傳這一類的結果 { found, n, missing:[名稱], kept, error }，不再往外丟錯：
+//   ① 說明檔讀不到或損毀 → 這一類整批不動（維持這台原本的資料），回報原因，其他類照常還原
+//   ② 說明檔在、檔案本體不在 → 這台同一筆還有檔案就沿用（kept），沒有才列為缺檔（missing）
 async function _restoreDir(dirHandle, dirName, table, extOf){
+  const res = { found:false, n:0, missing:[], kept:0, error:'' };
   let dir;
   try{ dir = await dirHandle.getDirectoryHandle(dirName); }
-  catch(e){ if(e.name === 'NotFoundError') return 0; throw e; }   // 舊版備份沒有這個資料夾 → 略過、保留手機現有資料
+  catch(e){ if(e.name === 'NotFoundError') return res; res.error = e.message; return res; }   // 舊版備份沒有這個資料夾 → 略過、保留手機現有資料
+  res.found = true;
   const rows = [];
-  for await(const [name, handle] of dir.entries()){
-    if(!name.endsWith('.meta.json')) continue;
-    const meta = JSON.parse(await (await handle.getFile()).text());
-    for(const f of _THUMBS){
-      const flag = '_' + f + 'IsBase64';
-      if(meta[flag] && meta[f]) meta[f] = await _base64ToBlob(meta[f], 'image/jpeg');
-      delete meta[flag];
+  try{
+    for await(const [name, handle] of dir.entries()){
+      if(!name.endsWith('.meta.json')) continue;
+      let meta;
+      try{ meta = JSON.parse(await (await handle.getFile()).text()); }
+      catch(e){ throw new Error(name + ' 讀取失敗或內容損毀（' + e.message + '）'); }
+      for(const f of _THUMBS){
+        const flag = '_' + f + 'IsBase64';
+        if(meta[flag] && meta[f]){ try{ meta[f] = await _base64ToBlob(meta[f], 'image/jpeg'); }catch(e){ meta[f] = null; } }
+        delete meta[flag];
+      }
+      try{ meta.blob = await (await dir.getFileHandle(meta.id + '.' + extOf(meta))).getFile(); }
+      catch(e){
+        if(e.name !== 'NotFoundError') throw new Error((meta.title || meta.name || meta.id) + ' 的檔案讀取失敗（' + e.message + '）');
+        meta.blob = null;
+      }
+      rows.push(meta);
     }
-    try{ meta.blob = await (await dir.getFileHandle(meta.id + '.' + extOf(meta))).getFile(); }
-    catch(e){ meta.blob = null; }
-    rows.push(meta);
+    const had = new Map((await da(table)).filter(r => r.blob).map(r => [r.id, true]));
+    for(const r of rows) if(!r.blob){ if(had.has(r.id)) res.kept++; else res.missing.push(r.title || r.name || r.id); }
+    await _db.transaction('rw', _db[table], () => _restoreTable(table, rows));
+    res.n = rows.length;
+  }catch(e){
+    logError('restoreDir-' + dirName, e);
+    res.error = e.message;
   }
-  await _db.transaction('rw', _db[table], () => _restoreTable(table, rows));
-  return rows.length;
+  return res;
+}
+function _dirLine(label, r){
+  if(r.error) return '✗ ' + label + '：' + r.error + '。這一類沒有還原，維持這台原本的資料';
+  if(!r.found) return '－ ' + label + '：備份資料夾沒有這一類，維持這台原本的資料';
+  let s = '✓ ' + label + '：' + r.n + ' 筆';
+  if(r.kept) s += '（' + r.kept + ' 筆備份缺檔，沿用這台原本的檔案）';
+  if(r.missing.length) s = '⚠ ' + label + '：' + r.n + ' 筆，其中 ' + r.missing.length + ' 筆缺少檔案本體（開啟會顯示無附加檔案）：'
+    + r.missing.slice(0, 5).join('、') + (r.missing.length > 5 ? ' 等' : '') + (r.kept ? '；另 ' + r.kept + ' 筆沿用這台原本的檔案' : '');
+  return s;
 }
 
 // 還原：選擇備份資料夾，讀取並還原所有項目
@@ -1022,28 +1096,45 @@ async function localRestore(){
     await _keepAwake(async () => {
       toast('還原中…請保持畫面開啟');
       if(examData && !await _snapOrAsk('資料夾還原')) return;
-      let count = examData ? await _restoreAll(examData, ['questions','laws','attempts','countdowns','usageLogs',
-        'refbooks','learnmedia','englishMaterials','englishVocab','healthLogs']) : 0;
-
-      // ── 書庫、影音、學習區（實際檔案）──
-      count += await _restoreDir(dirHandle, 'ebooks',     'ebooks',       _EXT.ebooks)
-             + await _restoreDir(dirHandle, 'media',      'leisuremedia', _EXT.leisuremedia)
-             + await _restoreDir(dirHandle, 'refbooks',   'refbooks',     _EXT.refbooks)
-             + await _restoreDir(dirHandle, 'learnmedia', 'learnmedia',   _EXT.learnmedia);
+      const EXAM_T = ['questions','laws','attempts','countdowns','usageLogs','refbooks','learnmedia','englishMaterials','englishVocab','healthLogs'];
+      const DIRS = [['ebooks','ebooks','電子書'], ['media','leisuremedia','影音'], ['refbooks','refbooks','參考書'], ['learnmedia','learnmedia','教材影音']];
+      _rsSet({ at: Date.now(), src:'資料夾「' + dirHandle.name + '」', finished:false,
+               steps: Object.fromEntries([...(examData ? [['exam','pending']] : []), ...DIRS.map(d => [d[0], 'pending'])]) });
+      // ── 題庫、法條等：一個交易整批寫入；失敗就全部停下（書庫、影音也不動），這台資料維持原樣 ──
+      const per = {};
+      if(examData){
+        try{ await _restoreAll(examData, EXAM_T, per); _rsStep('exam', 'done'); }
+        catch(e){
+          logError('localRestore-exam', e); _ls.set(_RS_KEY, null);
+          _showDoneDialog('還原失敗 ✗', ['題庫、法規、作答紀錄寫入失敗：' + e.message, '',
+            '這台的資料維持原樣（題庫、法規、作答紀錄、電子書、影音都沒有變動）。', '常見原因：裝置空間不足。'], ()=> location.reload());
+          return;
+        }
+      }
+      // ── 書庫、影音、學習區（實際檔案）：每一類各自整批寫入、各自回報 ──
+      const dirRes = {};
+      for(const [dn, tb] of DIRS){
+        dirRes[dn] = await _restoreDir(dirHandle, dn, tb, _EXT[tb]);
+        _rsStep(dn, dirRes[dn].error ? 'failed' : 'done');
+      }
+      _ls.set(_RS_KEY, null);
 
       if(src && chosen === main) _setAnchor('local', src, 'restore');
-      _showDoneDialog('本機還原完成 ✓', [
-        '共 ' + count + ' 個項目已還原。',
+      const bad = DIRS.some(([dn]) => dirRes[dn].error || dirRes[dn].missing.length);
+      _showDoneDialog(bad ? '本機還原部分完成 ⚠' : '本機還原完成 ✓', [
+        src ? '已還原「' + (src.device || '未記錄裝置') + '」在 ' + _fmtAt(src.at) + ' 的備份：' : '這個資料夾沒有 exam_data.json，題庫、法規、作答紀錄維持原本：',
         '',
-        src ? '已還原「' + (src.device || '未記錄裝置') + '」在 ' + _fmtAt(src.at) + ' 的備份。' : '',
-        examData ? '還原前的資料已存成快照，需要時可到設定頁「復原」。' : '',
+        ...(examData ? _reportLines(['questions','laws','attempts','englishMaterials'], examData, per) : []),
+        ...DIRS.map(([dn, , lb]) => _dirLine(lb, dirRes[dn])),
+        '',
+        examData ? '還原前的資料已存成快照，需要時可到設定頁「復原」（書庫、影音檔案不在快照內）。' : '',
         '按「知道了」後會重新整理頁面。',
       ], ()=> location.reload());
     });
   }catch(e){
     if(e.name === 'AbortError') return;
     logError('localRestore', e);
-    toast('還原失敗：' + e.message);
+    toast('還原失敗：' + e.message + '（這台資料沒有變動）');
   }
 }
 
@@ -1234,7 +1325,8 @@ const Settings = {
   renderSet, openExport, closeExportOv, doExport, _expSet, _expToggleSubj,
   clearAts, delAll, toggleGasHelp,
   localBackup, localRestore, saveAzureKey, openDebugPanel, removeGuessQs,
-  _snapOrAsk   // data.js 的考古題更正套用前也要存快照
+  _snapOrAsk,   // data.js 的考古題更正套用前也要存快照
+  checkRestoreInterrupted   // app.js 啟動時檢查上次還原是否中斷
 };
 window.Settings = Settings;
 Object.assign(window, Settings);

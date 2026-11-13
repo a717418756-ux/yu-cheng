@@ -242,7 +242,7 @@ async function buildAI(){  try{
   const rateAll = _pct(answered.filter(a => a.correct).length, answered.length);
   const rate7 = _pct(recent.filter(a => a.correct).length, recent.length);
   const rateOld = _pct(older.filter(a => a.correct).length, older.length);
-  const reviewDue = qs.filter(q => q.type === 'mc' && (q.nextReview || 0) <= Date.now()).length;
+  const reviewDue = qs.filter(q => isReviewDue(q)).length;   // 與首頁、今日複習同一判斷
   const untouched = qs.filter(q => q.type === 'mc' && !qStat.has(q.id)).length;
 
   // 各科：作答、正確率、近 7 天正確率、平均秒數
