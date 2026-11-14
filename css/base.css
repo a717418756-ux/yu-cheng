@@ -1982,5 +1982,4 @@ html[data-layout="desktop"] #fab-wrap{
 .sop-vec text{fill:var(--t1);font-family:"DFKai-SB","BiauKai","標楷體","Kaiti TC","STKaiti",serif}
 .sop-vec .fk{fill:var(--t1)} .sop-vec .fw{fill:var(--bg2)} .sop-vec .fg{fill:var(--bd)} .sop-vec .fn{fill:none}
 .sop-vec .sk{stroke:var(--t1)} .sop-vec .sw{stroke:var(--bg2)} .sop-vec .sn{stroke:none}
-.sop-vec path{vector-effect:non-scaling-stroke}
 .sop-zoom{font-size:11px;padding:1px 8px;border:1px solid var(--bd);border-radius:10px;background:none;color:var(--t2);cursor:pointer}

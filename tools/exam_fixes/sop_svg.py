@@ -6,38 +6,55 @@
   字型：原檔是標楷體，手機多半沒有，所以每一段字都加 textLength（PDF 上量到的寬度），
         換成別的字型也會被壓回原本的寬度，不會超出框。
 """
-import fitz, re
+import fitz, re, base64, collections
 
 
 def _cls(rgb):
     if rgb is None:
         return None
+    if max(rgb) - min(rgb) > 0.12:      # 有彩度（紅、藍、黃底…）：保留原色，不跟主題走
+        return '#%02x%02x%02x' % tuple(int(round(v * 255)) for v in rgb)
     v = sum(rgb) / 3
     return 'k' if v < 0.3 else ('w' if v > 0.95 else 'g')
+
+
+def _font(name):
+    """原檔字型 → class（只在整頁模式用）：tl 英數襯線（Times）、ts 無襯線（Arial／Calibri）、tm 等寬、tg 明體；楷體與不認得的不加"""
+    n = name.lower()
+    if 'kai' in n: return ''
+    if 'times' in n or 'nimbus' in n or 'roman' in n: return 'tl'
+    if 'arial' in n or 'calibri' in n or 'helvet' in n: return 'ts'
+    if 'courier' in n or 'mono' in n: return 'tm'
+    if 'ming' in n or 'song' in n or '明' in name: return 'tg'
+    return ''
 
 
 def _n(v):
     return ('%.2f' % v).rstrip('0').rstrip('.')
 
 
-def _path(items, close):
+def _path(items, close, f=None):
+    """f：座標換算 (x, y) → (x, y)，不給就照原座標"""
+    f = f or (lambda x, y: (x, y))
+    P = lambda p: '%s %s' % tuple(_n(v) for v in f(p.x, p.y))
     d, cur = [], None
     for it in items:
         k = it[0]
         if k == 're':
             r = it[1]
-            d.append('M%s %sH%sV%sH%sZ' % (_n(r.x0), _n(r.y0), _n(r.x1), _n(r.y1), _n(r.x0))); cur = None
+            (xa, ya), (xb, yb) = f(r.x0, r.y0), f(r.x1, r.y1)
+            d.append('M%s %sH%sV%sH%sZ' % (_n(xa), _n(ya), _n(xb), _n(yb), _n(xa))); cur = None
         elif k == 'qu':
             q = it[1]
-            d.append('M%s %sL%s %sL%s %sL%s %sZ' % (_n(q.ul.x), _n(q.ul.y), _n(q.ur.x), _n(q.ur.y), _n(q.lr.x), _n(q.lr.y), _n(q.ll.x), _n(q.ll.y))); cur = None
+            d.append('M%sL%sL%sL%sZ' % (P(q.ul), P(q.ur), P(q.lr), P(q.ll))); cur = None
         else:
             p0 = it[1]
             if cur is None or abs(cur.x - p0.x) > 0.01 or abs(cur.y - p0.y) > 0.01:
-                d.append('M%s %s' % (_n(p0.x), _n(p0.y)))
+                d.append('M' + P(p0))
             if k == 'l':
-                d.append('L%s %s' % (_n(it[2].x), _n(it[2].y))); cur = it[2]
+                d.append('L' + P(it[2])); cur = it[2]
             elif k == 'c':
-                d.append('C%s %s %s %s %s %s' % (_n(it[2].x), _n(it[2].y), _n(it[3].x), _n(it[3].y), _n(it[4].x), _n(it[4].y))); cur = it[4]
+                d.append('C%s %s %s' % (P(it[2]), P(it[3]), P(it[4]))); cur = it[4]
     if close:
         d.append('Z')
     return ''.join(d)
@@ -60,7 +77,12 @@ def elements(pg, clip):
         a = []
         f = _cls(dr.get('fill')) if 'f' in dr['type'] else None
         s = _cls(dr.get('color')) if 's' in dr['type'] else None
-        a.append('class="%s"' % ' '.join(['f' + f if f else 'fn', ('s' + s) if s else 'sn']))
+        st = ''
+        if f and f[0] == '#': st += 'fill:%s;' % f
+        if s and s[0] == '#': st += 'stroke:%s;' % s
+        a.append('class="%s"' % ' '.join(['fn' if not f else 'fc' if f[0] == '#' else 'f' + f, 'sn' if not s else 'sc' if s[0] == '#' else 's' + s]))
+        if st:
+            a.append('style="%s"' % st)
         if s:
             a.append('stroke-width="%s"' % _n(dr.get('width') or 1))
             ds = dr.get('dashes') or ''
@@ -72,10 +94,28 @@ def elements(pg, clip):
         if dr.get('even_odd'):
             a.append('fill-rule="evenodd"')
         # 看得到＝有黑或灰的填色／框線（白底白框是原檔用來墊字的，看不到）
-        vis = f in ('k', 'g') or s in ('k', 'g')
-        els.append(dict(kind='path', rect=fitz.Rect(dr['rect']), svg='<path d="%s" %s/>' % (d, ' '.join(a)), text='', vis=vis, dr=dr))
+        vis = bool(f and f != 'w') or bool(s and s != 'w')
+        els.append(dict(kind='path', rect=fitz.Rect(dr['rect']), svg='<path d="%s" %s/>' % (d, ' '.join(a)), attrs=' '.join(a), text='', vis=vis, dr=dr))
+    # PDF 裡的圖片（掃描頁、印章、照片）：原始圖檔原封不動放回原位置
+    for im in pg.get_image_info(xrefs=True):
+        r = fitz.Rect(im['bbox'])
+        if not im.get('xref') or not r.intersects(clip):
+            continue
+        tr = im.get('transform') or (1, 0, 0, 1, 0, 0)
+        try:
+            x = pg.parent.extract_image(im['xref'])
+        except Exception:
+            x = None
+        ok = bool(x) and x.get('ext') in ('png', 'jpeg', 'jpg') and abs(tr[1]) < 0.01 and abs(tr[2]) < 0.01 and tr[0] > 0 and tr[3] > 0 and not x.get('smask')
+        if ok:
+            data, mime = x['image'], 'image/' + ('png' if x['ext'] == 'png' else 'jpeg')
+        else:   # 旋轉、特殊格式、有透明遮罩：把這塊範圍照畫面轉成圖
+            data, mime = pg.get_pixmap(clip=r, dpi=150).tobytes('png'), 'image/png'
+        els.append(dict(kind='image', rect=r, text='', vis=True, bytes=len(data), svg='<image x="%s" y="%s" width="%s" height="%s" preserveAspectRatio="none" href="data:%s;base64,%s"/>' % (
+            _n(r.x0), _n(r.y0), _n(r.width), _n(r.height), mime, base64.b64encode(data).decode())))
     for b in pg.get_text('rawdict')['blocks']:
         for ln in b.get('lines', []):
+            rot = abs(ln['dir'][0] - 1) > 0.01 or abs(ln['dir'][1]) > 0.01   # 直排或旋轉的字：這裡照橫排放，位置會不對，由呼叫端決定要不要改用圖
             for sp in ln['spans']:
                 # 只取中心點落在裁切範圍內的字；頭尾空白不放（寬度只量有字的部分）
                 cs = [c for c in sp['chars'] if clip.contains(fitz.Point((c['bbox'][0] + c['bbox'][2]) / 2, (c['bbox'][1] + c['bbox'][3]) / 2))]
@@ -90,7 +130,7 @@ def elements(pg, clip):
                 w = cs[-1]['bbox'][2] - cs[0]['bbox'][0]
                 bold = ' font-weight="bold"' if sp['flags'] & 16 else ''
                 r = fitz.Rect(cs[0]['bbox'][0], min(c['bbox'][1] for c in cs), cs[-1]['bbox'][2], max(c['bbox'][3] for c in cs))
-                els.append(dict(kind='text', rect=r, text=body, vis=True, t=dict(ox=ox, oy=oy, size=sp['size'], w=w, bold=bold)))
+                els.append(dict(kind='text', rect=r, text=body, vis=True, rot=rot, t=dict(ox=ox, oy=oy, size=sp['size'], w=w, bold=bold, color=sp.get('color') or 0, font=_font(sp.get('font') or ''))))
     return els
 
 
@@ -104,6 +144,61 @@ def elements(pg, clip):
 #     結果：行距變成原本的 SY/FS 倍，字和框邊之間多出空隙，流程和樣式不變。
 SY = 1.25
 FS = 0.88
+LW = 1.0    # 流程圖所有線條統一的粗細（pt）。原檔的箭頭線是 1pt 寬的實心長方形，其他線是 0.75pt 的框線，兩種看起來一粗一細，這裡統一成 1pt
+
+
+def _arrow(dr):
+    """原檔的箭頭＝實心的「細長方形線身＋三角形箭頭」。回傳 (線身起點, 箭頭尖, 箭頭長, 箭頭半寬)；不是這種形狀回 None"""
+    if dr['type'] != 'f':
+        return None
+    its = dr['items']
+    if len(its) < 4 or any(it[0] != 'l' for it in its[-3:]) or any(it[0] not in ('l', 're') for it in its):
+        return None
+    tri = [its[-3][1], its[-2][1], its[-1][1]]
+    pts = []
+    for it in its[:-3]:
+        pts += [it[1].tl, it[1].br] if it[0] == 're' else [it[1], it[2]]
+    body = fitz.Rect(min(p.x for p in pts), min(p.y for p in pts), max(p.x for p in pts), max(p.y for p in pts))
+    vert = body.height >= body.width
+    if min(body.width, body.height) > 3:
+        return None
+    c = fitz.Point((body.x0 + body.x1) / 2, (body.y0 + body.y1) / 2)
+    key = (lambda p: p.y) if vert else (lambda p: p.x)
+    tip = max(tri, key=lambda p: abs(key(p) - key(c)))
+    base = [p for p in tri if p is not tip]
+    if abs(key(base[0]) - key(base[1])) > 0.2:
+        return None          # 斜的箭頭：不處理
+    sgn = 1 if key(tip) > key(c) else -1
+    if vert:
+        start = fitz.Point(tip.x, body.y0 if sgn > 0 else body.y1)
+        return start, fitz.Point(tip), abs(tip.y - base[0].y), abs(base[0].x - base[1].x) / 2
+    start = fitz.Point(body.x0 if sgn > 0 else body.x1, tip.y)
+    return start, fitz.Point(tip), abs(tip.x - base[0].x), abs(base[0].y - base[1].y) / 2
+
+
+def _geo(e, f):
+    """流程圖的一個線條元素 → 換算後的 SVG。
+    ・箭頭：線身改成和其他線一樣的框線（LW），從換算後的起點畫到箭頭底；箭頭三角形大小不變，尖端落在換算後的位置
+    ・其他：每個點照 f 換算，框線粗細統一成 LW"""
+    dr = e['dr']
+    a = _arrow(dr) if e['vis'] else None
+    if a:
+        s, t, hl, hw = a
+        (sx, sy), (tx, ty) = f(s.x, s.y), f(t.x, t.y)
+        if abs(sx - tx) < 0.01:      # 直的
+            d = 1 if ty > sy else -1
+            return ('<path d="M%s %sV%s" class="fn sk" stroke-width="%s"/>' % (_n(sx), _n(sy), _n(ty - d * hl * 0.9), _n(LW))
+                    + '<path d="M%s %sL%s %sL%s %sZ" class="fk sn"/>' % (_n(tx), _n(ty), _n(tx - hw), _n(ty - d * hl), _n(tx + hw), _n(ty - d * hl)))
+        d = 1 if tx > sx else -1     # 橫的
+        return ('<path d="M%s %sH%s" class="fn sk" stroke-width="%s"/>' % (_n(sx), _n(ty), _n(tx - d * hl * 0.9), _n(LW))
+                + '<path d="M%s %sL%s %sL%s %sZ" class="fk sn"/>' % (_n(tx), _n(ty), _n(tx - d * hl), _n(ty - hw), _n(tx - d * hl), _n(ty + hw)))
+    attrs = re.sub(r'stroke-width="[\d.]+"', 'stroke-width="%s"' % _n(LW), e['attrs'])
+    return '<path d="%s" %s/>' % (_path(dr['items'], dr.get('closePath'), f), attrs)
+
+
+def _chroma(c):
+    v = (c >> 16 & 255, c >> 8 & 255, c & 255)
+    return max(v) - min(v) > 30
 
 
 def _anchor(e, shapes):
@@ -116,12 +211,19 @@ def _anchor(e, shapes):
     return (s.x0 + s.x1) / 2
 
 
-def _render(pages, X0, X1, Y0, Y1, extra=''):
-    """pages：[(要畫的元素, 這頁往下移多少)]；extra：另外畫的線（接點連線，已是疊好後的座標）"""
+def _render(pages, X0, X1, Y0, Y1, extra='', SY=None, FS=None, fonts=False):
+    """pages：[(要畫的元素, 這頁往下移多少)]；extra：另外畫的線（接點連線，已是疊好後的座標）。
+    SY／FS 不給就用上面的流程圖設定；fonts＝要不要照原檔字型分 class（整頁模式用）"""
+    SY = globals()['SY'] if SY is None else SY
+    FS = globals()['FS'] if FS is None else FS
     my = lambda y: Y0 + SY * (y - Y0)
+    flow = not fonts     # 流程圖模式：座標直接換算、線條粗細統一；整頁模式：照原樣
     geo, txt = [], []
     for els, dy in pages:
-        geo.append('<g transform="translate(0 %s)">' % _n(dy) + ''.join(e['svg'] for e in els if e['kind'] == 'path') + '</g>')
+        if flow:
+            geo.append(''.join(_geo(e, lambda x, y, dy=dy: (x, my(y + dy))) if e['kind'] == 'path' else e['svg'] for e in els if e['kind'] in ('image', 'path')))
+        else:
+            geo.append('<g transform="translate(0 %s)">' % _n(dy) + ''.join(e['svg'] for e in els if e['kind'] in ('image', 'path')) + '</g>')
         shapes = [e['rect'] for e in els if e['kind'] == 'path' and e['vis']]
         for e in els:
             if e['kind'] != 'text':
@@ -131,20 +233,32 @@ def _render(pages, X0, X1, Y0, Y1, extra=''):
             cy = (r.y0 + r.y1) / 2 + dy
             x = ax + (t['ox'] - ax) * FS
             y = my(cy) + (t['oy'] + dy - cy) * FS
+            ex = t['bold']
+            if fonts and t['font']:
+                ex += ' class="%s"' % t['font']
+            if _chroma(t['color']):   # 彩色字（例：紅字標示修正）保留原色
+                ex += ' style="fill:#%06x"' % t['color']
             txt.append('<text x="%s" y="%s" font-size="%s" textLength="%s" lengthAdjust="spacingAndGlyphs"%s>%s</text>' % (
-                _n(x), _n(y), _n(t['size'] * FS), _n(t['w'] * FS), t['bold'], _esc(e['text'])))
-    body = ('<g transform="matrix(1 0 0 %s 0 %s)">' % (_n(SY), _n(Y0 * (1 - SY))) + ''.join(geo) + extra + '</g>'
-            + '<g>' + ''.join(txt) + '</g>')
-    return _wrap(X0, Y0, X1 - X0, SY * (Y1 - Y0), body)
+                _n(x), _n(y), _n(t['size'] * FS), _n(t['w'] * FS), ex, _esc(e['text'])))
+    if flow:
+        # extra＝接點連線，每條是一串點（疊好後的座標），和其他線一樣換算、一樣粗細，轉角用尖角接起來
+        ex = ''.join('<path d="M%s" class="fn sk" stroke-width="%s" stroke-linejoin="miter"/>' % (
+            'L'.join('%s %s' % (_n(x), _n(my(y))) for x, y in pts), _n(LW)) for pts in (extra or []))
+        body = '<g>' + ''.join(geo) + ex + '</g><g>' + ''.join(txt) + '</g>'
+    else:
+        body = ('<g transform="matrix(1 0 0 %s 0 %s)">' % (_n(SY), _n(Y0 * (1 - SY))) + ''.join(geo) + '</g>'
+                + '<g>' + ''.join(txt) + '</g>')
+    return _wrap(X0, Y0, X1 - X0, SY * (Y1 - Y0), body, fonts)
 
 
-def _wrap(x0, y0, w, h, body):
+def _wrap(x0, y0, w, h, body, fonts=False):
     return ('<svg xmlns="http://www.w3.org/2000/svg" class="sop-svg" viewBox="%s %s %s %s" width="%s" height="%s">' % (
         _n(x0), _n(y0), _n(w), _n(h), _n(w), _n(h))
         # 單獨開（放大檢視、<img>）時的顏色；App 內嵌時這段 <style> 和底色 rect 會被拿掉，改用主題色
         + '<style>.fk{fill:#000}.fw{fill:#fff}.fg{fill:#d9d9d9}.fn{fill:none}.sk{stroke:#000}.sw{stroke:#fff}.sn{stroke:none}'
-        + 'path{vector-effect:non-scaling-stroke}'
-        + 'text{fill:#000;font-family:"DFKai-SB","BiauKai","標楷體","Kaiti TC","STKaiti",serif}</style>'
+        + 'text{fill:#000;font-family:"DFKai-SB","BiauKai","標楷體","Kaiti TC","STKaiti",serif}'
+        + ('' if not fonts else '.tl{font-family:"Times New Roman",Times,"Noto Serif",serif}.ts{font-family:Arial,Helvetica,"Noto Sans",sans-serif}'
+        + '.tm{font-family:"Courier New",monospace}.tg{font-family:"PMingLiU","MingLiU","Noto Serif TC","Noto Serif CJK TC","Songti TC",serif}') + '</style>'
         + '<rect x="%s" y="%s" width="%s" height="%s" fill="#fff" class="bg"/>' % (_n(x0), _n(y0), _n(w), _n(h))
         + body + '</svg>')
 
@@ -158,6 +272,29 @@ def flow_svg(pg, clip):
     clip = fitz.Rect(clip)
     els = elements(pg, clip)
     return _render([(els, 0.0)], clip.x0, clip.x1, clip.y0, clip.y1), _chars(els)
+
+
+# ══ 整頁照搬（補充資料、表格、附表、原檔整頁）══════════════════════════════════════
+#   不切版、不拉高、不縮字：整頁每個東西照原檔座標放。四周空白裁掉（只留 margin），手機上字比較大。
+#   回傳的 info 給核對表用：
+#     text_ok＝SVG 裡的字和 PDF 文字層一字不差；rotated＝直排／旋轉的字有幾段（>0 時位置會不對，呼叫端應改用整頁圖）；
+#     images／image_bytes＝內嵌圖片數與大小；colored＝彩色字段數；scan＝這頁有圖而且幾乎沒有字（掃描頁，圖裡的字搜尋不到）
+def page_svg(pg, crop=True, margin=12):
+    els = elements(pg, pg.rect)
+    box = fitz.Rect(pg.rect)
+    vis = [e['rect'] & box for e in els if e['vis']]
+    vis = [r for r in vis if not r.is_empty]
+    if crop and vis:
+        b = fitz.Rect(min(r.x0 for r in vis), min(r.y0 for r in vis), max(r.x1 for r in vis), max(r.y1 for r in vis))
+        box = fitz.Rect(max(box.x0, b.x0 - margin), max(box.y0, b.y0 - margin), min(box.x1, b.x1 + margin), min(box.y1, b.y1 + margin))
+    svg = _render([(els, 0.0)], box.x0, box.x1, box.y0, box.y1, SY=1, FS=1, fonts=True)
+    ch = _chars(els)
+    cnt = lambda s: collections.Counter(re.sub(r'\s+', '', s))
+    imgs = [e for e in els if e['kind'] == 'image']
+    info = dict(chars=len(ch), text_ok=cnt(ch) == cnt(pg.get_text()), images=len(imgs), image_bytes=sum(e['bytes'] for e in imgs),
+                rotated=sum(1 for e in els if e.get('rot')), colored=sum(1 for e in els if e['kind'] == 'text' and _chroma(e['t']['color'])),
+                scan=bool(imgs) and len(ch) < 100, bytes=len(svg.encode('utf8')))
+    return svg, ch, info
 
 
 # ══ 跨頁接點（A、B、C 圓圈）直接連線（v4.43）══════════════════════════════════════
@@ -315,11 +452,9 @@ def joined_svg(parts):
             bx, by = pb.x, pb.y + db
             segs.append((min(ax, bx), max(ax, bx)))
             sw = c['el']['dr'].get('width') or 0.75
-            d_ = 'M%s %sV%s' % (_n(ax), _n(ay), _n(by)) if abs(ax - bx) < 0.6 else \
-                 'M%s %sV%sH%sV%s' % (_n(ax), _n(ay), _n(my), _n(bx), _n(by))
-            links.append('<path d="%s" class="fn sk" stroke-width="%s"/>' % (d_, _n(sw)))
+            links.append([(ax, ay), (ax, by)] if abs(ax - bx) < 0.6 else [(ax, ay), (ax, my), (bx, my), (bx, by)])
         segs.sort()
         for (a0, a1), (b0, b1) in zip(segs, segs[1:]):
             assert a1 + 4 < b0, '第 %d、%d 段的接線橫段會重疊' % (k + 1, k + 2)
-    svg = _render(out, x0, x1, clips[0].y0, yend, ''.join(links))
+    svg = _render(out, x0, x1, clips[0].y0, yend, links)
     return svg, ''.join(chars), [x for x in removed if x]
