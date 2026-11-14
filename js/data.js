@@ -1615,10 +1615,11 @@ function _sopBody(text, fmt, noFlow){
     if(hm){ flushAll(); flowMode = !noFlow && /流程/.test(hm[1]); heads.push(hm[1]); out.push('<div class="sop-h" data-h="' + (heads.length - 1) + '">' + fmt(hm[1]) + '</div>'); continue; }
     // v4.42 圖片行：![說明](data/sop/…png)——SOP 整理版的流程圖、附表（由 import_sop_pdf.py 從原檔裁出）
     //   手機上圖寬至少 500px、可左右滑動（整張縮到螢幕寬字會太小），點圖放大
-    const im = t.match(/^!\[([^\]]*)\]\((data\/sop\/[\w\-./]+)\)$/);
+    //   v4.45：桌面掃題匯入的 SOP 把圖包在資料裡（data:image/svg+xml／jpeg／png;base64,…），不用另外下載
+    const im = t.match(_SOP_IMG);
     // v4.43 .svg：流程圖是原檔的線條＋真文字（import_sop_pdf.py 照座標搬，不重畫）。先用 <img> 載入，
     //   載到後 _sopVec 換成內嵌 SVG，字才能選取、頁內搜尋。v4.43：跨頁的 A／B／C 接點已在匯入時直接連線
-    if(im && /\.svg$/.test(im[2])){ flushAll(); out.push('<figure class="sop-img sop-vec"><div class="sop-img-sc"><img src="' + esc(im[2]) + '" alt="' + esc(im[1]) + '" decoding="async" '
+    if(im && _isSvgSrc(im[2])){ flushAll(); out.push('<figure class="sop-img sop-vec"><div class="sop-img-sc"><img src="' + esc(im[2]) + '" alt="' + esc(im[1]) + '" decoding="async" '
       + 'onload="_sopVec(this)" onerror="_sopVecErr(this)"></div><figcaption>' + fmt(im[1])
       + '　<button type="button" class="sop-zoom" onclick="openImgViewer(&quot;' + esc(im[2]) + '&quot;)">🔍 放大</button><span class="sop-img-tip">　左右滑動</span>'
       + '<span class="sopp-miss">　這張圖還沒下載，連上網路後再開一次</span></figcaption></figure>'); continue; }
@@ -1692,8 +1693,12 @@ function soppView(btn, v){
   box.dataset.v = v;
   box.querySelectorAll('.sopp-tabs button').forEach(b => b.classList.toggle('on', b === btn));
 }
-// 內容是不是 import_sop_pdf.py 產生的整理版（有 data/sop 的圖片行）
-const _isSopImport = t => /^!\[[^\]]*\]\(data\/sop\//m.test(t || '');
+// SOP 整理版的圖片行：![說明](來源)。來源是 repo 裡的檔（data/sop/…，import_sop_pdf.py）
+//   或包在資料裡的圖（v4.45，桌面掃題「📄 匯入 SOP PDF」：data:image/svg+xml／jpeg／png;base64,…，隨備份走、離線也看得到）
+const _SOP_IMG = /^!\[([^\]]*)\]\((data\/sop\/[\w\-./]+|data:image\/(?:svg\+xml|jpeg|png);base64,[A-Za-z0-9+/=]+)\)$/;
+const _isSvgSrc = s => /\.svg$/.test(s) || s.startsWith('data:image/svg+xml');
+// 內容是不是整理版（有上面這種圖片行）
+const _isSopImport = t => String(t || '').split('\n').some(ln => _SOP_IMG.test(ln.trim()));
 // v4.43 SOP 流程圖 SVG → 內嵌（只留 svg／g／path／text，拿掉其他元素與事件、連結屬性；g 是跨頁接成一張時每頁的位移群組）
 const _SVG_OK = { svg:1, g:1, path:1, text:1 };
 async function _sopVec(img){
@@ -1705,6 +1710,8 @@ async function _sopVec(img){
     const doc = new DOMParser().parseFromString(await r.text(), 'image/svg+xml');
     const svg = doc.documentElement;
     if(!svg || svg.nodeName !== 'svg' || doc.querySelector('parsererror')) return;
+    // v4.45：整頁 SVG 裡有內嵌圖片（掃描、印章）時不內嵌——白名單會把 <image> 拿掉，留著 <img> 才看得到原圖
+    if(svg.querySelector('image')) return;
     for(const el of [svg, ...svg.querySelectorAll('*')]){
       if(!_SVG_OK[el.nodeName]){ el.remove(); continue; }
       for(const a of [...el.attributes]) if(/^on|href$/i.test(a.name)) el.removeAttribute(a.name);

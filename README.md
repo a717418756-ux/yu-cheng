@@ -1,6 +1,6 @@
 # Y.C. 多功能專用平台
 
-> 警察特考備考 PWA｜版本 **4.44.0**
+> 警察特考備考 PWA｜版本 **4.45.0**
 > 離線可用．資料存本機．支援電子紙
 
 ---
@@ -227,6 +227,8 @@ PDF 原檔**不理解、不重排、不改字**直接放進 App：
 
 流程：把 PDF 放進電腦 `Desktop\Y.C\原始資料庫\作業程序SOP`（檔名「正式名稱_民國日期7碼.pdf」）→ `python tools/exam_fixes/import_sop_pdf.py`（轉圖、抽字、產生 `tools/exam_fixes/sop/_匯入核對表.md`：頁數、每頁字數、沒有文字層的掃描頁）→ `python tools/exam_fixes/add_laws.py`（寫進 `data/exam_fixes.json` 的 `lawNew`，帶 `pages`、`pagesText`）→ 手機設定頁「考古題答案更正 → 檢查」套用。
 頁面圖放在獨立快取 `yc-pages-v1`（`sw.js`），看過一次就留在裝置裡，App 更新版本不會清掉；沒看過的頁面離線時會顯示「這一頁還沒下載」。圖片不進備份（備份只帶路徑與文字）。
+
+**桌面掃題匯入（v4.45.0）**：電腦上用桌面掃題（`Desktop\Y.C\桌面掃題`，2026.11.14-1 起）法規資料庫分頁的「📄 匯入 SOP PDF」「📄 匯入補充資料 PDF」，同一套 `import_sop_pdf.py`／`sop_svg.py`（桌面掃題照搬）轉好後直接寫進 `exam_data.json`，再用本機完整還原放進 App，不必推 GitHub。差別是圖包在資料裡：`content` 的圖片行是 `![說明](data:image/svg+xml;base64,…)`，`pages` 是整頁 SVG（掃描或字對不上的頁是灰階 JPG）的 data URI，隨備份與雲端同步走，離線也看得到；補充資料只有原檔整頁（`content`＝逐字文字），原本已是【】＋表格文字的保留文字、只加原檔頁面。App 端：`_SOP_IMG` 圖片行同時認 `data/sop/…` 路徑和 data URI；SVG 照樣先用 `<img>` 再換成內嵌（`fetch` 讀 data URI），整頁 SVG 裡有 `<image>`（掃描、印章）時不內嵌、維持 `<img>`；`sw.js` 只攔 http 請求，data URI 不經過快取。
 
 ### 大量新增
 
@@ -563,4 +565,4 @@ Promotion 記憶樹的文字修正寫在 `_extras.json` 的 `fixes`（建置時�
 
 ---
 
-*版本 4.44.0*
+*版本 4.45.0*
