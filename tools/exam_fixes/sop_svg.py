@@ -176,6 +176,229 @@ def _arrow(dr):
     return start, fitz.Point(tip), abs(tip.x - base[0].x), abs(base[0].y - base[1].y) / 2
 
 
+# ══ 連續的線（v4.47）══════════════════════════════════════════════════════════════
+#   原檔一條線常是好幾段分開畫的：箭頭線身、轉角前後各一段、跨頁接線，段與段之間有 0.3～1pt 的錯位，
+#   轉角是兩段方頭疊在一起，放大看就像拼接。這裡把所有「水平／垂直的連接線」放進一個線網：
+#     1. 同一直線上、錯位 ≤ SNAP、首尾相接（間隔 ≤ GAPJ）的段合併成一段，位置取較長那段
+#     2. 線頭離另一條線 ≤ SNAP 的，接到那條線上（轉角、T 字）
+#     3. 跨頁接線的小折角：另一側那段線若「一頭是轉折、另一頭是箭頭指進方框」，整段平移對齊，折角消失
+#     4. 首尾相連的段串成一筆（一個 path），轉角用尖角，箭頭只畫在線的末端
+#   框、菱形、圓角框不動。位移最多 SNAP（跨頁接線最多 JOG），流程和接到哪個框都不變。
+SNAP = 2.5
+GAPJ = 3.0
+JOG = 40.0
+
+
+def _boxy(dr):
+    """方框（含圓角框）＝邊都是水平／垂直；菱形這種斜邊的不算（箭頭要對準頂點，不能平移）"""
+    for it in dr['items']:
+        if it[0] == 'l' and abs(it[1].x - it[2].x) > 0.6 and abs(it[1].y - it[2].y) > 0.6:
+            return False
+    return True
+
+
+def _add(net, xa, ya, xb, yb, head=None):
+    """加一段水平或垂直線（換算後座標）；head＝(hl, hw)：箭頭在 (xb, yb) 那端"""
+    if abs(xa - xb) < 0.01 and abs(ya - yb) < 0.01:
+        return
+    v = abs(xa - xb) <= abs(ya - yb)
+    c = (xa + xb) / 2 if v else (ya + yb) / 2
+    a0, b0 = (ya, yb) if v else (xa, xb)
+    sg = dict(o='v' if v else 'h', c=c, a=min(a0, b0), b=max(a0, b0), heads=[], join=False)
+    if head:
+        sg['heads'].append(dict(at=b0, d=1 if b0 > a0 else -1, hl=head[0], hw=head[1]))
+    net['segs'].append(sg)
+
+
+def _conn(e, f, net):
+    """是連接線（直／橫的開放線、箭頭）就放進線網並回 True；其他（框、菱形、斜線）回 False"""
+    if not e['vis']:
+        return False
+    dr = e['dr']
+    a = _arrow(dr)
+    if a:
+        st, tp, hl, hw = a
+        (sx, sy), (tx, ty) = f(st.x, st.y), f(tp.x, tp.y)
+        _add(net, sx, sy, tx, ty, (hl, hw))
+        return True
+    if dr['type'] != 's' or dr.get('closePath') or not dr['items'] or any(it[0] != 'l' for it in dr['items']):
+        return False
+    if any(abs(it[1].x - it[2].x) > 0.6 and abs(it[1].y - it[2].y) > 0.6 for it in dr['items']):
+        return False
+    for it in dr['items']:
+        (xa, ya), (xb, yb) = f(it[1].x, it[1].y), f(it[2].x, it[2].y)
+        _add(net, xa, ya, xb, yb)
+    return True
+
+
+def _merge(segs):
+    """同一直線上、錯位 ≤ SNAP、首尾相接的段合併"""
+    changed = True
+    while changed:
+        changed = False
+        for i, p in enumerate(segs):
+            for q in segs[i + 1:]:
+                if p['o'] != q['o'] or abs(p['c'] - q['c']) > SNAP:
+                    continue
+                if q['a'] - p['b'] > GAPJ or p['a'] - q['b'] > GAPJ:
+                    continue
+                keep = p if p['b'] - p['a'] >= q['b'] - q['a'] else q
+                p['c'] = keep['c']; p['a'] = min(p['a'], q['a']); p['b'] = max(p['b'], q['b'])
+                p['heads'] += q['heads']; p['join'] = p['join'] or q['join']
+                segs.remove(q); changed = True
+                break
+            if changed:
+                break
+
+
+def _touch(segs):
+    """線頭離另一條（垂直方向的）線 ≤ SNAP：線頭接到那條線上；碰到的是那條線的端點附近，就連端點一起對齊（轉角）"""
+    for p in segs:
+        for end in ('a', 'b'):
+            for q in segs:
+                if q is p or q['o'] == p['o']:
+                    continue
+                if abs(p[end] - q['c']) > SNAP or not (q['a'] - SNAP <= p['c'] <= q['b'] + SNAP):
+                    continue
+                p[end] = q['c']
+                for qe in ('a', 'b'):            # 轉角：對方的端點也對到這條線上
+                    if abs(q[qe] - p['c']) <= SNAP:
+                        q[qe] = p['c']
+                break
+
+
+def _ends_at(segs, sg, end):
+    """哪些段的線頭接在 sg 的 end 端點上（轉角）"""
+    pt = sg[end]
+    return [q for q in segs if q is not sg and q['o'] != sg['o'] and abs(q['c'] - pt) < 0.01
+            and any(abs(q[e] - sg['c']) < 0.01 for e in ('a', 'b'))]
+
+
+def _side(segs, sg):
+    """接在 sg 身上（不在端點）的其他段數：有的話不能平移"""
+    n = 0
+    for q in segs:
+        if q is sg or q['o'] == sg['o']:
+            continue
+        if sg['a'] + 0.01 < q['c'] < sg['b'] - 0.01 and any(abs(q[e] - sg['c']) < 0.01 for e in ('a', 'b')):
+            n += 1
+        if abs(q['c'] - sg['a']) < 0.01 or abs(q['c'] - sg['b']) < 0.01:
+            if q['a'] + 0.01 < sg['c'] < q['b'] - 0.01:
+                n += 1                            # sg 的端點是 T 字接在 q 中間
+    return n
+
+
+def _straighten(net):
+    """跨頁接線的折角：V1（上）—H（折角）—V2（下）。V2 或 V1 能整段平移就平移，H 就不用了"""
+    segs = net['segs']
+    for H in [s for s in segs if s['o'] == 'h' and s.get('jog')]:
+        if H not in segs or H['b'] - H['a'] > JOG:
+            continue
+        V = [q for q in segs if q['o'] == 'v' and any(abs(q['c'] - H[e]) < 0.01 for e in ('a', 'b'))
+             and (abs(q['a'] - H['c']) < 0.01 or abs(q['b'] - H['c']) < 0.01)]
+        if len(V) != 2:
+            continue
+        for mv, st in ((V[0], V[1]), (V[1], V[0])):
+            far = 'b' if abs(mv['a'] - H['c']) < 0.01 else 'a'
+            if _side(segs, mv):
+                continue
+            ok = False
+            hd = [h for h in mv['heads'] if abs(h['at'] - mv[far]) < 0.01]
+            if hd:                                 # 遠端是箭頭：要指進方框，平移後仍在框邊內
+                y = mv[far] + hd[0]['d'] * 1.5
+                ok = any(bx and r.x0 + 4 <= st['c'] <= r.x1 - 4 and r.y0 - 2 <= y <= r.y1 + 2 for r, bx in net['boxes'])
+            elif not _ends_at(segs, mv, far):      # 遠端是從方框邊出發的線頭：平移後仍在框邊內
+                y = mv[far]
+                ok = any(bx and r.x0 + 4 <= st['c'] <= r.x1 - 4 and (abs(r.y0 - y) < 2 or abs(r.y1 - y) < 2) for r, bx in net['boxes'])
+            else:                                  # 遠端是轉角：那段橫線改接過來，長度要夠
+                cs = _ends_at(segs, mv, far)
+                if len(cs) == 1 and not cs[0]['heads'] or len(cs) == 1 and all(abs(h['at'] - mv['c']) > 0.01 for h in cs[0]['heads']):
+                    q = cs[0]
+                    qe = 'a' if abs(q['a'] - mv['c']) < 0.01 else 'b'
+                    other = q['b'] if qe == 'a' else q['a']
+                    ok = abs(other - st['c']) > 4 and (other - mv['c']) * (other - st['c']) > 0
+                    if ok:
+                        q[qe] = st['c']
+            if ok:
+                mv['c'] = st['c']
+                segs.remove(H)
+                _merge(segs)
+                break
+
+
+def _lines(net):
+    segs = net['segs']
+    for i in net['joins']:
+        for sg in segs[i:]:
+            sg['join'] = True
+            if sg['o'] == 'h':
+                sg['jog'] = True
+    _merge(segs)
+    _touch(segs)
+    _merge(segs)
+    _straighten(net)
+    segs[:] = [sg for sg in segs if sg['b'] - sg['a'] > 0.05]   # 對齊後長度變 0 的小折角（例：錯位 1pt 的接線）不要
+    # 串成一筆：端點相同（且那個點只有兩段相接）就接起來
+    key = lambda x, y: (round(x, 2), round(y, 2))
+    pts = lambda sg: [(sg['c'], sg['a']), (sg['c'], sg['b'])] if sg['o'] == 'v' else [(sg['a'], sg['c']), (sg['b'], sg['c'])]
+    deg = collections.Counter(key(*p) for sg in segs for p in pts(sg))
+    used, out, tips = set(), [], []
+    for sg in segs:
+        for h in sg['heads']:
+            x, y = (sg['c'], h['at']) if sg['o'] == 'v' else (h['at'], sg['c'])
+            tips.append((x, y, h['d'], sg['o'], h['hl'], h['hw']))
+    tipset = {key(x, y): (d, o, hl) for x, y, d, o, hl, hw in tips}
+
+    def nxt(p, cur):
+        if deg[key(*p)] != 2:
+            return None
+        for sg in segs:
+            if id(sg) in used or sg is cur:
+                continue
+            a, b = pts(sg)
+            if key(*a) == key(*p):
+                return sg, b
+            if key(*b) == key(*p):
+                return sg, a
+        return None
+
+    def trim(p, q):
+        """線的末端如果是箭頭尖，線身停在箭頭底（不要從三角形尖端穿出去）"""
+        t = tipset.get(key(*p))
+        if not t:
+            return p
+        d, o, hl = t
+        return (p[0] - d * hl * 0.9, p[1]) if o == 'h' else (p[0], p[1] - d * hl * 0.9)
+
+    for sg in segs:
+        if id(sg) in used:
+            continue
+        used.add(id(sg))
+        a, b = pts(sg)
+        line = [a, b]
+        cur = sg                                   # 往 b 方向接
+        while True:
+            r = nxt(line[-1], cur)
+            if not r or key(*r[1]) == key(*line[0]):
+                break
+            used.add(id(r[0])); cur = r[0]; line.append(r[1])
+        cur = sg                                   # 往 a 方向接
+        while True:
+            r = nxt(line[0], cur)
+            if not r or key(*r[1]) == key(*line[-1]):
+                break
+            used.add(id(r[0])); cur = r[0]; line.insert(0, r[1])
+        line[0] = trim(line[0], line[1]); line[-1] = trim(line[-1], line[-2])
+        out.append('<path d="M%s" class="fn sk" stroke-width="%s" stroke-linejoin="miter" stroke-linecap="square"/>' % (
+            'L'.join('%s %s' % (_n(x), _n(y)) for x, y in line), _n(LW)))
+    for x, y, d, o, hl, hw in tips:
+        if o == 'v':
+            out.append('<path d="M%s %sL%s %sL%s %sZ" class="fk sn"/>' % (_n(x), _n(y), _n(x - hw), _n(y - d * hl), _n(x + hw), _n(y - d * hl)))
+        else:
+            out.append('<path d="M%s %sL%s %sL%s %sZ" class="fk sn"/>' % (_n(x), _n(y), _n(x - d * hl), _n(y - hw), _n(x - d * hl), _n(y + hw)))
+    return ''.join(out)
+
+
 def _geo(e, f):
     """流程圖的一個線條元素 → 換算後的 SVG。
     ・箭頭：線身改成和其他線一樣的框線（LW），從換算後的起點畫到箭頭底；箭頭三角形大小不變，尖端落在換算後的位置
@@ -219,9 +442,17 @@ def _render(pages, X0, X1, Y0, Y1, extra='', SY=None, FS=None, fonts=False):
     my = lambda y: Y0 + SY * (y - Y0)
     flow = not fonts     # 流程圖模式：座標直接換算、線條粗細統一；整頁模式：照原樣
     geo, txt = [], []
+    net = dict(segs=[], heads=[], boxes=[], joins=[])
     for els, dy in pages:
         if flow:
-            geo.append(''.join(_geo(e, lambda x, y, dy=dy: (x, my(y + dy))) if e['kind'] == 'path' else e['svg'] for e in els if e['kind'] in ('image', 'path')))
+            fdy = (lambda x, y, dy=dy: (x, my(y + dy)))
+            for e in els:
+                if e['kind'] == 'image':
+                    geo.append(e['svg'])
+                elif e['kind'] == 'path' and not _conn(e, fdy, net):
+                    geo.append(_geo(e, fdy))
+                    if e['vis']:
+                        net['boxes'].append((fitz.Rect(*fdy(e['rect'].x0, e['rect'].y0), *fdy(e['rect'].x1, e['rect'].y1)), _boxy(e['dr'])))
         else:
             geo.append('<g transform="translate(0 %s)">' % _n(dy) + ''.join(e['svg'] for e in els if e['kind'] in ('image', 'path')) + '</g>')
         shapes = [e['rect'] for e in els if e['kind'] == 'path' and e['vis']]
@@ -241,10 +472,13 @@ def _render(pages, X0, X1, Y0, Y1, extra='', SY=None, FS=None, fonts=False):
             txt.append('<text x="%s" y="%s" font-size="%s" textLength="%s" lengthAdjust="spacingAndGlyphs"%s>%s</text>' % (
                 _n(x), _n(y), _n(t['size'] * FS), _n(t['w'] * FS), ex, _esc(e['text'])))
     if flow:
-        # extra＝接點連線，每條是一串點（疊好後的座標），和其他線一樣換算、一樣粗細，轉角用尖角接起來
-        ex = ''.join('<path d="M%s" class="fn sk" stroke-width="%s" stroke-linejoin="miter"/>' % (
-            'L'.join('%s %s' % (_n(x), _n(my(y))) for x, y in pts), _n(LW)) for pts in (extra or []))
-        body = '<g>' + ''.join(geo) + ex + '</g><g>' + ''.join(txt) + '</g>'
+        # extra＝接點連線，每條是一串點（疊好後的座標）；和原檔的線一起放進線網，合併成連續的線
+        for pts in (extra or []):
+            q = [(x, my(y)) for x, y in pts]
+            net['joins'].append(len(net['segs']))
+            for (xa, ya), (xb, yb) in zip(q, q[1:]):
+                _add(net, xa, ya, xb, yb)
+        body = '<g>' + ''.join(geo) + _lines(net) + '</g><g>' + ''.join(txt) + '</g>'
     else:
         body = ('<g transform="matrix(1 0 0 %s 0 %s)">' % (_n(SY), _n(Y0 * (1 - SY))) + ''.join(geo) + '</g>'
                 + '<g>' + ''.join(txt) + '</g>')
