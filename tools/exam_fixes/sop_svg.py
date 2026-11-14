@@ -90,9 +90,52 @@ def elements(pg, clip):
                 w = cs[-1]['bbox'][2] - cs[0]['bbox'][0]
                 bold = ' font-weight="bold"' if sp['flags'] & 16 else ''
                 r = fitz.Rect(cs[0]['bbox'][0], min(c['bbox'][1] for c in cs), cs[-1]['bbox'][2], max(c['bbox'][3] for c in cs))
-                els.append(dict(kind='text', rect=r, text=body, vis=True, svg='<text x="%s" y="%s" font-size="%s" textLength="%s" lengthAdjust="spacingAndGlyphs"%s>%s</text>' % (
-                    _n(ox), _n(oy), _n(sp['size']), _n(w), bold, _esc(body))))
+                els.append(dict(kind='text', rect=r, text=body, vis=True, t=dict(ox=ox, oy=oy, size=sp['size'], w=w, bold=bold)))
     return els
+
+
+# ══ 版面放鬆（v4.44）════════════════════════════════════════════════════════════
+#   原檔的字行距＝字高（有的還更小，字會疊在一起），框也貼著字，手機上看很擠。
+#   做法是「整張圖同一個公式換算」，不動任何一個東西的相對位置：
+#     ・線條、框、箭頭：只往垂直方向等比例拉高 SY 倍（y' = Y0 + SY·(y − Y0)），水平不動。
+#       橫線還是橫線、直線變長、框變高，原本接在一起的還是接在一起；線寬不跟著變（non-scaling-stroke）。
+#     ・字：字級不跟著拉高，只縮成 FS 倍，每一行的中心點用同一個公式換算。
+#       框裡的字以「框的中心」為準往內縮（對齊方式不變）；框外的字（是／否）以自己的中心為準。
+#     結果：行距變成原本的 SY/FS 倍，字和框邊之間多出空隙，流程和樣式不變。
+SY = 1.25
+FS = 0.88
+
+
+def _anchor(e, shapes):
+    """字的水平縮放基準：包住它的最小框（看得到的線條）的中心；沒有框就用自己的中心。
+    裡面還框著別的框的（外框、欄位框）不算"""
+    r = e['rect']; c = fitz.Point((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2)
+    cand = [s for s in shapes if s.contains(c) and s.width >= r.width - 1
+            and not any(o is not s and o.width * o.height > 60 and s.contains(o) for o in shapes)]
+    s = min(cand, key=lambda s: s.width * s.height) if cand else r
+    return (s.x0 + s.x1) / 2
+
+
+def _render(pages, X0, X1, Y0, Y1, extra=''):
+    """pages：[(要畫的元素, 這頁往下移多少)]；extra：另外畫的線（接點連線，已是疊好後的座標）"""
+    my = lambda y: Y0 + SY * (y - Y0)
+    geo, txt = [], []
+    for els, dy in pages:
+        geo.append('<g transform="translate(0 %s)">' % _n(dy) + ''.join(e['svg'] for e in els if e['kind'] == 'path') + '</g>')
+        shapes = [e['rect'] for e in els if e['kind'] == 'path' and e['vis']]
+        for e in els:
+            if e['kind'] != 'text':
+                continue
+            t, r = e['t'], e['rect']
+            ax = _anchor(e, shapes)
+            cy = (r.y0 + r.y1) / 2 + dy
+            x = ax + (t['ox'] - ax) * FS
+            y = my(cy) + (t['oy'] + dy - cy) * FS
+            txt.append('<text x="%s" y="%s" font-size="%s" textLength="%s" lengthAdjust="spacingAndGlyphs"%s>%s</text>' % (
+                _n(x), _n(y), _n(t['size'] * FS), _n(t['w'] * FS), t['bold'], _esc(e['text'])))
+    body = ('<g transform="matrix(1 0 0 %s 0 %s)">' % (_n(SY), _n(Y0 * (1 - SY))) + ''.join(geo) + extra + '</g>'
+            + '<g>' + ''.join(txt) + '</g>')
+    return _wrap(X0, Y0, X1 - X0, SY * (Y1 - Y0), body)
 
 
 def _wrap(x0, y0, w, h, body):
@@ -100,6 +143,7 @@ def _wrap(x0, y0, w, h, body):
         _n(x0), _n(y0), _n(w), _n(h), _n(w), _n(h))
         # 單獨開（放大檢視、<img>）時的顏色；App 內嵌時這段 <style> 和底色 rect 會被拿掉，改用主題色
         + '<style>.fk{fill:#000}.fw{fill:#fff}.fg{fill:#d9d9d9}.fn{fill:none}.sk{stroke:#000}.sw{stroke:#fff}.sn{stroke:none}'
+        + 'path{vector-effect:non-scaling-stroke}'
         + 'text{fill:#000;font-family:"DFKai-SB","BiauKai","標楷體","Kaiti TC","STKaiti",serif}</style>'
         + '<rect x="%s" y="%s" width="%s" height="%s" fill="#fff" class="bg"/>' % (_n(x0), _n(y0), _n(w), _n(h))
         + body + '</svg>')
@@ -113,7 +157,7 @@ def flow_svg(pg, clip):
     """回傳 (svg 字串, 放進 SVG 的字（去空白）)"""
     clip = fitz.Rect(clip)
     els = elements(pg, clip)
-    return _wrap(clip.x0, clip.y0, clip.width, clip.height, ''.join(e['svg'] for e in els)), _chars(els)
+    return _render([(els, 0.0)], clip.x0, clip.x1, clip.y0, clip.y1), _chars(els)
 
 
 # ══ 跨頁接點（A、B、C 圓圈）直接連線（v4.43）══════════════════════════════════════
@@ -124,7 +168,7 @@ def flow_svg(pg, clip):
 #     ・接線的橫段彼此不重疊（不會交叉看不清楚）
 #   拿掉的只有：成對的圓圈和裡面的字母、下一頁頂部重複的「流程」「權責人員」、上一頁底部的「(續下頁)」與頁碼，
 #   以及原檔用來墊字、看不到的白色方塊。其他任何東西落在要切掉的範圍就中止（照原樣分頁）。
-GAP = 26           # 疊起來後，上一頁圓圈底到下一頁圓圈頂的距離（pt）
+GAP = 10           # 疊起來後，上一頁圓圈底到下一頁圓圈頂的距離（pt）；圓圈本身拿掉後也是空白，所以不用留太多
 _JUNK_BOTTOM = re.compile(r'^([（(]續下頁[)）]|\d{1,3})$')
 _JUNK_TOP = re.compile(r'^(流程|權責人員)$')
 _CONT = re.compile(r'^[（(]續下頁[)）]$')   # 接起來後就沒有「下頁」了，不論位置都拿掉
@@ -143,12 +187,13 @@ def _circles(els):
     return res
 
 
-def _stub(els, c, where):
-    """圓圈上緣（where='top'）或下緣的線頭：原檔線條（或箭頭尖）最靠近該緣的端點；8pt 內沒有就回 None"""
+def _stub(els, c, where, skip=(), reach=8.0):
+    """圓圈上緣（where='top'）或下緣的線頭：原檔線條（或箭頭尖）最靠近該緣的端點；reach pt 內沒有就回 None。
+    skip：不算的元素 id（例如要拿掉的、指向圓圈的箭頭，這時找的是箭頭後面那條線的線頭）"""
     r = c['r']; cx = (r.x0 + r.x1) / 2; y = r.y0 if where == 'top' else r.y1
-    best, bd = None, 8.0
+    best, bd = None, reach
     for e in els:
-        if e['kind'] != 'path' or not e['vis'] or e is c['el']:
+        if e['kind'] != 'path' or not e['vis'] or e is c['el'] or id(e) in skip:
             continue
         for it in e['dr']['items']:
             if it[0] not in ('l', 'c'):
@@ -198,6 +243,19 @@ def can_join(a_els, b_els):
     return pairs, ''
 
 
+def _arrows_into(els, c):
+    """箭頭尖碰到圓圈的小實心三角形（指向接點的箭頭）。圓圈拿掉、改成直接連線後，這個箭頭就停在線中間，一起拿掉"""
+    box = fitz.Rect(c['r'].x0 - 1.5, c['r'].y0 - 1.5, c['r'].x1 + 1.5, c['r'].y1 + 1.5)
+    res = []
+    for e in els:
+        if e['kind'] != 'path' or not e['vis'] or e is c['el'] or 'f' not in e['dr']['type']:
+            continue
+        r = e['rect']
+        if max(r.width, r.height) <= 12 and r.intersects(box):
+            res.append(e)
+    return res
+
+
 def joined_svg(parts):
     """parts：[(pg, clip)]，相鄰兩頁都要能 can_join。回傳 (svg, 字, 拿掉的字列表)；不能接時丟 AssertionError"""
     pages = [elements(pg, cl) for pg, cl in parts]
@@ -208,19 +266,20 @@ def joined_svg(parts):
         pr, why = can_join(pages[k], pages[k + 1])
         assert pr, '第 %d、%d 段接不起來：%s' % (k + 1, k + 2, why)
         joins.append(pr)
-    body, chars, removed, links, offs = [], [], [], [], []
+    out, chars, removed, offs, arrows = [], [], [], [], []
     yend = None
     for k, els in enumerate(pages):
         drop = set()
         top_cut = bot_cut = None
         if k > 0:
             for _, d in joins[k - 1]:
-                drop |= {id(d['el']), id(d['txt'])}
+                drop |= {id(d['el']), id(d['txt'])} | {id(a) for a in _arrows_into(els, d)}
             top_cut = min(d['r'].y0 for _, d in joins[k - 1])
         if k < len(pages) - 1:
             for c, _ in joins[k]:
-                drop |= {id(c['el']), id(c['txt'])}
+                drop |= {id(c['el']), id(c['txt'])} | {id(a) for a in _arrows_into(els, c)}
             bot_cut = max(c['r'].y1 for c, _ in joins[k])
+        arrows.append(drop)
         keep = []
         for e in els:
             if id(e) in drop or (bot_cut is not None and e['kind'] == 'text' and _CONT.match(e['text'])):
@@ -238,23 +297,29 @@ def joined_svg(parts):
             # 上一頁底部圓圈下緣（疊好後的位置）＋GAP ＝ 這一頁頂部圓圈上緣
             dy = offs[k - 1] + max(c['r'].y1 for c, _ in joins[k - 1]) + GAP - top_cut
         offs.append(dy)
-        body.append('<g transform="translate(0 %s)">' % _n(dy) + ''.join(e['svg'] for e in keep) + '</g>')
+        out.append((keep, dy))
         chars.append(_chars(keep))
         yend = (bot_cut if bot_cut is not None else clips[k].y1) + dy
-    # 接線：上一頁圓圈上緣（線頭）→ 往下到兩頁中間 → 橫移 → 往下到下一頁圓圈下緣（線頭）
+    # 接線：上一頁的線頭（圓圈上方）→ 往下到兩頁中間 → 橫移 → 往下到下一頁的線頭（圓圈下方）
+    #   線頭不算指向圓圈、已拿掉的箭頭，找的是箭頭後面那條線的端點，所以接起來是一條完整的線
+    links = []
     for k, pr in enumerate(joins):
         da, db = offs[k], offs[k + 1]
         my = max(c['r'].y1 for c, _ in pr) + da + GAP / 2
         segs = []
         for c, d in pr:
-            pa, pb = _stub(pages[k], c, 'top'), _stub(pages[k + 1], d, 'bottom')
+            pa = _stub(pages[k], c, 'top', arrows[k], 16)
+            pb = _stub(pages[k + 1], d, 'bottom', arrows[k + 1], 16)
+            assert pa and pb, '第 %d、%d 段圓圈 %s 找不到線頭' % (k + 1, k + 2, c['L'])
             ax, ay = pa.x, pa.y + da
             bx, by = pb.x, pb.y + db
             segs.append((min(ax, bx), max(ax, bx)))
             sw = c['el']['dr'].get('width') or 0.75
-            body.append('<path d="M%s %sV%sH%sV%s" class="fn sk" stroke-width="%s"/>' % (_n(ax), _n(ay), _n(my), _n(bx), _n(by), _n(sw)))
+            d_ = 'M%s %sV%s' % (_n(ax), _n(ay), _n(by)) if abs(ax - bx) < 0.6 else \
+                 'M%s %sV%sH%sV%s' % (_n(ax), _n(ay), _n(my), _n(bx), _n(by))
+            links.append('<path d="%s" class="fn sk" stroke-width="%s"/>' % (d_, _n(sw)))
         segs.sort()
         for (a0, a1), (b0, b1) in zip(segs, segs[1:]):
             assert a1 + 4 < b0, '第 %d、%d 段的接線橫段會重疊' % (k + 1, k + 2)
-    svg = _wrap(x0, clips[0].y0, x1 - x0, yend - clips[0].y0, ''.join(body))
+    svg = _render(out, x0, x1, clips[0].y0, yend, ''.join(links))
     return svg, ''.join(chars), [x for x in removed if x]

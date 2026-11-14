@@ -23,7 +23,7 @@ OUT = os.path.join(ROOT, 'data', 'sop')
 PAGES_JSON = os.path.join(HERE, 'sop', '_pages.json')
 REPORT = os.path.join(HERE, 'sop', '_匯入核對表.md')
 WIDTH = 1400
-VER = 5   # 產出格式版本：改了切版規則就加一，舊的會自動重做
+VER = 6   # 產出格式版本：改了切版規則就加一，舊的會自動重做
 PAGE_MARK = '〔原檔第 %d 頁〕'
 
 
@@ -263,7 +263,8 @@ def main():
         doc = fitz.open(pdf)
         d = os.path.join(OUT, code)
         os.makedirs(d, exist_ok=True)
-        for f in glob.glob(os.path.join(d, '*.png')) + glob.glob(os.path.join(d, '*.svg')):
+        # 舊的流程圖 SVG 不刪：還沒套用新版內容的手機仍引用舊檔名（檔名帶 hash，不會互相覆蓋）
+        for f in glob.glob(os.path.join(d, '*.png')):
             os.remove(f)
         pages, texts, sizes, no_text, per = [], [], 0, [], []
         for i, pg in enumerate(doc, 1):
