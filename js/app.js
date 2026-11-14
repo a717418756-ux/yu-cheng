@@ -186,6 +186,8 @@ const _NAV_ICON = {
 };
 const _NAV_SETS = {
   none:    [['set','設定']],
+  // v4.48：沒選區、但人不在首頁（例如從首頁直接進設定）→ 一定要有「首頁」可以回去，不然會卡在那頁
+  away:    [['home','首頁'],['set','設定']],
   exam:    [['home','首頁'],['quiz','測驗'],['list','題庫'],['db','資料庫'],['more','更多']],
   leisure: [['home','首頁'],['books','書庫'],['media','影音庫'],['set','設定']],
   study:   [['home','首頁'],['english','英語'],['fitness','運動'],['set','設定']],
@@ -227,7 +229,7 @@ function _syncNav(){
   const pg = S.page || 'home';
   if(pg === 'home') _navZone = _activeZone;
   else if(_PAGE_ZONE[pg]) _navZone = _PAGE_ZONE[pg];
-  _buildNav(_navZone);
+  _buildNav(_navZone || (pg === 'home' ? null : 'away'));
   let key;
   if(pg === 'home') key = (_activeZone === 'exam' && _zoneQuizOpen) ? 'quiz' : 'home';
   else if(_navZone === 'exam') key = ({ list:'list', db:'db', laws:'db', set:'more' })[pg] || 'more';
