@@ -52,11 +52,16 @@ const _blobQ = q => ((q.stem||'')+' '+(q.groupStem||'')+' '+(q.subject||'')+' '+
 // 檔案類資料表：備份裡缺檔案本體的那一筆，若這台同一筆還有檔案就沿用，不因還原而變成「無附加檔案」
 //   （exam_data.json 裡的參考書、教材只有說明沒有檔案；資料夾裡少了某個檔案也一樣）
 const _FILE_TABLES = ['ebooks', 'leisuremedia', 'refbooks', 'learnmedia'];
+// v4.49：是不是「同一筆」：只比 id 不夠——每台裝置各自編號，別台的第 1 本書和這台的第 1 本書可能是不同的書，
+//   會把這台的檔案接到別本書上。要建立時間（毫秒）也相同；舊資料沒有建立時間才比名稱。兩邊都記了檔案大小就也要相同
+const _sameItem = (a, b) => !!(a && b) && a.id === b.id
+  && (a.createdAt && b.createdAt ? a.createdAt === b.createdAt : (a.title || a.name || '') === (b.title || b.name || ''))
+  && !(a.fileSize && b.fileSize && a.fileSize !== b.fileSize);
 async function _restoreTable(name, rows){
   if(!Array.isArray(rows)) return 0;
   if(_FILE_TABLES.includes(name)){
-    const old = new Map((await da(name)).filter(r => r.blob).map(r => [r.id, r.blob]));
-    rows = rows.map(r => (!r.blob && old.has(r.id)) ? { ...r, blob: old.get(r.id) } : r);
+    const old = new Map((await da(name)).filter(r => r.blob).map(r => [r.id, r]));
+    rows = rows.map(r => (!r.blob && _sameItem(r, old.get(r.id))) ? { ...r, blob: old.get(r.id).blob } : r);
   }
   if(name === 'questions') rows = rows.map(q => ({ ...q, searchBlob: _blobQ(q) }));
   if(name === 'laws')      rows = rows.map(l => {   // 條號一律以 art2n 為準（舊備份、桌面版寫回的可能是舊格式）
@@ -857,13 +862,23 @@ async function localBackup(){
   // 先選資料夾，讀出裡面現有那份的備份時間與裝置，和本機並排比較後才覆蓋
     try{
       const dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
-      const existing = await _readExamFile(dirHandle, 'exam_data.json').catch(()=>null);
+      // v4.49：只有「沒有這個檔」才當成第一次備份。原本任何錯誤都當成沒有：
+      //   損毀的檔會略過 history 直接被蓋掉；權限、讀取錯誤也照樣往下寫。損毀 → 原封不動移進 history 再備份；其他錯誤 → 停下
+      let existing = null, broken = '';
+      try{ existing = await _readExamFile(dirHandle, 'exam_data.json'); }
+      catch(e){
+        if(e.name === 'NotFoundError'){}
+        else if(e.damaged){ existing = { file: e.file, data: null, name:'exam_data.json' }; broken = e.message; }
+        else throw e;
+      }
       const local = await _localSumm();
-      const tSum = existing ? { ..._summ(existing.data), at: existing.data.exportedAt || new Date(existing.file.lastModified).toISOString() } : null;
+      const tSum = existing?.data ? { ..._summ(existing.data), at: existing.data.exportedAt || new Date(existing.file.lastModified).toISOString() } : null;
       if(!await _syncCompare({
         title:'備份到資料夾「' + dirHandle.name + '」', leftLabel:'資料夾目前', rightLabel:'這台（' + _device().name + '）',
         left: tSum, right: { ...local, at: new Date().toISOString() },
-        warns: [..._backupWarns(tSum, local, _anchor('local'), '資料夾裡'),
+        warns: [...(broken ? [{ lv:'danger', t:'資料夾裡的 ' + broken + '。備份時會把它原封不動移到 history 資料夾（檔名結尾 _damaged），不會直接蓋掉。' },
+                              ..._backupWarns(null, local, null, '資料夾裡').filter(w => w.lv === 'danger')]
+                           : _backupWarns(tSum, local, _anchor('local'), '資料夾裡')),
                 { lv:'info', t:'舊的那份會移到 history 資料夾保留（最近 ' + _LOCAL_KEEP + ' 份），不會直接消失。' }],
         okText:'備份'
       })) return;
@@ -937,8 +952,15 @@ async function _readExamFile(dir, name){
   const file = await (await dir.getFileHandle(name)).getFile();
   let data;
   // 從 Google Drive 下載的雲端備份（v4.33 起開頭是 gz1: 的壓縮字串）放進資料夾也能直接還原
-  try{ data = JSON.parse(await _gzUnpack((await file.text()).trim())); }
-  catch(e){ throw new Error(name + ' 內容損毀，無法讀取（' + e.message + '）'); }
+  try{
+    data = JSON.parse(await _gzUnpack((await file.text()).replace(/^﻿/, '').trim()));
+    // v4.49：雲端檔依 Apps Script 寫法可能多包一層 {data:"…"} 或 {ok:true, data:{…}}（桌面工具也認得這幾種），
+    //   不拆的話題庫、法規都讀不到。最多拆三層，同桌面規格 load_backup
+    for(let i = 0; i < 3 && data && typeof data === 'object' && !('questions' in data) && !('laws' in data) && 'data' in data; i++)
+      data = typeof data.data === 'string' ? JSON.parse(await _gzUnpack(data.data.trim())) : data.data;
+    if(!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('不是 Y.C. 平台的備份檔');
+  }
+  catch(e){ throw Object.assign(new Error(name + ' 內容損毀，無法讀取（' + e.message + '）'), { damaged:true, file }); }
   return { file, data, name };
 }
 function _stamp(iso){
@@ -947,16 +969,19 @@ function _stamp(iso){
 }
 async function _archiveExam(dirHandle, existing){
   const hist = await dirHandle.getDirectoryHandle('history', { create:true });
-  const at = existing.data.exportedAt || new Date(existing.file.lastModified).toISOString();
+  const data = existing.data || {};          // 損毀的檔（data 是 null）也原封不動移進來，不直接蓋掉
+  const at = data.exportedAt || new Date(existing.file.lastModified).toISOString();
   // 檔名只用英數（部分裝置的檔案系統不接受中文檔名）；裝置名稱記在檔案內容與 index.json
-  const fname = 'exam_data_' + _stamp(at) + '.json';
+  // v4.49：時間只到秒，同一秒的兩份不同備份會同名互蓋 → 加上備份編號（舊檔名、舊索引照常列出）
+  const id = String(data.meta?.backupId || '').replace(/[^0-9a-z-]/gi, '').slice(0, 40);
+  const fname = 'exam_data_' + _stamp(at) + (id ? '_' + id : '') + (existing.data ? '' : '_damaged') + '.json';
   await _writeFile(hist, fname, existing.file);
   // 版本索引：還原時列清單用，不必每份都讀進來
   let idx = [];
   try{ idx = JSON.parse(await (await (await hist.getFileHandle('index.json')).getFile()).text()); }catch(e){}
   idx = (Array.isArray(idx) ? idx : []).filter(x => x && x.file);
   idx = idx.filter(x => x.file !== fname);
-  idx.unshift({ file: fname, sum: { ..._summ(existing.data), at } });
+  idx.unshift({ file: fname, sum: { ..._summ(data), at, ...(existing.data ? {} : { device:'（檔案損毀）' }) } });
   const drop = idx.slice(_LOCAL_KEEP);
   idx = idx.slice(0, _LOCAL_KEEP);
   for(const x of drop){ try{ await hist.removeEntry(x.file); }catch(e){} }
@@ -983,12 +1008,32 @@ async function _writeFile(dir, name, data){
 //   v4.33：資料夾裡已有同名、同大小的檔案本體就不再重寫（書、影音動輒幾十 MB，每次全部重寫是本機備份慢的主因）；
 //   說明檔很小，照樣每次重寫（書籤、進度等會變）。
 let _skipN = 0;
+// v4.49：原本只比大小，同名同大小、內容不同（例如換了同大小的檔）就不會重寫，備份留著舊內容。
+//   現在大小相同再比內容：4 MB 以下整份比；更大的比開頭、中間、結尾各 256 KB（只讀這幾段，仍比整份重寫快很多）
+async function _sameBytes(a, b){
+  const N = 262144, S = a.size;
+  const parts = S <= 4194304 ? [[0, S]] : [[0, N], [Math.floor(S / 2) - N / 2, Math.floor(S / 2) + N / 2], [S - N, S]];
+  for(const [s, e] of parts){
+    const [x, y] = await Promise.all([a.slice(s, e).arrayBuffer(), b.slice(s, e).arrayBuffer()]);
+    if(x.byteLength !== y.byteLength) return false;
+    const u = new Uint8Array(x), v = new Uint8Array(y);
+    for(let i = 0; i < u.length; i++) if(u[i] !== v[i]) return false;
+  }
+  return true;
+}
 async function _sameFile(dir, name, blob){
-  try{ return (await (await dir.getFileHandle(name)).getFile()).size === blob.size; }
+  let f;
+  try{ f = await (await dir.getFileHandle(name)).getFile(); }
   catch(e){ return false; }
+  return f.size === blob.size && await _sameBytes(f, blob);
 }
 async function _backupDir(dirHandle, dirName, rows, extOf){
   const dir = await dirHandle.getDirectoryHandle(dirName, { create:true });
+  // v4.49：已經刪掉的書、影音，資料夾裡的說明檔要拿掉，不然還原時會「復活」。
+  //   只刪說明檔（.meta.json），檔案本體留著：選舊版本還原時還找得到，也不會誤刪大檔
+  const keep = new Set(rows.map(r => r.id + '.meta.json')), stale = [];
+  for await(const [name] of dir.entries()) if(name.endsWith('.meta.json') && !keep.has(name)) stale.push(name);
+  for(const name of stale){ try{ await dir.removeEntry(name); }catch(e){ logError('backupDir-stale', e); } }
   for(const r of rows){
     const { blob, coverBlob, ...meta } = r;
     for(const f of _THUMBS)
@@ -1007,13 +1052,16 @@ async function _backupDir(dirHandle, dirName, rows, extOf){
 //   v4.40：回傳這一類的結果 { found, n, missing:[名稱], kept, error }，不再往外丟錯：
 //   ① 說明檔讀不到或損毀 → 這一類整批不動（維持這台原本的資料），回報原因，其他類照常還原
 //   ② 說明檔在、檔案本體不在 → 這台同一筆還有檔案就沿用（kept），沒有才列為缺檔（missing）
-async function _restoreDir(dirHandle, dirName, table, extOf){
+//   ③ v4.49 listRows：選 history 的舊版本還原時，參考書、教材清單照那個版本（exam JSON 裡的），資料夾只拿來找檔案本體。
+//      原本先寫入舊版本清單、接著又被資料夾目前的說明檔整表蓋掉，選舊版本等於沒選。
+//      資料夾裡同編號的說明檔要是同一筆（_sameItem）才用它的檔案與縮圖；沒有說明檔時，記錄的檔案大小相同才用
+async function _restoreDir(dirHandle, dirName, table, extOf, listRows = null){
   const res = { found:false, n:0, missing:[], kept:0, error:'' };
   let dir;
   try{ dir = await dirHandle.getDirectoryHandle(dirName); }
   catch(e){ if(e.name === 'NotFoundError') return res; res.error = e.message; return res; }   // 舊版備份沒有這個資料夾 → 略過、保留手機現有資料
   res.found = true;
-  const rows = [];
+  const rows = [], metas = [];
   try{
     for await(const [name, handle] of dir.entries()){
       if(!name.endsWith('.meta.json')) continue;
@@ -1025,15 +1073,25 @@ async function _restoreDir(dirHandle, dirName, table, extOf){
         if(meta[flag] && meta[f]){ try{ meta[f] = await _base64ToBlob(meta[f], 'image/jpeg'); }catch(e){ meta[f] = null; } }
         delete meta[flag];
       }
-      try{ meta.blob = await (await dir.getFileHandle(meta.id + '.' + extOf(meta))).getFile(); }
-      catch(e){
-        if(e.name !== 'NotFoundError') throw new Error((meta.title || meta.name || meta.id) + ' 的檔案讀取失敗（' + e.message + '）');
-        meta.blob = null;
-      }
-      rows.push(meta);
+      metas.push(meta);
     }
-    const had = new Map((await da(table)).filter(r => r.blob).map(r => [r.id, true]));
-    for(const r of rows) if(!r.blob){ if(had.has(r.id)) res.kept++; else res.missing.push(r.title || r.name || r.id); }
+    const byId = new Map(metas.map(m => [m.id, m]));
+    for(const src of (listRows || metas)){
+      const r = listRows ? { ...src } : src, fm = byId.get(r.id);
+      r.blob = null;
+      if(listRows && fm){
+        if(!_sameItem(r, fm)){ rows.push(r); continue; }        // 資料夾裡同編號的是另一筆：不拿它的檔案
+        for(const f of _THUMBS) if(fm[f] && !r[f]) r[f] = fm[f];
+      }
+      try{ r.blob = await (await dir.getFileHandle(r.id + '.' + extOf(r))).getFile(); }
+      catch(e){
+        if(e.name !== 'NotFoundError') throw new Error((r.title || r.name || r.id) + ' 的檔案讀取失敗（' + e.message + '）');
+      }
+      if(listRows && !fm && r.blob && !(r.fileSize && r.blob.size === r.fileSize)) r.blob = null;   // 沒有說明檔又對不上大小：不敢認
+      rows.push(r);
+    }
+    const had = new Map((await da(table)).filter(r => r.blob).map(r => [r.id, r]));
+    for(const r of rows) if(!r.blob){ if(_sameItem(r, had.get(r.id))) res.kept++; else res.missing.push(r.title || r.name || r.id); }
     await _db.transaction('rw', _db[table], () => _restoreTable(table, rows));
     res.n = rows.length;
   }catch(e){
@@ -1088,7 +1146,9 @@ async function localRestore(){
       title:'從資料夾還原（覆蓋這台）', leftLabel:'備份', rightLabel:'這台（' + _device().name + '）',
       left: src, right: { ...local, at:'' },
       warns: src ? [..._restoreWarns(src, local, _anchor('local')),
-                    { lv:'info', t:'書庫、影音、學習教材檔案也會以這個資料夾為準（這些檔案不在快照內）。' }]
+                    chosen !== main
+                      ? { lv:'info', t:'選的是舊版本：參考書、教材影音清單照這個版本，檔案從資料夾找；電子書、影音以資料夾目前的內容為準（這些檔案不在快照內）。' }
+                      : { lv:'info', t:'書庫、影音、學習教材檔案也會以這個資料夾為準（這些檔案不在快照內）。' }]
                  : [{ lv:'warn', t:'這個資料夾沒有 exam_data.json，只會還原書庫、影音等檔案。' }],
       okText:'還原'
     })) return;
@@ -1113,8 +1173,10 @@ async function localRestore(){
       }
       // ── 書庫、影音、學習區（實際檔案）：每一類各自整批寫入、各自回報 ──
       const dirRes = {};
+      // 選的是 history 的舊版本：參考書、教材清單照那個版本，資料夾只補檔案（電子書、影音不在 exam JSON 裡，照資料夾目前）
+      const oldVer = !!examData && chosen !== main;
       for(const [dn, tb] of DIRS){
-        dirRes[dn] = await _restoreDir(dirHandle, dn, tb, _EXT[tb]);
+        dirRes[dn] = await _restoreDir(dirHandle, dn, tb, _EXT[tb], oldVer && Array.isArray(examData[tb]) ? examData[tb] : null);
         _rsStep(dn, dirRes[dn].error ? 'failed' : 'done');
       }
       _ls.set(_RS_KEY, null);
