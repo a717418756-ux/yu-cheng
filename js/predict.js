@@ -17,18 +17,18 @@
 
 let _data = null;
 let _keys = null;                         // 記憶樹引用到的法條（顯示 🌳 用）
-let _cur = { si:0, k:20, sort:'count', onlyWrong:false, view:'articles', exam:'二技', scope:'', scopeOwn:false, scopeRel:false };
+let _cur = { si:0, k:20, sort:'count', onlyWrong:false, view:'articles', exam:'二技', scope:'', scopeOwn:false, scopeRel:false, n:0 };   // n：每次練習題數（0＝全部）
 // 記住上次的考試別、科目、分頁、押前幾條、練習題數（只存本機；讀不到就用預設）
 try{
   const st = JSON.parse(localStorage.getItem('prState') || '{}');
-  ['si','k'].forEach(k => { if(Number.isFinite(st[k])) _cur[k] = st[k]; });
+  ['si','k','n'].forEach(k => { if(Number.isFinite(st[k])) _cur[k] = st[k]; });
   if(st.exam === '警佐' || st.exam === '二技') _cur.exam = st.exam;
   if(typeof st.view === 'string') _cur.view = st.view;
   if(typeof st.scope === 'string') _cur.scope = st.scope;
   ['scopeOwn','scopeRel'].forEach(k => { if(typeof st[k] === 'boolean') _cur[k] = st[k]; });
 }catch(e){}
 function _saveState(){
-  try{ localStorage.setItem('prState', JSON.stringify({ si:_cur.si, k:_cur.k, exam:_cur.exam, view:_cur.view, scope:_cur.scope, scopeOwn:_cur.scopeOwn, scopeRel:_cur.scopeRel })); }catch(e){}
+  try{ localStorage.setItem('prState', JSON.stringify({ si:_cur.si, k:_cur.k, exam:_cur.exam, view:_cur.view, scope:_cur.scope, scopeOwn:_cur.scopeOwn, scopeRel:_cur.scopeRel, n:_cur.n })); }catch(e){}
 }
 const _ZUO_SUBJ = ['憲法、法學緒論', '警察法規', '警察勤務', '刑法與刑事訴訟法'];
 const _isZuo = () => _cur.exam === '警佐';
@@ -157,7 +157,7 @@ async function _rArticles(s){
   const have = ids.filter(id => qmap.has(id) && (!wrong || wrong.has(id)));
   let h = _btCard(s.backtest, '法條', '條') + _kChips() +
     '<div class="mem-tools"><button class="btn bp" data-act="practice" style="flex:1">▶ 押題練習：這 ' + rows.length + ' 條的歷屆題（' + have.length + ' 題）</button>' +
-    '<button class="btn ' + (_cur.onlyWrong?'bp':'bg') + '" data-act="wrong">只出答錯過的</button></div>';
+    '<button class="btn ' + (_cur.onlyWrong?'bp':'bg') + '" data-act="wrong">只出答錯過的</button></div>' + _nChips();
   if(ids.length && have.length < ids.length && !_cur.onlyWrong)
     h += '<div class="mem-prog">題庫裡找到 ' + have.length + ' ／ ' + ids.length + ' 題（其餘可能已刪除或尚未匯入）</div>';
   const years = _yearsOf(s);
@@ -193,7 +193,7 @@ async function _rZuoArticles(s){
   const have = keys.filter(k => zm.has(k));
   let h = _kChips() +
     '<div class="mem-tools"><button class="btn bp" data-act="zpractice" style="flex:1">▶ 押題練習：這 ' + rows.length + ' 條的警佐班歷屆題（' + have.length + ' 題）</button>' +
-    '<button class="btn ' + (_cur.onlyWrong?'bp':'bg') + '" data-act="wrong">只出答錯過的</button></div>';
+    '<button class="btn ' + (_cur.onlyWrong?'bp':'bg') + '" data-act="wrong">只出答錯過的</button></div>' + _nChips();
   if(keys.length && !have.length && !_cur.onlyWrong)
     h += '<div class="mem-prog">題庫裡找不到考試別「警佐班」的題目，練習按鈕會無效；請先匯入警佐班考古題。</div>';
   const years = (s.zuo.years||[]).map(String);
@@ -221,7 +221,7 @@ async function _practiceZuo(keys, label){
   const pool = [...new Set(keys)].map(k => zm.get(k)).filter(Boolean);
   if(!pool.length){ toast(_cur.onlyWrong ? '這個範圍沒有答錯過的題目' : '題庫裡找不到這些警佐班題目'); return; }
   _shuffle(pool);
-  startQWithPool(pool, '🎯 警佐班 ' + label);
+  startQWithPool(_take(pool), '🎯 警佐班 ' + label);
 }
 
 function _yearsOf(s){
@@ -298,7 +298,10 @@ function _qScope(q, sc){
 async function _rScope(s){
   const sc = _SCOPES.find(x => x.id === _cur.scope) || _SCOPES[_isZuo() ? 0 : 2];
   _cur.scope = sc.id;
-  const [qs, wrong] = await Promise.all([da('questions'), _onlyWrongSet()]);
+  const [qs, wrong, ats] = await Promise.all([da('questions'), _onlyWrongSet(), da('attempts')]);
+  // 每題最近一次有判對錯的作答（id 越大越新）→ 每部法律的「做過／答對率」
+  const last = new Map();
+  ats.slice().sort((a, b) => (a.id||0) - (b.id||0)).forEach(a => { if(typeof a.correct === 'boolean') last.set(String(a.qid), a.correct); });
   const all = qs.filter(q => q.subject === '警察法規' && (!wrong || wrong.has(String(q.id))));
   const pool = _cur.scopeOwn && sc.src ? all.filter(q => q.exam === sc.src) : all;
   const withRel = sc.related || _cur.scopeRel;
@@ -321,16 +324,19 @@ async function _rScope(s){
       (sc.related ? '' : '<button class="btn ' + (_cur.scopeRel?'bp':'bg') + '" data-act="scoperel">' + (_cur.scopeRel ? '含相關命令' : '只出本法題') + ' ⇅</button>') +
       '<button class="btn ' + (_cur.onlyWrong?'bp':'bg') + '" data-act="wrong">只出答錯過的</button></div>' +
     (!sc.src ? '<div class="mem-prog">題庫還沒有' + esc(sc.name) + '的歷屆題，以下是其他考試考過、屬於這個範圍的題目。</div>' : '') +
-    '<div class="mem-tools"><button class="btn bp" data-act="scopeall" style="flex:1">▶ 範圍內全部練習（' + total.length + ' 題）</button></div>';
+    '<div class="mem-tools"><button class="btn bp" data-act="scopeall" style="flex:1">▶ 範圍內練習（' + total.length + ' 題' + (_cur.n && total.length > _cur.n ? '，每次隨機 ' + _cur.n + ' 題' : '') + '）</button></div>' + _nChips();
   const max = Math.max(1, ...[...per.values()].map(p => p.own.length + p.rel.length));
   h += '<div class="card">' + sc.laws.map(l => {
     const p = per.get(l), list = withRel ? [...p.own, ...p.rel] : p.own;
     list.forEach(q => { p.by[q.exam] = (p.by[q.exam]||0) + 1; });
+    const done = list.filter(q => last.has(String(q.id))), ok = done.filter(q => last.get(String(q.id))).length;
+    const prog = done.length ? '做過 ' + done.length + '／' + list.length + ' 題・最近一次答對 ' + Math.round(100*ok/done.length) + '%' : '還沒做過';
     _scopePools.laws[l] = list;
     const by = Object.entries(p.by).sort((a, b) => b[1] - a[1]).map(([k, v]) => esc(k) + ' ' + v).join('・');
     return '<div class="pr-row"><div class="pr-main"><div class="pr-title">' + esc(l) + '</div>' +
       '<div class="pr-bar"><div class="pr-bar-t" style="margin:0"><i style="width:' + (100*p.own.length/max) + '%"></i><i class="r" style="width:' + (100*p.rel.length/max) + '%"></i></div></div>' +
       '<div class="pr-meta">本法 ' + p.own.length + ' 題・相關命令 ' + p.rel.length + ' 題' + (by ? '（' + by + '）' : '') + '</div>' +
+      '<div class="pr-meta">' + prog + '</div>' +
       '<div class="pr-acts">' + (list.length ? '<button class="go" data-scopelaw="' + esc(l) + '">▶ 練習 ' + list.length + ' 題</button>' : '<span class="pr-meta">題庫裡沒有這部法律的題目</span>') + '</div>' +
     '</div></div>';
   }).join('') + '</div>';
@@ -345,7 +351,7 @@ function _practicePool(list, label){
   const pool = list.slice();
   if(!pool.length){ toast(_cur.onlyWrong ? '這個範圍沒有答錯過的題目' : '題庫裡沒有這個範圍的題目'); return; }
   _shuffle(pool);
-  startQWithPool(pool, '🎯 ' + label);
+  startQWithPool(_take(pool), '🎯 ' + label);
 }
 
 // 🧩 題型（國文、英文）
@@ -457,6 +463,13 @@ async function _rTrend(s){
   return h;
 }
 
+// 每次練習題數：範圍很大時（例如警察法規 800 多題）一次只出 N 題，洗牌後取前 N 題
+const _NS = [20, 50, 100, 0];
+function _nChips(){
+  return '<div class="mem-tools pr-k"><span class="pr-meta" style="align-self:center">每次練習</span>' + _NS.map(n =>
+    '<button class="chip' + (n===_cur.n?' on':'') + '" data-n="' + n + '">' + (n ? n + ' 題' : '全部') + '</button>').join('') + '</div>';
+}
+function _take(pool){ return _cur.n && pool.length > _cur.n ? pool.slice(0, _cur.n) : pool; }
 function _shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 // ════════ 練習 ════════
@@ -465,7 +478,7 @@ async function _practiceIds(ids, label){
   const pool = [...new Set(ids)].map(id => qmap.get(id)).filter(q => q && (!wrong || wrong.has(String(q.id))));
   if(!pool.length){ toast(_cur.onlyWrong ? '這個範圍沒有答錯過的題目' : '題庫裡找不到這些題目'); return; }
   _shuffle(pool);
-  startQWithPool(pool, '🎯 ' + label);
+  startQWithPool(_take(pool), '🎯 ' + label);
 }
 
 // ════════ 事件 ════════
@@ -474,7 +487,7 @@ function _bind(){
   if(!page || page._prBound) return;
   page._prBound = true;
   page.addEventListener('click', e => {
-    const t = e.target.closest('[data-exam],[data-si],[data-view],[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem],[data-scope],[data-scopelaw]');
+    const t = e.target.closest('[data-exam],[data-si],[data-view],[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem],[data-scope],[data-scopelaw],[data-n]');
     if(!t) return;
     const ds = t.dataset;
     if(ds.exam){ _cur.exam = ds.exam; _rSubj(); _rBody(); }
@@ -484,6 +497,7 @@ function _bind(){
     else if(ds.sort){ _cur.sort = _cur.sort === 'recent' ? 'count' : 'recent'; _rBody(); }
     else if(ds.qids) _practiceIds(ds.qids.split(','), ds.label || '');
     else if(ds.zkeys) _practiceZuo(ds.zkeys.split(','), ds.label || '');
+    else if(ds.n != null){ _cur.n = +ds.n; _rBody(); }
     else if(ds.scope){ _cur.scope = ds.scope; _rBody(); }
     else if(ds.scopelaw) _practicePool(_scopePools.laws[ds.scopelaw] || [], ds.scopelaw);
     else if(ds.ref) showLawPop(ds.ref);
