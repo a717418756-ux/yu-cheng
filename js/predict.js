@@ -17,16 +17,18 @@
 
 let _data = null;
 let _keys = null;                         // 記憶樹引用到的法條（顯示 🌳 用）
-let _cur = { si:0, k:20, sort:'count', onlyWrong:false, view:'articles', exam:'二技' };
+let _cur = { si:0, k:20, sort:'count', onlyWrong:false, view:'articles', exam:'二技', scope:'', scopeOwn:false, scopeRel:false };
 // 記住上次的考試別、科目、分頁、押前幾條、練習題數（只存本機；讀不到就用預設）
 try{
   const st = JSON.parse(localStorage.getItem('prState') || '{}');
   ['si','k'].forEach(k => { if(Number.isFinite(st[k])) _cur[k] = st[k]; });
   if(st.exam === '警佐' || st.exam === '二技') _cur.exam = st.exam;
   if(typeof st.view === 'string') _cur.view = st.view;
+  if(typeof st.scope === 'string') _cur.scope = st.scope;
+  ['scopeOwn','scopeRel'].forEach(k => { if(typeof st[k] === 'boolean') _cur[k] = st[k]; });
 }catch(e){}
 function _saveState(){
-  try{ localStorage.setItem('prState', JSON.stringify({ si:_cur.si, k:_cur.k, exam:_cur.exam, view:_cur.view })); }catch(e){}
+  try{ localStorage.setItem('prState', JSON.stringify({ si:_cur.si, k:_cur.k, exam:_cur.exam, view:_cur.view, scope:_cur.scope, scopeOwn:_cur.scopeOwn, scopeRel:_cur.scopeRel })); }catch(e){}
 }
 const _ZUO_SUBJ = ['憲法、法學緒論', '警察法規', '警察勤務', '刑法與刑事訴訟法'];
 const _isZuo = () => _cur.exam === '警佐';
@@ -90,10 +92,12 @@ function _views(s){
   const v = [];
   if(_isZuo()){
     v.push(['articles','⚖ 法條']);
+    if(s.name === '警察法規') v.push(['scope','🎯 考試範圍']);
     if(s.reasons || s.trend) v.push(['trend','📈 趨勢']);
     return v;
   }
   if(s.articles) v.push(['articles','⚖ 法條'], ['laws','📚 法規']);
+  if(s.name === '警察法規') v.push(['scope','🎯 考試範圍']);
   if(s.topics) v.push(['topics','🧩 題型']);
   Object.keys(s.points||{}).forEach(k => v.push(['pt:' + k, '📌 ' + k]));
   if(s.trend) v.push(['trend','📈 趨勢']);
@@ -112,6 +116,7 @@ async function _rBody(){
   const el = document.getElementById('pr-body');
   if(_cur.view === 'articles') h += await _rArticles(s);
   else if(_cur.view === 'laws') h += _rLaws(s);
+  else if(_cur.view === 'scope') h += await _rScope(s);
   else if(_cur.view === 'topics') h += _rTopics(s);
   else if(_cur.view.startsWith('pt:')) h += await _rPoints(s, _cur.view.slice(3));
   else if(_cur.view === 'trend') h += await _rTrend(s);
@@ -134,7 +139,7 @@ function _yearBars(by, years){
   }).join('') + '</div>';
 }
 function _kChips(){
-  return '<div class="mem-tools pr-k">' + [10,20,50,120].map(k => '<button class="chip' + (k===_cur.k?' on':'') + '" data-k="' + k + '">' + (k===120?'全部':'前 ' + k) + '</button>').join('') +
+  return '<div class="mem-tools pr-k">' + [10,20,50,120].map(k => '<button class="chip' + (k===_cur.k?' on':'') + '" data-k="' + k + '">' + '前 ' + k + '</button>').join('') +
     '<button class="chip' + (_cur.sort==='recent'?' on':'') + '" data-sort="1">' + (_cur.sort==='recent'?'依近3年':'依總題數') + ' ⇅</button></div>';
 }
 function _sorted(rows){
@@ -159,7 +164,7 @@ async function _rArticles(s){
   h += '<div class="card">' + rows.map(a => {
     const key = a.law + '|' + a.article_n;
     const ref = a.law + a.article;
-    const n = (a.question_ids||[]).filter(id => qmap.has(id)).length;
+    const n = (a.question_ids||[]).filter(id => qmap.has(id) && (!wrong || wrong.has(id))).length;
     return '<div class="pr-row"><div class="pr-rank' + (a.rank<=10?' top':'') + '">' + a.rank + '</div><div class="pr-main">' +
       '<div class="pr-title">' + esc(a.law) + ' ' + esc(a.article) + '</div>' +
       '<div class="pr-meta">考過 ' + a.count + ' 題・近3年 ' + (a.recent_count||0) + ' 題・最近 ' + (a.last_year||'—') + ' 年' +
@@ -236,6 +241,113 @@ function _rLaws(s){
     '<div class="pr-bar-n">' + r.count + '／近' + (r.recent_count||0) + '</div></div>').join('') + '</div>';
 }
 
+// 🎯 考試範圍（警察法規）：各考試公告的重點法律不同，把題庫裡所有警察法規題依引用的法規分到各考試
+//   本法題＝題目引用列出的法律本身；相關命令題＝只引用那些法律的施行細則、子法或作業規定（依主題歸類）
+//   範圍外＝沒有引用列出的法律（例如警察人員人事條例、警察教育條例）
+const _SCOPES = [
+  { id:'zuo',   name:'警佐班招生考試',       src:'警佐班',   laws:['警察法','社會秩序維護法','警械使用條例','警察職權行使法'] },
+  { id:'zheng', name:'警正班招生考試',       src:'',         laws:['警察法','行政程序法','警察職權行使法','行政執行法','社會秩序維護法','集會遊行法','警械使用條例'] },
+  { id:'2tech', name:'二年制技術系入學考試', src:'警大二技', laws:['警察法','警械使用條例','警察職權行使法','社會秩序維護法','集會遊行法'], related:true },
+  { id:'g4',    name:'一般警察人員四等特考', src:'',         laws:['警察法','行政執行法','社會秩序維護法','警械使用條例','集會遊行法','警察職權行使法','行政程序法','公務人員行政中立法'] },
+  { id:'p34',   name:'警察人員三、四等特考', src:'三等考試', laws:['警察法','行政執行法','社會秩序維護法','警械使用條例','集會遊行法','警察職權行使法','公務人員行政中立法'] },
+  { id:'up',    name:'警正警察人員升官等',   src:'升官等',   laws:['警察法','行政執行法','社會秩序維護法','槍砲彈藥刀械管制條例','集會遊行法','警械使用條例','警察職權行使法'] },
+];
+// 子法、作業規定 → 主題所屬的法律（施行細則另以名稱判斷）
+const _RELATED = {
+  '違反社會秩序維護法案件處理辦法':'社會秩序維護法', '拘留所設置管理辦法':'社會秩序維護法', '沒入物品處分規則':'社會秩序維護法',
+  '警械使用事件補償辦法':'警械使用條例', '警械許可定製售賣持有管理辦法':'警械使用條例', '警械使用調查小組組織及運作辦法':'警械使用條例',
+  '警察機關配備警械種類':'警械使用條例', '駐衛警察使用警械管理辦法':'警械使用條例', '警察人員使用槍械規範':'警械使用條例',
+  '警察人員使用防護型應勤裝備注意要點':'警械使用條例', '警察人員使用警銬規範':'警械使用條例',
+  '警察遴選第三人蒐集資料辦法':'警察職權行使法', '治安顧慮人口查訪辦法':'警察職權行使法',
+  '偶發性及緊急性集會遊行處理原則':'集會遊行法',
+  '槍砲彈藥刀械許可及管理辦法':'槍砲彈藥刀械管制條例', '槍砲彈藥及刀械收購價格標準':'槍砲彈藥刀械管制條例',
+};
+const _SCOPE_LAWS = [...new Set(_SCOPES.flatMap(x => x.laws))];
+// 「社會秩序維護法§22」「警察法第3條」→ 法規名
+function _refLaw(ref){
+  return String(ref||'').replace(/[《》「」〈〉]/g, '').split(/§|第[0-9０-９一二三四五六七八九十百千]+/)[0].trim();
+}
+// 法規名 → { law: 所屬的範圍法律, own: 是否就是法律本身 }；與範圍法律無關回傳 null
+function _family(name){
+  if(_SCOPE_LAWS.includes(name)) return { law:name, own:true };
+  const m = /^(.+)施行細則$/.exec(name);
+  if(m && _SCOPE_LAWS.includes(m[1])) return { law:m[1], own:false };
+  return _RELATED[name] ? { law:_RELATED[name], own:false } : null;
+}
+// 題目引用的法規名：優先用 relatedLaws；沒有時從題幹、解析、關鍵字找法規全名
+const _SCAN_NAMES = [..._SCOPE_LAWS, ..._SCOPE_LAWS.map(l => l + '施行細則'), ...Object.keys(_RELATED)].sort((a, b) => b.length - a.length);
+function _qLaws(q){
+  const refs = (q.relatedLaws||[]).map(r => _refLaw(r && r.ref)).filter(Boolean);
+  if(refs.length) return [...new Set(refs)];
+  let t = [q.stem, q.note, ...(q.keywords||[])].join(' ');
+  const found = [];
+  _SCAN_NAMES.forEach(n => { if(t.includes(n)){ found.push(n); t = t.split(n).join(' '); } });   // 先比長名，避免「警察法」吃掉「警察法施行細則」
+  return found;
+}
+// 一題對某考試：{ tier:'own'|'rel'|'out', own:[直接引用的範圍法律], rel:[只引用其子法的範圍法律], other:[範圍外法規] }
+function _qScope(q, sc){
+  const own = new Set(), rel = new Set(), other = [];
+  _qLaws(q).forEach(n => {
+    const f = _family(n);
+    if(f && sc.laws.includes(f.law)) (f.own ? own : rel).add(f.law);
+    else if(n !== '釋字' && !/憲判字|^最高/.test(n)) other.push(n);
+  });
+  own.forEach(l => rel.delete(l));
+  return { tier: own.size ? 'own' : rel.size ? 'rel' : 'out', own:[...own], rel:[...rel], other };
+}
+async function _rScope(s){
+  const sc = _SCOPES.find(x => x.id === _cur.scope) || _SCOPES[_isZuo() ? 0 : 2];
+  _cur.scope = sc.id;
+  const [qs, wrong] = await Promise.all([da('questions'), _onlyWrongSet()]);
+  const all = qs.filter(q => q.subject === '警察法規' && (!wrong || wrong.has(String(q.id))));
+  const pool = _cur.scopeOwn && sc.src ? all.filter(q => q.exam === sc.src) : all;
+  const withRel = sc.related || _cur.scopeRel;
+  const per = new Map(sc.laws.map(l => [l, { own:[], rel:[], by:{} }]));
+  const out = [], outLaws = {}, total = [];
+  pool.forEach(q => {
+    const r = _qScope(q, sc);
+    if(r.tier === 'out'){ out.push(q); r.other.forEach(n => { outLaws[n] = (outLaws[n]||0) + 1; }); return; }
+    if(r.tier === 'own' || withRel) total.push(q);
+    r.own.forEach(l => per.get(l).own.push(q));
+    r.rel.forEach(l => per.get(l).rel.push(q));
+  });
+  _scopePools = { all: total, laws: {} };
+  let h = '<div class="mem-tools pr-k">' + _SCOPES.map(x => '<button class="chip' + (x.id===sc.id?' on':'') + '" data-scope="' + x.id + '">' + esc(x.name) + '</button>').join('') + '</div>' +
+    '<div class="pr-note">📋 <b>' + esc(sc.name) + '</b>考試範圍：' + sc.laws.map(esc).join('、') + (sc.related ? '及相關命令' : '') + '。<br>' +
+    '<small>題目依引用的法規分類（解析的法條欄），一題可同時算進好幾部法律。「相關命令」＝只引用施行細則、子法或作業規定的題目' +
+    (sc.related ? '，本考試公告含相關命令，所以一起出。' : '，預設不出，可切換。') + '</small></div>' +
+    '<div class="mem-tools">' +
+      (sc.src ? '<button class="btn ' + (_cur.scopeOwn?'bp':'bg') + '" data-act="scopeown">' + (_cur.scopeOwn ? '只看' + esc(sc.src) + '歷屆題' : '所有考試的題目') + ' ⇅</button>' : '') +
+      (sc.related ? '' : '<button class="btn ' + (_cur.scopeRel?'bp':'bg') + '" data-act="scoperel">' + (_cur.scopeRel ? '含相關命令' : '只出本法題') + ' ⇅</button>') +
+      '<button class="btn ' + (_cur.onlyWrong?'bp':'bg') + '" data-act="wrong">只出答錯過的</button></div>' +
+    (!sc.src ? '<div class="mem-prog">題庫還沒有' + esc(sc.name) + '的歷屆題，以下是其他考試考過、屬於這個範圍的題目。</div>' : '') +
+    '<div class="mem-tools"><button class="btn bp" data-act="scopeall" style="flex:1">▶ 範圍內全部練習（' + total.length + ' 題）</button></div>';
+  const max = Math.max(1, ...[...per.values()].map(p => p.own.length + p.rel.length));
+  h += '<div class="card">' + sc.laws.map(l => {
+    const p = per.get(l), list = withRel ? [...p.own, ...p.rel] : p.own;
+    list.forEach(q => { p.by[q.exam] = (p.by[q.exam]||0) + 1; });
+    _scopePools.laws[l] = list;
+    const by = Object.entries(p.by).sort((a, b) => b[1] - a[1]).map(([k, v]) => esc(k) + ' ' + v).join('・');
+    return '<div class="pr-row"><div class="pr-main"><div class="pr-title">' + esc(l) + '</div>' +
+      '<div class="pr-bar"><div class="pr-bar-t" style="margin:0"><i style="width:' + (100*p.own.length/max) + '%"></i><i class="r" style="width:' + (100*p.rel.length/max) + '%"></i></div></div>' +
+      '<div class="pr-meta">本法 ' + p.own.length + ' 題・相關命令 ' + p.rel.length + ' 題' + (by ? '（' + by + '）' : '') + '</div>' +
+      '<div class="pr-acts">' + (list.length ? '<button class="go" data-scopelaw="' + esc(l) + '">▶ 練習 ' + list.length + ' 題</button>' : '<span class="pr-meta">題庫裡沒有這部法律的題目</span>') + '</div>' +
+    '</div></div>';
+  }).join('') + '</div>';
+  const ol = Object.entries(outLaws).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  h += '<div class="mem-prog">' + (_cur.scopeOwn && sc.src ? esc(sc.src) + '歷屆題' : '題庫警察法規題') + '中有 <b>' + out.length + '</b> 題不在這個範圍' +
+    (ol.length ? '，引用最多的是：' + ol.map(([k, v]) => esc(k) + ' ' + v).join('、') : '') + '。' +
+    (_cur.scopeOwn && sc.src && out.length ? '這些是這個考試以前考過、但不在上面公告法律裡的題目，可當補充。' : '') + '</div>';
+  return h;
+}
+let _scopePools = { all:[], laws:{} };
+function _practicePool(list, label){
+  const pool = list.slice();
+  if(!pool.length){ toast(_cur.onlyWrong ? '這個範圍沒有答錯過的題目' : '題庫裡沒有這個範圍的題目'); return; }
+  _shuffle(pool);
+  startQWithPool(pool, '🎯 ' + label);
+}
+
 // 🧩 題型（國文、英文）
 function _rTopics(s){
   const t = s.topics || {};
@@ -310,7 +422,7 @@ function _rReasons(s){
     '</tbody></table></div>' +
     '<div class="pr-meta">' + Object.entries(r.ex||{}).filter(([k]) => k !== '常考條文').slice(0, 3).map(([k, list]) => esc(k) + '例：' + esc(String((list||[])[0]||'').slice(0, 34)) + '…').join('<br>') + '</div></div>';
   const x = (s.xval||{})[ex];
-  if(x){
+  if(x && Object.keys(x).length){
     const best = Object.entries(x).sort((a, b) => b[1] - a[1])[0][0];
     h += '<div class="cc"><div class="ct">🔁 交互驗證：押前 50 條，隔年能蓋到幾成（逐年回測平均）</div><div class="pr-bt">' +
       Object.entries(x).map(([k, v]) => '<div' + (k===best?' class="best"':'') + '><b>' + v + '%</b><span>' + esc(k) + '</span></div>').join('') + '</div>' +
@@ -362,7 +474,7 @@ function _bind(){
   if(!page || page._prBound) return;
   page._prBound = true;
   page.addEventListener('click', e => {
-    const t = e.target.closest('[data-exam],[data-si],[data-view],[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem]');
+    const t = e.target.closest('[data-exam],[data-si],[data-view],[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem],[data-scope],[data-scopelaw]');
     if(!t) return;
     const ds = t.dataset;
     if(ds.exam){ _cur.exam = ds.exam; _rSubj(); _rBody(); }
@@ -372,11 +484,16 @@ function _bind(){
     else if(ds.sort){ _cur.sort = _cur.sort === 'recent' ? 'count' : 'recent'; _rBody(); }
     else if(ds.qids) _practiceIds(ds.qids.split(','), ds.label || '');
     else if(ds.zkeys) _practiceZuo(ds.zkeys.split(','), ds.label || '');
+    else if(ds.scope){ _cur.scope = ds.scope; _rBody(); }
+    else if(ds.scopelaw) _practicePool(_scopePools.laws[ds.scopelaw] || [], ds.scopelaw);
     else if(ds.ref) showLawPop(ds.ref);
     else if(ds.mem) openMemoryAt(ds.mem);
     else if(ds.act === 'clamp') t.classList.toggle('open');
     else if(ds.act === 'wrong'){ _cur.onlyWrong = !_cur.onlyWrong; _rBody(); }
     else if(ds.act === 'goeng') goPage('engexam');
+    else if(ds.act === 'scopeown'){ _cur.scopeOwn = !_cur.scopeOwn; _rBody(); }
+    else if(ds.act === 'scoperel'){ _cur.scopeRel = !_cur.scopeRel; _rBody(); }
+    else if(ds.act === 'scopeall'){ const sc = _SCOPES.find(x => x.id === _cur.scope); _practicePool(_scopePools.all, (sc ? sc.name : '考試範圍') + ' 範圍內'); }
     else if(ds.act === 'zpractice'){
       const s = _data.subjects[_cur.si];
       _practiceZuo(_sorted(s.zuo.articles).flatMap(a => a.keys||[]), s.name + ' 前' + _cur.k + '條');
@@ -388,6 +505,6 @@ function _bind(){
   });
 }
 
-const Predict = { renderPredict };
+const Predict = { renderPredict, _predictScope:{ SCOPES:_SCOPES, refLaw:_refLaw, family:_family, qLaws:_qLaws, qScope:_qScope } };
 Object.assign(window, Predict);
 })();
