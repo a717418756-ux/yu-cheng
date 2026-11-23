@@ -182,3 +182,18 @@
 .fit-burn-sub{ font-size:12px; color:var(--t2); text-align:center; margin:6px 4px 0; line-height:1.5; }
 .fit-hc-warn{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--t1); background:var(--bg2, rgba(224,160,32,.12)); border:1px solid #e0a020; border-radius:8px; padding:8px 10px; margin:8px 0; }
 .fit-hc-warn .fit-hc-btn{ margin-left:auto; }
+/* v4.57.2 熱量拆解（基礎代謝／活動／健身） */
+.fit-kcal{ background:var(--card, var(--bg2)); border:1px solid var(--bd); border-radius:12px; padding:12px; margin:10px 0 4px; }
+.fit-kcal-row{ display:flex; justify-content:space-between; font-size:14px; color:var(--t1); }
+.fit-kcal-bar{ display:flex; height:10px; border-radius:5px; overflow:hidden; background:var(--bd); }
+.fit-kcal-bar i{ display:block; height:100%; }
+.fit-kcal-bar .b, .fit-kcal-leg .dot.b{ background:#8a93a6; }
+.fit-kcal-bar .a, .fit-kcal-leg .dot.a{ background:#f08a3c; }
+.fit-kcal-bar .e, .fit-kcal-leg .dot.e{ background:#4caf7d; }
+.fit-kcal-leg{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:10px; }
+.fit-kcal-leg > div{ font-size:12px; color:var(--t2); display:flex; flex-direction:column; align-items:center; gap:2px; }
+.fit-kcal-leg b{ font-size:18px; color:var(--t1); }
+.fit-kcal-leg .dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+.fit-kcal-note{ font-size:11px; color:var(--t2); text-align:center; margin-top:8px; line-height:1.5; }
+.fit-balance-lab small{ display:block; font-size:11px; color:var(--t2); font-weight:400; }
+[data-theme="eink"] .fit-kcal-bar .b{ background:#bbb; } [data-theme="eink"] .fit-kcal-bar .a{ background:#555; } [data-theme="eink"] .fit-kcal-bar .e{ background:#000; }

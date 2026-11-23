@@ -40,8 +40,10 @@ async function renderFitness(){
     }
     if(hcOn && d.hc) d = { ...d, ...d.hc };
   }
-  // 熱量結餘（攝取 - 消耗）
-  const balance = (d.intake||0) - (d.burned||0);
+  // App 版連三星健康：和三星健康同樣的分法——總燃燒＝基礎代謝＋活動＋健身（健身＝今天各筆運動的熱量）
+  const K = hcOn && d.total ? _fitKcal(d) : null;
+  // 熱量結餘（攝取 - 消耗；連三星健康時用總燃燒，才是真正的收支）
+  const balance = (d.intake||0) - (K ? K.total : (d.burned||0));
   const balColor = balance > 0 ? '#e0a020' : '#4caf7d';
   const balSign  = balance > 0 ? '+' : '';
 
@@ -58,8 +60,8 @@ async function renderFitness(){
       </div>
       <div class="fit-card fit-card-burn" ondblclick="editFitField('burned','消耗熱量','kcal')">
         <div class="fit-card-ico">🔥</div>
-        <div class="fit-card-val" id="fit-burned">${d.burned||0}<span class="fit-card-unit">kcal</span></div>
-        <div class="fit-card-lab">消耗熱量</div>
+        <div class="fit-card-val" id="fit-burned">${K ? K.total : (d.burned||0)}<span class="fit-card-unit">kcal</span></div>
+        <div class="fit-card-lab">${K ? '總燃燒熱量' : '消耗熱量'}</div>
       </div>
       <div class="fit-card fit-card-intake" ondblclick="editFitField('intake','攝取熱量','kcal')">
         <div class="fit-card-ico">🍽️</div>
@@ -72,12 +74,12 @@ async function renderFitness(){
         <div class="fit-card-lab">步數</div>
       </div>
     </div>
-    ${hcOn && d.total ? `<div class="fit-burn-sub">🔥 消耗熱量＝活動消耗（平時活動＋運動）${d.basal ? `<br>總消耗 ${d.total} kcal＝基礎代謝 ${d.basal}＋活動 ${d.burned}` : `<br>總消耗 ${d.total} kcal`}</div>` : ''}
+    ${K ? _fitKcalHtml(K) : ''}
     <div class="fit-edit-hint">${hcOn ? '💡 數字來自三星健康；點「記一筆運動／飲食」新增，步數由手機或手錶自動記錄' : '💡 雙擊上方卡片即可編輯數值'}</div>
 
     <!-- 熱量結餘 -->
     <div class="fit-balance">
-      <span class="fit-balance-lab">今日熱量結餘</span>
+      <span class="fit-balance-lab">今日熱量結餘${K ? '<small>攝取－總燃燒</small>' : ''}</span>
       <span class="fit-balance-val" style="color:${balColor}">${balSign}${balance} kcal</span>
     </div>
     <div class="fit-balance-hint">
@@ -96,6 +98,27 @@ async function renderFitness(){
 
     <!-- 手動記錄改為雙擊卡片編輯，已移除底部輸入區 -->
   `;
+}
+
+// 熱量拆解（和三星健康的「總計燃燒／活動消耗／健身」對得起來）
+function _fitKcal(d){
+  const total = d.total || 0, basal = d.basal || 0, move = d.burned || 0;   // move＝總燃燒－基礎代謝（活動＋健身）
+  const ex = d.id === _fitTodayKey() ? Math.min(move, (_fitHcState.sessions || []).reduce((n, m) => n + (m.kcal || 0), 0)) : 0;
+  return { total, basal, move, ex, act:Math.max(0, move - ex), noBmr:!basal };
+}
+function _fitKcalHtml(K){
+  const pct = v => K.total ? Math.max(0, Math.min(100, v / K.total * 100)).toFixed(1) + '%' : '0';
+  if(K.noBmr) return `<div class="fit-kcal"><div class="fit-kcal-row"><span>總燃燒熱量</span><b>${K.total} kcal</b></div>
+    <div class="fit-kcal-note">還沒有基礎代謝資料，分不出活動消耗；請在下方按「重新授權」。</div></div>`;
+  return `<div class="fit-kcal">
+    <div class="fit-kcal-bar"><i class="b" style="width:${pct(K.basal)}"></i><i class="a" style="width:${pct(K.act)}"></i><i class="e" style="width:${pct(K.ex)}"></i></div>
+    <div class="fit-kcal-leg">
+      <div><span class="dot b"></span>基礎代謝<b>${K.basal}</b></div>
+      <div><span class="dot a"></span>活動消耗<b>${K.act}</b></div>
+      <div><span class="dot e"></span>健身<b>${K.ex}</b></div>
+    </div>
+    <div class="fit-kcal-note">總燃燒 ${K.total}＝基礎代謝＋活動消耗＋健身（和三星健康同樣的分法，今天只算到現在）</div>
+  </div>`;
 }
 
 function _fitDateLabel(){
@@ -279,8 +302,8 @@ async function _fitHcHtml(){
     ${mine.length ? `<div class="fit-hc-sub">今天在這裡記的飲食</div>` + mine.sort((a, b) => a.start - b.start).map(m => `<div class="fit-hc-row">
         <span>🍽️ ${((_FIT_MEALS.find(x => x[0] === m.meal) || [0, ''])[1] || '飲食') + (m.title ? '・' + esc(m.title) : '')}・${m.kcal} kcal<small>${_fitHm(m.start)}</small></span>
         <button onclick="fitHcRemove('food','${esc(m.id)}','')" aria-label="刪除">✕</button></div>`).join('') : ''}
-    ${days.length > 1 ? `<div class="fit-hc-sub">最近 ${days.length} 天</div><table class="fit-hc-tb"><tr><th>日期</th><th>步數</th><th>運動</th><th>活動消耗</th><th>攝取</th></tr>
-      ${days.map(r => `<tr><td>${r.id.slice(5).replace('-', '/')}</td><td>${(r.hc.steps || 0).toLocaleString()}</td><td>${r.hc.activeMin || 0} 分</td><td>${r.hc.burned || 0}</td><td>${r.hc.intake || 0}</td></tr>`).join('')}</table>` : ''}
+    ${days.length > 1 ? `<div class="fit-hc-sub">最近 ${days.length} 天</div><table class="fit-hc-tb"><tr><th>日期</th><th>步數</th><th>運動</th><th>總燃燒</th><th>活動＋健身</th><th>攝取</th></tr>
+      ${days.map(r => `<tr><td>${r.id.slice(5).replace('-', '/')}</td><td>${(r.hc.steps || 0).toLocaleString()}</td><td>${r.hc.activeMin || 0} 分</td><td>${r.hc.total || 0}</td><td>${r.hc.burned || 0}</td><td>${r.hc.intake || 0}</td></tr>`).join('')}</table>` : ''}
     ${st.err ? `<div class="fit-source-note" style="color:var(--red)">${esc(st.err)}</div>` : ''}
   </div>`;
 }
