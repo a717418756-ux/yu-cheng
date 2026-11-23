@@ -1477,8 +1477,15 @@ a.zpanel-row{text-decoration:none;color:inherit}
 
 /* ══ v4.58 黑膠播放器 Spotify 式版面：封面配色背景、可往下滑看歌詞卡與接下來播放 ══ */
 #vinyl-player-ov{
-  --vs:clamp(190px, min(84vw, calc(100dvh - 500px)), 400px);   /* 唱盤直徑：依螢幕高度縮放，第一屏剛好放下控制列並露出歌詞卡 */
-  background:linear-gradient(180deg, var(--vp-c,#3a3150) 0%, color-mix(in srgb, var(--vp-c,#3a3150) 35%, #121212) 45%, #121212 85%);
+  --vs:clamp(190px, min(80vw, calc(100dvh - 500px)), 380px);   /* 唱盤直徑：依螢幕高度縮放，第一屏剛好放下控制列並露出歌詞卡 */
+  /* v4.58.1 一條連續的漸層（封面色 → 深色），多段過渡、沒有硬邊 */
+  background:linear-gradient(180deg,
+    color-mix(in srgb, var(--vp-c,#3a3150) 92%, #121212) 0%,
+    color-mix(in srgb, var(--vp-c,#3a3150) 70%, #121212) 30%,
+    color-mix(in srgb, var(--vp-c,#3a3150) 45%, #121212) 55%,
+    color-mix(in srgb, var(--vp-c,#3a3150) 22%, #121212) 78%,
+    #121212 100%);
+  background-attachment:fixed;
 }
 #vinyl-player-ov .vp-bg{ display:none; }
 .vp-top-mid{ text-align:center; min-width:0; flex:1; padding:0 8px; }
@@ -1487,8 +1494,30 @@ a.zpanel-row{text-decoration:none;color:inherit}
 .vp-scroll{ flex:1; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .vp-main{ min-height:calc(100% - 64px); display:flex; flex-direction:column; justify-content:space-evenly; }
 #vinyl-player-ov .vp-vinyl-wrap{ height:calc(var(--vs) * 1.12); width:min(100%, calc(var(--vs) * 1.47)); margin:4px auto 0; }
-#vinyl-player-ov .vp-record-outer{ width:var(--vs); height:var(--vs); }
-#vinyl-player-ov .vp-tonearm-img{ width:calc(var(--vs) * .41); }
+/* ── v4.58.1 唱片改用 CSS 畫：正圓、圓心就是旋轉中心（原本的圖 715×725 不是正方形，轉起來會晃）──
+   外層 .vp-plate 不轉（陰影、反光固定），裡面 .vp-disc 轉（溝紋、封面標籤）；暫停時停在原角度，不會跳回 0° */
+#vinyl-player-ov .vp-plate{ position:relative; width:var(--vs); height:var(--vs); border-radius:50%; flex-shrink:0; z-index:1;
+  box-shadow:0 14px 36px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.3); }
+#vinyl-player-ov .vp-disc{ position:absolute; inset:0; border-radius:50%;
+  background:
+    /* closest-side：100% 剛好是唱片邊緣。標籤外圈→溝紋（三道分隔亮圈）→外緣 */
+    radial-gradient(circle closest-side, transparent 0 39%, rgba(0,0,0,.9) 39% 41%, #0b0b0b 41% 45%, transparent 45% 60%,
+      rgba(255,255,255,.06) 60% 60.8%, transparent 60.8% 76%, rgba(255,255,255,.06) 76% 76.8%, transparent 76.8% 95.5%,
+      #2a2a2a 95.5% 96.5%, #0d0d0d 96.5% 100%, transparent 100%),
+    repeating-radial-gradient(circle closest-side, #111 0 1.1px, #1d1d1d 1.1px 2.4px),
+    #141414;
+  animation:vinyl-spin 2.4s linear infinite; animation-play-state:paused; will-change:transform; }
+#vinyl-player-ov .vp-disc.spinning{ animation-play-state:running; }
+#vinyl-player-ov .vp-sheen{ position:absolute; inset:0; border-radius:50%; pointer-events:none; z-index:3;
+  background:conic-gradient(from 20deg, transparent 0 6%, rgba(255,255,255,.13) 11%, transparent 18% 50%, rgba(255,255,255,.09) 59%, transparent 67% 100%);
+  -webkit-mask:radial-gradient(circle closest-side, transparent 0 41%, #000 42%); mask:radial-gradient(circle closest-side, transparent 0 41%, #000 42%); }
+#vinyl-player-ov .vp-record-cover{ width:38%; height:38%; background:var(--vp-c,#3a3150);
+  box-shadow:0 0 0 2px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.08); }
+#vinyl-player-ov .vp-spindle{ position:absolute; left:50%; top:50%; width:3.2%; height:3.2%; transform:translate(-50%,-50%); border-radius:50%; z-index:3;
+  background:radial-gradient(circle at 35% 35%, #e9e9e9, #8a8a8a 60%, #4a4a4a); box-shadow:0 0 0 2px rgba(0,0,0,.45); pointer-events:none; }
+/* 唱針：播放時放到唱片上，暫停時抬回旁邊 */
+#vinyl-player-ov .vp-tonearm-img{ width:calc(var(--vs) * .41); transform:rotate(-4deg); transition:transform .6s cubic-bezier(.4,0,.2,1); filter:drop-shadow(2px 6px 8px rgba(0,0,0,.45)); }
+#vinyl-player-ov .vp-vinyl-wrap.playing .vp-tonearm-img{ transform:rotate(18deg); }
 #vinyl-player-ov .vp-title{ font-size:21px; font-weight:800; }
 #vinyl-player-ov .vp-artist{ font-size:14px; color:rgba(255,255,255,.65); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #vinyl-player-ov .vpc-main{ width:66px; height:66px; background:#fff; border:none; box-shadow:0 6px 24px rgba(0,0,0,.35); backdrop-filter:none; -webkit-backdrop-filter:none; }

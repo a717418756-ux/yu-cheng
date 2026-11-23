@@ -754,8 +754,8 @@ function _showVinylPlayer(meta, url, full){
     <!-- ── 唱片台：唱盤圖 + 唱針圖 + 封面裁圓 ── -->
     <div class="vp-vinyl-wrap" id="vp-vinyl-wrap">
       <img class="vp-tonearm-img" id="vp-tonearm-img" src="icons/tonearm.png" alt="">
-      <div class="vp-record-outer" id="vp-record">
-        <img class="vp-record-img" src="icons/vinyl-record.png" alt="">
+      <div class="vp-plate">
+       <div class="vp-disc" id="vp-record">
         <div class="vp-record-cover" id="vp-cover-ring" onclick="_openCoverCrop(${meta.id})">
           ${meta.thumbnail
             ? `<img id="vp-cover-img" src="${meta.thumbnail}"
@@ -763,6 +763,9 @@ function _showVinylPlayer(meta, url, full){
                 transform:scale(var(--cover-scale,1)) translate(var(--cover-x,0),var(--cover-y,0))">`
             : `<div class="vp-cover-empty">＋封面</div>`}
         </div>
+        <i class="vp-spindle"></i>
+       </div>
+       <i class="vp-sheen"></i>
       </div>
     </div>
 
@@ -1056,12 +1059,12 @@ async function _vpToggleFav(id, btn){
 
 // 黑膠旋轉
 function _startVinylSpin(){
-  const rec=document.getElementById('vp-record');
-  if(rec) rec.classList.add('spinning');
+  document.getElementById('vp-record')?.classList.add('spinning');
+  document.getElementById('vp-vinyl-wrap')?.classList.add('playing');   // 唱針放到唱片上
 }
 function _stopVinylSpin(){
-  const rec=document.getElementById('vp-record');
-  if(rec) rec.classList.remove('spinning');
+  document.getElementById('vp-record')?.classList.remove('spinning');
+  document.getElementById('vp-vinyl-wrap')?.classList.remove('playing');
 }
 function _clearVinyl(){
   _stopVinylSpin();
