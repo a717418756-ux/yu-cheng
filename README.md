@@ -1,6 +1,6 @@
 # Y.C. 多功能專用平台
 
-> 警察特考備考 PWA｜版本 **4.57.0**
+> 警察特考備考 PWA｜版本 **4.57.1**
 > 離線可用．資料存本機．支援電子紙
 
 ---
@@ -50,7 +50,7 @@
 - **題庫稽核（v4.51.0）**：`python -X utf8 tools/tests/bank_audit.py <exam_data.json> [報告.md]` 唯讀檢查答案、選項、重複、缺號、解析與答案矛盾、相關法條條號；最近一次報告 `docs/題庫稽核_2026-11-22.md`；持續優化進度記在 `tools/優化進度.md`
 - **解析更正（v4.52.0）**：稽核找到的 3 題解析與官方答案矛盾（4152、4189、5214），依官方答案改寫解析，答案不動，`tools/exam_fixes/make_fixes_1123.py` 產生、設定「考古題答案更正」套用；2 題選項重複（1508、2825）經對照原卷確認原卷如此，不改。
 - **影音庫 YouTube（v4.53.0，`js/youtube.js`）**：影音庫上方「▶ 搜尋 YouTube」。搜尋用 YouTube Data API v3（設定填自己的金鑰，存在本機設定、還原時不覆蓋已設定的；搜尋一次 100 額度、每天 10,000），貼影片／播放清單網址不需要金鑰（清單需要）。播放用官方 IFrame 播放器（要連網；不下載、不去廣告、不隱藏畫面）。收進影音庫的存在 leisuremedia（`ytId`、`ytChannel`、`note`、縮圖網址、沒有檔案本體），同分類依建立時間連續播放、記住 lastPos；SW 對 YouTube／googleapis 一律直連不快取。
-- **三星健康、App 相容層（v4.57.0）**：YcHealth（Kotlin，Health Connect connect-client 1.1.0：讀步數／運動／活動消耗／總消耗／飲食，寫運動＋活動消耗、飲食，刪本 App 的紀錄）；`js/fitness.js` App 版改讀 Health Connect（healthLogs 每天的 `hc` 欄位）；`js/folder-native.js` 另補 `dl()` 存到下載／Y.C.、`window.open` 開 App 內檔案改視窗顯示、以 YcTts（Android TextToSpeech）補 `speechSynthesis`。App minSdk 26。
+- **三星健康、App 相容層（v4.57.0）**：YcHealth（Kotlin，Health Connect connect-client 1.1.0：讀步數／運動／活動消耗／總消耗／基礎代謝／飲食；三星健康沒寫活動消耗時以 總消耗－基礎代謝 計算（v4.57.1），列出所有來源的當天運動與各自熱量，寫運動＋活動消耗、飲食，刪本 App 的紀錄）；`js/fitness.js` App 版改讀 Health Connect（healthLogs 每天的 `hc` 欄位）；`js/folder-native.js` 另補 `dl()` 存到下載／Y.C.、`window.open` 開 App 內檔案改視窗顯示、以 YcTts（Android TextToSpeech）補 `speechSynthesis`。App minSdk 26。
 - **FSRS、資料夾 App 版、跳過片段、歌詞（v4.56.0）**：`js/ts-fsrs.umd.js`（ts-fsrs 5.2.3，MIT，本機內附）＋ db.js `reviewSchedule`／`reviewRescore`（題目欄位 `fsrs`，`nextReview` 照舊；localStorage `review_algo`、`review_ret`）；`js/folder-native.js` 在 App 裡以 YcFolder 原生外掛（Storage Access Framework）補上 `showDirectoryPicker`，settings.js 備份還原不改流程；YcPlayer 內建 SponsorBlock（`sb`、`sbCats`）與系統子母畫面；歌詞用 LRCLIB 搜尋，標題解析在 `_ytSongGuess`。
 - **YouTube 訂閱、紀錄、字幕、小視窗（v4.55.0）**：搜尋建議與篩選；頻道訂閱與動態（設定 `yt_subs`，可匯入 NewPipe／Takeout）；觀看紀錄（設定 `yt_hist`，最多 300 筆）；App 版字幕（NewPipe 字幕網址改 `fmt=srv1`，雙語顯示用 YcPlayer.setCues、逐字稿、.srt 下載，下載影片可附字幕 `subs`）；浮動小視窗（原生畫面跟著 `#yt-float`）；清單播完原生端自動接相關影片（`autoplay`、`exclude`＝看過的）。YouTube 自動翻譯字幕常被拒（HTTP 429），預設不開。
 - **Android App 版（v4.54.0，專案在 `E:\YC-app`，只在本機）**：Capacitor 8 外殼包同一份網頁；原生外掛 YtNative（NewPipeExtractor：搜尋、串流、分段下載、MediaMuxer 合併 mp4／webm、另存到下載資料夾、系統列顏色）與 YcPlayer（Media3 ExoPlayer＋MediaSessionService：背景播放、通知列控制、畫面疊在網頁上）。`js/youtube.js` 偵測到外掛才走 App 版路徑，瀏覽器版不受影響。打包：`E:\YC-app\build-apk.ps1`。
@@ -579,4 +579,4 @@ Promotion 記憶樹的文字修正寫在 `_extras.json` 的 `fixes`（建置時�
 
 ---
 
-*版本 4.57.0*
+*版本 4.57.1*

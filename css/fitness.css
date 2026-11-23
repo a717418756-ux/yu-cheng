@@ -178,3 +178,7 @@
 .fit-types{ display:flex; flex-wrap:wrap; gap:6px; }
 .fit-types button{ padding:8px 10px; border-radius:9px; border:1px solid var(--bd); background:var(--bg2); color:var(--t1); font-size:13px; cursor:pointer; }
 .fit-types button.on{ border-color:var(--acc); color:var(--acc); background:rgba(110,168,254,.14); }
+/* v4.57.1 消耗熱量拆解、基礎代謝權限提示 */
+.fit-burn-sub{ font-size:12px; color:var(--t2); text-align:center; margin:6px 4px 0; line-height:1.5; }
+.fit-hc-warn{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--t1); background:var(--bg2, rgba(224,160,32,.12)); border:1px solid #e0a020; border-radius:8px; padding:8px 10px; margin:8px 0; }
+.fit-hc-warn .fit-hc-btn{ margin-left:auto; }

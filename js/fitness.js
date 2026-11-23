@@ -72,6 +72,7 @@ async function renderFitness(){
         <div class="fit-card-lab">步數</div>
       </div>
     </div>
+    ${hcOn && d.total ? `<div class="fit-burn-sub">🔥 消耗熱量＝活動消耗（平時活動＋運動）${d.basal ? `<br>總消耗 ${d.total} kcal＝基礎代謝 ${d.basal}＋活動 ${d.burned}` : `<br>總消耗 ${d.total} kcal`}</div>` : ''}
     <div class="fit-edit-hint">${hcOn ? '💡 數字來自三星健康；點「記一筆運動／飲食」新增，步數由手機或手錶自動記錄' : '💡 雙擊上方卡片即可編輯數值'}</div>
 
     <!-- 熱量結餘 -->
@@ -197,7 +198,7 @@ function _fitHC(){
 }
 const _FIT_TYPES = [['walk', '🚶 走路'], ['run', '🏃 跑步'], ['bike', '🚴 騎車'], ['swim', '🏊 游泳'], ['strength', '🏋️ 重量訓練'], ['yoga', '🧘 瑜伽'], ['hike', '🥾 健行'], ['other', '💪 其他運動']];
 const _FIT_MEALS = [[1, '早餐'], [2, '午餐'], [3, '晚餐'], [4, '點心']];
-const _fitHcState = { status:null, read:false, write:false, syncing:false, at:0, err:'' };
+const _fitHcState = { status:null, read:false, write:false, bmr:false, syncing:false, at:0, err:'', sessions:null };
 
 async function _fitHcStatus(){
   const H = _fitHC(); if(!H) return null;
@@ -213,10 +214,12 @@ async function fitHcSync(quiet){
     const r = await H.days({ days:7 });
     for(const d of r.days || []){
       const cur = await _getFitData(d.date);
-      cur.hc = { steps:d.steps || 0, activeMin:d.activeMin || 0, burned:d.active || 0, total:d.total || 0, intake:d.intake || 0 };   // 消耗＝活動消耗（total 含基礎代謝，不混用）
+      // 消耗＝活動消耗（三星健康沒寫活動消耗時＝總消耗－基礎代謝）；total／basal 另存，卡片下方顯示
+      cur.hc = { steps:d.steps || 0, activeMin:d.activeMin || 0, burned:d.active || 0, src:d.activeSrc || '', total:d.total || 0, basal:d.basal || 0, intake:d.intake || 0 };
       cur.hcAt = Date.now(); cur.updatedAt = Date.now();
       await dp('healthLogs', cur);
     }
+    _fitHcState.sessions = r.sessions || []; _fitHcState.bmr = !!r.bmr;
     _fitHcState.at = Date.now(); _fitHcState.err = '';
     try{ localStorage.setItem('fit_hc_at', String(_fitHcState.at)); }catch(_){}
     if(!quiet) toast('已從 Health Connect 同步');
@@ -257,7 +260,8 @@ async function _fitHcHtml(){
     <div class="fit-source-note">連接後，步數、運動、消耗熱量、飲食會從三星健康自動帶進來；在這裡記的運動和飲食也會寫回去。<br>
     三星健康要先開同步：三星健康 → 設定 → Health Connect → 允許三星健康讀取和寫入。</div>
     <div class="fit-hc-btns"><button class="fit-hc-btn pri" onclick="fitHcConnect()">連接</button><button class="fit-hc-btn" onclick="fitHcSettings()">權限設定</button></div></div>`;
-  const mine = await _fitHcMine();
+  const mine = (await _fitHcMine()).filter(m => m.kind === 'food');
+  const ses = st.sessions || [];
   const days = (await da('healthLogs').catch(()=>[])).filter(r => r.hc).sort((a, b) => String(b.id).localeCompare(String(a.id))).slice(0, 7);
   const at = st.at || +(localStorage.getItem('fit_hc_at') || 0);
   return `<div class="fit-hc">
@@ -268,10 +272,13 @@ async function _fitHcHtml(){
       <button class="fit-hc-btn" onclick="fitHcSync().then(renderFitness)">↻ 同步</button>
       <button class="fit-hc-btn" onclick="fitHcSettings()">權限設定</button>
     </div>
-    ${mine.length ? `<div class="fit-hc-sub">今天在這裡記的</div>` + mine.sort((a, b) => a.start - b.start).map(m => `<div class="fit-hc-row">
-        <span>${m.kind === 'exercise' ? (_FIT_TYPES.find(t => t[0] === m.type) || ['', '💪 運動'])[1] + ' ' + m.minutes + ' 分' + (m.kcal ? '・' + m.kcal + ' kcal' : '')
-          : '🍽️ ' + ((_FIT_MEALS.find(x => x[0] === m.meal) || [0, ''])[1] || '飲食') + (m.title ? '・' + esc(m.title) : '') + '・' + m.kcal + ' kcal'}<small>${m.kind === 'exercise' ? _fitHm(m.start) + '～' + _fitHm(m.end) : _fitHm(m.start)}${m.title && m.kind === 'exercise' ? '・' + esc(m.title) : ''}</small></span>
-        <button onclick="fitHcRemove('${m.kind}','${esc(m.id)}','${esc(m.cid || '')}')" aria-label="刪除">✕</button></div>`).join('') : ''}
+    ${st.bmr ? '' : `<div class="fit-hc-warn">三星健康只提供「總消耗」，要算出活動消耗還需要讀取「基礎代謝率」的權限。<button class="fit-hc-btn pri" onclick="fitHcConnect()">重新授權</button></div>`}
+    ${ses.length ? `<div class="fit-hc-sub">今天的運動</div>` + ses.map(m => `<div class="fit-hc-row">
+        <span>${(_FIT_TYPES.find(t => t[0] === m.type) || ['', '💪 運動'])[1]} ${m.minutes} 分${m.kcal ? '・' + m.kcal + ' kcal' : ''}<small>${_fitHm(m.start)}～${_fitHm(m.end)}・${m.mine ? '本 App 記的' : esc(m.app)}${m.title ? '・' + esc(m.title) : ''}</small></span>
+        ${m.mine ? `<button onclick="fitHcRemove('exercise','${esc(m.id)}','${esc(m.cid || '')}')" aria-label="刪除">✕</button>` : ''}</div>`).join('') : ''}
+    ${mine.length ? `<div class="fit-hc-sub">今天在這裡記的飲食</div>` + mine.sort((a, b) => a.start - b.start).map(m => `<div class="fit-hc-row">
+        <span>🍽️ ${((_FIT_MEALS.find(x => x[0] === m.meal) || [0, ''])[1] || '飲食') + (m.title ? '・' + esc(m.title) : '')}・${m.kcal} kcal<small>${_fitHm(m.start)}</small></span>
+        <button onclick="fitHcRemove('food','${esc(m.id)}','')" aria-label="刪除">✕</button></div>`).join('') : ''}
     ${days.length > 1 ? `<div class="fit-hc-sub">最近 ${days.length} 天</div><table class="fit-hc-tb"><tr><th>日期</th><th>步數</th><th>運動</th><th>活動消耗</th><th>攝取</th></tr>
       ${days.map(r => `<tr><td>${r.id.slice(5).replace('-', '/')}</td><td>${(r.hc.steps || 0).toLocaleString()}</td><td>${r.hc.activeMin || 0} 分</td><td>${r.hc.burned || 0}</td><td>${r.hc.intake || 0}</td></tr>`).join('')}</table>` : ''}
     ${st.err ? `<div class="fit-source-note" style="color:var(--red)">${esc(st.err)}</div>` : ''}
