@@ -1394,6 +1394,14 @@ async function playVideo(id){
   document.body.appendChild(ov);
 
   const vidEl=document.getElementById('video-el');
+  // v4.55 從 YouTube 下載時一併存的字幕（第一個預設顯示）
+  (full.subs||[]).forEach((sb,i)=>{ try{
+    const tr=document.createElement('track');
+    tr.kind='subtitles'; tr.label=sb.label||sb.lang||'字幕'; tr.srclang=String(sb.lang||'').split('-')[0]||'und';
+    tr.src=URL.createObjectURL(new Blob([sb.vtt||''],{type:'text/vtt'}));
+    if(i===0) tr.default=true;
+    vidEl.appendChild(tr);
+  }catch(e){} });
   if(full.lastPos>3) vidEl.currentTime=full.lastPos;
 
   // 更新播放記錄
