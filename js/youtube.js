@@ -10,7 +10,16 @@ const _YT = {
   lib:new Map(),        // ytId → 影音庫裡那一筆（標示「已收藏」、避免重複收）
   player:null, apiP:null, timer:null,
   queue:[], qi:0, cur:null, rate:1, loop:false,
+  dl:new Set(),         // 已下載到影音庫的 ytId（App 版）
 };
+const _YS = { ENDED:0, PLAYING:1, PAUSED:2 };   // 與 YT.PlayerState 相同的數值（App 版不一定載入官方播放器）
+
+// ── Android App 外殼（E:\YC-app，Capacitor）：有 YtNative 外掛時（NewPipeExtractor），
+//   搜尋不需要金鑰、直接播影片串流（沒有廣告）、可下載到影音庫離線看。瀏覽器版照舊用官方 API 與播放器。
+function _ytN(){
+  const C = window.Capacitor;
+  return (C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.YtNative) || null;
+}
 
 // ── 網址／編號解析 ───────────────────────────────────────────
 // 認得：11 碼編號、youtu.be/ID、watch?v=ID、/shorts/ID、/embed/ID、/live/ID（含 m.、music. 網域）
@@ -105,7 +114,8 @@ function _ytFromVideo(v){
 async function openYtSearch(kw){
   try{
     document.getElementById('yt-search-ov')?.remove();
-    const hasKey = !!String(await getSetting(YT_KEY, '').catch(()=>'') || '').trim();
+    const native = !!_ytN();
+    const hasKey = native || !!String(await getSetting(YT_KEY, '').catch(()=>'') || '').trim();
     await _ytRefreshLib();
     const ov = document.createElement('div');
     ov.id = 'yt-search-ov';
@@ -121,13 +131,13 @@ async function openYtSearch(kw){
             placeholder="${hasKey ? '搜尋影片，或貼上影片／播放清單網址' : '貼上影片或播放清單網址'}" value="${esc(kw || _YT.q || '')}">
           <button type="submit" class="yt-go">搜尋</button>
         </form>
-        <div id="yt-hint" class="yt-hint">${hasKey ? '' : `沒有金鑰也能貼網址播放；要在 App 內搜尋，請到設定填「YouTube 搜尋金鑰」。
+        <div id="yt-hint" class="yt-hint">${native ? 'App 版：搜尋不需要金鑰，播放沒有廣告；按 ⬇ 可下載到影音庫離線看。' : hasKey ? '' : `沒有金鑰也能貼網址播放；要在 App 內搜尋，請到設定填「YouTube 搜尋金鑰」。
           <button class="yt-link" onclick="ytGoKey()">前往設定 ›</button>`}</div>
         <div id="yt-results" class="yt-results"></div>
       </div>`;
     ov.onclick = e => { if(e.target === ov) ov.remove(); };
     document.body.appendChild(ov);
-    if(hasKey) _ytQuotaText().then(t => { const h = document.getElementById('yt-hint'); if(h && !h.textContent.trim()) h.textContent = t; });
+    if(hasKey && !native) _ytQuotaText().then(t => { const h = document.getElementById('yt-hint'); if(h && !h.textContent.trim()) h.textContent = t; });
     if(kw) ytDoSearch();
     else if(_YT.items.length) _ytRenderResults();
     else setTimeout(()=>document.getElementById('yt-q')?.focus(), 200);
@@ -136,6 +146,7 @@ async function openYtSearch(kw){
 async function _ytRefreshLib(){
   const all = await _getMediaMetaList().catch(()=>[]);
   _YT.lib = new Map(all.filter(m => m.ytId).map(m => [m.ytId, m]));
+  _YT.dl = new Set(all.filter(m => m.ytSrc).map(m => m.ytSrc));
 }
 
 async function ytDoSearch(more){
@@ -151,7 +162,10 @@ async function ytDoSearch(more){
     } else if(vid && !more){                 // 單一影片網址
       _YT.mode = 'url'; _YT.next = ''; _YT.q = q;
       let it = { ytId:vid, title:'YouTube 影片', ytChannel:'', duration:0, embeddable:true };
-      try{ const d = await _ytDetails([vid]); if(d.get(vid)) it = _ytFromVideo(d.get(vid)); else throw new Error('找不到這部影片'); }
+      if(_ytN()){
+        const r = await _ytN().info({ url:_ytWatch(vid) });
+        it = { ytId:vid, title:r.title || it.title, ytChannel:r.channel || '', duration:r.duration > 0 ? r.duration : 0, embeddable:true };
+      } else try{ const d = await _ytDetails([vid]); if(d.get(vid)) it = _ytFromVideo(d.get(vid)); else throw new Error('找不到這部影片'); }
       catch(e){
         if(!e.nokey) throw e;
         // 沒有金鑰：用 YouTube 公開的 oEmbed 取標題（拿不到就用預設標題，照樣能播）
@@ -159,6 +173,17 @@ async function ytDoSearch(more){
           if(r.ok){ const j = await r.json(); it.title = j.title || it.title; it.ytChannel = j.author_name || ''; } }catch(_){}
       }
       _YT.items = [it];
+    } else if(_ytN()){
+      if(!more){ _YT.items = []; _YT.next = ''; _YT.q = q; _YT.mode = 'search'; }
+      const r = more ? await _ytN().more() : await _ytN().search({ query:_YT.q });
+      _YT.next = r.hasMore ? 'native' : '';
+      const have = new Set(_YT.items.map(x => x.ytId));
+      for(const x of r.items || []){
+        const id = _ytId(x.url);
+        if(!id || have.has(id) || x.live) continue;   // 直播不列（不能下載，也沒有固定長度）
+        have.add(id);
+        _YT.items.push({ ytId:id, title:x.title || id, ytChannel:x.channel || '', duration:x.duration > 0 ? x.duration : 0, embeddable:true });
+      }
     } else {
       if(!more){ _YT.items = []; _YT.next = ''; _YT.q = q; _YT.mode = 'search'; }
       const j = await _ytApi('search', { part:'snippet', type:'video', videoEmbeddable:'true', maxResults:20,
@@ -172,7 +197,7 @@ async function ytDoSearch(more){
     }
     _ytRenderResults();
     const h = document.getElementById('yt-hint');
-    if(h && String(await getSetting(YT_KEY, '').catch(()=>'') || '').trim()) h.textContent = await _ytQuotaText();
+    if(h && !_ytN() && String(await getSetting(YT_KEY, '').catch(()=>'') || '').trim()) h.textContent = await _ytQuotaText();
   }catch(e){
     if(box) box.innerHTML = '<div class="yt-empty">' + esc(e.message) + (e.nokey ? '<br>（貼影片網址不需要金鑰）' : '') + '</div>';
   }finally{ _YT.loading = false; }
@@ -207,11 +232,12 @@ function _ytRenderResults(){
       </div>
       <div class="yt-info" onclick="ytPlayResults(${i})">
         <div class="yt-t">${esc(it.title)}</div>
-        <div class="yt-ch">${esc(it.ytChannel || '')}${it.embeddable ? '' : '・不能在 App 內播放'}</div>
+        <div class="yt-ch">${esc(it.ytChannel || '')}${it.embeddable ? '' : '・不能在 App 內播放'}${_YT.dl.has(it.ytId) ? '・<b class="yt-dl-ok">已下載</b>' : ''}</div>
       </div>
+      ${_ytN() ? `<button class="yt-add" onclick="ytDownload(${i})" title="下載到影音庫" aria-label="下載到影音庫">⬇</button>` : ''}
       <button class="yt-add${saved ? ' on' : ''}" onclick="ytSaveResult(${i})" title="${saved ? '已在影音庫（點一下編輯）' : '收進影音庫'}" aria-label="${saved ? '編輯' : '收進影音庫'}">${saved ? '✓' : '＋'}</button>
     </div>`;
-  }).join('') + (_YT.mode === 'search' && _YT.next ? '<button class="yt-more" onclick="ytDoSearch(true)">載入更多（再用 100 額度）</button>' : '');
+  }).join('') + (_YT.mode === 'search' && _YT.next ? '<button class="yt-more" onclick="ytDoSearch(true)">' + (_ytN() ? '載入更多' : '載入更多（再用 100 額度）') + '</button>' : '');
 }
 
 function ytPlayResults(i){
@@ -374,9 +400,10 @@ async function _ytOpenPlayer(queue, idx){
     document.body.appendChild(ov);
   }
   _ytRenderPlayerInfo();
-  try{
-    await _ytLoadApi();
-  }catch(e){ toast(e.message); closeYtPlayer(); return; }
+  if(!_ytN()){
+    try{ await _ytLoadApi(); }
+    catch(e){ toast(e.message); closeYtPlayer(); return; }
+  }
   _ytStart();
 }
 
@@ -386,6 +413,25 @@ function _ytStart(){
   _ytRenderPlayerInfo();
   // 看到一半的從上次位置接著看（最後 10 秒內就從頭）
   const start = it.lastPos > 5 && !(it.duration && it.lastPos > it.duration - 10) ? Math.floor(it.lastPos) : 0;
+  if(_ytN() && !it._iframe){
+    if(_YT.player && !_YT.player.native){   // 上一部用官方播放器：先拆掉
+      try{ _YT.player.destroy(); }catch(_){}
+      _YT.player = null;
+      const w = document.querySelector('#yt-player-ov .ytp-frame-wrap'); if(w) w.innerHTML = '<div id="ytp-frame"></div>';
+    }
+    _ytStartNative(it, start); return;
+  }
+  _ytStartIframe(it, start);
+}
+// 官方 IFrame 播放器（瀏覽器版；App 版直接播放失敗時的備用）
+async function _ytStartIframe(it, start){
+  if(_YT.player && _YT.player.native){   // 從直接播放切回官方播放器
+    try{ _YT.player.destroy(); }catch(_){}
+    _YT.player = null;
+    const w = document.querySelector('#yt-player-ov .ytp-frame-wrap'); if(w) w.innerHTML = '<div id="ytp-frame"></div>';
+  }
+  try{ await _ytLoadApi(); }catch(e){ toast(e.message); return; }
+  if(_YT.cur !== it || !document.getElementById('yt-player-ov')) return;
   if(_YT.player && _YT.player.loadVideoById){
     _YT.player.loadVideoById({ videoId:it.ytId, startSeconds:start });
   } else {
@@ -401,6 +447,208 @@ function _ytStart(){
   }
   _ytMarkPlayed(it);
 }
+
+// App 版：用 NewPipeExtractor 取得影片串流網址，用 <video> 直接播（沒有廣告）；失敗就改用官方播放器
+function _ytVideoPlayer(){
+  const wrap = document.querySelector('#yt-player-ov .ytp-frame-wrap');
+  let v = document.getElementById('ytp-video');
+  if(!v){
+    wrap.innerHTML = '<video id="ytp-video" controls playsinline autoplay preload="auto"></video>';
+    v = document.getElementById('ytp-video');
+    v.addEventListener('playing', () => _ytState({ data:_YS.PLAYING }));
+    v.addEventListener('pause', () => { if(!v.ended) _ytState({ data:_YS.PAUSED }); });
+    v.addEventListener('ended', () => _ytState({ data:_YS.ENDED }));
+    v.addEventListener('error', () => { if(v.getAttribute('src')) _ytNativeFail(); });
+  }
+  return { native:true, el:v,
+    getCurrentTime:() => v.currentTime || 0, getDuration:() => isFinite(v.duration) ? v.duration : 0,
+    seekTo:s => { v.currentTime = s; }, playVideo:() => v.play().catch(()=>{}), pauseVideo:() => v.pause(),
+    setPlaybackRate:r => { v.playbackRate = r; },
+    destroy:() => { v.pause(); v.removeAttribute('src'); try{ v.load(); }catch(_){} } };
+}
+async function _ytStartNative(it, start){
+  // YouTube 現在只有「畫面」「聲音」分開的串流（少數舊影片才有合在一起的）：
+  //   音樂（type=audio）直接播聲音串流（沒有廣告）；影片若沒有合在一起的串流，就用官方播放器
+  let info;
+  try{ info = await _ytN().info({ url:_ytWatch(it.ytId) }); }
+  catch(e){ if(_YT.cur !== it) return; toast('取得影片失敗（' + e.message + '），改用 YouTube 播放器'); it._iframe = true; _ytStartIframe(it, start); return; }
+  if(_YT.cur !== it) return;   // 等待中已切到別部
+  if(!it.duration && info.duration > 0) it.duration = info.duration;
+  const muxed = (info.video || []).slice().sort((a, b) => (b.height || 0) - (a.height || 0))[0];
+  const audio = (info.audio || []).slice().sort((a, b) => ((b.mime === 'audio/mp4') - (a.mime === 'audio/mp4')) || ((b.kbps || 0) - (a.kbps || 0)))[0];
+  const src = muxed ? muxed.url : (it.type === 'audio' && audio ? audio.url : '');
+  if(!src){ it._iframe = true; _ytStartIframe(it, start); return; }
+  const p = _YT.player = (_YT.player && _YT.player.native) ? _YT.player : _ytVideoPlayer();
+  try{
+    p.el.poster = muxed ? '' : _ytThumb(it.ytId).replace('mqdefault', 'hqdefault');
+    p.el.src = src;
+    p.el.playbackRate = _YT.rate;
+    if(start) p.el.addEventListener('loadedmetadata', () => { p.el.currentTime = start; }, { once:true });
+    p.el.play().catch(()=>{});
+    _ytMarkPlayed(it);
+  }catch(e){
+    if(_YT.cur !== it) return;
+    toast('直接播放失敗（' + e.message + '），改用 YouTube 播放器');
+    it._iframe = true;
+    _ytStartIframe(it, start);
+  }
+}
+function _ytNativeFail(){
+  const it = _YT.cur; if(!it || it._iframe) return;
+  toast('這部影片無法直接播放，改用 YouTube 播放器');
+  it._iframe = true;
+  _ytStartIframe(it, Math.floor(_YT.player?.getCurrentTime?.() || 0));
+}
+
+// ════════════════════════════════════════════════════════════
+// 【下載到影音庫（App 版）】NewPipe 取得串流 → 原生分段下載 → 存進影音庫（離線可看、隨資料夾備份）
+// ════════════════════════════════════════════════════════════
+function ytDownload(i){ const it = _YT.items[i]; if(it) _ytDlSheet(it); }
+function _ytDlSheet(it){
+  if(!_ytN()){ toast('下載只在 Android App 版可用'); return; }
+  document.getElementById('yt-dl-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'yt-dl-ov';
+  ov.className = 'media-ov-sheet z700-d';
+  ov.innerHTML = `
+    <div class="yt-sheet yt-edit">
+      <div class="yt-sheet-hd"><div class="yt-sheet-title">下載到影音庫</div>
+        <button class="yt-x" onclick="_ytDlClose()" aria-label="關閉">✕</button></div>
+      <div class="yt-edit-top"><img src="${_ytThumb(it.ytId)}" alt="" onerror="this.remove()">
+        <div class="yt-ch">${esc(it.ytChannel || '')}${it.duration ? '・' + _fmtDur(it.duration) : ''}${_YT.dl.has(it.ytId) ? '・已下載過' : ''}</div></div>
+      <label class="yt-lb">標題</label>
+      <input id="ytd-title" class="finput" value="${esc(it.title || '')}">
+      <label class="yt-lb">分類</label>
+      <input id="ytd-cat" class="finput" list="ytd-cats" value="${esc(it.category || '')}" placeholder="例：英文聽力、讀書音樂">
+      <datalist id="ytd-cats">${_ytCats().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+      <label class="yt-lb">下載</label>
+      <div class="yt-seg">
+        <button id="ytd-k-audio" class="on" onclick="_ytDlKind('audio')">🎵 只要聲音（檔案小）</button>
+        <button id="ytd-k-video" onclick="_ytDlKind('video')">🎬 影片（含聲音）</button>
+      </div>
+      <div id="ytd-q-row" hidden>
+        <label class="yt-lb">畫質（越高檔案越大；十分鐘約 360p 30 MB、720p 80 MB、1080p 150 MB）</label>
+        <div class="yt-seg">
+          <button id="ytd-q-360" onclick="_ytDlQ(360)">360p</button>
+          <button id="ytd-q-720" class="on" onclick="_ytDlQ(720)">720p</button>
+          <button id="ytd-q-1080" onclick="_ytDlQ(1080)">1080p</button>
+        </div>
+      </div>
+      <div id="ytd-prog" class="ytd-prog" hidden><div class="ytd-bar"><i id="ytd-bar"></i></div><div id="ytd-txt" class="yt-ch"></div></div>
+      <div class="yt-edit-btns">
+        <button class="yt-btn" id="ytd-cancel" onclick="_ytDlClose()">取消</button>
+        <button class="yt-btn pri" id="ytd-go" onclick="_ytDlGo()">開始下載</button>
+      </div>
+    </div>`;
+  ov._it = it; ov._kind = 'audio'; ov._q = 720;
+  ov.onclick = e => { if(e.target === ov && !ov._busy) ov.remove(); };
+  document.body.appendChild(ov);
+}
+function _ytDlKind(k){
+  const ov = document.getElementById('yt-dl-ov'); if(!ov || ov._busy) return;
+  ov._kind = k;
+  for(const x of ['audio', 'video']) document.getElementById('ytd-k-' + x)?.classList.toggle('on', x === k);
+  const q = document.getElementById('ytd-q-row'); if(q) q.hidden = k !== 'video';
+}
+function _ytDlQ(h){
+  const ov = document.getElementById('yt-dl-ov'); if(!ov || ov._busy) return;
+  ov._q = h;
+  for(const x of [360, 720, 1080]) document.getElementById('ytd-q-' + x)?.classList.toggle('on', x === h);
+}
+function _ytDlClose(){
+  const ov = document.getElementById('yt-dl-ov'); if(!ov) return;
+  if(ov._busy){ for(const x of ['', '_v', '_a']) _ytN()?.cancel({ id:ov._busy + x }); return; }   // 下載中：取消（完成取消後視窗會自己關）
+  ov.remove();
+}
+async function _ytDlGo(){
+  const ov = document.getElementById('yt-dl-ov'); if(!ov || ov._busy) return;
+  const N = _ytN(), it = ov._it, kind = ov._kind;
+  const title = document.getElementById('ytd-title').value.trim() || it.title || it.ytId;
+  const category = document.getElementById('ytd-cat').value.trim();
+  const txt = document.getElementById('ytd-txt'), bar = document.getElementById('ytd-bar');
+  document.getElementById('ytd-prog').hidden = false;
+  document.getElementById('ytd-go').disabled = true;
+  document.getElementById('ytd-cancel').textContent = '取消下載';
+  const id = 'yt_' + it.ytId + '_' + kind + '_' + Date.now().toString(36);
+  ov._busy = id;
+  let lis = null; const tmp = [];
+  try{
+    txt.textContent = '取得下載網址…';
+    const info = await N.info({ url:_ytWatch(it.ytId) });
+    // 聲音：優先 m4a（各裝置都能播、也能和畫面合併），同格式取位元率最高的
+    const au = (info.audio || []).slice().sort((a, b) => ((b.mime === 'audio/mp4') - (a.mime === 'audio/mp4')) || ((b.kbps || 0) - (a.kbps || 0)))[0];
+    if(!au) throw new Error('找不到可下載的聲音');
+    let label = '', phase = '';
+    lis = await N.addListener('dlProgress', e => {
+      if(!e.id.startsWith(id) || e.id.endsWith('_t')) return;   // 封面不算進度
+      const pct = e.total ? Math.floor(e.done / e.total * 100) : 0;
+      bar.style.width = pct + '%';
+      txt.textContent = phase + '下載中 ' + pct + '%（' + _fmtSize(e.done) + '／' + _fmtSize(e.total) + '）' + label;
+    });
+    let r, pick;
+    if(kind === 'audio'){
+      pick = au;
+      r = await N.download({ url:au.url, id, ext:au.ext });
+      tmp.push(r.path);
+    } else {
+      // 有合在一起的就直接下載；沒有（現在大多數）就畫面、聲音分開下載再合併
+      const muxed = (info.video || []).filter(v => (v.height || 0) <= ov._q).sort((a, b) => (b.height || 0) - (a.height || 0))[0];
+      const vo = (info.videoOnly || []).filter(v => (v.height || 0) <= ov._q).sort((a, b) => (b.height || 0) - (a.height || 0) || (a.fps || 0) - (b.fps || 0))[0];
+      if(vo && (!muxed || (vo.height || 0) > (muxed.height || 0))){
+        if(au.mime !== 'audio/mp4') throw new Error('這部影片的聲音不是 m4a，無法和畫面合併（可改下載聲音）');
+        label = '（' + vo.res + '）';
+        phase = '① 畫面 ';
+        const rv = await N.download({ url:vo.url, id:id + '_v', ext:'mp4' });
+        tmp.push(rv.path);
+        phase = '② 聲音 ';
+        const ra = await N.download({ url:au.url, id:id + '_a', ext:'m4a' });
+        tmp.push(ra.path);
+        phase = '';
+        txt.textContent = '③ 合併畫面和聲音…';
+        r = await N.mux({ video:rv.path, audio:ra.path, id });
+        tmp.push(r.path);
+        pick = { mime:'video/mp4', ext:'mp4' };
+      } else if(muxed){
+        pick = muxed; label = '（' + (muxed.res || '') + '）';
+        r = await N.download({ url:muxed.url, id, ext:muxed.ext });
+        tmp.push(r.path);
+      } else throw new Error('找不到可下載的影片畫質（可改下載聲音）');
+    }
+    txt.textContent = '存進影音庫…';
+    const raw = await (await fetch(window.Capacitor.convertFileSrc(r.path))).blob();
+    const blob = new Blob([raw], { type:pick.mime });
+    // 封面也下載下來（離線也看得到）
+    let thumbnail = null;
+    try{
+      const t = await N.download({ url:info.thumb || _ytThumb(it.ytId), id:id + '_t', ext:'jpg' });
+      tmp.push(t.path);
+      const tb = await (await fetch(window.Capacitor.convertFileSrc(t.path))).blob();
+      thumbnail = await _compressMediaThumb(new File([tb], 'thumb.jpg', { type:'image/jpeg' }));
+    }catch(_){}
+    await dp('leisuremedia', {
+      title, type:kind === 'audio' ? 'audio' : 'video', category,
+      fileType:pick.ext, mimeType:pick.mime, fileSize:blob.size, blob, thumbnail,
+      duration:info.duration > 0 ? info.duration : (it.duration || null),
+      tags:[], favorite:false, lastPlay:null, lastPos:0, playCount:0, createdAt:Date.now(),
+      ytSrc:it.ytId, ytChannel:info.channel || it.ytChannel || '', source:'youtube-download',
+    });
+    ov._busy = null;
+    ov.remove();
+    toast('已下載到影音庫：' + title + '（' + _fmtSize(blob.size) + '）');
+    await _ytAfterChange();
+  }catch(e){
+    ov._busy = null;
+    if(/已取消/.test(e.message || '')){ ov.remove(); toast('已取消下載'); }
+    else {
+      txt.textContent = '✗ ' + (e.message || e);
+      document.getElementById('ytd-go').disabled = false;
+      document.getElementById('ytd-cancel').textContent = '關閉';
+    }
+  }finally{
+    try{ lis && lis.remove(); }catch(_){}
+    for(const pth of tmp) N.remove({ path:pth }).catch(()=>{});
+  }
+}
 async function _ytMarkPlayed(it){
   if(!it.id) return;   // 搜尋結果還沒收進影音庫：不記錄
   try{
@@ -411,7 +659,7 @@ async function _ytMarkPlayed(it){
   }catch(e){ logError('_ytMarkPlayed', e); }
 }
 function _ytState(e){
-  const S_ = YT.PlayerState;
+  const S_ = _YS;
   clearInterval(_YT.timer); _YT.timer = null;
   if(e.data === S_.PLAYING){
     try{ _YT.player.setPlaybackRate(_YT.rate); }catch(_){}
@@ -515,6 +763,7 @@ function _ytMenu(){
   ov.className = 'media-ov-sheet z700';
   ov.innerHTML = `<div class="yt-sheet yt-menu">
     <button onclick="document.getElementById('yt-menu-ov').remove();${it.id ? 'ytEditItem(' + it.id + ')' : '_ytEditSheet(_YT.cur)'}">✎　${it.id ? '編輯標題、分類、筆記' : '收進影音庫'}</button>
+    ${_ytN() ? `<button onclick="document.getElementById('yt-menu-ov').remove();_ytDlSheet(_YT.cur)">⬇　下載到影音庫（離線看）</button>` : ''}
     <button onclick="document.getElementById('yt-menu-ov').remove();window.open('${_ytWatch(it.ytId)}','_blank','noopener')">↗　在 YouTube 開啟</button>
     <button onclick="document.getElementById('yt-menu-ov').remove()">取消</button></div>`;
   ov.onclick = e => { if(e.target === ov) ov.remove(); };

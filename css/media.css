@@ -1382,3 +1382,11 @@ a.zpanel-row{text-decoration:none;color:inherit}
 }
 [data-theme="eink"] .yt-logo, [data-theme="eink"] .yt-go, [data-theme="eink"] .yt-badge{ background:#000; }
 [data-theme="eink"] .hd-btn.yt-hd{ color:#000; }
+
+/* App 版（Android 外殼）：直接播放、下載進度 */
+#ytp-video{ width:100%; height:100%; display:block; background:#000; }
+.ytd-prog{ margin-top:12px; }
+.ytd-bar{ height:8px; border-radius:4px; background:var(--bg2); overflow:hidden; }
+.ytd-bar i{ display:block; height:100%; width:0; background:#e02424; transition:width .3s; }
+.yt-dl-ok{ color:#34c759; font-weight:600; }
+.yt-add + .yt-add{ margin-left:-4px; }
