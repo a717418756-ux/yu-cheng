@@ -486,7 +486,7 @@ function _handleBackLayer(){
   // 1-0-1) YouTube（v4.53）：播放器可能是從搜尋面板開的、蓋在面板上 → 先關最上面的選單／編輯，再關播放器，最後才是面板
   const ytDl = document.getElementById('yt-dl-ov');
   if(ytDl){ window._ytDlClose ? _ytDlClose() : ytDl.remove(); return true; }   // 下載中按返回＝取消下載
-  for(const id of ['yt-menu-ov', 'yt-edit-ov', 'yt-sub-ov', 'yt-subm-ov']){ const el = document.getElementById(id); if(el){ el.remove(); return true; } }
+  for(const id of ['yt-menu-ov', 'yt-edit-ov', 'yt-sub-ov', 'yt-subm-ov', 'yt-sbs-ov']){ const el = document.getElementById(id); if(el){ el.remove(); return true; } }
   if(document.getElementById('yt-player-ov')){ _callIf('closeYtPlayer'); return true; }
   // v4.55 搜尋面板裡的頻道頁：返回先回到原本的分頁
   if(document.getElementById('yt-search-ov') && typeof _YT !== 'undefined' && _YT.tab === 'channel' && typeof ytTab === 'function'){ ytTab(_YT.chBack || 'search'); return true; }

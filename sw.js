@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.55.0';
+const APP_VERSION = '4.56.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 const PAGES_CACHE = 'yc-pages-v1';   // SOP 原檔頁面圖：不跟版本走，更新 App 不清
 
@@ -37,6 +37,8 @@ const CORE_ASSETS = [
   './js/milestone.js',
   './js/stats.js',
   './js/coach.js',
+  './js/ts-fsrs.umd.js',
+  './js/folder-native.js',
   './js/settings.js',
   './js/countdown.js',
   './js/app.js',

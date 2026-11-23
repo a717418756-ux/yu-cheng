@@ -1,4 +1,4 @@
-// ══ youtube.js — 影音庫的 YouTube（v4.53.0；v4.55.0 訂閱、紀錄、字幕、小視窗、自動接相關）═══════════════════
+// ══ youtube.js — 影音庫的 YouTube（v4.53.0；v4.55.0 訂閱、紀錄、字幕、小視窗、自動接相關；v4.56.0 跳過業配、歌詞、系統子母畫面）═══════════════════
 // App 內搜尋（YouTube Data API v3，使用者自己的金鑰）＋ App 內播放（YouTube 官方 IFrame 播放器）＋ 收進影音庫。
 // ★ 只用官方提供的方式：不下載影片、不去廣告、不隱藏播放畫面；要連網才能播。
 // 收進影音庫的項目存在 leisuremedia：{ ytId, ytChannel, source:'youtube', blob:null, thumbnail:縮圖網址, duration(秒), note }
@@ -890,6 +890,13 @@ async function _ytStartIframe(it, start){
     });
   }
   _ytMarkPlayed(it);
+  _ytSbIframe(it);
+  _ytSubAuto(it);
+  clearInterval(_YT.ifT);
+  _YT.ifT = setInterval(() => {
+    if(!_YT.player || _YT.player.np || !document.getElementById('yt-player-ov')){ clearInterval(_YT.ifT); return; }
+    try{ _YT.npPos = _YT.player.getCurrentTime() || 0; _ytTrTick(); }catch(_){}
+  }, 500);
 }
 
 // App 版：用 NewPipeExtractor 取得影片串流網址，用 <video> 直接播（沒有廣告）；失敗就改用官方播放器
@@ -1233,8 +1240,10 @@ function _ytRenderPlayerInfo(){
       <button onclick="ytQuality()" aria-label="畫質">${_ytMaxH()}p</button>`}
       <button onclick="ytSubSheet()" class="${_ytSubPref().on ? 'on' : ''}" aria-label="字幕">CC 字幕</button>
       <button onclick="ytAutoToggle()" class="${_ytAuto() ? 'on' : ''}" aria-label="播完自動接相關影片">∞ 自動接</button>
+      ${it.type === 'audio' ? `<button onclick="ytLyrics()" class="${_YT.subs && _YT.subs.lyrics && _YT.subs.ytId === it.ytId ? 'on' : ''}" aria-label="歌詞">♪ 歌詞</button>` : ''}
     </div>` : ''}
     ${it.note ? `<div class="ytp-note">${_ytNoteHtml(it.note)}</div>` : ''}
+    <div id="ytp-sb" class="ytp-sb" hidden></div>
     <div id="ytp-tr" class="ytp-tr" hidden></div>
     ${q.length > 1 ? `<div class="ytp-qhd">播放清單・${_YT.qi + 1}／${q.length}${_YT.loop ? '（單部重複中）' : '（播完自動接下一部）'}</div>
       <div class="ytp-q">${q.map((x, i) => `
@@ -1245,6 +1254,7 @@ function _ytRenderPlayerInfo(){
         </div>`).join('')}</div>` : ''}`;
   body.querySelector('.ytp-qi.on')?.scrollIntoView({ block:'nearest' });
   _ytTrRender();
+  _ytRenderSbLine();
 }
 
 function _ytMenu(){
@@ -1256,6 +1266,9 @@ function _ytMenu(){
   ov.innerHTML = `<div class="yt-sheet yt-menu">
     <button onclick="document.getElementById('yt-menu-ov').remove();${it.id ? 'ytEditItem(' + it.id + ')' : '_ytEditSheet(_YT.cur)'}">✎　${it.id ? '編輯標題、分類、筆記' : '收進影音庫'}</button>
     ${_ytN() ? `<button onclick="document.getElementById('yt-menu-ov').remove();_ytDlSheet(_YT.cur)">⬇　下載到影音庫（離線看）</button>` : ''}
+    <button onclick="document.getElementById('yt-menu-ov').remove();ytLyrics()">♪　找歌詞（LRCLIB）</button>
+    <button onclick="document.getElementById('yt-menu-ov').remove();ytLyrToggle()">♪　音樂自動顯示歌詞：${_ytLyrOn() ? '開' : '關'}</button>
+    <button onclick="document.getElementById('yt-menu-ov').remove();ytSbSheet()">⏭　自動跳過業配等片段（SponsorBlock）</button>
     <button onclick="document.getElementById('yt-menu-ov').remove();window.open('${_ytWatch(it.ytId)}','_blank','noopener')">↗　在 YouTube 開啟</button>
     <button onclick="document.getElementById('yt-menu-ov').remove()">取消</button></div>`;
   ov.onclick = e => { if(e.target === ov) ov.remove(); };
@@ -1280,7 +1293,7 @@ async function closeYtPlayer(bg){
     if(S.page === 'media' && !document.getElementById('yt-search-ov')) _renderMediaPage();
     return;
   }
-  _YT.bg = false; _ytMiniRemove(); _ytFloatRemove(); _YT.subs = null; _ytNPLast = '';
+  _YT.bg = false; _ytMiniRemove(); _ytFloatRemove(); _YT.subs = null; _ytNPLast = ''; clearInterval(_YT.sbT); clearInterval(_YT.ifT); _YT.sbSegs = null;
   clearInterval(_YT.timer); _YT.timer = null;
   await _ytSavePos();
   try{ _YT.player && _YT.player.destroy && _YT.player.destroy(); }catch(_){}
@@ -1326,7 +1339,7 @@ async function _ytNPStart(it, start){
       _YT.player = _ytNPAdapter();
       const ex = (await _ytHist()).slice(0, 200).map(h => h.ytId);
       await P.open({ items:_ytNPItems(), index:_YT.qi, start, maxHeight:_ytMaxH(), rate:_YT.rate, loop:_YT.loop, rect:_ytNPRect(),
-        autoplay:_ytAuto(), exclude:ex });
+        autoplay:_ytAuto(), exclude:ex, ..._ytSbNative() });
       _YT.npOpen = true;
     }
   }catch(e){ toast('播放器開啟失敗：' + e.message); return; }
@@ -1342,7 +1355,7 @@ function _ytNPPoster(it){
   if(!w) return;
   w.innerHTML = it && it.type === 'audio' ? `<img class="ytp-poster" src="${_ytThumb(it.ytId).replace('mqdefault', 'hqdefault')}" alt="">` : '';
 }
-const _YT_COVER = '#yt-edit-ov, #yt-menu-ov, #yt-dl-ov, #yt-sub-ov, #yt-subm-ov, #ask-in-ov, #cfm-ov.on, .cov.on, #img-viewer';
+const _YT_COVER = '#yt-edit-ov, #yt-menu-ov, #yt-dl-ov, #yt-sub-ov, #yt-subm-ov, #yt-sbs-ov, #ask-in-ov, #cfm-ov.on, .cov.on, #img-viewer';
 function _ytNPCovered(){
   if(_YT.float) return !document.getElementById('yt-float') || !!document.querySelector(_YT_COVER);
   return !document.getElementById('yt-player-ov') || _YT.bg || !!document.querySelector(_YT_COVER);
@@ -1420,6 +1433,9 @@ function _ytNPInit(){
     _ytStartIframe(it, start);
   });
   P.addListener('fullscreen', () => ytFull());
+  P.addListener('segments', e => { _YT.sbSegs = { ytId:e.ytId, segs:e.segments || [] }; _ytRenderSbLine(); });
+  P.addListener('skipped', e => _ytSbToast(e));
+  P.addListener('pip', e => { if(!e.in){ _ytNPLast = ''; _ytNPSync(); } });
 }
 // 全螢幕：畫面放滿、轉橫向；再按一次（或返回鍵）還原
 function ytFull(){
@@ -1436,7 +1452,7 @@ function ytQuality(){
   try{ localStorage.setItem('yt_maxh', String(h)); }catch(_){}
   toast('畫質上限 ' + h + 'p');
   if(_YT.player && _YT.player.np){
-    _ytNP().open({ items:_ytNPItems(), index:_YT.qi, start:_YT.npPos || 0, maxHeight:h, rate:_YT.rate, loop:_YT.loop, rect:_ytNPRect(), autoplay:_ytAuto() });
+    _ytNP().open({ items:_ytNPItems(), index:_YT.qi, start:_YT.npPos || 0, maxHeight:h, rate:_YT.rate, loop:_YT.loop, rect:_ytNPRect(), autoplay:_ytAuto(), ..._ytSbNative() });
   }
   _ytRenderPlayerInfo();
 }
@@ -1463,7 +1479,9 @@ function _ytMiniUpdate(){
   const t = bar.querySelector('.yt-mini-t .yt-t'); if(t && t.textContent !== (it.title || '')) _ytMiniRender();
   const pp = document.getElementById('yt-mini-pp'); if(pp) pp.textContent = _YT.npPlaying ? '⏸' : '▶';
   const st = document.getElementById('yt-mini-s');
-  if(st) st.textContent = (_YT.npPlaying ? '背景播放中' : '已暫停') + (_YT.npDur ? '・' + _fmtDur(Math.floor(_YT.npPos)) + '／' + _fmtDur(Math.floor(_YT.npDur)) : '');
+  const L = _YT.subs && _YT.subs.lyrics && _YT.subs.ytId === it.ytId ? _YT.subs.ca : null;
+  const line = L ? (L.filter(c => c.s <= (_YT.npPos || 0)).pop() || {}).t : '';
+  if(st) st.textContent = line ? '♪ ' + line : (_YT.npPlaying ? '背景播放中' : '已暫停') + (_YT.npDur ? '・' + _fmtDur(Math.floor(_YT.npPos)) + '／' + _fmtDur(Math.floor(_YT.npDur)) : '');
 }
 function _ytMiniRemove(){ document.getElementById('yt-mini')?.remove(); }
 function ytReopen(){
@@ -1694,11 +1712,15 @@ async function _ytSubGet(ytId, p){
   return { a, b:cb.length ? b : null, ca, cb, list, tlFail:!!(b && b.tl && !cb.length) };
 }
 async function _ytSubAuto(it){
+  if(it && it.type === 'audio' && _ytLyrOn()){
+    if(_YT.subs && _YT.subs.ytId === it.ytId && _YT.subs.lyrics) return;
+    if(await _ytLyrLoad(it, null, true)) return;
+  }
   if(!_ytNP() || !it) return;
   const p = _ytSubPref();
   if(_YT.subs && _YT.subs.ytId !== it.ytId) _YT.subs = null;
   if(!p.on || it._iframe){ _YT.subs = null; _ytNP().setCues({ ytId:'', cues:[] }).catch(()=>{}); _ytTrRender(); return; }
-  if(_YT.subs && _YT.subs.ytId === it.ytId) return;
+  if(_YT.subs && _YT.subs.ytId === it.ytId && !_YT.subs.lyrics) return;
   try{
     const r = await _ytSubGet(it.ytId, p);
     if(_YT.cur !== it) return;
@@ -1713,12 +1735,20 @@ async function _ytSubAuto(it){
 function _ytTrRender(){
   const el = document.getElementById('ytp-tr'); if(!el) return;
   const S2 = _YT.subs, p = _ytSubPref();
-  if(!S2 || !_YT.cur || S2.ytId !== _YT.cur.ytId || !p.list || !S2.ca.length){ el.hidden = true; el.innerHTML = ''; _YT.trOn = -1; return; }
+  const show = S2 && _YT.cur && S2.ytId === _YT.cur.ytId && (S2.lyrics ? (S2.ca.length || S2.plain) : (p.list && S2.ca.length));
+  if(!show){ el.hidden = true; el.innerHTML = ''; _YT.trOn = -1; return; }
+  if(S2.lyrics && !S2.ca.length){   // 只有不同步的歌詞：整段顯示
+    el.innerHTML = `<div class="ytp-trh"><b>歌詞</b><span>${esc(S2.a?.name || '')}（沒有時間軸）</span><button class="yt-link" onclick="ytLyrics()">改找</button></div>
+      <div class="ytp-trb ytp-plain">${esc(S2.plain).replace(/\n/g, '<br>')}</div>`;
+    el.hidden = false; _YT.trOn = -1; return;
+  }
   const lines = S2.ca.map(c => {
     const sub = S2.cb.filter(x => x.s >= c.s - 0.4 && x.s < c.e).map(x => x.t).join(' ');
-    return `<div class="ytp-trl" data-s="${c.s}" onclick="ytSeek(${Math.floor(c.s)})"><span>${_fmtDur(Math.floor(c.s))}</span><div>${esc(c.t)}${sub ? '<small>' + esc(sub) + '</small>' : ''}</div></div>`;
+    return `<div class="ytp-trl" data-s="${c.s}" onclick="ytSeek(${Math.floor(c.s)})"><span>${_ytTs(c.s)}</span><div>${esc(c.t)}${sub ? '<small>' + esc(sub) + '</small>' : ''}</div></div>`;
   });
-  el.innerHTML = `<div class="ytp-trh"><b>逐字稿</b><span>${esc(S2.a?.name || '')}${S2.b ? '＋' + esc(S2.b.name || '') : ''}</span>
+  el.innerHTML = S2.lyrics
+    ? `<div class="ytp-trh"><b>歌詞</b><span>${esc(S2.a?.name || '')}・LRCLIB</span><button class="yt-link" onclick="ytLyrics()">改找</button></div><div class="ytp-trb">${lines.join('')}</div>`
+    : `<div class="ytp-trh"><b>逐字稿</b><span>${esc(S2.a?.name || '')}${S2.b ? '＋' + esc(S2.b.name || '') : ''}</span>
       <button class="yt-link" onclick="ytSubDownload()">⬇ 字幕</button></div><div class="ytp-trb">${lines.join('')}</div>`;
   el.hidden = false;
   _YT.trOn = -1;
@@ -1806,6 +1836,213 @@ function _ytSubApply(){
 async function _ytSubForSave(ytId){
   const r = await _ytSubGet(ytId, { ..._ytSubPref(), on:true });
   return [[r.a, r.ca], [r.b, r.cb]].filter(([t, c]) => t && c.length).map(([t, c]) => ({ lang:t.lang, label:t.name || t.lang, vtt:_ytVtt(c) }));
+}
+
+// ════════════════════════════════════════════════════════════
+// 【SponsorBlock 跳過片段】（v4.56）社群標記的業配、自我宣傳、訂閱提醒、開場、片尾等，播到就自動跳過
+//   App 版在原生播放器裡跳（關螢幕也會跳）；瀏覽器版官方播放器、下載到影音庫的檔案在網頁裡跳
+//   只送影片編號雜湊的前 4 碼給 sponsor.ajay.app（不會知道你在看哪一部）
+//   設定存在這台的 localStorage yt_sb：{on, cats:[...]}
+// ════════════════════════════════════════════════════════════
+const _YT_SBC = [
+  ['sponsor', '業配（付費宣傳）', true], ['selfpromo', '自我宣傳（自家商品、贊助會員）', true],
+  ['interaction', '要你訂閱、按讚的提醒', true], ['music_offtopic', '音樂影片裡的非音樂片段', true],
+  ['intro', '開場動畫', false], ['outro', '片尾、結尾畫面', false], ['preview', '預告、回顧', false], ['filler', '離題閒聊', false],
+];
+// 時間點（0 秒也顯示 0:00）
+const _ytTs = t => { t = Math.max(0, Math.floor(t || 0)); const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, x = String(t % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + x : m + ':' + x; };
+const _ytSbName = c => (_YT_SBC.find(x => x[0] === c) || [c, c])[1].replace(/（.*$/, '');
+function _ytSbPref(){
+  const d = { on:true, cats:_YT_SBC.filter(x => x[2]).map(x => x[0]) };
+  try{ const v = JSON.parse(localStorage.getItem('yt_sb') || 'null'); return v && Array.isArray(v.cats) ? { ...d, ...v } : d; }catch(_){ return d; }
+}
+function _ytSbNative(){ const p = _ytSbPref(); return { sb:!!(p.on && p.cats.length), sbCats:JSON.stringify(p.cats) }; }
+async function _ytSbFetch(ytId){
+  const p = _ytSbPref();
+  if(!p.on || !p.cats.length || !ytId) return [];
+  try{
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ytId));
+    const pre = [...new Uint8Array(buf).slice(0, 2)].map(b => b.toString(16).padStart(2, '0')).join('');
+    const u = 'https://sponsor.ajay.app/api/skipSegments/' + pre + '?categories=' + encodeURIComponent(JSON.stringify(p.cats)) + '&actionTypes=' + encodeURIComponent('["skip"]');
+    let txt;
+    if(_ytN()){ try{ txt = (await _ytN().fetchText({ url:u })).text; }catch(e){ return []; } }
+    else { const r = await fetch(u, { cache:'no-store' }); if(!r.ok) return []; txt = await r.text(); }
+    const v = (JSON.parse(txt) || []).find(x => x.videoID === ytId);
+    return (v?.segments || []).filter(s => Array.isArray(s.segment) && s.segment[1] - s.segment[0] >= 1)
+      .map(s => ({ start:s.segment[0], end:s.segment[1], cat:s.category }));
+  }catch(e){ return []; }
+}
+function _ytSbToast(s){ toast('已跳過' + _ytSbName(s.cat) + '（' + _ytTs(s.start) + '～' + _ytTs(s.end) + '）'); }
+// 網頁裡的播放器（官方 IFrame、影音庫的 <video>／<audio>）：每半秒看一次位置
+function _ytSbWatch(getT, seek, segs, isLive){
+  const done = new Set();
+  const t = setInterval(() => {
+    if(!isLive()){ clearInterval(t); return; }
+    let now; try{ now = getT(); }catch(_){ return; }
+    segs.forEach((s, i) => {
+      if(now >= s.start && now < s.end - 0.5 && !done.has(i)){ done.add(i); seek(s.end); _ytSbToast(s); }
+      else if(now < s.start - 2) done.delete(i);
+    });
+  }, 500);
+  return t;
+}
+// 影音庫裡從 YouTube 下載的檔案（media.js 播放時呼叫）
+async function ytSbAttach(el, ytId){
+  if(!el || !ytId) return;
+  const segs = await _ytSbFetch(ytId);
+  if(!segs.length) return;
+  const src0 = el.getAttribute('src') || '';   // 同一個播放器換下一首時停止（不拿上一首的片段跳）
+  _ytSbWatch(() => el.currentTime, s => { el.currentTime = s; }, segs, () => el.isConnected && (el.getAttribute('src') || '') === src0 && !!src0);
+}
+// 官方 IFrame 播放器（瀏覽器版）
+async function _ytSbIframe(it){
+  clearInterval(_YT.sbT);
+  const segs = await _ytSbFetch(it.ytId);
+  _YT.sbSegs = { ytId:it.ytId, segs };
+  _ytRenderSbLine();
+  if(!segs.length || _YT.cur !== it) return;
+  _YT.sbT = _ytSbWatch(() => _YT.player.getCurrentTime(), s => _YT.player.seekTo(s, true), segs,
+    () => _YT.cur === it && !!_YT.player && !_YT.player.np);
+}
+function _ytRenderSbLine(){
+  const el = document.getElementById('ytp-sb'); if(!el) return;
+  const S2 = _YT.sbSegs, it = _YT.cur;
+  if(!S2 || !it || S2.ytId !== it.ytId || !S2.segs.length){ el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = '⏭ 會自動跳過：' + S2.segs.map(s => esc(_ytSbName(s.cat)) + ' ' + _ytTs(s.start) + '～' + _ytTs(s.end)).join('、');
+}
+function ytSbSheet(){
+  const p = _ytSbPref();
+  document.getElementById('yt-sbs-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'yt-sbs-ov';
+  ov.className = 'media-ov-sheet z700-d';
+  ov.innerHTML = `<div class="yt-sheet yt-edit">
+      <div class="yt-sheet-hd"><div class="yt-sheet-title">自動跳過片段（SponsorBlock）</div>
+        <button class="yt-x" onclick="document.getElementById('yt-sbs-ov').remove()" aria-label="關閉">✕</button></div>
+      <div class="yt-ch" style="line-height:1.7">由觀眾社群標記片段，播到就自動跳過。只送出影片編號雜湊的前 4 碼，SponsorBlock 不會知道你在看哪一部。</div>
+      <label class="ytd-chk"><input type="checkbox" id="ytsb-on"${p.on ? ' checked' : ''}> 開啟自動跳過</label>
+      <div class="yt-lb">要跳過的片段</div>
+      ${_YT_SBC.map(([k, n]) => `<label class="ytd-chk" style="margin-top:6px"><input type="checkbox" data-sb="${k}"${p.cats.includes(k) ? ' checked' : ''}> ${esc(n)}</label>`).join('')}
+      <div class="yt-edit-btns"><button class="yt-btn pri" onclick="_ytSbApply()">儲存</button></div>
+    </div>`;
+  ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+}
+function _ytSbApply(){
+  const p = { on:document.getElementById('ytsb-on').checked, cats:[...document.querySelectorAll('#yt-sbs-ov [data-sb]')].filter(x => x.checked).map(x => x.dataset.sb) };
+  try{ localStorage.setItem('yt_sb', JSON.stringify(p)); }catch(_){}
+  document.getElementById('yt-sbs-ov')?.remove();
+  if(_ytNP() && _YT.npOpen) _ytNP().control({ cmd:'sb', ..._ytSbNative() });
+  toast(p.on && p.cats.length ? '已開啟自動跳過（下一部開始套用）' : '已關閉自動跳過');
+}
+
+// ════════════════════════════════════════════════════════════
+// 【同步歌詞】（v4.56）LRCLIB 免費歌詞庫：音樂播放時一句一句跟著亮，影片上也顯示；點一句跳過去
+//   用標題、頻道猜歌名和歌手，挑長度最接近的；找不到可以自己改關鍵字再找
+// ════════════════════════════════════════════════════════════
+function _ytLyrOn(){ try{ return localStorage.getItem('yt_lyr') !== '0'; }catch(_){ return true; } }
+// 從 YouTube 標題整理出歌名、歌手
+//   「周杰倫 Jay Chou【晴天 Sunny Day】Official MV」：括號（【】《》「」『』）裡是歌名、前面是歌手
+//   「Queen – Bohemian Rhapsody (Official Video)」：破折號前歌手、後歌名
+const _ytLyrJunk = /\b(official\s+(music\s+)?video|official\s+audio|official|lyric\s+video|lyrics?|music\s+video|mv|m\/v|4k|hd|hq|remastered|visualizer|audio|video)\b/ig;
+function _ytSongGuess(it){
+  const raw = String(it.title || '');
+  const ch = String(it.ytChannel || '').replace(/\s*-\s*Topic$/i, '').replace(/VEVO$/i, '').replace(/\s*(官方頻道|Official)$/i, '').trim();
+  const clean = x => String(x || '').replace(/\([^)]*\)|（[^）]*）|\[[^\]]*\]/g, ' ').replace(_ytLyrJunk, ' ')
+    .replace(/(官方|完整版|高音質|動態歌詞|歌詞版|字幕版)\S*/g, ' ').replace(/[|｜]/g, ' ').replace(/\s+/g, ' ').trim();
+  const br = raw.match(/[【《「『]([^】》」』]+)[】》」』]/);
+  if(br && !/^(mv|official|官方|歌詞|動態歌詞|lyrics?)/i.test(br[1].trim())){
+    const track = clean(br[1]);
+    const artist = clean(raw.slice(0, br.index)) || ch;
+    return { artist, track, q:(track + ' ' + artist).trim() };
+  }
+  const t = clean(raw.replace(/【[^】]*】/g, ' '));
+  const m = t.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+  if(m) return { artist:m[1].trim(), track:m[2].replace(/\s+[-–—].*$/, '').trim(), q:t };
+  return { artist:ch, track:t, q:(t + ' ' + ch).trim() };
+}
+// 歌名的幾種寫法：整個、中文部分、英文部分（「晴天 Sunny Day」→ 晴天、Sunny Day）
+function _ytTrackKeys(track){
+  const n = x => String(x || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  const cjk = (track.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+/gu) || []).join('');
+  const lat = track.replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+/gu, ' ').trim();
+  return [...new Set([n(cjk), n(lat), n(track)].filter(x => x.length >= 2))];
+}
+function _ytTrackMatch(name, keys){
+  const v = String(name || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  return keys.some(k => v.includes(k) || (v.length >= 2 && k.includes(v)));
+}
+async function _ytLrcGet(url){
+  if(_ytN()) return JSON.parse((await _ytN().fetchText({ url })).text || '[]');
+  const r = await fetch(url, { cache:'no-store' });
+  if(!r.ok) throw new Error('歌詞庫回應 ' + r.status);
+  return r.json();
+}
+async function _ytLyrFind(it, q){
+  const g = _ytSongGuess(it), dur = it.duration || _YT.npDur || 0, keys = _ytTrackKeys(g.track);
+  const cjk = (g.track.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}][\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\s]*/gu) || [''])[0].trim();
+  const S = 'https://lrclib.net/api/search?';
+  const tries = q ? [S + 'q=' + encodeURIComponent(q)] : [
+    ...(g.artist && g.track ? [S + 'track_name=' + encodeURIComponent(g.track) + '&artist_name=' + encodeURIComponent(g.artist)] : []),
+    ...(cjk && cjk !== g.track ? [S + 'q=' + encodeURIComponent(cjk + ' ' + g.artist)] : []),
+    S + 'q=' + encodeURIComponent(g.q),
+    ...(cjk ? [S + 'track_name=' + encodeURIComponent(cjk)] : []),
+  ];
+  for(const u of tries){
+    let list = [];
+    try{ list = await _ytLrcGet(u); }catch(e){ continue; }
+    list = (list || []).filter(x => !x.instrumental && (x.syncedLyrics || x.plainLyrics));
+    if(!q && keys.length) list = list.filter(x => _ytTrackMatch(x.trackName, keys));   // 歌名要對得上，不然可能是同歌手別首
+    if(!list.length) continue;
+    const score = x => (x.syncedLyrics ? 0 : 1000) + (dur && x.duration ? Math.abs(x.duration - dur) : 30);
+    list.sort((a, b) => score(a) - score(b));
+    const best = list[0];
+    if(!q && dur && best.duration && Math.abs(best.duration - dur) > 25) continue;   // 長度差太多：大概不是這個版本
+    return best;
+  }
+  return null;
+}
+function _ytLrcParse(lrc){
+  const out = [];
+  for(const line of String(lrc || '').split(/\r?\n/)){
+    const tags = [...line.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    if(!tags.length) continue;
+    const t = line.replace(/\[[^\]]*\]/g, '').trim();
+    for(const m of tags) out.push({ s:+m[1] * 60 + +m[2], t });
+  }
+  out.sort((a, b) => a.s - b.s);
+  const cues = [];
+  out.forEach((c, i) => { if(c.t) cues.push({ s:c.s, e:out[i + 1] ? out[i + 1].s : c.s + 6, t:c.t }); });
+  return cues;
+}
+// 載入歌詞（取代這部的字幕顯示）
+async function _ytLyrLoad(it, q, quiet){
+  try{
+    const r = await _ytLyrFind(it, q);
+    if(_YT.cur !== it) return false;
+    if(!r){ if(!quiet) toast('歌詞庫找不到這首，可以按「♪ 歌詞」改關鍵字再找'); return false; }
+    const ca = r.syncedLyrics ? _ytLrcParse(r.syncedLyrics) : [];
+    _YT.subs = { ytId:it.ytId, lyrics:true, a:{ name:(r.artistName ? r.artistName + '－' : '') + (r.trackName || '') }, b:null,
+      ca, cb:[], plain:ca.length ? '' : (r.plainLyrics || '') };
+    if(_ytNP()) await _ytNP().setCues({ ytId:it.ytId, cues:ca.map(c => [c.s, c.e, 0, c.t]) });
+    _ytRenderPlayerInfo();   // 「♪ 歌詞」按鈕亮起、面板換成歌詞
+    return true;
+  }catch(e){ if(!quiet) toast('歌詞讀取失敗：' + (e.message || e)); return false; }
+}
+async function ytLyrics(){
+  const it = _YT.cur; if(!it) return;
+  const g = _ytSongGuess(it);
+  const q = await askInput?.('找歌詞（LRCLIB）', '歌名、歌手（可自己修改）', (g.artist && g.track ? g.track + ' ' + g.artist : g.q));
+  if(q == null) return;
+  toast('找歌詞中…');
+  if(await _ytLyrLoad(it, String(q).trim())) toast('已載入歌詞');
+}
+function ytLyrToggle(){
+  const on = !_ytLyrOn();
+  try{ localStorage.setItem('yt_lyr', on ? '1' : '0'); }catch(_){}
+  toast(on ? '音樂會自動找歌詞' : '音樂不自動找歌詞');
+  _ytRenderPlayerInfo();
 }
 
 // ════════════════════════════════════════════════════════════

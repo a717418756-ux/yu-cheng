@@ -529,11 +529,7 @@ async function ansQ(sel){  try{
   //   缺正確答案的題目完全跳過：不動 reviewLevel/nextReview、不累計錯誤數、
   //   也不寫入 attempts，避免污染複習排程、危險題判定與正確率統計。
   if(!noAnswerKey){
-    const curLevel = qu.reviewLevel || 0;
-    const {level:newLevel, next:nextReview} = calcNextReview(curLevel, correct);
-    qu.reviewLevel = newLevel;
-    qu.nextReview  = nextReview;
-    qu.lastReview  = Date.now();
+    S.quiz._fsrs = await reviewSchedule(qu, correct, hesitant);   // v4.56 FSRS（設定可切回固定間隔）
     qu.wrongCount    = (qu.wrongCount||0) + (correct ? 0 : 1);
     qu.correctStreak = correct ? (qu.correctStreak||0)+1 : 0;
     delete qu.guessed;
@@ -779,6 +775,7 @@ async function setWhy(btn){  try{
     btn.classList.toggle('on', on);
     if(mine){ at.confidence = on ? 'guess' : 'normal'; await dp('attempts', at); }
     if(on) qu.guessed = true; else delete qu.guessed;
+    reviewRescore(qu, S.quiz._fsrs, on);   // 猜對的＝「勉強」，下次複習提早
     await dp('questions', qu);
     return;
   }
@@ -1621,9 +1618,7 @@ async function ansQMulti(selected, correctStr, qu){  try{
   const freeHit  = !!qu.answerFree && !!selected && selected !== correctStr && !altHit;
   const correct  = selected === correctStr || altHit || freeHit;
   const hesitant = responseTime > 40000;
-  const curLevel = qu.reviewLevel || 0;
-  const {level:newLevel, next:nextReview} = calcNextReview(curLevel, correct);
-  qu.reviewLevel = newLevel; qu.nextReview = nextReview; qu.lastReview = Date.now();
+  S.quiz._fsrs = await reviewSchedule(qu, correct, hesitant);   // v4.56 FSRS（設定可切回固定間隔）
   qu.wrongCount    = (qu.wrongCount||0) + (correct ? 0 : 1);
   qu.correctStreak = correct ? (qu.correctStreak||0)+1 : 0; delete qu.guessed;
   qu.difficultyScore = Math.min(10, (qu.difficultyScore||5) + (correct ? (hesitant?0:-0.5) : 1.5));

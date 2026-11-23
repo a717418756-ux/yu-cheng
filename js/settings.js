@@ -77,6 +77,30 @@ async function _restoreTable(name, rows){
 //   ★ 連線設定（雲端網址、密碼、Azure 金鑰）只在手機上「還沒設定」時才從備份補上：
 //   新手機還原一次就能用；但已經設好的不會被舊備份蓋回舊值
 //   （Apps Script 重新部署會換網址，用舊備份還原後網址變回舊的 → 雲端一直 HTTP 404）
+// v4.56 複習排程設定（db.js reviewSchedule）
+function _renderReviewAlgo(){
+  const a = document.getElementById('rv-algo'), r = document.getElementById('rv-ret'), info = document.getElementById('rv-info');
+  if(!a) return;
+  a.value = _reviewAlgo();
+  r.value = String(_reviewRet());
+  r.disabled = _reviewAlgo() !== 'fsrs';
+  if(info) da('questions').then(qs => {
+    const mc = qs.filter(q => q.type === 'mc'), n = mc.filter(q => q.fsrs).length;
+    info.textContent = !window.FSRS ? 'FSRS 程式沒有載入，暫時用固定間隔。'
+      : _reviewAlgo() === 'fsrs' ? '已有 ' + n + '／' + mc.length + ' 題用 FSRS 排程（其他題目下次作答時，會用以前的作答紀錄算出來）。'
+      : '目前用固定間隔。已有 FSRS 資料的題目保留資料，切回 FSRS 時接著用。';
+  }).catch(()=>{});
+}
+function setReviewAlgo(v){
+  try{ localStorage.setItem('review_algo', v === 'fixed' ? 'fixed' : 'fsrs'); }catch(_){}
+  toast(v === 'fixed' ? '改用固定間隔（之後作答開始生效）' : '改用 FSRS（之後作答開始生效）');
+  _renderReviewAlgo();
+}
+function setReviewRet(v){
+  try{ localStorage.setItem('review_ret', String(+v || 0.9)); }catch(_){}
+  toast('目標記住 ' + Math.round((+v || 0.9) * 100) + '%（之後作答開始生效）');
+  _renderReviewAlgo();
+}
 const _CONN_KEYS = [GAS_URL_KEY, GAS_PWD_KEY, 'tts_azure_key', 'yt_api_key'];
 // 舊版把「上次備份／還原時間」存在設定裡，會跟著備份跑到別台裝置，造成誤判 → 還原時略過
 const _DEVICE_LOCAL_KEYS = ['lastBackupTime', 'lastRestoreTime'];
@@ -699,7 +723,7 @@ async function removeGuessQs(){ try{
   renderSet();
 }catch(e){ logError('removeGuessQs', e); toast('移除失敗：' + e.message); }}
 
-async function renderSet(){  _renderAzureKey().catch(()=>{}); window._renderYtKey?.().catch(()=>{}); try{
+async function renderSet(){  _renderAzureKey().catch(()=>{}); window._renderYtKey?.().catch(()=>{}); try{ _renderReviewAlgo(); }catch(e){} try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
   const gRow = document.getElementById('guess-row'), gN = qs.filter(_isGuessQ).length;
   if(gRow){ gRow.style.display = gN ? '' : 'none'; const b = document.getElementById('guess-n'); if(b) b.textContent = gN; }
@@ -921,7 +945,7 @@ async function localBackup(){
         _setAnchor('local', _summ({ exportedAt, meta }), 'backup');
 
         // ── 書庫、影音、學習區（參考書／教材影音）：每筆一個說明檔＋實際檔案 ──
-        _skipN = 0;
+        _skipN = 0; _badList = [];
         const count = 1
           + await _backupDir(dirHandle, 'ebooks',     ebooks,     _EXT.ebooks)
           + await _backupDir(dirHandle, 'media',      media,      _EXT.leisuremedia)
@@ -935,6 +959,7 @@ async function localBackup(){
           '裝置：' + meta.device,
           '內容：exam_data.json（' + _mb(new Blob([examBody]).size) + '）＋ ebooks／media／refbooks／learnmedia 四個資料夾',
           _skipN ? '其中 ' + _skipN + ' 個書籍、影音檔與資料夾裡的相同，沒有重寫。' : '',
+          _badList.length ? '⚠ 有 ' + _badList.length + ' 個檔案在這台讀不到（可能存檔時 App 被關掉），沒有寫入，資料夾裡原本的檔案保留：' + _badList.slice(0, 5).join('、') + (_badList.length > 5 ? ' 等' : '') + '。這幾個請在影音庫或書庫刪除後重新加入。' : '',
           existing ? '上一份已移到 history 資料夾保留。' : '',
         ]);
         _renderSyncStatus().catch(()=>{});
@@ -1000,14 +1025,23 @@ const _THUMBS = ['coverThumb', 'spineThumb', 'thumbnail'];
 
 async function _writeFile(dir, name, data){
   const w = await (await dir.getFileHandle(name, { create:true })).createWritable();
-  await w.write(data);
+  try{ await w.write(data); }
+  catch(e){ try{ await w.abort?.(); }catch(_){} throw e; }   // 寫入失敗：放棄這次寫入（瀏覽器版原檔不變）
   await w.close();
 }
 
 // 備份一類檔案到子資料夾：{id}.meta.json（不含檔案本體）＋ {id}.{副檔名}（檔案本體）
 //   v4.33：資料夾裡已有同名、同大小的檔案本體就不再重寫（書、影音動輒幾十 MB，每次全部重寫是本機備份慢的主因）；
 //   說明檔很小，照樣每次重寫（書籤、進度等會變）。
-let _skipN = 0;
+let _skipN = 0, _badList = [];
+// v4.56：這台的檔案讀不到（例如存檔時 App 被關掉）就略過這一個，不讓整份備份失敗；先讀開頭和結尾試試
+async function _blobProbe(b){
+  const n = Math.min(65536, b.size);
+  const read = (s, e) => Promise.race([b.slice(s, e).arrayBuffer(),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('讀取逾時')), 8000))]);
+  await read(0, n);
+  if(b.size > n) await read(b.size - n, b.size);
+}
 // v4.49：原本只比大小，同名同大小、內容不同（例如換了同大小的檔）就不會重寫，備份留著舊內容。
 //   現在大小相同再比內容：4 MB 以下整份比；更大的比開頭、中間、結尾各 256 KB（只讀這幾段，仍比整份重寫快很多）
 async function _sameBytes(a, b){
@@ -1023,7 +1057,7 @@ async function _sameBytes(a, b){
 }
 async function _sameFile(dir, name, blob){
   let f;
-  try{ f = await (await dir.getFileHandle(name)).getFile(); }
+  try{ const h = await dir.getFileHandle(name); f = h._lazyFile ? h._lazyFile() : await h.getFile(); }   // App 版：只讀要比的那幾段（folder-native.js）
   catch(e){ return false; }
   return f.size === blob.size && await _sameBytes(f, blob);
 }
@@ -1037,12 +1071,25 @@ async function _backupDir(dirHandle, dirName, rows, extOf){
   for(const r of rows){
     const { blob, coverBlob, ...meta } = r;
     for(const f of _THUMBS)
-      if(meta[f] instanceof Blob){ meta[f] = await _blobToBase64(meta[f]); meta['_' + f + 'IsBase64'] = true; }
+      if(meta[f] instanceof Blob){
+        try{ meta[f] = await _blobToBase64(meta[f]); meta['_' + f + 'IsBase64'] = true; }
+        catch(e){ logError('backupDir-thumb', e); meta[f] = null; }   // v4.56 封面讀不到：不帶封面，不讓整份備份失敗
+      }
     await _writeFile(dir, r.id + '.meta.json', JSON.stringify(meta));
     if(!blob) continue;
     const name = r.id + '.' + extOf(r);
-    if(await _sameFile(dir, name, blob)){ _skipN++; continue; }
-    await _writeFile(dir, name, blob);
+    try{ await _blobProbe(blob); }
+    catch(e){ logError('backupDir-unreadable', e); _badList.push(r.title || r.name || String(r.id)); continue; }
+    try{
+      if(await _sameFile(dir, name, blob)){ _skipN++; continue; }
+      await _writeFile(dir, name, blob);
+    }catch(e){
+      // 讀到一半失敗（檔案中段損毀）：App 版是直接覆寫，寫了一半的檔不能留著（還原會拿到壞檔），刪掉並列出；
+      //   瀏覽器版寫入失敗時原檔不變（關閉才生效），不刪
+      logError('backupDir-write', e);
+      if(dir._native){ try{ await dir.removeEntry(name); }catch(_){} }
+      _badList.push(r.title || r.name || String(r.id));
+    }
   }
   return rows.length;
 }
@@ -1389,7 +1436,8 @@ const Settings = {
   clearAts, delAll, toggleGasHelp,
   localBackup, localRestore, saveAzureKey, openDebugPanel, removeGuessQs,
   _snapOrAsk,   // data.js 的考古題更正套用前也要存快照
-  checkRestoreInterrupted   // app.js 啟動時檢查上次還原是否中斷
+  checkRestoreInterrupted,  // app.js 啟動時檢查上次還原是否中斷
+  setReviewAlgo, setReviewRet   // v4.56 複習排程設定（設定頁的選單）
 };
 window.Settings = Settings;
 Object.assign(window, Settings);

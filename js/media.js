@@ -704,6 +704,7 @@ async function playAudio(id){
     meta = {...meta, thumbnail: full.thumbnail};
   }
   _showVinylPlayer(meta, url, full);
+  if(full.ytSrc && typeof ytSbAttach==='function') ytSbAttach(_audioEl, full.ytSrc);   // v4.56 自動跳過業配（SponsorBlock）
 
   // 更新播放記錄
   full.lastPlay=Date.now();
@@ -1403,6 +1404,7 @@ async function playVideo(id){
     vidEl.appendChild(tr);
   }catch(e){} });
   if(full.lastPos>3) vidEl.currentTime=full.lastPos;
+  if(full.ytSrc && typeof ytSbAttach==='function') ytSbAttach(vidEl, full.ytSrc);   // v4.56 自動跳過業配（SponsorBlock）
 
   // 更新播放記錄
   full.lastPlay=Date.now();
