@@ -597,6 +597,9 @@ function _handleBackLayer(){
   return false;   //   
 }
 
+// Android App 外殼的返回鍵（MainActivity 呼叫）：有可關的層或上一頁就處理並回 true，沒有就回 false（App 退到背景）
+window._ycNativeBack = () => { try{ return !!_handleBackLayer(); }catch(e){ logError('nativeBack', e); return false; } };
+
 function _initBackHandler(){
   _pushBackGuard();   // 一次性推入 60 筆緩衝，之後不再需要動態補回
 

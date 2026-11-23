@@ -88,6 +88,7 @@ async function _fillMediaThumbs(container){
     const img = document.createElement('img');
     img.loading = 'lazy';
     img.className = 'media-thumb-img'+(isAudio?' audio':'');
+    img.loading = 'eager';   // 這張圖載入成功才放進畫面；lazy 的圖不在畫面上永遠不會載入
     const badge = el.querySelector('.yt-badge');
     // 載入成功才換掉佔位（YouTube 縮圖是網址，離線時載不到就保留原本的🎬／唱盤）
     img.onload = ()=>{
@@ -676,6 +677,7 @@ async function playAudio(id){
   // 讀取 Blob
   const full=await dg('leisuremedia',id);
   if(full?.ytId){ ytPlayItem(full); return; }   // v4.53 YouTube 項目：用官方播放器播（youtube.js）
+  if(full?.blob && !await _blobOk(full.blob)){ _blobBad(id); return; }
   if(!full?.blob){
     // 無附加檔案：如果是自動播放（播放列表）就跳下一首，手動點擊才開詳情
     if(_M.playlist.length > 1){
@@ -1362,6 +1364,7 @@ function openVpPlaylist(){
 async function playVideo(id){
   const full=await dg('leisuremedia',id);
   if(full?.ytId){ ytPlayItem(full); return; }   // v4.53 YouTube 項目：用官方播放器播（youtube.js）
+  if(full?.blob && !await _blobOk(full.blob)){ _blobBad(id); return; }
   if(!full?.blob){
     openMediaDetail(id);
     toast('此影片無附加檔案，可在詳情中刪除');
@@ -1919,3 +1922,14 @@ function _fmtDurSec(sec){
   return `${m}:${String(s).padStart(2,'0')}`;
 }
 // _fmtSize 已於 books.js 定義（共用），此處不重複定義
+
+// v4.54 檔案讀得到嗎：手機在檔案剛存進去時斷電、App 被強制關閉，檔案可能沒寫完，
+//   這時讀它會一直卡住（播放器轉圈不動）。先讀開頭 2 個位元組，3 秒內讀不到就當壞掉
+async function _blobOk(b){
+  try{ return await Promise.race([b.slice(0, 2).arrayBuffer().then(() => true), new Promise(r => setTimeout(() => r(false), 3000))]); }
+  catch(e){ return false; }
+}
+function _blobBad(id){
+  openMediaDetail(id);
+  toast('這個檔案讀不到（可能存檔時 App 被關掉或手機斷電），請刪除後重新下載或重新加入');
+}

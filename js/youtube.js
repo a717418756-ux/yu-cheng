@@ -384,6 +384,16 @@ async function _ytOpenPlayer(queue, idx){
   if(!navigator.onLine){ toast('YouTube 需要網路才能播放'); return; }
   try{ if(typeof closeVinylPlayer === 'function') closeVinylPlayer(); }catch(_){}   // 同時只播一個
   _YT.queue = queue; _YT.qi = idx < 0 ? 0 : idx;
+  _YT.bg = false; _ytMiniRemove();
+  _ytEnsureOverlay();
+  _ytRenderPlayerInfo();
+  if(!_ytN()){
+    try{ await _ytLoadApi(); }
+    catch(e){ toast(e.message); closeYtPlayer(); return; }
+  }
+  _ytStart();
+}
+function _ytEnsureOverlay(){
   let ov = document.getElementById('yt-player-ov');
   if(!ov){
     ov = document.createElement('div');
@@ -399,12 +409,7 @@ async function _ytOpenPlayer(queue, idx){
       <div class="ytp-body" id="ytp-body"></div>`;
     document.body.appendChild(ov);
   }
-  _ytRenderPlayerInfo();
-  if(!_ytN()){
-    try{ await _ytLoadApi(); }
-    catch(e){ toast(e.message); closeYtPlayer(); return; }
-  }
-  _ytStart();
+  return ov;
 }
 
 function _ytStart(){
@@ -413,6 +418,7 @@ function _ytStart(){
   _ytRenderPlayerInfo();
   // 看到一半的從上次位置接著看（最後 10 秒內就從頭）
   const start = it.lastPos > 5 && !(it.duration && it.lastPos > it.duration - 10) ? Math.floor(it.lastPos) : 0;
+  if(_ytNP() && !it._iframe){ _ytNPStart(it, start); return; }
   if(_ytN() && !it._iframe){
     if(_YT.player && !_YT.player.native){   // 上一部用官方播放器：先拆掉
       try{ _YT.player.destroy(); }catch(_){}
@@ -521,39 +527,61 @@ function _ytDlSheet(it){
       <label class="yt-lb">分類</label>
       <input id="ytd-cat" class="finput" list="ytd-cats" value="${esc(it.category || '')}" placeholder="例：英文聽力、讀書音樂">
       <datalist id="ytd-cats">${_ytCats().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
-      <label class="yt-lb">下載</label>
-      <div class="yt-seg">
-        <button id="ytd-k-audio" class="on" onclick="_ytDlKind('audio')">🎵 只要聲音（檔案小）</button>
-        <button id="ytd-k-video" onclick="_ytDlKind('video')">🎬 影片（含聲音）</button>
-      </div>
-      <div id="ytd-q-row" hidden>
-        <label class="yt-lb">畫質（越高檔案越大；十分鐘約 360p 30 MB、720p 80 MB、1080p 150 MB）</label>
-        <div class="yt-seg">
-          <button id="ytd-q-360" onclick="_ytDlQ(360)">360p</button>
-          <button id="ytd-q-720" class="on" onclick="_ytDlQ(720)">720p</button>
-          <button id="ytd-q-1080" onclick="_ytDlQ(1080)">1080p</button>
-        </div>
-      </div>
+      <label class="yt-lb">格式與畫質</label>
+      <div id="ytd-opts" class="ytd-opts"><div class="yt-ch">讀取可下載的格式…</div></div>
+      <label class="ytd-chk"><input type="checkbox" id="ytd-export"> 另存一份到手機的「下載／Y.C.」資料夾（其他 App 也能開）</label>
       <div id="ytd-prog" class="ytd-prog" hidden><div class="ytd-bar"><i id="ytd-bar"></i></div><div id="ytd-txt" class="yt-ch"></div></div>
       <div class="yt-edit-btns">
         <button class="yt-btn" id="ytd-cancel" onclick="_ytDlClose()">取消</button>
         <button class="yt-btn pri" id="ytd-go" onclick="_ytDlGo()">開始下載</button>
       </div>
     </div>`;
-  ov._it = it; ov._kind = 'audio'; ov._q = 720;
+  ov._it = it; ov._opt = null;
   ov.onclick = e => { if(e.target === ov && !ov._busy) ov.remove(); };
   document.body.appendChild(ov);
+  _ytDlLoadOpts(ov);
 }
-function _ytDlKind(k){
-  const ov = document.getElementById('yt-dl-ov'); if(!ov || ov._busy) return;
-  ov._kind = k;
-  for(const x of ['audio', 'video']) document.getElementById('ytd-k-' + x)?.classList.toggle('on', x === k);
-  const q = document.getElementById('ytd-q-row'); if(q) q.hidden = k !== 'video';
+// 依影片實際有的串流列出選項：聲音（M4A 相容最好、Opus 音質好檔案小）、影片 MP4（H.264）、WebM（VP9，可到 4K）
+async function _ytDlLoadOpts(ov){
+  const box = document.getElementById('ytd-opts');
+  try{
+    const info = ov._info = await _ytN().info({ url:_ytWatch(ov._it.ytId) });
+    const sz = x => (x && x.size > 0) ? x.size : 0;
+    const orig = (info.audio || []).filter(a => a.original !== false);
+    const best = fmt => orig.filter(a => a.fmt === fmt).sort((a, b) => (b.kbps || 0) - (a.kbps || 0))[0];
+    const m4a = best('M4A'), opus = best('WEBMA_OPUS');
+    const opts = [];
+    if(m4a) opts.push({ kind:'audio', a:m4a, label:'🎵 聲音 M4A ' + (m4a.kbps > 0 ? m4a.kbps + 'kbps' : ''), sub:'各裝置都能播', size:sz(m4a) });
+    if(opus) opts.push({ kind:'audio', a:opus, label:'🎵 聲音 Opus ' + (opus.kbps > 0 ? opus.kbps + 'kbps' : ''), sub:'音質較好、檔案較小', size:sz(opus) });
+    const byH = {};
+    for(const v of info.videoOnly || []){
+      const k = (v.ext === 'webm' ? 'webm' : 'mp4') + v.height;
+      if(!byH[k] || (v.fps || 0) < (byH[k].fps || 0)) byH[k] = v;   // 同畫質選幀率低的（檔案小）
+    }
+    const vids = Object.values(byH).sort((a, b) => (b.height || 0) - (a.height || 0) || (a.ext === 'mp4' ? -1 : 1));
+    for(const v of vids){
+      const a = v.ext === 'webm' ? opus : m4a;
+      if(!a) continue;
+      opts.push({ kind:'video', v, a, fmt:v.ext, label:'🎬 影片 ' + (v.ext === 'webm' ? 'WebM ' : 'MP4 ') + v.res,
+        sub:v.ext === 'webm' ? 'VP9，檔案較小' : 'H.264，各裝置都能播', size:sz(v) && sz(a) ? sz(v) + sz(a) : 0 });
+    }
+    for(const v of info.video || []) opts.push({ kind:'muxed', v, label:'🎬 影片 ' + (v.ext || '').toUpperCase() + ' ' + (v.res || ''), sub:'含聲音（舊格式）', size:sz(v) });
+    if(!opts.length) throw new Error('這部影片沒有可下載的格式');
+    ov._opts = opts;
+    // 預設：音樂選 M4A；影片選 MP4 720p 以下最高的
+    let def = ov._it.type === 'audio' ? 0 : opts.findIndex(o => o.kind === 'video' && o.fmt === 'mp4' && o.v.height <= 720);
+    if(def < 0) def = 0;
+    box.innerHTML = opts.map((o, i) => `<button class="ytd-opt" data-i="${i}" onclick="_ytDlPick(${i})">
+      <span class="ytd-opt-l">${esc(o.label)}<small>${esc(o.sub)}</small></span><span class="ytd-opt-s">${o.size ? _fmtSize(o.size) : ''}</span></button>`).join('');
+    _ytDlPick(def);
+  }catch(e){
+    box.innerHTML = '<div class="yt-ch">✗ ' + esc(e.message || e) + '</div>';
+  }
 }
-function _ytDlQ(h){
-  const ov = document.getElementById('yt-dl-ov'); if(!ov || ov._busy) return;
-  ov._q = h;
-  for(const x of [360, 720, 1080]) document.getElementById('ytd-q-' + x)?.classList.toggle('on', x === h);
+function _ytDlPick(i){
+  const ov = document.getElementById('yt-dl-ov'); if(!ov || ov._busy || !ov._opts) return;
+  ov._opt = ov._opts[i];
+  document.querySelectorAll('#ytd-opts .ytd-opt').forEach(b => b.classList.toggle('on', +b.dataset.i === i));
 }
 function _ytDlClose(){
   const ov = document.getElementById('yt-dl-ov'); if(!ov) return;
@@ -562,7 +590,9 @@ function _ytDlClose(){
 }
 async function _ytDlGo(){
   const ov = document.getElementById('yt-dl-ov'); if(!ov || ov._busy) return;
-  const N = _ytN(), it = ov._it, kind = ov._kind;
+  if(!ov._opt){ toast('請先選格式'); return; }
+  const N = _ytN(), it = ov._it, opt = ov._opt, kind = opt.kind === 'audio' ? 'audio' : 'video';
+  const exportCopy = !!document.getElementById('ytd-export')?.checked;
   const title = document.getElementById('ytd-title').value.trim() || it.title || it.ytId;
   const category = document.getElementById('ytd-cat').value.trim();
   const txt = document.getElementById('ytd-txt'), bar = document.getElementById('ytd-bar');
@@ -573,11 +603,7 @@ async function _ytDlGo(){
   ov._busy = id;
   let lis = null; const tmp = [];
   try{
-    txt.textContent = '取得下載網址…';
-    const info = await N.info({ url:_ytWatch(it.ytId) });
-    // 聲音：優先 m4a（各裝置都能播、也能和畫面合併），同格式取位元率最高的
-    const au = (info.audio || []).slice().sort((a, b) => ((b.mime === 'audio/mp4') - (a.mime === 'audio/mp4')) || ((b.kbps || 0) - (a.kbps || 0)))[0];
-    if(!au) throw new Error('找不到可下載的聲音');
+    const info = ov._info;
     let label = '', phase = '';
     lis = await N.addListener('dlProgress', e => {
       if(!e.id.startsWith(id) || e.id.endsWith('_t')) return;   // 封面不算進度
@@ -586,33 +612,33 @@ async function _ytDlGo(){
       txt.textContent = phase + '下載中 ' + pct + '%（' + _fmtSize(e.done) + '／' + _fmtSize(e.total) + '）' + label;
     });
     let r, pick;
-    if(kind === 'audio'){
-      pick = au;
-      r = await N.download({ url:au.url, id, ext:au.ext });
+    if(opt.kind === 'audio'){
+      pick = { mime:opt.a.mime, ext:opt.a.ext };
+      r = await N.download({ url:opt.a.url, id, ext:opt.a.ext });
+      tmp.push(r.path);
+    } else if(opt.kind === 'muxed'){
+      pick = { mime:opt.v.mime, ext:opt.v.ext }; label = '（' + (opt.v.res || '') + '）';
+      r = await N.download({ url:opt.v.url, id, ext:opt.v.ext });
       tmp.push(r.path);
     } else {
-      // 有合在一起的就直接下載；沒有（現在大多數）就畫面、聲音分開下載再合併
-      const muxed = (info.video || []).filter(v => (v.height || 0) <= ov._q).sort((a, b) => (b.height || 0) - (a.height || 0))[0];
-      const vo = (info.videoOnly || []).filter(v => (v.height || 0) <= ov._q).sort((a, b) => (b.height || 0) - (a.height || 0) || (a.fps || 0) - (b.fps || 0))[0];
-      if(vo && (!muxed || (vo.height || 0) > (muxed.height || 0))){
-        if(au.mime !== 'audio/mp4') throw new Error('這部影片的聲音不是 m4a，無法和畫面合併（可改下載聲音）');
-        label = '（' + vo.res + '）';
-        phase = '① 畫面 ';
-        const rv = await N.download({ url:vo.url, id:id + '_v', ext:'mp4' });
-        tmp.push(rv.path);
-        phase = '② 聲音 ';
-        const ra = await N.download({ url:au.url, id:id + '_a', ext:'m4a' });
-        tmp.push(ra.path);
-        phase = '';
-        txt.textContent = '③ 合併畫面和聲音…';
-        r = await N.mux({ video:rv.path, audio:ra.path, id });
-        tmp.push(r.path);
-        pick = { mime:'video/mp4', ext:'mp4' };
-      } else if(muxed){
-        pick = muxed; label = '（' + (muxed.res || '') + '）';
-        r = await N.download({ url:muxed.url, id, ext:muxed.ext });
-        tmp.push(r.path);
-      } else throw new Error('找不到可下載的影片畫質（可改下載聲音）');
+      // 畫面、聲音分開下載，再在手機上合成一個檔（不重新編碼）
+      label = '（' + opt.v.res + '）';
+      phase = '① 畫面 ';
+      const rv = await N.download({ url:opt.v.url, id:id + '_v', ext:opt.v.ext });
+      tmp.push(rv.path);
+      phase = '② 聲音 ';
+      const ra = await N.download({ url:opt.a.url, id:id + '_a', ext:opt.a.ext });
+      tmp.push(ra.path);
+      phase = '';
+      txt.textContent = '③ 合併畫面和聲音…';
+      r = await N.mux({ video:rv.path, audio:ra.path, id, format:opt.fmt });
+      tmp.push(r.path);
+      pick = { mime:opt.fmt === 'webm' ? 'video/webm' : 'video/mp4', ext:opt.fmt };
+    }
+    if(exportCopy){
+      txt.textContent = '另存到手機的「下載」資料夾…';
+      try{ await N.exportFile({ path:r.path, name:title + '.' + pick.ext, mime:pick.mime }); }
+      catch(e){ toast('另存到「下載」資料夾失敗：' + e.message); }
     }
     txt.textContent = '存進影音庫…';
     const raw = await (await fetch(window.Capacitor.convertFileSrc(r.path))).blob();
@@ -634,7 +660,7 @@ async function _ytDlGo(){
     });
     ov._busy = null;
     ov.remove();
-    toast('已下載到影音庫：' + title + '（' + _fmtSize(blob.size) + '）');
+    toast('已下載到影音庫：' + title + '（' + _fmtSize(blob.size) + '）' + (exportCopy ? '，也存到手機「下載／Y.C.」' : ''));
     await _ytAfterChange();
   }catch(e){
     ov._busy = null;
@@ -686,6 +712,11 @@ async function _ytSavePos(ended){
   if(!it || !it.id || !p || !p.getCurrentTime) return;
   let pos = 0, dur = 0;
   try{ pos = Math.floor(p.getCurrentTime() || 0); dur = Math.floor(p.getDuration() || 0); }catch(_){ return; }
+  return _ytSavePosOf(it, pos, dur, ended);
+}
+async function _ytSavePosOf(it, pos, dur, ended){
+  if(!it || !it.id) return;
+  pos = Math.floor(pos || 0); dur = Math.floor(dur || 0);
   if(ended || (dur && pos > dur - 10)) pos = 0;
   it.lastPos = pos;
   try{
@@ -708,7 +739,11 @@ function ytRate(){
   try{ _YT.player.setPlaybackRate(_YT.rate); }catch(_){}
   _ytRenderPlayerInfo();
 }
-function ytLoop(){ _YT.loop = !_YT.loop; _ytRenderPlayerInfo(); toast(_YT.loop ? '單部重複播放' : '播完接下一部'); }
+function ytLoop(){
+  _YT.loop = !_YT.loop;
+  if(_YT.player && _YT.player.np) _ytNP().control({ cmd:'loop', loop:_YT.loop });
+  _ytRenderPlayerInfo(); toast(_YT.loop ? '單部重複播放' : '播完接下一部');
+}
 async function ytFav(){
   const it = _YT.cur; if(!it) return;
   if(!it.id){ _ytEditSheet({ ...it, type:'video', category:'', note:'' }); return; }   // 還沒收進：先收
@@ -744,6 +779,11 @@ function _ytRenderPlayerInfo(){
       <button onclick="${saved ? 'ytEditItem(' + it.id + ')' : '_ytEditSheet(_YT.cur)'}" aria-label="分類與筆記">✎</button>
       <button onclick="ytNext()" aria-label="下一部"${_YT.qi >= q.length - 1 ? ' disabled' : ''}>⏭</button>
     </div>
+    ${_YT.player && _YT.player.np ? `<div class="ytp-ctrls ytp-ctrls2">
+      <button onclick="closeYtPlayer(true)" aria-label="背景播放">🎧 背景播放</button>
+      ${it.type === 'audio' ? '' : `<button onclick="ytFull()" aria-label="全螢幕">⛶ 全螢幕</button>
+      <button onclick="ytQuality()" aria-label="畫質">${_ytMaxH()}p</button>`}
+    </div>` : ''}
     ${it.note ? `<div class="ytp-note">${_ytNoteHtml(it.note)}</div>` : ''}
     ${q.length > 1 ? `<div class="ytp-qhd">播放清單・${_YT.qi + 1}／${q.length}${_YT.loop ? '（單部重複中）' : '（播完自動接下一部）'}</div>
       <div class="ytp-q">${q.map((x, i) => `
@@ -770,7 +810,23 @@ function _ytMenu(){
   document.body.appendChild(ov);
 }
 
-async function closeYtPlayer(){
+async function closeYtPlayer(bg){
+  const ovEl = document.getElementById('yt-player-ov');
+  if(ovEl && ovEl.classList.contains('yt-fs') && bg === undefined){ ytFull(); return; }   // 返回鍵：先退出全螢幕
+  const np = _YT.player && _YT.player.np;
+  if(np && bg === undefined) bg = !!(_YT.npPlaying && _YT.cur && _YT.cur.type === 'audio');   // 音樂：關掉畫面、繼續在背景播
+  if(np && bg === true){
+    await _ytSavePos();
+    _ytNP().setView({ visible:false });
+    _ytNPObs(false);
+    document.getElementById('yt-menu-ov')?.remove();
+    ovEl?.remove();
+    _YT.bg = true;
+    _ytMiniRender();
+    if(S.page === 'media' && !document.getElementById('yt-search-ov')) _renderMediaPage();
+    return;
+  }
+  _YT.bg = false; _ytMiniRemove();
   clearInterval(_YT.timer); _YT.timer = null;
   await _ytSavePos();
   try{ _YT.player && _YT.player.destroy && _YT.player.destroy(); }catch(_){}
@@ -779,6 +835,193 @@ async function closeYtPlayer(){
   document.getElementById('yt-player-ov')?.remove();
   if(S.page === 'media' && !document.getElementById('yt-search-ov')) _renderMediaPage();   // 「最近播放」、看到哪裡
   else if(document.getElementById('yt-results')) _ytRenderResults();
+}
+
+// ════════════════════════════════════════════════════════════
+// 【App 版原生播放器】YcPlayer（Media3）：影片沒有廣告、關螢幕／切 App 繼續播、通知列控制、全螢幕
+//   畫面是原生元件，疊在 .ytp-frame-wrap 的位置；有彈窗蓋上來時先藏起來
+// ════════════════════════════════════════════════════════════
+function _ytNP(){
+  const C = window.Capacitor;
+  return (C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.YcPlayer) || null;
+}
+function _ytMaxH(){ try{ return +(localStorage.getItem('yt_maxh') || 720) || 720; }catch(_){ return 720; } }
+function _ytNPAdapter(){
+  const P = _ytNP();
+  return { native:true, np:true,
+    getCurrentTime:() => _YT.npPos || 0, getDuration:() => _YT.npDur || 0,
+    seekTo:s => { P.control({ cmd:'seek', pos:s }); }, playVideo:() => P.control({ cmd:'play' }), pauseVideo:() => P.control({ cmd:'pause' }),
+    setPlaybackRate:r => P.control({ cmd:'rate', rate:r }),
+    destroy:() => { P.stop(); _YT.npOpen = false; _ytNPObs(false); } };
+}
+function _ytNPItems(){
+  return _YT.queue.map(x => ({ ytId:x.ytId, title:x.title || '', artist:x.ytChannel || '', audioOnly:x.type === 'audio' }));
+}
+async function _ytNPStart(it, start){
+  const P = _ytNP();
+  _ytNPInit();
+  if(_YT.player && !_YT.player.np){   // 上一部用官方播放器：先拆掉
+    try{ _YT.player.destroy(); }catch(_){}
+    _YT.player = null;
+  }
+  _ytNPPoster(it);
+  try{
+    if(_YT.player && _YT.player.np && _YT.npOpen){
+      await P.jump({ index:_YT.qi, start });
+    } else {
+      _YT.player = _ytNPAdapter();
+      await P.open({ items:_ytNPItems(), index:_YT.qi, start, maxHeight:_ytMaxH(), rate:_YT.rate, loop:_YT.loop, rect:_ytNPRect() });
+      _YT.npOpen = true;
+    }
+  }catch(e){ toast('播放器開啟失敗：' + e.message); return; }
+  _ytNPObs(true);
+  _ytRenderPlayerInfo();
+  _ytNPSync();
+  _ytMarkPlayed(it);
+}
+// 音樂：原生畫面藏起來，改顯示封面
+function _ytNPPoster(it){
+  const w = document.querySelector('#yt-player-ov .ytp-frame-wrap');
+  if(!w) return;
+  w.innerHTML = it && it.type === 'audio' ? `<img class="ytp-poster" src="${_ytThumb(it.ytId).replace('mqdefault', 'hqdefault')}" alt="">` : '';
+}
+function _ytNPCovered(){
+  return !document.getElementById('yt-player-ov') || _YT.bg ||
+    !!document.querySelector('#yt-edit-ov, #yt-menu-ov, #yt-dl-ov, #ask-in-ov, #cfm-ov.on, .cov.on, #img-viewer');
+}
+function _ytNPRect(){
+  const it = _YT.cur || _YT.queue[_YT.qi];
+  const w = document.querySelector('#yt-player-ov .ytp-frame-wrap');
+  if(!w || !it || it.type === 'audio' || _ytNPCovered()) return { visible:false };
+  const r = w.getBoundingClientRect();
+  return { x:r.left, y:r.top, w:r.width, h:r.height, visible:r.width > 0 && r.height > 0 };
+}
+let _ytNPSyncT = 0;
+function _ytNPSync(){
+  if(!_ytNP() || !_YT.npOpen) return;
+  cancelAnimationFrame(_ytNPSyncT);
+  _ytNPSyncT = requestAnimationFrame(() => _ytNP().setView(_ytNPRect()));
+}
+let _ytNPMo = null;
+function _ytNPObs(on){
+  if(on && !_ytNPMo){
+    _ytNPMo = new MutationObserver(_ytNPSync);
+    _ytNPMo.observe(document.body, { childList:true, subtree:true, attributes:true, attributeFilter:['class'] });
+    window.addEventListener('resize', _ytNPSync);
+  } else if(!on && _ytNPMo){
+    _ytNPMo.disconnect(); _ytNPMo = null;
+    window.removeEventListener('resize', _ytNPSync);
+  }
+}
+let _ytNPInited = false;
+function _ytNPInit(){
+  if(_ytNPInited) return;
+  _ytNPInited = true;
+  const P = _ytNP();
+  P.addListener('state', s => {
+    if(!_YT.npOpen) return;
+    // 原生端自己換到下一部（播完、通知列按下一首）：先存上一部看到哪裡，再換畫面上的資訊
+    if(s.index !== _YT.qi && _YT.queue[s.index]){
+      const prev = _YT.cur;
+      if(prev) _ytSavePosOf(prev, _YT.npPos, _YT.npDur, true);
+      _YT.qi = s.index; _YT.cur = _YT.queue[s.index];
+      _YT.npPos = 0; _YT.npDur = 0;
+      _ytNPPoster(_YT.cur);
+      _ytRenderPlayerInfo();
+      _ytNPSync();
+      _ytMarkPlayed(_YT.cur);
+    }
+    _YT.npPos = s.pos; _YT.npDur = s.dur; _YT.npPlaying = s.playing;
+    if(s.playing && Date.now() - (_YT.npSaved || 0) > 10000){ _YT.npSaved = Date.now(); _ytSavePos(); }
+    if(s.ended) _ytSavePos(true);
+    _ytMiniUpdate();
+  });
+  P.addListener('error', e => {
+    const it = _YT.queue[e.index];
+    if(!it || e.index !== _YT.qi) return;
+    if(_YT.bg){ toast(e.message + '，跳到下一部'); _ytNP().control({ cmd:'next' }); return; }
+    toast(e.message + '，改用 YouTube 播放器');
+    it._iframe = true;
+    const start = Math.floor(_YT.npPos || it.lastPos || 0);
+    try{ _YT.player && _YT.player.destroy(); }catch(_){}
+    _YT.player = null;
+    _ytStartIframe(it, start);
+  });
+  P.addListener('fullscreen', () => ytFull());
+}
+// 全螢幕：畫面放滿、轉橫向；再按一次（或返回鍵）還原
+function ytFull(){
+  const ov = document.getElementById('yt-player-ov'); if(!ov) return;
+  const on = !ov.classList.contains('yt-fs');
+  ov.classList.toggle('yt-fs', on);
+  _ytNP()?.setOrientation({ mode:on ? 'landscape' : 'auto' });
+  setTimeout(_ytNPSync, 50); setTimeout(_ytNPSync, 600);
+}
+// 畫質：360／480／720／1080 輪流（之後每部都用這個上限；目前這部從現在的位置重新載入）
+function ytQuality(){
+  const hs = [360, 480, 720, 1080];
+  const h = hs[(hs.indexOf(_ytMaxH()) + 1) % hs.length];
+  try{ localStorage.setItem('yt_maxh', String(h)); }catch(_){}
+  toast('畫質上限 ' + h + 'p');
+  if(_YT.player && _YT.player.np){
+    _ytNP().open({ items:_ytNPItems(), index:_YT.qi, start:_YT.npPos || 0, maxHeight:h, rate:_YT.rate, loop:_YT.loop, rect:_ytNPRect() });
+  }
+  _ytRenderPlayerInfo();
+}
+// 背景播放時的迷你播放列（任何頁面都看得到；點一下回到播放畫面）
+function _ytMiniRender(){
+  let bar = document.getElementById('yt-mini');
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'yt-mini';
+    bar.className = 'yt-mini';
+    document.body.appendChild(bar);
+  }
+  const it = _YT.cur || {};
+  bar.innerHTML = `
+    <img src="${_ytThumb(it.ytId || '')}" alt="" onclick="ytReopen()" onerror="this.style.visibility='hidden'">
+    <div class="yt-mini-t" onclick="ytReopen()"><div class="yt-t">${esc(it.title || '')}</div><div class="yt-ch" id="yt-mini-s">背景播放中</div></div>
+    <button onclick="_ytNP().control({cmd:'toggle'})" id="yt-mini-pp" aria-label="播放／暫停">⏸</button>
+    <button onclick="_ytNP().control({cmd:'next'})" aria-label="下一部">⏭</button>
+    <button onclick="ytStopBg()" aria-label="停止">✕</button>`;
+}
+function _ytMiniUpdate(){
+  const bar = document.getElementById('yt-mini'); if(!bar) return;
+  const it = _YT.cur || {};
+  const t = bar.querySelector('.yt-mini-t .yt-t'); if(t && t.textContent !== (it.title || '')) _ytMiniRender();
+  const pp = document.getElementById('yt-mini-pp'); if(pp) pp.textContent = _YT.npPlaying ? '⏸' : '▶';
+  const st = document.getElementById('yt-mini-s');
+  if(st) st.textContent = (_YT.npPlaying ? '背景播放中' : '已暫停') + (_YT.npDur ? '・' + _fmtDur(Math.floor(_YT.npPos)) + '／' + _fmtDur(Math.floor(_YT.npDur)) : '');
+}
+function _ytMiniRemove(){ document.getElementById('yt-mini')?.remove(); }
+function ytReopen(){
+  if(!_YT.npOpen) { _ytMiniRemove(); return; }
+  _YT.bg = false; _ytMiniRemove();
+  _ytEnsureOverlay();
+  _ytNPPoster(_YT.cur);
+  _ytRenderPlayerInfo();
+  _ytNPObs(true);
+  _ytNPSync();
+}
+async function ytStopBg(){
+  await _ytSavePos();
+  try{ _ytNP().stop(); }catch(_){}
+  _YT.player = null; _YT.npOpen = false; _YT.bg = false; _YT.cur = null;
+  _ytNPObs(false);
+  _ytMiniRemove();
+}
+// 系統列（狀態列、手勢列）底色跟著主題
+function _ytBars(){
+  const N = _ytN(); if(!N || !N.setBars) return;
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--bg0').trim() || '#0a0a0a';
+  const c = document.createElement('canvas').getContext('2d'); c.fillStyle = v; const hex = c.fillStyle;   // 轉成 #rrggbb
+  const n = parseInt(String(hex).slice(1), 16);
+  const lum = ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000;
+  N.setBars({ color:/^#[0-9a-f]{6}$/i.test(hex) ? hex : '#0a0a0a', dark:lum < 140 }).catch(()=>{});
+}
+if(_ytN()){
+  setTimeout(_ytBars, 300);
+  new MutationObserver(() => setTimeout(_ytBars, 50)).observe(document.documentElement, { attributes:true, attributeFilter:['data-theme', 'class', 'style'] });
 }
 
 // ════════════════════════════════════════════════════════════
