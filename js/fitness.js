@@ -298,10 +298,10 @@ async function _fitHcHtml(){
     ${st.bmr ? '' : `<div class="fit-hc-warn">三星健康只提供「總消耗」，要算出活動消耗還需要讀取「基礎代謝率」的權限。<button class="fit-hc-btn pri" onclick="fitHcConnect()">重新授權</button></div>`}
     ${ses.length ? `<div class="fit-hc-sub">今天的運動</div>` + ses.map(m => `<div class="fit-hc-row">
         <span>${(_FIT_TYPES.find(t => t[0] === m.type) || ['', '💪 運動'])[1]} ${m.minutes} 分${m.kcal ? '・' + m.kcal + ' kcal' : ''}<small>${_fitHm(m.start)}～${_fitHm(m.end)}・${m.mine ? '本 App 記的' : esc(m.app)}${m.title ? '・' + esc(m.title) : ''}</small></span>
-        ${m.mine ? `<button onclick="fitHcRemove('exercise','${esc(m.id)}','${esc(m.cid || '')}')" aria-label="刪除">✕</button>` : ''}</div>`).join('') : ''}
+        ${m.mine ? `<button onclick="fitHcRemove('exercise','${escJs(m.id)}','${escJs(m.cid || '')}')" aria-label="刪除">✕</button>` : ''}</div>`).join('') : ''}
     ${mine.length ? `<div class="fit-hc-sub">今天在這裡記的飲食</div>` + mine.sort((a, b) => a.start - b.start).map(m => `<div class="fit-hc-row">
         <span>🍽️ ${((_FIT_MEALS.find(x => x[0] === m.meal) || [0, ''])[1] || '飲食') + (m.title ? '・' + esc(m.title) : '')}・${m.kcal} kcal<small>${_fitHm(m.start)}</small></span>
-        <button onclick="fitHcRemove('food','${esc(m.id)}','')" aria-label="刪除">✕</button></div>`).join('') : ''}
+        <button onclick="fitHcRemove('food','${escJs(m.id)}','')" aria-label="刪除">✕</button></div>`).join('') : ''}
     ${days.length > 1 ? `<div class="fit-hc-sub">最近 ${days.length} 天</div><table class="fit-hc-tb"><tr><th>日期</th><th>步數</th><th>運動</th><th>總燃燒</th><th>活動＋健身</th><th>攝取</th></tr>
       ${days.map(r => `<tr><td>${r.id.slice(5).replace('-', '/')}</td><td>${(r.hc.steps || 0).toLocaleString()}</td><td>${r.hc.activeMin || 0} 分</td><td>${r.hc.total || 0}</td><td>${r.hc.burned || 0}</td><td>${r.hc.intake || 0}</td></tr>`).join('')}</table>` : ''}
     ${st.err ? `<div class="fit-source-note" style="color:var(--red)">${esc(st.err)}</div>` : ''}

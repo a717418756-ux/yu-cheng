@@ -52,7 +52,7 @@ function _ytIsoDur(iso){
 }
 // API 回傳的標題有 &amp; &#39; 這類字元參照，先還原成文字（顯示時再 esc）
 function _ytTxt(s){ const t = document.createElement('textarea'); t.innerHTML = s || ''; return t.value; }
-const _ytThumb = id => 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg';
+const _ytThumb = id => 'https://i.ytimg.com/vi/' + encodeURIComponent(id || '') + '/mqdefault.jpg';   // 編號來自匯入／還原的資料，先編碼再放進網址
 const _ytWatch = id => 'https://www.youtube.com/watch?v=' + id;
 
 // ── 額度（估算）：每天 10,000 單位；搜尋一次 100、查影片長度／播放清單一頁各 1。
