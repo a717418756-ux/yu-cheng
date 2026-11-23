@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════
 // 【運動健康庫】成長區 - 健康數據儀表板
-// 資料來源：目前手動輸入（存 IndexedDB）；未來以 Capacitor 包殼後，
-//          可接 Health Connect / 三星健康原生外掛灌入真實數據。
+// 資料來源：瀏覽器版手動輸入（存 IndexedDB）；
+//          Android App 版（v4.57）連接 Health Connect，和三星健康雙向同步（見下方 Health Connect 區）。
 // ════════════════════════════════════════════════════════════
 
 // 取得今日日期 key（YYYY-MM-DD）
@@ -28,7 +28,18 @@ async function renderFitness(){
   const el = document.getElementById('fitness-body');
   if(!el) return;
   const key = _fitTodayKey();
-  const d = await _getFitData(key);
+  let d = await _getFitData(key);
+  // App 版：連接 Health Connect 後，卡片顯示三星健康的數字（一分鐘內不重複同步）
+  const H = _fitHC();
+  let hcOn = false;
+  if(H){
+    if(_fitHcState.status == null) await _fitHcStatus();
+    hcOn = _fitHcState.status === 'available' && _fitHcState.read;
+    if(hcOn && !_fitHcState.syncing && Date.now() - (_fitHcState.at || +(localStorage.getItem('fit_hc_at') || 0)) > 60000){
+      fitHcSync(true).then(ok => { if(ok && document.getElementById('fitness-body')) renderFitness(); });
+    }
+    if(hcOn && d.hc) d = { ...d, ...d.hc };
+  }
   // 熱量結餘（攝取 - 消耗）
   const balance = (d.intake||0) - (d.burned||0);
   const balColor = balance > 0 ? '#e0a020' : '#4caf7d';
@@ -61,7 +72,7 @@ async function renderFitness(){
         <div class="fit-card-lab">步數</div>
       </div>
     </div>
-    <div class="fit-edit-hint">💡 雙擊上方卡片即可編輯數值</div>
+    <div class="fit-edit-hint">${hcOn ? '💡 數字來自三星健康；點「記一筆運動／飲食」新增，步數由手機或手錶自動記錄' : '💡 雙擊上方卡片即可編輯數值'}</div>
 
     <!-- 熱量結餘 -->
     <div class="fit-balance">
@@ -72,15 +83,15 @@ async function renderFitness(){
       ${balance > 0 ? '攝取大於消耗，呈熱量盈餘' : balance < 0 ? '消耗大於攝取，呈熱量赤字' : '收支平衡'}
     </div>
 
-    <!-- 資料來源提示（開啟健康 App 功能已移至頂部按鈕）-->
+    ${H ? await _fitHcHtml() : `<!-- 資料來源提示（開啟健康 App 功能已移至頂部按鈕）-->
     <div class="fit-source">
       <div class="fit-source-row">
         <span>📲 資料來源</span>
       </div>
       <div class="fit-source-note">
-        目前數據為手動記錄。以 Capacitor 打包為 App 後，可自動同步三星健康（Health Connect）的運動與熱量資料。可點右上角按鈕開啟三星健康。
+        網頁版為手動記錄。Android App 版可連接三星健康（Health Connect），步數、運動、熱量自動帶入，在 App 記的運動和飲食也會寫回三星健康。
       </div>
-    </div>
+    </div>`}
 
     <!-- 手動記錄改為雙擊卡片編輯，已移除底部輸入區 -->
   `;
@@ -98,6 +109,12 @@ function _fitDateLabel(){
 // ════════════════════════════════════════════════════════════
 // 雙擊卡片：彈出輸入框編輯單一欄位
 async function editFitField(field, label, unit){
+  // App 版已連接 Health Connect：改成記一筆（寫進三星健康），步數不手動改
+  if(_fitHC() && _fitHcState.read){
+    if(field === 'steps'){ toast('步數由手機或手錶自動記錄，要修改請到三星健康'); return; }
+    if(field === 'intake') return fitAddFood();
+    return fitAddExercise();
+  }
   const key = _fitTodayKey();
   const cur = await _getFitData(key);
   const input = await askInput(`今日${label}`, `單位：${unit}`, cur[field] || '', {type:'number', placeholder:'0', okText:'儲存'});
@@ -145,20 +162,9 @@ async function _cleanOldHealthLogs(){
 // ════════════════════════════════════════════════════════════
 async function openHealthApp(){
   const pkg = 'com.sec.android.app.shealth';
-  // 1) Capacitor 環境：用原生外掛開啟（打包後可用）
-  if(window.Capacitor?.isNativePlatform?.()){
-    try{
-      // 需安裝 @capacitor/app-launcher 外掛
-      const launcher = window.Capacitor.Plugins?.AppLauncher;
-      if(launcher){
-        const { value } = await launcher.canOpenUrl({ url: pkg });
-        if(value){
-          await launcher.openUrl({ url: pkg });
-          return;
-        }
-      }
-    }catch(e){ /* 落到下方提示 */ }
-    toast('找不到三星健康，請確認已安裝');
+  // 1) App 版：原生外掛直接開啟三星健康
+  if(_fitHC()){
+    try{ await _fitHC().openSamsungHealth(); }catch(e){ toast(e.message || '找不到三星健康，請確認已安裝'); }
     return;
   }
   // 2) 純網頁環境：用 intent 但不帶 Play 商店 fallback
@@ -176,4 +182,156 @@ async function openHealthApp(){
   setTimeout(()=>{
     toast('網頁版較難直接開啟；打包成 App 後可一鍵開啟三星健康');
   }, 600);
+}
+
+// ════════════════════════════════════════════════════════════
+// 【運動健康庫 × Health Connect（三星健康）】v4.57.0，只在 Android App 版
+//   Health Connect 是 Android 的健康資料中心：三星健康會把步數、運動、消耗熱量、飲食同步進去，也會讀其他 App 寫的。
+//   ・讀：今天和最近 7 天的步數、運動時間、消耗熱量、攝取熱量（存進 healthLogs 的 hc 欄位，離線也看得到）
+//   ・寫：在這裡「記一筆運動」「記一筆飲食」→ 寫進 Health Connect（三星健康有開啟讀取就會看到）
+//   ・步數由手機／手錶自動量，這裡不改；只能刪除本 App 寫的紀錄
+// ════════════════════════════════════════════════════════════
+function _fitHC(){
+  const C = window.Capacitor;
+  return (C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.YcHealth) || null;
+}
+const _FIT_TYPES = [['walk', '🚶 走路'], ['run', '🏃 跑步'], ['bike', '🚴 騎車'], ['swim', '🏊 游泳'], ['strength', '🏋️ 重量訓練'], ['yoga', '🧘 瑜伽'], ['hike', '🥾 健行'], ['other', '💪 其他運動']];
+const _FIT_MEALS = [[1, '早餐'], [2, '午餐'], [3, '晚餐'], [4, '點心']];
+const _fitHcState = { status:null, read:false, write:false, syncing:false, at:0, err:'' };
+
+async function _fitHcStatus(){
+  const H = _fitHC(); if(!H) return null;
+  try{ Object.assign(_fitHcState, await H.status(), { err:'' }); }
+  catch(e){ _fitHcState.err = e.message || String(e); }
+  return _fitHcState;
+}
+// 從 Health Connect 讀最近 7 天，存進 healthLogs（每天一筆的 hc 欄位）
+async function fitHcSync(quiet){
+  const H = _fitHC(); if(!H || _fitHcState.syncing) return false;
+  _fitHcState.syncing = true;
+  try{
+    const r = await H.days({ days:7 });
+    for(const d of r.days || []){
+      const cur = await _getFitData(d.date);
+      cur.hc = { steps:d.steps || 0, activeMin:d.activeMin || 0, burned:d.active || 0, total:d.total || 0, intake:d.intake || 0 };   // 消耗＝活動消耗（total 含基礎代謝，不混用）
+      cur.hcAt = Date.now(); cur.updatedAt = Date.now();
+      await dp('healthLogs', cur);
+    }
+    _fitHcState.at = Date.now(); _fitHcState.err = '';
+    try{ localStorage.setItem('fit_hc_at', String(_fitHcState.at)); }catch(_){}
+    if(!quiet) toast('已從 Health Connect 同步');
+    return true;
+  }catch(e){
+    _fitHcState.err = e.message || String(e);
+    if(!quiet) toast('同步失敗：' + _fitHcState.err);
+    return false;
+  }finally{ _fitHcState.syncing = false; }
+}
+async function fitHcConnect(){
+  const H = _fitHC(); if(!H) return;
+  try{
+    const r = await H.connect();
+    Object.assign(_fitHcState, r);
+    if(r.read){ toast('已連接 Health Connect'); await fitHcSync(true); }
+    else toast('沒有取得讀取權限，可到「權限設定」開啟');
+  }catch(e){ toast(e.message || String(e)); }
+  renderFitness();
+}
+function fitHcSettings(){ _fitHC()?.openSettings().catch(e => toast(e.message)); }
+
+// 今天本 App 寫進 Health Connect 的紀錄
+async function _fitHcMine(){
+  const H = _fitHC(); if(!H || !_fitHcState.read) return [];
+  try{ return (await H.mine({ date:_fitTodayKey() })).items || []; }catch(e){ return []; }
+}
+const _fitHm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+
+// App 版的健康區塊（連接狀態、記一筆、今天記的、最近 7 天）
+async function _fitHcHtml(){
+  const st = _fitHcState;
+  if(st.status === 'unavailable') return `<div class="fit-hc"><div class="fit-hc-t">Health Connect</div>
+    <div class="fit-source-note">這台手機沒有 Health Connect（Android 14 以上內建；Android 13 以下要從 Play 商店安裝「Health Connect」）。目前維持手動記錄。</div></div>`;
+  if(st.status === 'update') return `<div class="fit-hc"><div class="fit-hc-t">Health Connect</div>
+    <div class="fit-source-note">Health Connect 需要更新，請到 Play 商店更新後再回來連接。</div></div>`;
+  if(!st.read) return `<div class="fit-hc"><div class="fit-hc-t">連接三星健康（Health Connect）</div>
+    <div class="fit-source-note">連接後，步數、運動、消耗熱量、飲食會從三星健康自動帶進來；在這裡記的運動和飲食也會寫回去。<br>
+    三星健康要先開同步：三星健康 → 設定 → Health Connect → 允許三星健康讀取和寫入。</div>
+    <div class="fit-hc-btns"><button class="fit-hc-btn pri" onclick="fitHcConnect()">連接</button><button class="fit-hc-btn" onclick="fitHcSettings()">權限設定</button></div></div>`;
+  const mine = await _fitHcMine();
+  const days = (await da('healthLogs').catch(()=>[])).filter(r => r.hc).sort((a, b) => String(b.id).localeCompare(String(a.id))).slice(0, 7);
+  const at = st.at || +(localStorage.getItem('fit_hc_at') || 0);
+  return `<div class="fit-hc">
+    <div class="fit-hc-t">三星健康（Health Connect）<span class="fit-hc-s">${st.syncing ? '同步中…' : at ? _fitAgo(at) + '同步' : ''}${st.write ? '' : '・沒有寫入權限'}</span></div>
+    <div class="fit-hc-btns">
+      <button class="fit-hc-btn pri" onclick="fitAddExercise()"${st.write ? '' : ' disabled'}>＋ 記一筆運動</button>
+      <button class="fit-hc-btn pri" onclick="fitAddFood()"${st.write ? '' : ' disabled'}>＋ 記一筆飲食</button>
+      <button class="fit-hc-btn" onclick="fitHcSync().then(renderFitness)">↻ 同步</button>
+      <button class="fit-hc-btn" onclick="fitHcSettings()">權限設定</button>
+    </div>
+    ${mine.length ? `<div class="fit-hc-sub">今天在這裡記的</div>` + mine.sort((a, b) => a.start - b.start).map(m => `<div class="fit-hc-row">
+        <span>${m.kind === 'exercise' ? (_FIT_TYPES.find(t => t[0] === m.type) || ['', '💪 運動'])[1] + ' ' + m.minutes + ' 分' + (m.kcal ? '・' + m.kcal + ' kcal' : '')
+          : '🍽️ ' + ((_FIT_MEALS.find(x => x[0] === m.meal) || [0, ''])[1] || '飲食') + (m.title ? '・' + esc(m.title) : '') + '・' + m.kcal + ' kcal'}<small>${m.kind === 'exercise' ? _fitHm(m.start) + '～' + _fitHm(m.end) : _fitHm(m.start)}${m.title && m.kind === 'exercise' ? '・' + esc(m.title) : ''}</small></span>
+        <button onclick="fitHcRemove('${m.kind}','${esc(m.id)}','${esc(m.cid || '')}')" aria-label="刪除">✕</button></div>`).join('') : ''}
+    ${days.length > 1 ? `<div class="fit-hc-sub">最近 ${days.length} 天</div><table class="fit-hc-tb"><tr><th>日期</th><th>步數</th><th>運動</th><th>活動消耗</th><th>攝取</th></tr>
+      ${days.map(r => `<tr><td>${r.id.slice(5).replace('-', '/')}</td><td>${(r.hc.steps || 0).toLocaleString()}</td><td>${r.hc.activeMin || 0} 分</td><td>${r.hc.burned || 0}</td><td>${r.hc.intake || 0}</td></tr>`).join('')}</table>` : ''}
+    ${st.err ? `<div class="fit-source-note" style="color:var(--red)">${esc(st.err)}</div>` : ''}
+  </div>`;
+}
+function _fitAgo(t){ const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? '剛剛' : m < 60 ? m + ' 分鐘前' : Math.floor(m / 60) + ' 小時前'; }
+
+async function fitHcRemove(kind, id, cid){
+  if(!await askConfirm('刪除這筆紀錄', '從 Health Connect 刪除（三星健康裡同步過去的也會一起不見）。', '刪除')) return;
+  try{ await _fitHC().remove({ kind, id, cid }); toast('已刪除'); await fitHcSync(true); }
+  catch(e){ toast('刪除失敗：' + (e.message || e)); }
+  renderFitness();
+}
+// 記一筆運動：種類、時間（分）、消耗熱量（選填）、結束時間（預設現在）
+function fitAddExercise(){
+  const ov = _fitSheet('記一筆運動', `
+    <label class="yt-lb">種類</label>
+    <div class="fit-types">${_FIT_TYPES.map(([k, n], i) => `<button data-t="${k}" class="${i === 0 ? 'on' : ''}" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===this))">${n}</button>`).join('')}</div>
+    <label class="yt-lb">運動時間（分鐘）</label><input id="fx-min" class="finput" type="number" inputmode="numeric" min="1" placeholder="例如 30">
+    <label class="yt-lb">消耗熱量（kcal，選填）</label><input id="fx-kcal" class="finput" type="number" inputmode="numeric" min="0" placeholder="不知道可以不填">
+    <label class="yt-lb">什麼時候結束</label><input id="fx-end" class="finput" type="time" value="${_fitHm(Date.now())}">
+    <label class="yt-lb">備註（選填）</label><input id="fx-title" class="finput" placeholder="例如：體能訓練、晨跑">`, async () => {
+    const minutes = parseInt(document.getElementById('fx-min').value), kcal = parseFloat(document.getElementById('fx-kcal').value) || 0;
+    if(!(minutes > 0)){ toast('請填運動時間'); return false; }
+    const [h, m] = (document.getElementById('fx-end').value || _fitHm(Date.now())).split(':').map(Number);
+    const end = new Date(); end.setHours(h || 0, m || 0, 0, 0);
+    if(end.getTime() > Date.now() + 60000){ toast('結束時間不能晚於現在'); return false; }
+    await _fitHC().addExercise({ type:ov.querySelector('.fit-types .on')?.dataset.t || 'other', minutes, kcal, endMs:end.getTime(),
+      title:document.getElementById('fx-title').value.trim() });
+    toast('已記錄，並寫入 Health Connect');
+  });
+}
+function fitAddFood(){
+  const h = new Date().getHours(), def = h < 10 ? 1 : h < 15 ? 2 : h < 21 ? 3 : 4;
+  const ov = _fitSheet('記一筆飲食', `
+    <label class="yt-lb">哪一餐</label>
+    <div class="fit-types">${_FIT_MEALS.map(([k, n]) => `<button data-m="${k}" class="${k === def ? 'on' : ''}" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===this))">${n}</button>`).join('')}</div>
+    <label class="yt-lb">熱量（kcal）</label><input id="ff-kcal" class="finput" type="number" inputmode="numeric" min="1" placeholder="例如 650">
+    <label class="yt-lb">吃了什麼（選填）</label><input id="ff-name" class="finput" placeholder="例如：雞腿便當">`, async () => {
+    const kcal = parseFloat(document.getElementById('ff-kcal').value);
+    if(!(kcal > 0)){ toast('請填熱量'); return false; }
+    await _fitHC().addFood({ kcal, name:document.getElementById('ff-name').value.trim(), meal:+(ov.querySelector('.fit-types .on')?.dataset.m || 0) });
+    toast('已記錄，並寫入 Health Connect');
+  });
+}
+function _fitSheet(title, body, onSave){
+  document.getElementById('fit-sheet-ov')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'fit-sheet-ov';
+  ov.className = 'media-ov-sheet z700-d';
+  ov.innerHTML = `<div class="yt-sheet yt-edit"><div class="yt-sheet-hd"><div class="yt-sheet-title">${title}</div>
+      <button class="yt-x" aria-label="關閉">✕</button></div>${body}
+      <div class="yt-edit-btns"><button class="yt-btn" data-x>取消</button><button class="yt-btn pri" data-ok>儲存</button></div></div>`;
+  ov.querySelector('.yt-x').onclick = ov.querySelector('[data-x]').onclick = () => ov.remove();
+  ov.querySelector('[data-ok]').onclick = async e => {
+    const b = e.currentTarget; if(b.disabled) return; b.disabled = true;
+    try{ if(await onSave() === false){ b.disabled = false; return; } ov.remove(); await fitHcSync(true); renderFitness(); }
+    catch(err){ b.disabled = false; toast('寫入失敗：' + (err.message || err)); }
+  };
+  ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+  return ov;
 }

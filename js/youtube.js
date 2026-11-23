@@ -2056,6 +2056,8 @@ async function saveYtKey(value){
 async function _renderYtKey(){
   const el = document.getElementById('yt-key');
   if(!el) return;
+  // App 版搜尋不需要金鑰：這張設定卡藏起來
+  if(_ytN()){ for(const id of ['yt-key-sec', 'yt-key-card']){ const x = document.getElementById(id); if(x) x.style.display = 'none'; } return; }
   const key = await getSetting(YT_KEY, '').catch(()=>'');
   if(key) el.value = key;
   const u = document.getElementById('yt-usage');

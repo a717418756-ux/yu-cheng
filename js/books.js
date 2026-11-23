@@ -1036,10 +1036,7 @@ async function _attachBookFile(id){
 async function downloadBook(id){
   const book=await dg('ebooks',id);
   if(!book?.blob){toast('這本書沒有檔案本體（可能是備份缺檔），請在書籍詳情按「📎 附加檔案以閱讀」');return;}
-  const url=URL.createObjectURL(book.blob);
-  const a=document.createElement('a');
-  a.href=url; a.download=(book.title||'book')+'.'+(book.fileType||'pdf');
-  a.click(); setTimeout(()=>URL.revokeObjectURL(url),3000);
+  dl(book.blob, (book.title||'book')+'.'+(book.fileType||'pdf'));   // v4.57 共用下載（App 版存到手機「下載／Y.C.」）
 }
 
 // 快速收藏切換（只更新按鈕外觀，不重渲染整頁）
