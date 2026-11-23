@@ -728,48 +728,34 @@ function _showVinylPlayer(meta, url, full){
   const lastPos=full.lastPos||0;
 
   const isFav = meta.favorite || false;
+  const ICO = {
+    down:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+    list:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+    more:'<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
+    lyr:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M4 11h10M4 16h6"/><circle cx="18" cy="16" r="2.5"/><path d="M20.5 16V5l-3 1"/></svg>',
+  };
   ov.innerHTML=`
-    <!-- ── 頂部列 ── -->
+    <div class="vp-bg" id="vp-bg"></div>
+    <!-- ── 頂部列（Spotify 式：收起｜正在播放・分類｜清單、更多）── -->
     <div class="vp-topbar">
-      <button class="vp-back" onclick="closeVinylPlayer()">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" stroke-width="2.2"
-            stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-      <div style="text-align:center">
-        <div class="vp-mode-lbl">黑膠模式</div>
+      <button class="vp-back" onclick="closeVinylPlayer()" aria-label="收起">${ICO.down}</button>
+      <div class="vp-top-mid">
+        <div class="vp-mode-lbl">正在播放</div>
+        <div class="vp-top-sub">${esc(meta.category||'影音庫')}・${_M.playlist.length>1 ? (_M.playIdx+1)+'／'+_M.playlist.length : '單曲'}</div>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
-        <!-- 播放列表按鈕（在三點旁邊）-->
-        <button class="vp-more" onclick="openVpPlaylist()" title="播放列表"
-          style="font-size:16px">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="21" y2="18"/>
-            <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/>
-            <line x1="3" y1="18" x2="3.01" y2="18"/>
-          </svg>
-        </button>
-        <!-- 三點選單 -->
-        <button class="vp-more" onclick="_openAudioMenu(${meta.id})">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/>
-            <circle cx="12" cy="19" r="2"/>
-          </svg>
-        </button>
+        <button class="vp-more" onclick="openVpPlaylist()" title="播放列表" aria-label="播放列表">${ICO.list}</button>
+        <button class="vp-more" onclick="_openAudioMenu(${meta.id})" aria-label="更多">${ICO.more}</button>
       </div>
     </div>
 
+    <div class="vp-scroll" id="vp-scroll">
+    <div class="vp-main">
     <!-- ── 唱片台：唱盤圖 + 唱針圖 + 封面裁圓 ── -->
     <div class="vp-vinyl-wrap" id="vp-vinyl-wrap">
-      <!-- 唱針圖片（絕對定位，右上角） -->
-      <img class="vp-tonearm-img" id="vp-tonearm-img"
-        src="icons/tonearm.png" alt="">
-      <!-- 唱盤圖片（旋轉主體） -->
+      <img class="vp-tonearm-img" id="vp-tonearm-img" src="icons/tonearm.png" alt="">
       <div class="vp-record-outer" id="vp-record">
         <img class="vp-record-img" src="icons/vinyl-record.png" alt="">
-        <!-- 封面：點擊可裁剪 -->
         <div class="vp-record-cover" id="vp-cover-ring" onclick="_openCoverCrop(${meta.id})">
           ${meta.thumbnail
             ? `<img id="vp-cover-img" src="${meta.thumbnail}"
@@ -780,19 +766,17 @@ function _showVinylPlayer(meta, url, full){
       </div>
     </div>
 
-    <!-- ── 曲目資訊列：[♡] [標題] [≡播放列表] ── -->
+    <!-- ── 曲目資訊列 ── -->
     <div class="vp-info">
-      <!-- 標題（左側）-->
       <div class="vp-info-text" style="flex:1;min-width:0">
         <div class="vp-title">${esc(meta.title||'未命名')}</div>
-        <div class="vp-artist">${esc(meta.category||'Y.C. 影音庫')}</div>
+        <div class="vp-artist">${esc(full.ytChannel||meta.category||'Y.C. 影音庫')}</div>
       </div>
-      <!-- 收藏按鈕（右側，稍微向左）-->
       <button class="vp-fav-btn${isFav?' on':''}" id="vp-fav-btn"
         onclick="_vpToggleFav(${meta.id},this)" style="flex-shrink:0;margin-right:4px">
         <svg width="24" height="24" viewBox="0 0 24 24"
           fill="${isFav?'#ec4899':'none'}"
-          stroke="${isFav?'#ec4899':'rgba(255,255,255,0.4)'}" stroke-width="2">
+          stroke="${isFav?'#ec4899':'rgba(255,255,255,0.55)'}" stroke-width="2">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/>
         </svg>
       </button>
@@ -803,79 +787,62 @@ function _showVinylPlayer(meta, url, full){
       <input type="range" id="vp-seek" class="vp-seek"
         value="0" min="0" max="100" step="0.1"
         oninput="_vpSeek(this.value)" style="width:100%">
-      <div class="vp-times">
-        <span id="vp-cur">0:00</span>
-        <span id="vp-dur">0:00</span>
-      </div>
+      <div class="vp-times"><span id="vp-cur">0:00</span><span id="vp-dur">0:00</span></div>
     </div>
 
-    <!-- ── 控制列：倍速 | 循環 | ⏮ | ⏸(大) | ⏭ | 隨機 | 定時 ── -->
+    <!-- ── 控制列（Spotify 排法）：隨機｜⏮｜⏯｜⏭｜循環 ── -->
     <div class="vp-controls">
-      <button class="vpc-btn vpc-sm vpt-speed-btn" onclick="_vpCycleSpeed(this)"
-        style="display:flex;flex-direction:column;align-items:center;gap:2px">
-        <span style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6)">1.0×</span>
+      <button id="vp-shuffle-btn" class="vpc-btn vpc-sm" onclick="_vpToggleShuffle(this)" style="color:rgba(255,255,255,0.35)" aria-label="隨機">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
       </button>
-      <button id="vp-loop-btn" class="vpc-btn vpc-sm"
-        onclick="_vpToggleLoop(this)" style="color:rgba(255,255,255,0.35)">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="17 1 21 5 17 9"/>
-          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-          <polyline points="7 23 3 19 7 15"/>
-          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-        </svg>
+      <button class="vpc-btn vpc-side" onclick="_vpPrev()" aria-label="上一首">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/></svg>
       </button>
-      <button class="vpc-btn vpc-side" onclick="_vpPrev()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <polygon points="19 20 9 12 19 4 19 20"/>
-          <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/>
-        </svg>
+      <button class="vpc-btn vpc-main" id="vp-play-btn" onclick="_vpToggle()" aria-label="播放／暫停">
+        <svg id="vp-play-icon" width="26" height="26" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       </button>
-      <button class="vpc-btn vpc-main" id="vp-play-btn" onclick="_vpToggle()">
-        <svg id="vp-play-icon" width="26" height="26" viewBox="0 0 24 24" fill="white">
-          <polygon points="5 3 19 12 5 21 5 3"/>
-        </svg>
+      <button class="vpc-btn vpc-side" onclick="_vpNext()" aria-label="下一首">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/></svg>
       </button>
-      <button class="vpc-btn vpc-side" onclick="_vpNext()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <polygon points="5 4 15 12 5 20 5 4"/>
-          <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/>
-        </svg>
+      <button id="vp-loop-btn" class="vpc-btn vpc-sm" onclick="_vpToggleLoop(this)" style="color:rgba(255,255,255,0.35)" aria-label="循環">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       </button>
-      <button id="vp-shuffle-btn" class="vpc-btn vpc-sm"
-        onclick="_vpToggleShuffle(this)" style="color:rgba(255,255,255,0.35)">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="16 3 21 3 21 8"/>
-          <line x1="4" y1="20" x2="21" y2="3"/>
-          <polyline points="21 16 21 21 16 21"/>
-          <line x1="15" y1="15" x2="21" y2="21"/>
-        </svg>
+    </div>
+
+    <!-- ── 次要列：倍速｜定時｜歌詞｜清單 ── -->
+    <div class="vp-sub">
+      <button class="vp-chip vpt-speed-btn" onclick="_vpCycleSpeed(this)"><span style="color:rgba(255,255,255,0.6)">1.0×</span></button>
+      <button class="vp-chip" onclick="_vpSleepTimer(this)" id="vp-sleep-btn" style="color:rgba(255,255,255,0.6)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span id="vp-sleep-lbl">定時</span>
       </button>
-      <button class="vpc-btn vpc-sm" onclick="_vpSleepTimer(this)" id="vp-sleep-btn"
-        style="color:rgba(255,255,255,0.35);
-          display:flex;flex-direction:column;align-items:center;gap:2px;
-          min-width:32px">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-        </svg>
-        <span id="vp-sleep-lbl"
-          style="font-size:9px;line-height:1;white-space:nowrap;
-          display:block;text-align:center;max-width:36px">定時</span>
-      </button>
+      <button class="vp-chip" id="vp-lyr-chip" onclick="_vpLyrJump()">${ICO.lyr}<span>歌詞</span></button>
+      <button class="vp-chip" onclick="openVpPlaylist()">${ICO.list}<span>清單</span></button>
     </div>
 
     <!-- 播放列表容器（在控制列下方展開）-->
     <div id="vp-playlist-wrap"
       style="overflow:hidden;flex-shrink:0;max-height:0;
-             transition:max-height .3s cubic-bezier(.4,0,.2,1);
-             margin-top:20px"></div>
+             transition:max-height .3s cubic-bezier(.4,0,.2,1)"></div>
+    </div>
 
-    <!-- 隱藏 audio 元素 -->
+    <!-- ── 往下滑：歌詞卡、接下來播放（Spotify 式）── -->
+    <div class="vp-cards">
+      <div class="vp-lyr-card" id="vp-lyr-card"></div>
+      <div class="vp-next-card" id="vp-next-card"></div>
+    </div>
+    </div>
+
     <audio id="vp-audio" src="${url}" style="display:none"></audio>`;
 
   document.body.appendChild(ov);
 
   _audioEl=document.getElementById('vp-audio');
   if(lastPos>3) _audioEl.currentTime=lastPos;
+  ov._urls=[];
+  _vpLyrInit(full);
+  _vpNextRender(ov);
+  _vpTint(meta.thumbnail);
 
   // 事件綁定
   _audioEl.ontimeupdate=_vpTimeUpdate;
@@ -1117,6 +1084,8 @@ function closeVinylPlayer(){
     URL.revokeObjectURL(_audioEl.src);
   }
   _clearVinyl();
+  (ov._urls||[]).forEach(u=>URL.revokeObjectURL(u));
+  _VPL.cues=[]; _VPL.on=-1;
   ov.remove();
   _updateMiniBar();
 }
@@ -1135,6 +1104,7 @@ function _vpTimeUpdate(){
   }
   const curEl=document.getElementById('vp-cur');
   if(curEl) curEl.textContent=_fmtDurSec(cur);
+  _vpLyrTick(cur);
 }
 function _vpSeek(val){
   if(!_audioEl) return;
@@ -1926,6 +1896,143 @@ function _fmtDur(sec){
   const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=Math.floor(sec%60);
   return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
 }
+// ════════════════════════════════════════════════════════════
+// 【黑膠播放器：同步歌詞、接下來播放、依封面配色】v4.58
+//   歌詞（存在這首的 lyrics 欄位，離線也看得到）：
+//     ① 下載時一起存的同步歌詞（LRCLIB）或字幕 ② 影片字幕（subs）
+//     ③ 都沒有時，有網路會自動找一次並存起來；也可按「找歌詞」自己改關鍵字
+// ════════════════════════════════════════════════════════════
+const _VPL = { cues:[], on:-1, id:null, src:'', name:'', plain:'' };
+function _vpLyrFromFull(full){
+  if(full.lyrics && (full.lyrics.cues?.length || full.lyrics.plain)) return full.lyrics;
+  const sb = (full.subs||[])[0];
+  if(sb && sb.vtt && typeof _ytSubParse==='function'){
+    const cues = _ytSubParse(sb.vtt, 'vtt');
+    if(cues.length) return { src:'subs', name:sb.label||sb.lang||'字幕', cues, plain:'' };
+  }
+  return null;
+}
+function _vpLyrInit(full){
+  _VPL.id = full.id; _VPL.on = -1;
+  const L = _vpLyrFromFull(full);
+  Object.assign(_VPL, L ? { cues:L.cues||[], src:L.src||'', name:L.name||'', plain:L.plain||'' } : { cues:[], src:'', name:'', plain:'' });
+  _vpLyrRender();
+  // 沒有歌詞、有網路、開著「自動找歌詞」、這首還沒找過 → 背景找一次
+  if(!L && navigator.onLine && !full.lyricsTried && typeof _ytLyrOn==='function' && _ytLyrOn()) _vpLyrFetch(full.id, null, true);
+}
+function _vpLyrRender(){
+  const card = document.getElementById('vp-lyr-card'); if(!card) return;
+  const chip = document.getElementById('vp-lyr-chip');
+  if(chip) chip.classList.toggle('on', !!(_VPL.cues.length || _VPL.plain));
+  const full = card.classList.contains('full');
+  const hd = `<div class="vp-lyr-hd"><b>歌詞</b><span>${_VPL.src==='lrclib' ? (_VPL.cues.length ? '同步歌詞' : '歌詞（沒有時間軸）') : _VPL.src==='subs' ? '字幕：' + esc(_VPL.name) : ''}</span>
+    <button onclick="_vpLyrSearch()">找歌詞</button>${_VPL.cues.length ? `<button onclick="_vpLyrFull()">${full ? '收起' : '全螢幕'}</button>` : ''}</div>`;
+  if(_VPL.cues.length){
+    card.innerHTML = hd + `<div class="vp-lyr-body" id="vp-lyr-body">${_VPL.cues.map((c,i)=>`<p data-i="${i}" onclick="_vpLyrSeek(${i})">${esc(c.t)}</p>`).join('')}</div>`;
+    _VPL.on = -1; if(_audioEl) _vpLyrTick(_audioEl.currentTime);
+  } else if(_VPL.plain){
+    card.innerHTML = hd + `<div class="vp-lyr-body plain">${esc(_VPL.plain).replace(/\n/g,'<br>')}</div>`;
+  } else {
+    card.innerHTML = hd + `<div class="vp-lyr-empty">${navigator.onLine ? '這首還沒有歌詞。按「找歌詞」從 LRCLIB 歌詞庫找，找到會存起來，之後離線也看得到。' : '這首還沒有歌詞；連上網路後可以按「找歌詞」。'}</div>`;
+  }
+}
+function _vpLyrTick(t){
+  if(!_VPL.cues.length) return;
+  let k = -1;
+  for(let i=0;i<_VPL.cues.length;i++){ if(_VPL.cues[i].s <= t + 0.15) k = i; else break; }
+  if(k === _VPL.on) return;
+  _VPL.on = k;
+  const body = document.getElementById('vp-lyr-body'); if(!body) return;
+  body.querySelectorAll('p.on').forEach(p=>p.classList.remove('on'));
+  const p = k >= 0 ? body.querySelector(`p[data-i="${k}"]`) : null;
+  if(p){ p.classList.add('on'); body.scrollTo({ top: p.offsetTop - body.clientHeight/2 + p.clientHeight/2, behavior:'smooth' }); }
+}
+function _vpLyrSeek(i){
+  const c = _VPL.cues[i];
+  if(c && _audioEl){ _audioEl.currentTime = c.s; if(_audioEl.paused){ _audioEl.play(); _setPlayIcon(true); _startVinylSpin(); } }
+}
+function _vpLyrFull(){
+  const card = document.getElementById('vp-lyr-card'); if(!card) return;
+  card.classList.toggle('full');
+  _vpLyrRender();
+}
+function _vpLyrJump(){
+  const card = document.getElementById('vp-lyr-card'), sc = document.getElementById('vp-scroll');
+  if(card && sc) sc.scrollTo({ top: card.offsetTop - 12, behavior:'smooth' });
+}
+async function _vpLyrSearch(){
+  const full = await dg('leisuremedia', _VPL.id); if(!full) return;
+  const g = typeof _ytSongGuess==='function' ? _ytSongGuess({ title:full.title, ytChannel:full.ytChannel }) : { q:full.title };
+  const q = await askInput('找歌詞（LRCLIB 歌詞庫）', '歌名、歌手（可自己修改）', (g.artist && g.track ? g.track + ' ' + g.artist : g.q) || full.title || '');
+  if(q == null) return;
+  toast('找歌詞中…');
+  _vpLyrFetch(full.id, String(q).trim(), false);
+}
+// 找歌詞並存進這首（q 空白＝用標題、頻道自動猜歌名）
+async function _vpLyrFetch(id, q, quiet){
+  try{
+    const full = await dg('leisuremedia', id); if(!full) return;
+    const L = await ytLyricsFor({ title:full.title, ytChannel:full.ytChannel, duration:full.duration || (_audioEl && _audioEl.duration) || 0, ytId:full.ytSrc }, q || null);
+    full.lyricsTried = Date.now();
+    if(L) full.lyrics = L;
+    await dp('leisuremedia', full);
+    if(_VPL.id !== id) return;
+    if(!L){ if(!quiet) toast('歌詞庫找不到，可以改關鍵字再找'); return; }
+    Object.assign(_VPL, { cues:L.cues||[], src:L.src, name:L.name||'', plain:L.plain||'' });
+    _vpLyrRender();
+    if(!quiet) toast('已載入歌詞，離線也看得到');
+  }catch(e){ if(!quiet) toast('歌詞讀取失敗：' + (e.message||e)); }
+}
+// 接下來播放（目前這首之後的 5 首）
+function _vpNextRender(ov){
+  const box = document.getElementById('vp-next-card'); if(!box) return;
+  const pl = _M.playlist || [], n = pl.length;
+  if(n < 2){ box.innerHTML = ''; box.hidden = true; return; }
+  const rows = [];
+  for(let k=1;k<=Math.min(5,n-1);k++){
+    const m = pl[(_M.playIdx + k) % n]; if(!m) continue;
+    let src = '';
+    if(m.thumbnail instanceof Blob){ src = URL.createObjectURL(m.thumbnail); ov._urls.push(src); }
+    else if(typeof m.thumbnail === 'string' && /^(data:image\/|blob:|https:)/.test(m.thumbnail)) src = m.thumbnail;
+    rows.push(`<div class="vp-next-row" onclick="playAudio(${+m.id})">
+      <div class="vp-next-th" data-mid="${+m.id}"${src ? '' : ' data-lazy="1"'}>${src ? `<img src="${esc(src)}" alt="">` : '♪'}</div>
+      <div class="vp-next-tx"><b>${esc(m.title||'未命名')}</b><small>${esc(m.ytChannel||m.category||'')}</small></div></div>`);
+  }
+  box.hidden = false;
+  box.innerHTML = `<div class="vp-lyr-hd"><b>接下來播放</b><span>共 ${n} 首</span></div>` + rows.join('');
+  // 列表資料沒帶封面的，從資料庫讀出來補上
+  box.querySelectorAll('.vp-next-th[data-lazy]').forEach(async el => {
+    try{
+      const f = await dg('leisuremedia', +el.dataset.mid); const t = f && f.thumbnail; if(!t) return;
+      const u = t instanceof Blob ? URL.createObjectURL(t) : (typeof t === 'string' && /^(data:image\/|blob:|https:)/.test(t) ? t : '');
+      if(!u) return;
+      if(t instanceof Blob) ov._urls.push(u);
+      const img = new Image(); img.alt = ''; img.src = u; el.textContent = ''; el.appendChild(img);
+    }catch(_){}
+  });
+}
+// 依封面顏色染背景（加權平均色、拉到中等亮度，白字看得清楚）
+function _vpTint(src){
+  if(!src) return;
+  const img = new Image();
+  img.onload = () => {
+    try{
+      const c = document.createElement('canvas'); c.width = c.height = 12;
+      const x = c.getContext('2d'); x.drawImage(img, 0, 0, 12, 12);
+      const d = x.getImageData(0, 0, 12, 12).data; let r=0, g=0, b=0, n=0;
+      for(let i=0;i<d.length;i+=4){
+        const mx = Math.max(d[i],d[i+1],d[i+2]), mn = Math.min(d[i],d[i+1],d[i+2]), w = 1 + (mx-mn)/40;   // 鮮豔的顏色權重高
+        r += d[i]*w; g += d[i+1]*w; b += d[i+2]*w; n += w;
+      }
+      r/=n; g/=n; b/=n;
+      const k = 140 / Math.max(r, g, b, 1);
+      const col = `rgb(${Math.round(Math.min(255,r*k))},${Math.round(Math.min(255,g*k))},${Math.round(Math.min(255,b*k))})`;
+      document.getElementById('vinyl-player-ov')?.style.setProperty('--vp-c', col);
+    }catch(_){}
+  };
+  img.src = src;
+}
+
 function _fmtDurSec(sec){
   if(!sec||isNaN(sec)) return '0:00';
   const m=Math.floor(sec/60),s=Math.floor(sec%60);

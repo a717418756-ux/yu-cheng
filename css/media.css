@@ -1474,3 +1474,60 @@ a.zpanel-row{text-decoration:none;color:inherit}
 .ytp-sb{ margin-top:10px; padding:8px 10px; border-radius:10px; background:rgba(52,199,89,.10); border:1px solid rgba(52,199,89,.35);
   font-size:12px; color:var(--t1); line-height:1.6; }
 .ytp-plain{ padding:10px 12px; font-size:13.5px; line-height:1.8; color:var(--t1); }
+
+/* ══ v4.58 黑膠播放器 Spotify 式版面：封面配色背景、可往下滑看歌詞卡與接下來播放 ══ */
+#vinyl-player-ov{
+  --vs:clamp(190px, min(84vw, calc(100dvh - 500px)), 400px);   /* 唱盤直徑：依螢幕高度縮放，第一屏剛好放下控制列並露出歌詞卡 */
+  background:linear-gradient(180deg, var(--vp-c,#3a3150) 0%, color-mix(in srgb, var(--vp-c,#3a3150) 35%, #121212) 45%, #121212 85%);
+}
+#vinyl-player-ov .vp-bg{ display:none; }
+.vp-top-mid{ text-align:center; min-width:0; flex:1; padding:0 8px; }
+.vp-top-mid .vp-mode-lbl{ font-size:12px; font-weight:600; letter-spacing:.08em; color:rgba(255,255,255,.75); }
+.vp-top-sub{ font-size:13px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+.vp-scroll{ flex:1; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+.vp-main{ min-height:calc(100% - 64px); display:flex; flex-direction:column; justify-content:space-evenly; }
+#vinyl-player-ov .vp-vinyl-wrap{ height:calc(var(--vs) * 1.12); width:min(100%, calc(var(--vs) * 1.47)); margin:4px auto 0; }
+#vinyl-player-ov .vp-record-outer{ width:var(--vs); height:var(--vs); }
+#vinyl-player-ov .vp-tonearm-img{ width:calc(var(--vs) * .41); }
+#vinyl-player-ov .vp-title{ font-size:21px; font-weight:800; }
+#vinyl-player-ov .vp-artist{ font-size:14px; color:rgba(255,255,255,.65); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#vinyl-player-ov .vpc-main{ width:66px; height:66px; background:#fff; border:none; box-shadow:0 6px 24px rgba(0,0,0,.35); backdrop-filter:none; -webkit-backdrop-filter:none; }
+#vinyl-player-ov .vpc-main svg{ fill:#111 !important; }
+#vinyl-player-ov .vpc-main svg *{ fill:#111; }
+#vinyl-player-ov .vpc-side{ color:#fff; }
+.vp-sub{ display:flex; justify-content:center; gap:8px; padding:6px 16px 8px; flex-wrap:wrap; }
+.vp-chip{ display:inline-flex; align-items:center; gap:5px; padding:7px 13px; border-radius:18px; border:none; cursor:pointer;
+  background:rgba(255,255,255,.1); color:rgba(255,255,255,.75); font-size:12px; font-weight:600; min-height:34px; }
+.vp-chip:active{ background:rgba(255,255,255,.2); }
+.vp-chip.on{ background:rgba(255,255,255,.22); color:#fff; }
+.vp-chip span{ white-space:nowrap; }
+.vp-cards{ display:flex; flex-direction:column; gap:14px; padding:4px 16px calc(28px + env(safe-area-inset-bottom)); }
+.vp-lyr-card, .vp-next-card{ border-radius:14px; padding:14px 16px 10px; color:#fff; }
+.vp-lyr-card{ background:color-mix(in srgb, var(--vp-c,#5b4b8a) 70%, #000); box-shadow:0 6px 24px rgba(0,0,0,.25); }
+.vp-next-card{ background:rgba(255,255,255,.07); }
+.vp-lyr-hd{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.vp-lyr-hd b{ font-size:16px; }
+.vp-lyr-hd span{ flex:1; min-width:0; font-size:11px; color:rgba(255,255,255,.6); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vp-lyr-hd button{ background:rgba(0,0,0,.25); border:none; color:#fff; border-radius:14px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; min-height:30px; }
+.vp-lyr-body{ position:relative; max-height:min(46vh, 340px); overflow-y:auto; scroll-behavior:smooth; padding:40px 0;
+  -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+          mask-image:linear-gradient(180deg, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%); }
+.vp-lyr-body p{ font-size:20px; font-weight:800; line-height:1.4; margin:0 0 14px; color:rgba(0,0,0,.45); cursor:pointer; transition:color .25s, transform .25s; transform-origin:left center; }
+.vp-lyr-body p.on{ color:#fff; transform:scale(1.03); }
+.vp-lyr-body.plain{ font-size:16px; font-weight:600; line-height:1.7; color:rgba(255,255,255,.9); padding:0; -webkit-mask-image:none; mask-image:none; }
+.vp-lyr-empty{ font-size:13px; line-height:1.6; color:rgba(255,255,255,.8); padding:6px 0 8px; }
+.vp-lyr-card.full{ position:fixed; inset:0; z-index:5; border-radius:0; display:flex; flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 18px) 22px calc(env(safe-area-inset-bottom) + 18px); }
+.vp-lyr-card.full .vp-lyr-body{ max-height:none; flex:1; }
+.vp-lyr-card.full .vp-lyr-body p{ font-size:24px; }
+.vp-next-row{ display:flex; align-items:center; gap:12px; padding:8px 0; cursor:pointer; }
+.vp-next-row:active{ opacity:.7; }
+.vp-next-th{ width:46px; height:46px; border-radius:6px; overflow:hidden; flex-shrink:0; background:rgba(255,255,255,.1);
+  display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.5); font-size:18px; }
+.vp-next-th img{ width:100%; height:100%; object-fit:cover; }
+.vp-next-tx{ min-width:0; display:flex; flex-direction:column; gap:2px; }
+.vp-next-tx b{ font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vp-next-tx small{ font-size:12px; color:rgba(255,255,255,.55); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+[data-theme="eink"] #vinyl-player-ov{ background:#fff; }
+[data-theme="eink"] .vp-lyr-card, [data-theme="eink"] .vp-next-card{ background:#fff; color:#000; border:1px solid #000; box-shadow:none; }
+[data-theme="eink"] .vp-lyr-body p{ color:#888; } [data-theme="eink"] .vp-lyr-body p.on{ color:#000; }

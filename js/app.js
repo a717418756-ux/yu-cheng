@@ -521,6 +521,7 @@ function _handleBackLayer(){
 
   // 5)  
   //      remove() 
+  if(document.querySelector('#vp-lyr-card.full')){ _callIf('_vpLyrFull'); return true; }   // 全螢幕歌詞先收起
   for(const [id, fn] of [
     ['vinyl-player-ov','closeVinylPlayer'],
     ['video-player-ov','closeVideoPlayer'],

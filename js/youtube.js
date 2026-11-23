@@ -974,7 +974,7 @@ function _ytDlSheet(it){
       <label class="yt-lb">格式與畫質</label>
       <div id="ytd-opts" class="ytd-opts"><div class="yt-ch">讀取可下載的格式…</div></div>
       <label class="ytd-chk"><input type="checkbox" id="ytd-export"> 另存一份到手機的「下載／Y.C.」資料夾（其他 App 也能開）</label>
-      <label class="ytd-chk"><input type="checkbox" id="ytd-subs"${_ytSubPref().on ? ' checked' : ''}> 一併存字幕（依字幕設定；離線看影片時可顯示）</label>
+      <label class="ytd-chk"><input type="checkbox" id="ytd-subs" checked> 一併存字幕／歌詞（影片存字幕；音樂存同步歌詞，找不到時存字幕；離線也看得到）</label>
       <div id="ytd-prog" class="ytd-prog" hidden><div class="ytd-bar"><i id="ytd-bar"></i></div><div id="ytd-txt" class="yt-ch"></div></div>
       <div class="yt-edit-btns">
         <button class="yt-btn" id="ytd-cancel" onclick="_ytDlClose()">取消</button>
@@ -1038,7 +1038,7 @@ async function _ytDlGo(){
   if(!ov._opt){ toast('請先選格式'); return; }
   const N = _ytN(), it = ov._it, opt = ov._opt, kind = opt.kind === 'audio' ? 'audio' : 'video';
   const exportCopy = !!document.getElementById('ytd-export')?.checked;
-  const withSubs = kind === 'video' && !!document.getElementById('ytd-subs')?.checked;
+  const withSubs = !!document.getElementById('ytd-subs')?.checked;
   const title = document.getElementById('ytd-title').value.trim() || it.title || it.ytId;
   const category = document.getElementById('ytd-cat').value.trim();
   const txt = document.getElementById('ytd-txt'), bar = document.getElementById('ytd-bar');
@@ -1098,8 +1098,12 @@ async function _ytDlGo(){
       const tb = await (await fetch(window.Capacitor.convertFileSrc(t.path))).blob();
       thumbnail = await _compressMediaThumb(new File([tb], 'thumb.jpg', { type:'image/jpeg' }));
     }catch(_){}
-    let subs;
-    if(withSubs){
+    let subs, lyrics;
+    if(withSubs && kind === 'audio'){
+      txt.textContent = '找歌詞…';
+      try{ lyrics = await ytLyricsFor({ title:it.title || title, ytChannel:info.channel || it.ytChannel || '', duration:info.duration > 0 ? info.duration : (it.duration || 0), ytId:it.ytId }); }catch(_){}
+      if(!lyrics) toast('找不到這首的歌詞（音樂照樣存，播放時可按「找歌詞」）');
+    } else if(withSubs){
       txt.textContent = '下載字幕…';
       try{ subs = await _ytSubForSave(it.ytId); if(!subs.length) toast('這部影片沒有字幕'); }catch(e){ toast('字幕下載失敗（影片照樣存）：' + (e.message || e)); }
     }
@@ -1110,6 +1114,7 @@ async function _ytDlGo(){
       tags:[], favorite:false, lastPlay:null, lastPos:0, playCount:0, createdAt:Date.now(),
       ytSrc:it.ytId, ytChannel:info.channel || it.ytChannel || '', source:'youtube-download',
       ...(subs && subs.length ? { subs } : {}),
+      ...(lyrics ? { lyrics, lyricsTried:Date.now() } : {}),
     });
     ov._busy = null;
     ov.remove();
@@ -2030,6 +2035,24 @@ async function _ytLyrLoad(it, q, quiet){
     _ytRenderPlayerInfo();   // 「♪ 歌詞」按鈕亮起、面板換成歌詞
     return true;
   }catch(e){ if(!quiet) toast('歌詞讀取失敗：' + (e.message || e)); return false; }
+}
+// 給影音庫用（黑膠播放器、下載時一起存）：先找 LRCLIB 同步歌詞，找不到再用影片字幕 → {src, name, cues:[{s,e,t}], plain} 或 null
+async function ytLyricsFor(it, q){
+  try{
+    const r = await _ytLyrFind({ title:it.title || '', ytChannel:it.ytChannel || '', duration:it.duration || 0 }, q || undefined);
+    if(r){
+      const cues = r.syncedLyrics ? _ytLrcParse(r.syncedLyrics) : [];
+      if(cues.length || r.plainLyrics) return { src:'lrclib', name:(r.artistName ? r.artistName + '－' : '') + (r.trackName || ''), cues, plain:cues.length ? '' : (r.plainLyrics || '') };
+    }
+  }catch(_){}
+  if(it.ytId && !q && _ytN()){
+    try{
+      const subs = await _ytSubForSave(it.ytId), sb = subs[0];
+      const cues = sb ? _ytSubParse(sb.vtt, 'vtt') : [];
+      if(cues.length) return { src:'subs', name:sb.label || sb.lang, cues, plain:'' };
+    }catch(_){}
+  }
+  return null;
 }
 async function ytLyrics(){
   const it = _YT.cur; if(!it) return;

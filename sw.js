@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.57.3';
+const APP_VERSION = '4.58.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 const PAGES_CACHE = 'yc-pages-v1';   // SOP 原檔頁面圖：不跟版本走，更新 App 不清
 
@@ -63,8 +63,9 @@ const CORE_ASSETS = [
   // v4.40：Dexie（IndexedDB 存取，少了它整個 App 打不開）與 Chart.js 改列必要資源。
   //   原本是「可選」：安裝當下 CDN 剛好連不上就沒快取，之後也補不回來（script 標籤的回應是 opaque，下面不存），
   //   離線開啟就整個壞掉。列為必要後，CDN 連不上時新版先不安裝、繼續用舊版，下次再試
-  'https://cdnjs.cloudflare.com/ajax/libs/dexie/4.0.8/dexie.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js',
+  // v4.58：兩個都改放本機（js/，與 cdnjs 的 SRI 雜湊相同），不再靠 CDN；App 更新後清掉快取、離線開也不會壞
+  './js/dexie.min.js',
+  './js/chart.umd.min.js',
 ];
 
 // ── 可選資源（快取失敗不影響 SW 安裝）──────────────────────
@@ -87,9 +88,12 @@ const OPTIONAL_ASSETS = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      const corePromise = cache.addAll(CORE_ASSETS);
+      // v4.58：一律向伺服器拿最新的（cache:'reload' 略過瀏覽器的 HTTP 快取）。
+      //   原本可能把 HTTP 快取裡的舊 index.html 存進新版快取 → 新版程式配舊頁面
+      const fresh = u => new Request(u, { cache:'reload' });
+      const corePromise = cache.addAll(CORE_ASSETS.map(fresh));
       const optionalPromise = Promise.allSettled(
-        OPTIONAL_ASSETS.map(url => cache.add(url).catch(() => {}))
+        OPTIONAL_ASSETS.map(url => cache.add(fresh(url)).catch(() => {}))
       );
       return Promise.all([corePromise, optionalPromise]);
     })
