@@ -9,6 +9,8 @@ art = collections.defaultdict(set)
 for l in LAWS: art[l['lawName']].add(l['articleNumber'])
 R = collections.defaultdict(list)
 def tag(q): return f"ID {q['id']}｜{q['exam']} {q['year']}年 {q['subject']} 第{q['num']}題"
+# 使用者已對照原卷、原卷選項就是重複的（2026-11-23 確認）：1508 警佐110刑法5、2825 二技108法規2
+DUP_OK = {1508, 2825}
 FW = str.maketrans('ＡＢＣＤＥ', 'ABCDE')
 for q in Q:
     if q['type'] != 'mc': continue
@@ -21,9 +23,12 @@ for q in Q:
     empty = [k for k, v in opts.items() if not str(v).strip()]
     if empty: R['選項空白'].append(tag(q) + '｜' + ''.join(empty))
     vals = [re.sub(r'\s', '', str(v)) for v in opts.values() if str(v).strip()]
-    if len(vals) != len(set(vals)): R['選項文字重複'].append(tag(q))
+    if len(vals) != len(set(vals)):
+        if q['id'] in DUP_OK: R['選項文字重複（已對照原卷，原卷如此）'].append(tag(q))
+        else: R['選項文字重複'].append(tag(q))
     # 解析的正確選項：「正確為(B)」「故(C)正確」「(B)(D)正確」；只比單一明確寫法，官方送分／更正題略過
-    note = q.get('note') or ''
+    #   「【解析更正】原解析寫…」是更正說明，引用的是舊解析的寫法，不算
+    note = '\n'.join(l for l in (q.get('note') or '').split('\n') if not l.startswith('【解析更正】'))
     if '【官方】' in note or q.get('answerAlt') or q.get('answerFree'): continue
     if '⚠' in note or '檢核' in note: pass   # 解析已自己註明疑義或新舊法並列，不重複列
     else:
