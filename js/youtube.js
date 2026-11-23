@@ -1050,6 +1050,7 @@ async function _ytDlGo(){
   let lis = null; const tmp = [];
   try{
     const info = ov._info;
+    const page = 'https://www.youtube.com/watch?v=' + encodeURIComponent(it.ytId);   // 下載網址過期（403）時，原生端用這個重新取得新網址接著下載
     let label = '', phase = '';
     lis = await N.addListener('dlProgress', e => {
       if(!e.id.startsWith(id) || e.id.endsWith('_t')) return;   // 封面不算進度
@@ -1060,20 +1061,20 @@ async function _ytDlGo(){
     let r, pick;
     if(opt.kind === 'audio'){
       pick = { mime:opt.a.mime, ext:opt.a.ext };
-      r = await N.download({ url:opt.a.url, id, ext:opt.a.ext });
+      r = await N.download({ url:opt.a.url, id, ext:opt.a.ext, page });
       tmp.push(r.path);
     } else if(opt.kind === 'muxed'){
       pick = { mime:opt.v.mime, ext:opt.v.ext }; label = '（' + (opt.v.res || '') + '）';
-      r = await N.download({ url:opt.v.url, id, ext:opt.v.ext });
+      r = await N.download({ url:opt.v.url, id, ext:opt.v.ext, page });
       tmp.push(r.path);
     } else {
       // 畫面、聲音分開下載，再在手機上合成一個檔（不重新編碼）
       label = '（' + opt.v.res + '）';
       phase = '① 畫面 ';
-      const rv = await N.download({ url:opt.v.url, id:id + '_v', ext:opt.v.ext });
+      const rv = await N.download({ url:opt.v.url, id:id + '_v', ext:opt.v.ext, page });
       tmp.push(rv.path);
       phase = '② 聲音 ';
-      const ra = await N.download({ url:opt.a.url, id:id + '_a', ext:opt.a.ext });
+      const ra = await N.download({ url:opt.a.url, id:id + '_a', ext:opt.a.ext, page });
       tmp.push(ra.path);
       phase = '';
       txt.textContent = '③ 合併畫面和聲音…';
