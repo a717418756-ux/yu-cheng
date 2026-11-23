@@ -521,6 +521,7 @@
     <div id="media-hd-title" class="hdt">影音庫</div>
     <div id="media-hd-right" style="display:flex;align-items:center;gap:6px">
       <!-- 批量刪除（展開模式時插入）-->
+      <button class="hd-btn yt-hd" onclick="openYtSearch()" title="YouTube" aria-label="搜尋 YouTube">▶</button>
       <button class="hd-btn blue plus" onclick="openAddMedia()" title="新增影音" aria-label="新增影音">＋</button>
     </div>
   </div>
@@ -742,6 +743,25 @@
       border-radius:var(--r);padding:9px 12px;color:var(--t1);font-size:13px"
       oninput="saveAzureKey(this.value)">
     <div id="azure-usage" style="margin-top:7px;font-size:11.5px;color:var(--t2);line-height:1.6"></div>
+  </div>
+
+  <!-- YouTube 搜尋金鑰（v4.53） -->
+  <div class="sec">YouTube 搜尋（選填）</div>
+  <div class="scard" style="padding:12px 14px">
+    <div style="font-size:12px;color:var(--t2);margin-bottom:10px;line-height:1.7">
+      影音庫可以在 App 內搜尋 YouTube、用官方播放器播放（要連網）。<b>貼影片網址播放不需要金鑰</b>；要搜尋才需要自己的免費金鑰：<br>
+      ① 到 Google Cloud Console 建立專案 → ② 啟用「YouTube Data API v3」→ ③「憑證」建立 API 金鑰，貼在下面。<br>
+      免費額度每天約可搜尋 100 次。建議在金鑰設定裡把「API 限制」設成只能用 YouTube Data API v3、「網站限制」加上本 App 的網址。
+    </div>
+    <input id="yt-key" type="password" autocomplete="off"
+      placeholder="YouTube Data API 金鑰（選填）"
+      style="width:100%;background:var(--bg2);border:1px solid var(--bd);
+      border-radius:var(--r);padding:9px 12px;color:var(--t1);font-size:13px"
+      oninput="saveYtKey(this.value)">
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <button class="btn bg" style="padding:6px 12px;font-size:12px" onclick="ytTestKey()">測試金鑰</button>
+      <div id="yt-usage" style="flex:1;font-size:11.5px;color:var(--t2);line-height:1.6"></div>
+    </div>
   </div>
 
   <div class="sec">考試規則</div>
@@ -1239,6 +1259,7 @@
 <script src="js/epub.min.js"></script>
 <script src="js/books.js"></script>
 <script src="js/media.js"></script>
+<script src="js/youtube.js"></script>
 <script src="js/layout.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/quiz.js"></script>

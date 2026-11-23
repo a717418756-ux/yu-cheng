@@ -55,14 +55,13 @@ async function _fillMediaThumbs(container){
     const src = (raw instanceof Blob) ? URL.createObjectURL(raw) : raw;
     // 影片展開卡 poster：保留播放圖示/時長 badge，只替換無封面佔位、插入背景縮圖
     if(el.dataset.vthumb){
-      const noPoster = el.querySelector('.mvc-no-poster');
-      if(noPoster) noPoster.remove();
-      // 避免重複插入
+      // 避免重複插入；圖載入成功才拿掉🎬佔位（YouTube 縮圖是網址，離線時載不到就保留佔位）
       if(!el.querySelector('img.mvc-thumb-img')){
         const img = document.createElement('img');
         img.loading = 'lazy';
         img.className = 'mvc-thumb-img';
-        if(raw instanceof Blob){ img.onload = ()=> URL.revokeObjectURL(src); }
+        img.onload = ()=>{ el.querySelector('.mvc-no-poster')?.remove(); if(raw instanceof Blob) URL.revokeObjectURL(src); };
+        img.onerror = ()=> img.remove();
         img.src = src;
         el.insertBefore(img, el.firstChild);
       }
@@ -77,6 +76,7 @@ async function _fillMediaThumbs(container){
         img.loading = 'lazy';
         img.className = 'mar-thumb-img';
         if(raw instanceof Blob){ img.onload = ()=> URL.revokeObjectURL(src); }
+        img.onerror = ()=> img.remove();
         img.src = src;
         el.appendChild(img);
       }
@@ -88,10 +88,16 @@ async function _fillMediaThumbs(container){
     const img = document.createElement('img');
     img.loading = 'lazy';
     img.className = 'media-thumb-img'+(isAudio?' audio':'');
-    if(raw instanceof Blob){ img.onload = ()=> URL.revokeObjectURL(src); }
+    const badge = el.querySelector('.yt-badge');
+    // 載入成功才換掉佔位（YouTube 縮圖是網址，離線時載不到就保留原本的🎬／唱盤）
+    img.onload = ()=>{
+      if(raw instanceof Blob) URL.revokeObjectURL(src);
+      if(!el.isConnected) return;
+      el.innerHTML=''; el.appendChild(img);
+      if(durEl) el.appendChild(durEl);
+      if(badge) el.appendChild(badge);
+    };
     img.src = src;
-    if(el.isConnected){ el.innerHTML=''; el.appendChild(img); }
-    if(durEl && el.isConnected) el.appendChild(durEl);
   }
 }
 
@@ -120,6 +126,8 @@ function _filteredMedia(){
   if(kw) list=list.filter(m=>
     (m.title||'').toLowerCase().includes(kw)||
     (m.category||'').toLowerCase().includes(kw)||
+    (m.ytChannel||'').toLowerCase().includes(kw)||
+    (m.note||'').toLowerCase().includes(kw)||
     (m.tags||[]).join(' ').toLowerCase().includes(kw)
   );
   return list;
@@ -150,8 +158,15 @@ function _renderMediaPage(){
   if(_hdTitle && _hdTitle.textContent !== '影音庫') _hdTitle.textContent = '影音庫';
   el.innerHTML='';
 
+  // v4.53 YouTube 入口：App 內搜尋、貼網址播放
+  const ytBar=document.createElement('button');
+  ytBar.className='yt-entry';
+  ytBar.onclick=()=>openYtSearch();
+  ytBar.innerHTML='<span class="yt-logo">▶</span><span>搜尋 YouTube、貼網址播放</span><span class="yt-entry-go">›</span>';
+  el.appendChild(ytBar);
+
   if(!all.length){
-    el.innerHTML=`<div class="empty"><span class="ic">🎬</span><span>尚無影音，點右上角＋新增</span></div>`;
+    el.insertAdjacentHTML('beforeend',`<div class="empty"><span class="ic">🎬</span><span>尚無影音：點右上角＋加入自己的影音檔，或從 YouTube 收進來</span></div>`);
     return;
   }
 
@@ -170,10 +185,14 @@ function _renderMediaPage(){
   const audios = [...all].filter(m=>m.type==='audio')
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
 
+  // YouTube（收進影音庫的）
+  const yts = [...all].filter(m=>m.ytId).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
   if(recent.length) el.appendChild(_mkHScrollSection('最近播放','recent',recent, false));
   el.appendChild(_mkHScrollSection('收藏','fav',favs));  // 無收藏也顯示（空狀態）
   if(videos.length) el.appendChild(_mkHScrollSection('影片','video',videos,true,true));
   if(audios.length) el.appendChild(_mkHScrollSection('音頻','audio',audios));
+  if(yts.length) el.appendChild(_mkHScrollSection('YouTube','yt',yts));
   setTimeout(()=>_fillMediaThumbs(el), 0);
 }
 
@@ -225,6 +244,7 @@ function _mkAudioCard(m){
   div.innerHTML=`
     <div class="media-hcard-thumb audio" data-mid="${m.id}">
       <div class="media-hcard-vinyl"></div>
+      ${m.ytId?'<div class="yt-badge sm">▶</div>':''}
     </div>
     <div class="media-hcard-name">${esc(m.title||'未命名')}</div>`;
   return div;
@@ -240,6 +260,7 @@ function _mkVideoThumbCard(m, isFeatured=false){
     <div class="${isFeatured?'media-hcard-thumb video featured':'media-hcard-thumb video'}" data-mid="${m.id}">
       <div class="media-hcard-nothumb">🎬</div>
       ${dur?`<div class="media-hcard-dur">${dur}</div>`:''}
+      ${m.ytId?'<div class="yt-badge">▶ YouTube</div>':''}
     </div>
     <div class="media-hcard-name">${esc(m.title||'未命名')}</div>`;
   return div;
@@ -318,6 +339,9 @@ function _renderExpandMode(el){
   } else if(type==='audio'){
     items=items.filter(m=>m.type==='audio').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     title='音頻';
+  } else if(type==='yt'){
+    items=items.filter(m=>m.ytId).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    title='YouTube';
   } else if(type==='search'){
     title=`搜尋「${_M.kw}」`;
   }
@@ -327,6 +351,8 @@ function _renderExpandMode(el){
     items=items.filter(m=>
       (m.title||'').toLowerCase().includes(kw)||
       (m.category||'').toLowerCase().includes(kw)||
+      (m.ytChannel||'').toLowerCase().includes(kw)||
+      (m.note||'').toLowerCase().includes(kw)||
       (m.tags||[]).join(' ').toLowerCase().includes(kw)
     );
   }
@@ -372,7 +398,7 @@ function _renderExpandMode(el){
   }
 
   // 類別標籤（影片和音頻模式下才顯示）
-  if(type==='video'||type==='audio'){
+  if(type==='video'||type==='audio'||type==='yt'){
     const cats=[...new Set(items.map(m=>m.category||'').filter(Boolean))];
     if(cats.length>0){
       const catRow=document.createElement('div');
@@ -389,6 +415,14 @@ function _renderExpandMode(el){
   cntDiv.className='media-count';
   cntDiv.textContent=`共 ${items.length} 筆`;
   el.appendChild(cntDiv);
+  // 搜尋時：本機找不到想要的，可以直接拿同一個關鍵字搜 YouTube
+  if(isSearchMode && _M.kw){
+    const b=document.createElement('button');
+    b.className='yt-entry';
+    b.onclick=()=>openYtSearch(_M.kw);
+    b.innerHTML=`<span class="yt-logo">▶</span><span>在 YouTube 搜尋「${esc(_M.kw)}」</span><span class="yt-entry-go">›</span>`;
+    el.appendChild(b);
+  }
 
   // ── 分頁：每頁 10 筆 ──
   const totalPages = Math.max(1, Math.ceil(items.length / _M.EXPAND_PAGE));
@@ -553,6 +587,7 @@ function _setExpandCat(btn, cat){
   const type=_M.expandMode;
   let items=[..._M.allMedia];
   if(type==='video') items=items.filter(m=>m.type==='video');
+  else if(type==='yt') items=items.filter(m=>m.ytId);
   else items=items.filter(m=>m.type==='audio');
   if(cat) items=items.filter(m=>(m.category||'')===cat);
   items.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
@@ -582,13 +617,14 @@ function _mkVideoCard(m){
       <div class="mvc-no-poster">🎬</div>
       ${dur?`<div class="mvc-dur-badge">${dur}</div>`:''}
       <div class="mvc-play-icon">▶</div>
+      ${m.ytId?'<div class="yt-badge">▶ YouTube</div>':''}
     </div>
     <div class="mvc-meta-row">
       <div class="mvc-title-txt" onclick="playVideo(${m.id})">${esc(m.title||'未命名')}</div>
       <button class="mv-fav-btn${m.favorite?' on':''}"
         onclick="toggleMediaFav(${m.id},this)">${m.favorite?'★':'☆'}</button>
     </div>
-    ${m.category?`<div class="mvc-cat">${esc(m.category)}</div>`:''}`;
+    ${m.category||m.ytId?`<div class="mvc-cat">${esc(m.category||'')}${m.ytId&&m.lastPos>5?(m.category?' · ':'')+'看到 '+_fmtDur(m.lastPos):''}${m.ytId?` <button class="yt-edit-mini" onclick="event.stopPropagation();ytEditItem(${m.id})" aria-label="編輯">✎</button>`:''}</div>`:''}`;
   return div;
 }
 
@@ -609,13 +645,13 @@ function _mkAudioRow(m,i){
     </div>
     <div class="mar-info" onclick="playAudio(${m.id})">
       <div class="mar-title${isPlaying?' playing':''}">${esc(m.title||'未命名')}</div>
-      <div class="mar-meta">${m.category||''}${dur?' · '+dur:''}</div>
+      <div class="mar-meta">${m.ytId?'▶ YouTube · ':''}${esc(m.category||'')}${dur?' · '+dur:''}${m.lastPos>5&&m.ytId?' · 看到 '+_fmtDur(m.lastPos):''}</div>
     </div>
     <div class="mar-actions">
       ${dur?`<span class="mar-dur">${dur}</span>`:''}
       <button class="mv-fav-btn${m.favorite?' on':''}"
         onclick="toggleMediaFav(${m.id},this)">${m.favorite?'★':'☆'}</button>
-      <button class="mar-more" onclick="openMediaDetail(${m.id})">⋯</button>
+      <button class="mar-more" onclick="${m.ytId?`ytEditItem(${m.id})`:`openMediaDetail(${m.id})`}">⋯</button>
     </div>`;
   return div;
 }
@@ -639,6 +675,7 @@ async function playAudio(id){
 
   // 讀取 Blob
   const full=await dg('leisuremedia',id);
+  if(full?.ytId){ ytPlayItem(full); return; }   // v4.53 YouTube 項目：用官方播放器播（youtube.js）
   if(!full?.blob){
     // 無附加檔案：如果是自動播放（播放列表）就跳下一首，手動點擊才開詳情
     if(_M.playlist.length > 1){
@@ -1324,6 +1361,7 @@ function openVpPlaylist(){
 // ════════════════════════════════════════════════════════════
 async function playVideo(id){
   const full=await dg('leisuremedia',id);
+  if(full?.ytId){ ytPlayItem(full); return; }   // v4.53 YouTube 項目：用官方播放器播（youtube.js）
   if(!full?.blob){
     openMediaDetail(id);
     toast('此影片無附加檔案，可在詳情中刪除');

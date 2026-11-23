@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.52.0';
+const APP_VERSION = '4.53.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 const PAGES_CACHE = 'yc-pages-v1';   // SOP 原檔頁面圖：不跟版本走，更新 App 不清
 
@@ -26,6 +26,7 @@ const CORE_ASSETS = [
   './js/db.js',
   './js/books.js',
   './js/media.js',
+  './js/youtube.js',
   './js/utils.js',
   './js/quiz.js',
   './js/data.js',
@@ -115,6 +116,9 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = e.request.url;
   if (!url.startsWith('http')) return;
+  // v4.53 YouTube（搜尋 API、播放器、縮圖）：一律直接連網，不存快取（搜尋網址含金鑰，也不該留在快取裡）
+  if (/^https:\/\/([\w-]+\.)*(youtube\.com|youtube-nocookie\.com|ytimg\.com|googlevideo\.com|youtu\.be)\//.test(url)
+      || url.startsWith('https://www.googleapis.com/youtube/')) return;
 
   // 頁面導覽（index.html）→ 用「這一版」快取裡的 index.html（v4.40 起）
   //   ★ 原本網路優先：部署新版後第一次開啟，舊 SW 從網路拿到新版 index.html，JS／CSS 卻還是舊快取

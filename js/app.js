@@ -483,6 +483,10 @@ function _handleBackLayer(){
   const imgV = document.getElementById('img-viewer');
   if(imgV){ imgV.remove(); return true; }
 
+  // 1-0-1) YouTube（v4.53）：播放器可能是從搜尋面板開的、蓋在面板上 → 先關最上面的選單／編輯，再關播放器，最後才是面板
+  for(const id of ['yt-menu-ov', 'yt-edit-ov']){ const el = document.getElementById(id); if(el){ el.remove(); return true; } }
+  if(document.getElementById('yt-player-ov')){ _callIf('closeYtPlayer'); return true; }
+
   // 1-1) 法條小視窗（疊在答題、法規頁之上）：從清單點進來的先回清單，與按 ✕ 相同
   //      ★ 原本沒攔，答題中看法條按返回會直接離開測驗
   if(_isShown(document.getElementById('lawpop-ov'))){ _callIf('closeLawPop'); return true; }

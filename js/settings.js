@@ -77,7 +77,7 @@ async function _restoreTable(name, rows){
 //   ★ 連線設定（雲端網址、密碼、Azure 金鑰）只在手機上「還沒設定」時才從備份補上：
 //   新手機還原一次就能用；但已經設好的不會被舊備份蓋回舊值
 //   （Apps Script 重新部署會換網址，用舊備份還原後網址變回舊的 → 雲端一直 HTTP 404）
-const _CONN_KEYS = [GAS_URL_KEY, GAS_PWD_KEY, 'tts_azure_key'];
+const _CONN_KEYS = [GAS_URL_KEY, GAS_PWD_KEY, 'tts_azure_key', 'yt_api_key'];
 // 舊版把「上次備份／還原時間」存在設定裡，會跟著備份跑到別台裝置，造成誤判 → 還原時略過
 const _DEVICE_LOCAL_KEYS = ['lastBackupTime', 'lastRestoreTime'];
 async function _restoreSettings(rows){
@@ -699,7 +699,7 @@ async function removeGuessQs(){ try{
   renderSet();
 }catch(e){ logError('removeGuessQs', e); toast('移除失敗：' + e.message); }}
 
-async function renderSet(){  _renderAzureKey().catch(()=>{}); try{
+async function renderSet(){  _renderAzureKey().catch(()=>{}); window._renderYtKey?.().catch(()=>{}); try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
   const gRow = document.getElementById('guess-row'), gN = qs.filter(_isGuessQ).length;
   if(gRow){ gRow.style.display = gN ? '' : 'none'; const b = document.getElementById('guess-n'); if(b) b.textContent = gN; }
@@ -1091,7 +1091,8 @@ async function _restoreDir(dirHandle, dirName, table, extOf, listRows = null){
       rows.push(r);
     }
     const had = new Map((await da(table)).filter(r => r.blob).map(r => [r.id, r]));
-    for(const r of rows) if(!r.blob){ if(_sameItem(r, had.get(r.id))) res.kept++; else res.missing.push(r.title || r.name || r.id); }
+    // v4.53 YouTube 項目本來就沒有檔案本體（播放時連線），不算缺檔
+    for(const r of rows) if(!r.blob && !r.ytId){ if(_sameItem(r, had.get(r.id))) res.kept++; else res.missing.push(r.title || r.name || r.id); }
     await _db.transaction('rw', _db[table], () => _restoreTable(table, rows));
     res.n = rows.length;
   }catch(e){
