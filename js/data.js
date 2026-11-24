@@ -1649,8 +1649,7 @@ function _sopBody(text, fmt, noFlow){
 }
 // 段落跳轉：捲到同一份內容裡的第 i 個【標題】（同一畫面可能同時有好幾份，所以從按鈕往上找自己的那份）
 function sopJump(btn, i){
-  const eink = document.documentElement.getAttribute('data-theme') === 'eink';   // 電子紙不做捲動動畫（殘影）
-  btn.closest('.sop')?.querySelector('.sop-h[data-h="' + i + '"]')?.scrollIntoView({ block:'start', behavior: eink ? 'auto' : 'smooth' });
+  btn.closest('.sop')?.querySelector('.sop-h[data-h="' + i + '"]')?.scrollIntoView({ block:'start', behavior:'smooth' });
 }
 // 條文內容 → HTML：SOP 類別且有 SOP 標記時排成流程圖／表格，其餘照法條排版
 // v4.36：「法規條文」以外的類別（補充資料、行政規則…）有【標題】或「|」表格時也照這套排版（不畫流程圖），

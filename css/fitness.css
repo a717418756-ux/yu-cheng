@@ -86,19 +86,6 @@
 }
 .fit-save-btn:active{ transform:scale(0.98); }
 
-/* eink 模式：去漸層、純黑白高對比 */
-[data-theme="eink"] .fit-card,
-[data-theme="eink"] .fit-balance,
-[data-theme="eink"] .fit-edit-item input{ background:#fff; border-color:#999; }
-[data-theme="eink"] .fit-card::before{ background:#000 !important; }
-[data-theme="eink"] .fit-card-val,
-[data-theme="eink"] .fit-edit-title{ color:#000; }
-[data-theme="eink"] .fit-source{ background:#f0f0f0; border-color:#999; }
-[data-theme="eink"] .fit-health-btn,
-[data-theme="eink"] .fit-save-btn{ background:#000; color:#fff; transition:none; }
-[data-theme="eink"] .fit-health-btn:active,
-[data-theme="eink"] .fit-save-btn:active{ transform:none; }
-
 /* ════ 首頁運動摘要卡（與成長軌跡同款外觀）════════════════ */
 .fitsum-wrap{
   margin:10px 14px 6px; padding:12px 14px 14px;
@@ -143,12 +130,6 @@
 }
 .fitsum-bar-date{ font-size:8px; color:var(--t2); }
 .fitsum-trend-lab{ font-size:10px; color:var(--t2); text-align:center; }
-/* eink */
-[data-theme="eink"] .fitsum-wrap{ background:#fff; border-color:#999; }
-[data-theme="eink"] .fitsum-title,
-[data-theme="eink"] .fitsum-stat-val{ color:#000; }
-[data-theme="eink"] .fitsum-stat{ background:#f0f0f0; }
-[data-theme="eink"] .fitsum-bar-fill{ background:#000; }
 
 /* 雙擊編輯提示 */
 .fit-edit-hint{
@@ -156,7 +137,6 @@
   margin:-4px 0 16px;
 }
 .fit-card{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
-[data-theme="eink"] .fit-edit-hint{ color:#555; }
 
 /* v4.57 Health Connect（三星健康）區塊 */
 .fit-hc{ margin-top:14px; padding:12px 14px; border-radius:14px; background:var(--bg1); border:1px solid var(--bd); }
@@ -196,4 +176,4 @@
 .fit-kcal-leg .dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }
 .fit-kcal-note{ font-size:11px; color:var(--t2); text-align:center; margin-top:8px; line-height:1.5; }
 .fit-balance-lab small{ display:block; font-size:11px; color:var(--t2); font-weight:400; }
-[data-theme="eink"] .fit-kcal-bar .b{ background:#bbb; } [data-theme="eink"] .fit-kcal-bar .a{ background:#555; } [data-theme="eink"] .fit-kcal-bar .e{ background:#000; }
+

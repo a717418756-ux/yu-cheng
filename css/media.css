@@ -92,9 +92,6 @@
 }
 /* ── 展開模式頂部 ── */
 
-
-
-
 /* 類別標籤列 */
 .media-expand-cats{
   display:flex;gap:8px;
@@ -223,7 +220,6 @@
 .mar-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .mar-dur{font-size:11px;color:var(--t2)}
 
-
 /* ── 黑膠播放器（全螢幕）────────────────────────────────────── */
 .vp-topbar{
   display:flex;align-items:center;justify-content:space-between;
@@ -314,7 +310,6 @@
 }
 
 /* 中心孔 */
-
 
 /* ── 唱針圖片（右上角，絕對定位）── */
 .vp-tonearm-img{
@@ -462,13 +457,10 @@
 
 /* ── 工具列 ── */
 
-
 .vpt-btn:active{
   color:rgba(255,255,255,0.85);
   background:rgba(255,255,255,0.06);
 }
-
-
 
 /* ── 影片播放器 ─────────────────────────────────────────────── */
 .vvp-topbar{
@@ -490,10 +482,7 @@
   font-size:20px;cursor:pointer;padding:4px 8px;flex-shrink:0;
 }
 
-
 .vvp-tool-btn:active{background:rgba(255,255,255,0.08)}
-
-
 
 /* ── 音頻列表更多按鈕 ─────────────────────────────────────── */
 .mar-more{
@@ -662,15 +651,9 @@ a.zpanel-row{text-decoration:none;color:inherit}
 
 /* 學習區 wip */
 
-
-
-
-
 /* 閱覽區子選單（zpanel-browse）*/
 
 .zpanel-browse-sub.open{max-height:200px}
-
-
 
 .zpanel-browse-opt-text .t{font-size:12.5px;font-weight:600;color:var(--t0)}
 .zpanel-browse-opt-text .s{font-size:11px;color:var(--t2);margin-top:1px}
@@ -811,249 +794,7 @@ a.zpanel-row{text-decoration:none;color:inherit}
 
 /* bottom sheet modal */
 
-/* ══ 電子紙模式：關閉動畫與特效 ════════════════════════════════ */
-[data-theme="eink"] *{
-  animation:none !important;
-  transition:none !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-  box-shadow:none !important;
-}
-[data-theme="eink"] body{
-  background:var(--bg0);color:var(--t0);
-  font-size:var(--fs-body);
-  line-height:var(--lh-body);
-  /* 字體沿用一般模式的黑體：楷書、明體筆畫細，在電子紙上發灰，看久了吃力。
-     Boox 內建中文字型多半只有一種字重，調 font-weight 無效（600 以上又變成假粗體），
-     改用 0.3px 描邊把每一筆加實：所有字一起變黑，不影響排版寬度。 */
-  -webkit-text-stroke:.3px currentColor;
-}
-[data-theme="eink"] input,
-[data-theme="eink"] textarea,
-[data-theme="eink"] select{
-  background:var(--bg2);color:var(--t0);
-  border-color:var(--bd);border-width:1.5px;
-  font-size:var(--fs-body);
-  min-height:var(--btn-h);
-}
-[data-theme="eink"] select option{ background:var(--bg2);color:var(--t0); }
-
-/* 電子紙：header / nav */
-[data-theme="eink"] .hd{
-  background:var(--bg1);border-bottom:2px solid var(--bd);
-}
-[data-theme="eink"] .nav{
-  background:var(--bg1);border-top:2px solid var(--bd);
-}
-[data-theme="eink"] .hdt{ font-size:17px;font-weight:800;color:var(--t0); }
-
-/* 電子紙：卡片加框線 */
-[data-theme="eink"] .card,
-[data-theme="eink"] .qc,
-[data-theme="eink"] .cc,
-[data-theme="eink"] .sc,
-[data-theme="eink"] .stb,
-[data-theme="eink"] .qb{
-  background:var(--bg1);
-  border:1.5px solid var(--bd);
-}
-
-/* 電子紙：FAB → 純文字按鈕，不用圓型 */
-[data-theme="eink"] #fab-list{
-  background:var(--bg1);border:1.5px solid var(--bd);
-}
-[data-theme="eink"] .fab-btn{
-  background:var(--bg2);color:var(--t0);
-  border:1.5px solid var(--bd);border-radius:8px;
-  font-size:13px;
-}
-[data-theme="eink"] #fab-main{
-  background:var(--t0);color:var(--bg0);
-  border:2px solid var(--t0);
-}
-
-/* 電子紙：題目字體放大 */
-[data-theme="eink"] .q-stem,
-[data-theme="eink"] .qstem,
-[data-theme="eink"] #q-stem,
-[data-theme="eink"] .qst{
-  font-size:var(--fs-q) !important;
-  line-height:var(--lh-body);
-  letter-spacing:.04em;
-  font-weight:500;
-}
-[data-theme="eink"] .law-content,
-
-[data-theme="eink"] .pi-s,
-[data-theme="eink"] .pi-n{ font-size:calc(var(--fs-body) - 1px); }
-
-/* 電子紙：按鈕加高、加粗邊線 */
-[data-theme="eink"] .btn,
-[data-theme="eink"] .nb,
-[data-theme="eink"] button{ min-height:var(--btn-h);font-size:15px; }
-[data-theme="eink"] .btn.bg{
-  background:var(--bg2);color:var(--t0);border:1.5px solid var(--bd);
-}
-[data-theme="eink"] .btn.bp{
-  background:var(--t0);color:var(--bg0);border:none;
-}
-
-/* 電子紙：chip */
-[data-theme="eink"] .chip{
-  background:var(--bg2);color:var(--t0);
-  border:1.5px solid var(--bd);font-size:13px;
-  padding:7px 14px;
-}
-[data-theme="eink"] .chip.on{
-  background:var(--t0);color:var(--bg0);border-color:var(--t0);
-}
-
-/* 電子紙：答題選項更清晰 */
-[data-theme="eink"] .qabn{
-  background:var(--bg2);color:var(--t0);
-  border:1.5px solid var(--bd);
-  padding:10px 14px;font-size:15px;
-}
-
-/* 電子紙：單欄版面 */
-[data-theme="eink"] .grid-2,
-[data-theme="eink"] [style*="grid-template-columns"]{
-  grid-template-columns:1fr !important;
-}
-
-/* 電子紙：勉勵語 */
-[data-theme="eink"] .h-motto{
-  font-size:22px;font-weight:800;color:var(--t0);letter-spacing:-.01em;
-}
-
-/* 電子紙：scrollbar */
-[data-theme="eink"] .page::-webkit-scrollbar-thumb{ background:var(--bd); }
-
-/* 電子紙：zone-card */
-[data-theme="eink"] .zone-card{
-  background:var(--bg1);border:1.5px solid var(--bd);
-}
-[data-theme="eink"] .zone-card.zone-active{ border-color:var(--t0); }
-[data-theme="eink"] .zone-exam .zone-title{ color:var(--t0); }
-[data-theme="eink"] .zone-leisure .zone-title{ color:var(--t0); }
-[data-theme="eink"] .zone-study .zone-title{ color:var(--t0); }
-
-/* 電子紙：zone-panel */
-[data-theme="eink"] .zone-panel{
-  background:var(--bg1);border:1.5px solid var(--bd);
-}
-[data-theme="eink"] .zpanel-main{ border-bottom:1px solid var(--bd); }
-[data-theme="eink"] .zpanel-main-text .t{ color:var(--t0);font-size:15px; }
-[data-theme="eink"] .zpanel-main-text .s{ color:var(--t2); }
-[data-theme="eink"] .zpanel-quiz{ background:var(--bd); }
-[data-theme="eink"] .zqb{
-  background:var(--bg2);border-top:1px solid var(--bd);
-}
-[data-theme="eink"] .zqb::before{ display:none; }
-[data-theme="eink"] .zqb-label{ color:var(--t0);font-size:13px; }
-[data-theme="eink"] .zqb-desc{ color:var(--t2);font-size:11px; }
-[data-theme="eink"] .zpanel-row{ border-top:1px solid var(--bd); }
-[data-theme="eink"] .zpanel-row-text .t{ color:var(--t0);font-size:15px; }
-[data-theme="eink"] .zpanel-row-text .s{ color:var(--t2); }
-
-/* 電子紙：數據橫條 */
-[data-theme="eink"] .hdb-cell{
-  background:var(--bg1);border:1px solid var(--bd);
-}
-
-/* 電子紙：hcd 倒數 */
-[data-theme="eink"] .hcd-row{ border-bottom:1px solid var(--bd); }
-[data-theme="eink"] .hcd-name{ color:var(--t0);font-size:15px; }
-[data-theme="eink"] .hcd-days{ font-size:28px; }
-
-/* 電子紙：FAB */
-[data-theme="eink"] #fab-list{
-  background:var(--bg1);border:1.5px solid var(--bd);
-}
-
-
-/* 電子紙：lw-card */
-[data-theme="eink"] .lw-card{ background:var(--bg1);border:1.5px solid var(--bd); }
-
-/* 電子紙：FAB label（深色半透明 → 不透明深色）*/
-[data-theme="eink"] .fab-label{
-  background:var(--t0) !important;
-  color:var(--bg0) !important;
-  border:none !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-  box-shadow:none !important;
-  font-size:14px;
-  font-weight:700;
-}
-[data-theme="eink"] .fab-btn{
-  background:var(--t0) !important;
-  border:none !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-  box-shadow:none !important;
-  font-size:18px;
-}
-[data-theme="eink"] #fab-main{
-  background:var(--t0) !important;
-  border:none !important;
-  box-shadow:none !important;
-}
-
-/* 電子紙：hd-home 無邊框無背景 */
-[data-theme="eink"] .hd-home{
-  background:var(--bg0) !important;   /* 置頂標題要不透明，否則往下捲時內容會透出來疊字 */
-  border:none !important;
-  box-shadow:none !important;
-}
-/* 電子紙：一般 hd（非首頁）用不透明背景 */
-[data-theme="eink"] .hd:not(.hd-home){
-  background:var(--bg1) !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-  border-bottom:1.5px solid var(--bd) !important;
-}
-/* 電子紙：hd 統一 */
-[data-theme="eink"] .hd{
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-}
-[data-theme="eink"] .zone-card{
-  background:var(--bg1) !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-}
-[data-theme="eink"] .zone-panel{
-  background:var(--bg1) !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-}
-[data-theme="eink"] .zqb{
-  background:var(--bg2) !important;
-}
-[data-theme="eink"] .zpanel-quiz{
-  background:var(--bd) !important;
-}
-[data-theme="eink"] .btn.bg,
-[data-theme="eink"] .hd-btn.bg{
-  background:var(--bg2) !important;
-  color:var(--t0) !important;
-  border:1.5px solid var(--bd) !important;
-}
-[data-theme="eink"] #fab-overlay.open{
-  background:rgba(0,0,0,0.5) !important;
-}
-[data-theme="eink"] #fab-list{
-  background:var(--bg1) !important;
-  border:1.5px solid var(--bd) !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-  box-shadow:none !important;
-}
 /* plan-badges 底部分隔 */
-[data-theme="eink"] .plan-badges{
-  border-bottom:1px solid var(--bd);
-}
 
 /* ── inline style 抽取（v2.11.32）──────────────────────── */
 .media-empty-sec{ padding:12px 14px 18px; font-size:12px; color:var(--t2); }
@@ -1141,8 +882,6 @@ a.zpanel-row{text-decoration:none;color:inherit}
 .bulk-selecting .mvc-poster{ pointer-events:none; }  /* 批量模式停用內部播放點擊區 */
 .media-arow.bulk-selected{ background:rgba(110,168,254,0.14); }
 .media-vcard.bulk-selected{ outline:2px solid var(--acc); outline-offset:-2px; }
-[data-theme="eink"] .media-arow.bulk-selected{ background:#e0e0e0; }
-[data-theme="eink"] .media-vcard.bulk-selected{ outline-color:#000; }
 
 /* ── 各式全螢幕遮罩（v2.11.39：inline 抽取）──────────── */
 /* 底部彈出式（半透明遮罩 + 內容貼底） */
@@ -1195,8 +934,6 @@ a.zpanel-row{text-decoration:none;color:inherit}
   display:flex; align-items:center; justify-content:center; overflow:hidden;
   font-size:40px;
 }
-[data-theme="eink"] .media-detail-thumb{ background:#e8e8e8; }
-[data-theme="eink"] .media-detail-thumb.placeholder{ color:#000; }
 
 /* ── 影片展開卡縮圖（v2.11.42）：墊在 poster 底層 ──────── */
 .mvc-thumb-img{
@@ -1238,14 +975,6 @@ a.zpanel-row{text-decoration:none;color:inherit}
   min-width:20px; text-align:center; color:var(--t2);
   font-size:14px; user-select:none;
 }
-/* eink：去陰影、純黑白高對比、無動畫 */
-[data-theme="eink"] .pager-btn{
-  background:#fff; border-color:#999; color:#000; transition:none;
-}
-[data-theme="eink"] .pager-btn.active{
-  background:#000; border-color:#000; color:#fff; box-shadow:none;
-}
-[data-theme="eink"] .pager-btn:active{ transform:none; }
 
 /* ══ 備份比較視窗 / 版本選擇 / 同步狀態 ══════════════════════════ */
 .sc-box{max-width:440px;width:100%;text-align:left;max-height:88vh;overflow-y:auto}
@@ -1279,9 +1008,6 @@ a.zpanel-row{text-decoration:none;color:inherit}
 .ss-v small{color:var(--t2)}
 .ss-none{color:var(--t2)}
 .ss-btn{background:none;border:1px solid var(--bd);color:var(--acc);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;margin-left:6px;font-family:inherit}
-[data-theme="eink"] .sc-warn{border:1.5px solid #000;background:#fff;color:#000}
-[data-theme="eink"] .sc-warn.danger{border-width:2.5px}
-[data-theme="eink"] .sc-tbl tr.sc-diff td{color:#000;text-decoration:underline}
 
 /* ══ YouTube（v4.53）：App 內搜尋、官方播放器、收進影音庫 ══════════ */
 .yt-logo{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:18px;
@@ -1380,8 +1106,6 @@ a.zpanel-row{text-decoration:none;color:inherit}
   .ytp-frame-wrap{ height:100%; width:auto; max-width:62%; aspect-ratio:16/9; margin:0; }
   .ytp-body{ max-width:none; }
 }
-[data-theme="eink"] .yt-logo, [data-theme="eink"] .yt-go, [data-theme="eink"] .yt-badge{ background:#000; }
-[data-theme="eink"] .hd-btn.yt-hd{ color:#000; }
 
 /* App 版（Android 外殼）：直接播放、下載進度 */
 #ytp-video{ width:100%; height:100%; display:block; background:#000; }
@@ -1557,6 +1281,4 @@ a.zpanel-row{text-decoration:none;color:inherit}
 .vp-next-tx{ min-width:0; display:flex; flex-direction:column; gap:2px; }
 .vp-next-tx b{ font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .vp-next-tx small{ font-size:12px; color:rgba(255,255,255,.55); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-[data-theme="eink"] #vinyl-player-ov{ background:#fff; }
-[data-theme="eink"] .vp-lyr-card, [data-theme="eink"] .vp-next-card{ background:#fff; color:#000; border:1px solid #000; box-shadow:none; }
-[data-theme="eink"] .vp-lyr-body p{ color:#888; } [data-theme="eink"] .vp-lyr-body p.on{ color:#000; }
+

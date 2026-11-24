@@ -118,23 +118,6 @@
 }
 .eng-rate-lbl{ font-size:13px; color:var(--t2); min-width:34px; text-align:center; }
 
-/* ══ eink 模式：英語庫高對比 + 朗讀高亮改邊框（電子紙避免大色塊）══ */
-[data-theme="eink"] .eng-sent{
-  font-family:'Noto Serif TC','標楷體','DFKai-SB',Georgia,serif;
-  color:#000; font-weight:500;
-}
-[data-theme="eink"] .eng-sent.reading{
-  background:transparent;
-  box-shadow:inset 4px 0 0 #000;
-  border-bottom:2px solid #000;
-  color:#000; font-weight:700;
-}
-[data-theme="eink"] .eng-card,
-[data-theme="eink"] #eng-reader{ box-shadow:none; }
-[data-theme="eink"] .eng-tts-btn{
-  background:#000; color:#fff;
-}
-
 /* ── 學習區入口按鈕 ── */
 .zone-act-btn{
   display:flex; align-items:center; gap:12px; width:100%;
@@ -144,7 +127,6 @@
 }
 .zone-act-btn:hover{ border-color:var(--acc); background:var(--bg2); }
 .zone-act-btn:active{ transform:scale(.99); }
-[data-theme="eink"] .zone-act-btn{ box-shadow:none; border-color:#000; }
 
 /* ── 音檔播放列 ── */
 .eng-audio-bar{
@@ -185,12 +167,6 @@
   background:var(--acc); color:#fff; font-size:12px; cursor:pointer;
 }
 .eng-aum-btn.del{ background:transparent; border-color:var(--red); color:var(--red); }
-
-/* eink：音檔列高對比 */
-[data-theme="eink"] .eng-au-play{ background:#000; color:#fff; }
-[data-theme="eink"] .eng-au-seek::-webkit-slider-thumb{ background:#000; }
-[data-theme="eink"] .eng-aum-btn{ background:#000; border-color:#000; }
-[data-theme="eink"] .eng-aum-btn.del{ background:transparent; border-color:#000; color:#000; }
 
 /* ── 跟讀糾正（Azure Pronunciation Assessment）── */
 .eng-sent-wrap{ position:relative; }
@@ -249,14 +225,6 @@
   color:var(--red,#e05c57);
 }
 
-/* eink 模式 */
-[data-theme="eink"] .eng-repeat-btn{ border-color:#000; color:#000; }
-[data-theme="eink"] .eng-repeat-btn-rec{ border-color:#000 !important; color:#000 !important; }
-[data-theme="eink"] .eng-repeat-res{ border-left-color:#000; background:#f0f0f0; }
-[data-theme="eink"] .eng-pa-score-item{ background:#fff; border-color:#000; }
-[data-theme="eink"] .eng-pa-score-total{ background:#eee; }
-[data-theme="eink"] .eng-pa-scores{ border-color:#000; }
-
 /* ── 跟讀重試按鈕（v2.11.26）──────────────────────────── */
 .eng-pa-retry{
   background:none; border:1px solid var(--bd);
@@ -266,8 +234,6 @@
   flex-shrink:0;
 }
 .eng-pa-retry:active{ border-color:var(--acc); color:var(--acc); transform:scale(.95); }
-[data-theme="eink"] .eng-pa-retry{ border-color:#000; color:#000; }
-[data-theme="eink"] .eng-pa-retry:active{ transform:none; }
 
 /* ── 跟讀練習歷史趨勢（v2.11.45）──────────────────────── */
 .eng-pa-hist{

@@ -305,9 +305,8 @@ function _clearFabItems(){
   const container = document.getElementById('fab-items');
   if(!container) return;
   document.querySelectorAll('#fab-items .fab-item').forEach(el=>el.classList.remove('vis'));
-  // 動畫結束後清空，避免佔空間（電子紙模式直接清）
-  const isEink = document.documentElement.getAttribute('data-theme')==='eink';
-  setTimeout(()=>{ if(container) container.innerHTML=''; }, isEink ? 0 : 260);
+  // 動畫結束後清空，避免佔空間
+  setTimeout(()=>{ if(container) container.innerHTML=''; }, 260);
 }
 
 function fabGo(pg){
@@ -393,32 +392,14 @@ document.addEventListener('visibilitychange', ()=>{
 
 const _splashStart = Date.now();
 
-/* ══════════════════════════════════════════════════════════════
-   主題系統（兩模式：dark / eink）
-   儲存於 IndexedDB settings store，key: 'displayTheme'
-   ══════════════════════════════════════════════════════════════ */
-
 // ════════════════════════════════════════════════════════════
-// 【主題系統（深色/電子紙）】
+// 【主題】v4.59.0 拿掉電子紙模式（Boox 跑不動），只剩標準深色；
+//   以前選過電子紙的裝置，啟動時把設定改回標準
 // ════════════════════════════════════════════════════════════
 async function initTheme(){
-  const saved = await getSetting('displayTheme', 'dark');
-  _applyTheme(saved);
-}
-
-async function setTheme(theme){
-  _applyTheme(theme);
-  await setSetting('displayTheme', theme);
-}
-
-function _applyTheme(theme){
-  const t = (theme === 'eink') ? 'eink' : 'dark';
-  document.documentElement.setAttribute('data-theme', t === 'dark' ? '' : t);
-  try{ localStorage.setItem('_themeCache', t); }catch(e){}
-  ['dark','eink'].forEach(th => {
-    const btn = document.getElementById(`theme-btn-${th}`);
-    if(btn) btn.classList.toggle('active', th === t);
-  });
+  document.documentElement.removeAttribute('data-theme');
+  try{ localStorage.removeItem('_themeCache'); }catch(e){}
+  if((await getSetting('displayTheme', 'dark')) !== 'dark') await setSetting('displayTheme', 'dark');
 }
 
 /* ── 初始化 ── */
@@ -752,7 +733,7 @@ function _showUpdateBanner(reg){
 const App = {
   toggleZone, toggleZoneQuiz,
   toggleAddQMenu, closeAddQMenu, toggleAddLawMenu, closeAddLawMenu,
-  toggleFab, closeFab, fabGo, navQuiz, _navClick, goPage, setTheme
+  toggleFab, closeFab, fabGo, navQuiz, _navClick, goPage
 };
 window.App = App;
 Object.assign(window, App);

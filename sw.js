@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.58.2';
+const APP_VERSION = '4.59.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 const PAGES_CACHE = 'yc-pages-v1';   // SOP 原檔頁面圖：不跟版本走，更新 App 不清
 
@@ -19,12 +19,29 @@ const CORE_ASSETS = [
   './css/books.css',
   './css/media.css',
   './css/quiz.css',
-  './css/eink.css',
   './css/splash.css',
   './css/english.css',
   './css/fitness.css',
   './js/db.js',
   './js/books.js',
+  './css/reader.css',
+  './js/reader.js',
+  // v4.59 閱讀引擎 foliate-js（小檔先快取，離線也能開 EPUB／MOBI）；PDF.js（約 3MB）第一次開 PDF 時才下載並留在快取
+  './js/foliate/view.js',
+  './js/foliate/epub.js',
+  './js/foliate/epubcfi.js',
+  './js/foliate/paginator.js',
+  './js/foliate/fixed-layout.js',
+  './js/foliate/overlayer.js',
+  './js/foliate/progress.js',
+  './js/foliate/text-walker.js',
+  './js/foliate/search.js',
+  './js/foliate/mobi.js',
+  './js/foliate/fb2.js',
+  './js/foliate/comic-book.js',
+  './js/foliate/pdf.js',
+  './js/foliate/vendor/zip.js',
+  './js/foliate/vendor/fflate.js',
   './js/media.js',
   './js/youtube.js',
   './js/utils.js',

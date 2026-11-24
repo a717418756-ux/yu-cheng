@@ -363,6 +363,12 @@
   //   裡面所有段落，整章會先唸一遍、再逐段唸一遍（很多書每章都包在 div 裡）。
   //   同時記下每段對應的元素，供「畫面跟著翻頁」與段落標示使用。
   //   fromPage：從本章第幾頁開始（開始朗讀時＝目前這一頁；換章後＝0）
+  // v4.59 新閱讀器（js/reader.js）：段落、換章、翻到朗讀位置都由 window._ycBookTTS 提供
+  function _bookParas(fromHere){
+    const list = window._ycBookTTS.paras(fromHere);
+    _TTS.highlightEls = list.map(x => x.el);
+    return list.map(x => x.text);
+  }
   function _epubParas(fromPage){
     const c   = window._epubRendition?.getContents?.()[0];
     const doc = c && c.document;
@@ -385,14 +391,15 @@
   // 由閱讀器的 _epubNextSection 換章（算使用者操作，守門員不會拉回；
   // 原本用 epub.js 內建 next() 一頁頁翻，會被守門員當成位置自己變了而拉回）。
   async function _epubAdvanceAndContinue(){
-    if(!window._epubRendition){ _stop(); return; }
+    const B = window._ycBookTTS;
+    if(!B && !window._epubRendition){ _stop(); return; }
     _TTS._turning = true;
     try{
       for(let guard = 0; guard < 30; guard++){          // 連續空白章節的上限
-        const ok = await _epubNextSection();
+        const ok = B ? await B.next() : await _epubNextSection();
         if(!_TTS.speaking) return;                        // 換章途中被停止
         if(!ok){ _stop(); toast('已讀完'); return; }
-        const segs = _epubParas(0);
+        const segs = B ? _bookParas(false) : _epubParas(0);
         if(segs.length){
           _prefetchCache = null;                          // 清舊章預抓，避免重複播放
           _TTS.utterances = segs;
@@ -417,6 +424,7 @@
     if(!el) return;
     el.classList.add('tts-reading-hl');
     _TTS.hlEl = el;
+    if(_TTS.mode === 'epub' && window._ycBookTTS){ window._ycBookTTS.show(el); return; }
     if(_TTS.mode === 'epub'){
       // ★ 電子書是分頁排版，scrollIntoView 會把整個分頁捲亂；改成翻到該段所在的頁。
       //   只往後翻：從上一頁延續過來的段落（開始朗讀的第一段）不要把畫面翻回上一頁
@@ -611,7 +619,8 @@
     // 開始朗讀時標示按鈕
     const btn = document.getElementById('tts-epub-btn');
     if(btn){ btn.style.color='var(--acc)'; btn.style.opacity='1'; }
-    const segments = _epubParas(_epubGeom()?.idx || 0);   // 從目前這一頁開始
+    const segments = window._ycBookTTS ? _bookParas(true)          // v4.59 新閱讀器：從目前這一頁開始
+                                       : _epubParas(_epubGeom()?.idx || 0);   // 從目前這一頁開始
     if(!segments.length){ toast('無法取得頁面文字'); return; }
     _speak(segments, 'epub');
   };

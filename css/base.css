@@ -59,42 +59,6 @@
 
 /* ══ 淺色模式 ══════════════════════════════════════════════════ */
 
-/* ══ 電子紙模式（Boox 實機用）══════════════════════════════════
-   電子紙無背光、灰階少：底色用純白（米白在螢幕上是一層灰，字就不黑），
-   文字一律純黑或近黑，框線用深灰——灰字、淺框在電子紙上會糊成一片。 */
-[data-theme="eink"]{
-  --bg0:#FFFFFF;
-  --bg1:#FFFFFF;
-  --bg2:#F0F0F0;
-  --bg3:#E0E0E0;
-  --bd:#555555;
-
-  --t0:#000000;
-  --t1:#000000;
-  --t2:#222222;
-
-  --acc:#000000;
-  --acc2:#000000;
-
-  --grn:#1a5c2e;
-  --grn2:rgba(26,92,46,0.1);
-  --red:#8b0000;
-  --red2:rgba(139,0,0,0.08);
-  --org:#6b4c00;
-  --org2:rgba(107,76,0,0.08);
-  --pur:#3d2b6b;
-  --pur2:rgba(61,43,107,0.08);
-
-  /* 字體放大 */
-  --fs-body:18px;
-  --fs-q:22px;
-  --fs-law:19px;
-  --lh-body:1.8;
-  --btn-h:56px;
-
-  color-scheme: light;
-}
-
 /* ── 2. 基底 ─────────────────────────────────────────────────── */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:var(--bg0);color:var(--t0);font-family:'Noto Sans TC','Microsoft JhengHei','PingFang TC',system-ui,sans-serif;overflow:hidden}
@@ -139,9 +103,7 @@ textarea{resize:vertical;line-height:1.7}
   .nb{flex-direction:row;height:40px;gap:6px}
   .nb svg{width:18px;height:18px}
 }
-[data-theme="eink"] .nb{color:#000;font-weight:500}
-[data-theme="eink"] .nb.on{font-weight:800}
-[data-theme="eink"] .nb.on::before{background:#000;width:40px}
+
 #fab-main[hidden]{display:none}
 /* 分析頁練習量圖：只讓圖本身左右捲，標題不跟著捲走 */
 .dchart-wrap{overflow-x:auto;overflow-y:hidden}
@@ -472,8 +434,7 @@ textarea{resize:vertical;line-height:1.7}
   color:var(--t0);font-size:13px;font-weight:600;
 }
 .hcta-main:focus-visible,.hcta-q:focus-visible,[role="button"]:focus-visible,.nb:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-[data-theme="eink"] .hcta-main{background:#000;color:#fff;box-shadow:none}
-[data-theme="eink"] .hcta-q{background:#fff;border:2px solid #000;color:#000}
+
 /* 首頁數據橫條：危險題、待複習可點 */
 .hdb-cell[role="button"]{cursor:pointer}
 /* v4.40 開放雙指縮放（原本 user-scalable=no 擋住，看小字、法規表格無法放大）。
@@ -489,9 +450,7 @@ html{touch-action:manipulation}
   padding:6px 0;
   border-bottom:1px solid rgba(255,255,255,0.04);
 }
-[data-theme="eink"] .hcd-row{
-  border-bottom:1px solid var(--bd);
-}
+
 .hcd-row:last-child{border-bottom:none}
 .hcd-icon{font-size:14px;margin-right:9px;flex-shrink:0;width:20px;text-align:center}
 .hcd-name{
@@ -626,7 +585,6 @@ html{touch-action:manipulation}
 /* 可點擊的任務 badge（v2.11.26）：游標 + 按壓回饋 */
 .plan-badge[role="button"]{ cursor:pointer; transition:transform var(--t-fast,.14s), filter var(--t-fast,.14s); }
 .plan-badge[role="button"]:active{ transform:scale(.94); filter:brightness(1.15); }
-[data-theme="eink"] .plan-badge[role="button"]:active{ transform:none; filter:none; }
 
 /* ── 兩大區塊：橫向展縮 ── */
 .home-zones{
@@ -765,7 +723,7 @@ html{touch-action:manipulation}
   flex:none; width:auto; max-width:128px; padding:8px 6px; font-size:12px;
   border-radius:8px; background:var(--bg2); border:1px solid var(--bd); color:var(--t1);
 }
-[data-theme="eink"] .eng-voice-sel{ background:#fff; color:#000; border:1.5px solid #000; }
+
 /* 引擎選單 */
 .tts-voice-sel{
   flex:1;
@@ -807,7 +765,7 @@ html{touch-action:manipulation}
 
 /* ══════════════════════════════════════════════════════════════
    視覺美化層 (v2.9.1 整合自 polish.css)
-   配色收斂、卡片質感、微動畫。eink/reduced-motion 自動停用動畫。
+   配色收斂、卡片質感、微動畫。使用者偏好減少動態時自動停用動畫。
    ══════════════════════════════════════════════════════════════ */
 /* ── 1. 設計變數微調：陰影層級 + 統一節奏 ───────────────────── */
 :root{
@@ -926,32 +884,6 @@ input:focus, textarea:focus, select:focus{
 #qdone-area{ animation: polish-fade-up var(--t-base) both; }
 
 /* ══════════════════════════════════════════════════════════════
-   14. 停用動畫：eink 模式 + 使用者偏好減少動態
-   （Boox 電子紙重繪慢，動畫反而拖累體驗）
-   ══════════════════════════════════════════════════════════════ */
-[data-theme="eink"] .card,
-[data-theme="eink"] .btn,
-[data-theme="eink"] .qopt,
-[data-theme="eink"] .qstar,
-[data-theme="eink"] .nb,
-[data-theme="eink"] .srow{
-  transition: none !important;
-}
-[data-theme="eink"] .page:not(.hide),
-[data-theme="eink"] .ov.on .sh,
-[data-theme="eink"] #qdone-area{
-  animation: none !important;
-}
-[data-theme="eink"] .card,
-[data-theme="eink"] .fab-main,
-[data-theme="eink"] .fab-btn,
-[data-theme="eink"] .sh{
-  box-shadow: none !important;
-}
-/* eink 下章節短線改為純黑，維持高對比 */
-[data-theme="eink"] .sec::before{ background:#000; opacity:1; }
-
-/* ══════════════════════════════════════════════════════════════
    15. 首頁三大區補強（v2.11.14）：手感 + 即時資料強調
    ══════════════════════════════════════════════════════════════ */
 /* zone-card 按壓：保留原 brightness，疊加極輕微位移增強手感 */
@@ -973,13 +905,6 @@ input:focus, textarea:focus, select:focus{
 #h-plan-badges .plan-badge:nth-child(3){ animation-delay:.10s; }
 #h-plan-badges .plan-badge:nth-child(4){ animation-delay:.15s; }
 
-/* eink 降級：關閉新增的位移與進場動畫 */
-[data-theme="eink"] .zone-card{ transition:none !important; }
-[data-theme="eink"] .zone-card:active{ transform:none !important; filter:brightness(.9) !important; }
-[data-theme="eink"] #h-plan-badges .plan-badge{ animation:none !important; }
-/* eink 下 zone-desc 維持高對比純色 */
-[data-theme="eink"] .zone-desc{ color:#000; opacity:1; }
-
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after{
     animation-duration: .001ms !important;
@@ -994,11 +919,6 @@ input:focus, textarea:focus, select:focus{
   border-left-color: var(--acc) !important;
   box-shadow: 0 0 0 2px var(--acc) inset;
   transition: background .3s, box-shadow .3s;
-}
-[data-theme="eink"] .tts-reading-hl{
-  background: #e8e8e8 !important;
-  box-shadow: 0 0 0 2px #000 inset !important;
-  border-left-color: #000 !important;
 }
 
 /* ── 法條劃線/筆記（v2.11.27）──────────────────────────── */
@@ -1022,8 +942,6 @@ input:focus, textarea:focus, select:focus{
   content:"✕"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
   font-size:13px; color:var(--t2);
 }
-[data-theme="eink"] .law-note-box{ background:#f0f0f0; border-left-color:#000; color:#000; }
-[data-theme="eink"] .note-mark-dot.sel{ border-color:#000; box-shadow:0 0 0 2px #000; }
 
 /* ── 法條卡片（v2.11.29：inline style 抽取為 class）──────── */
 .law-art-card{
@@ -1053,11 +971,7 @@ mark.lv-hit{ background:rgba(110,168,254,.35); color:inherit; border-radius:2px;
 mark.lv-hit.cur{ background:#d4a438; color:#121212; }
 .law-art-card.lv-flash{ animation:lv-flash 1.2s ease-out; }
 @keyframes lv-flash{ 0%{ box-shadow:0 0 0 2px var(--acc) inset; } 100%{ box-shadow:none; } }
-[data-theme="eink"] .lv-find{ background:#fff; border-bottom:1.5px solid #000; }
-[data-theme="eink"] .lv-find button{ border:1.5px solid #000; color:#000; }
-[data-theme="eink"] mark.lv-hit{ background:none; color:#000; text-decoration:underline; }
-[data-theme="eink"] mark.lv-hit.cur{ background:#000; color:#fff; text-decoration:none; }
-[data-theme="eink"] .law-art-card.lv-flash{ animation:none; outline:2px solid #000; }
+
 /* 答題中開啟的編輯題目視窗：疊在答題畫面（z-index 400）之上 */
 #add-ov.over-quiz{ z-index:450; }
 /* 題目編輯：關聯法條的法規建議清單（放在輸入框下方、跟著版面走，不會被視窗底部裁掉） */
@@ -1065,8 +979,7 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
 .fl-sug button{ display:block; width:100%; text-align:left; padding:10px 12px; font-size:13px; color:var(--t1);
   background:none; border:0; border-bottom:1px solid var(--bd); cursor:pointer; }
 .fl-sug button:last-child{ border-bottom:0; }
-[data-theme="eink"] .fl-sug{ background:#fff; border:1.5px solid #000; }
-[data-theme="eink"] .fl-sug button{ color:#000; border-bottom-color:#000; }
+
 /* 條文各行：款目標號懸掛，內文換行對齊標號後（內縮量由 _lawBody 依層級給） */
 .law-ln{ display:flex; }
 .law-ln > span:last-child{ flex:1; min-width:0; }
@@ -1096,8 +1009,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
 .bulk-sel-acts{ display:flex; gap:8px; margin-top:16px; }
 .bulk-sel-acts .btn{ flex:1; padding:12px; }
 .bulk-sel-acts .btn.bg.dim{ color:var(--t2); }
-[data-theme="eink"] .bulk-sel-panel{ background:#fff; }
-[data-theme="eink"] .bulk-sel-title{ color:#000; }
 
 /* ── 圖片檢視器（v2.11.34：inline 抽取，transform 仍動態）── */
 .img-viewer-ov{
@@ -1173,11 +1084,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
   transform:translateX(-100%); animation:skeleton-shine 1.3s infinite;
 }
 @keyframes skeleton-shine{ to{ transform:translateX(100%); } }
-/* eink 模式：停用動畫，純灰塊 */
-[data-theme="eink"] .skeleton-thumb,
-[data-theme="eink"] .skeleton-line{ background:#ddd; }
-[data-theme="eink"] .skeleton-thumb::after,
-[data-theme="eink"] .skeleton-line::after{ display:none; }
 
 /* ════ 【每日任務】首頁 - 商業高級感 ════════════════════════ */
 .dtask-wrap{
@@ -1229,13 +1135,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
   border-radius:10px; color:var(--acc); font-size:13px; font-weight:600;
   cursor:pointer; -webkit-tap-highlight-color:transparent;
 }
-/* eink 高對比 */
-[data-theme="eink"] .dtask-wrap{ background:#fff; border-color:#999; }
-[data-theme="eink"] .dtask-title{ color:#000; }
-[data-theme="eink"] .dtask-item.done .dtask-check{ background:#000; border-color:#000; }
-[data-theme="eink"] .dtask-check{ border-color:#555; }
-[data-theme="eink"] .dtask-text{ color:#000; }
-[data-theme="eink"] .dtask-item:active{ background:#eee; }
 
 /* 達成圖示基礎尺寸（歷史顯示於成長詳情，首頁不再直接列出）*/
 .dtask-ach{ width:22px; height:22px; }
@@ -1266,13 +1165,7 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
 .dtask-ach-half{ color:#d4d8e0; }  /* 星星銀 */
 .dtask-ach-low{  color:#e08a3c; }  /* 三角驚嘆橘 */
 .dtask-ach-none{ color:rgba(255,255,255,0.22); }  /* 叉叉灰 */
-/* eink 四圖示 */
-[data-theme="eink"] .dtask-ach-full,
-[data-theme="eink"] .dtask-ach-half,
-[data-theme="eink"] .dtask-ach-low{ color:#000; }
-[data-theme="eink"] .dtask-ach-none{ color:#bbb; }
-[data-theme="eink"] .dtask-ring-fg{ stroke:#000 !important; }
-[data-theme="eink"] .dtask-ring-pct{ color:#000; }
+
 /* 勾選改用 SVG */
 .dtask-check svg{ width:14px; height:14px; }
 
@@ -1325,9 +1218,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
 }
 .hm-fit-val small{ font-size:11px; font-weight:600; color:var(--t2); margin-left:2px; }
 .hm-fit-lab{ font-size:11px; color:var(--t2); }
-[data-theme="eink"] .hm-fit-item{ background:#f4f4f4; border-color:#ddd; }
-[data-theme="eink"] .hm-fit-val{ color:#000; }
-[data-theme="eink"] .hm-fit-title::before{ background:#000; }
 
 /* ════ 成長詳情：每日任務（升級版）════════════════════════ */
 .hm-dt-section{
@@ -1367,11 +1257,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
 .hm-dt-task.undone .hm-dt-tick{ background:rgba(255,255,255,0.06); color:var(--t2); border:1.5px solid rgba(255,255,255,0.15); }
 .hm-dt-task.done .hm-dt-text{ color:var(--t0); }
 .hm-dt-task.undone .hm-dt-text{ color:var(--t2); }
-[data-theme="eink"] .hm-dt-task.done{ background:#f0f0f0; }
-[data-theme="eink"] .hm-dt-task.done .hm-dt-tick{ background:#000; color:#fff; }
-[data-theme="eink"] .hm-dt-task.undone .hm-dt-tick{ background:#fff; color:#888; border-color:#aaa; }
-[data-theme="eink"] .hm-dt-cnt{ background:#eee; color:#000; }
-
 
 /* 完成編輯按鈕 */
 .dtask-done-edit{
@@ -1381,7 +1266,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
   -webkit-tap-highlight-color:transparent;
 }
 .dtask-done-edit:active{ background:rgba(76,175,125,0.2); }
-[data-theme="eink"] .dtask-done-edit{ background:#eee; color:#000; }
 
 /* ════ 成長詳情彈窗：標題列固定（捲動不重疊）════════════════ */
 #heatmap-ov .shdl{ margin:10px auto 0; }
@@ -1474,23 +1358,12 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
   padding:13px 20px; background:rgba(224,92,87,0.15); color:#e05c57;
   border:none; border-radius:11px; font-size:14px; font-weight:600; cursor:pointer;
 }
-/* eink */
-[data-theme="eink"] .plan-wrap{ background:#fff; border-color:#999; }
-[data-theme="eink"] .plan-nav-date{ color:#000; }
-[data-theme="eink"] .plan-nav-date{ color:#000; }
-[data-theme="eink"] .plan-hour-lbl{ background:#fff; color:#555; }
-[data-theme="eink"] .plan-hour-line{ background:#ddd; }
-[data-theme="eink"] .plan-event-title{ color:#000; }
-[data-theme="eink"] .plan-ed-input{ background:#fff; border-color:#999; color:#000; }
 
 /* 考試別分組：未建題的項目（灰階、不可點）*/
 .qc.exam-empty{
   opacity:0.55;
   background:rgba(255,255,255,0.015);
   border:1px dashed rgba(255,255,255,0.1);
-}
-[data-theme="eink"] .qc.exam-empty{
-  opacity:1; background:#f5f5f5; border:1px dashed #bbb; color:#888;
 }
 
 /* ════ 搜尋說明 ════════════════════════════════════════════ */
@@ -1509,8 +1382,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
   border-radius:10px; border:1px solid rgba(224,160,32,0.15);
 }
 .shelp-tip b{ color:var(--t0); }
-[data-theme="eink"] .shelp-tag{ background:#eef; color:#004; }
-[data-theme="eink"] .shelp-tip{ background:#f5f0e0; border-color:#ccb; }
 
 /* ════ 每日任務：自動完成相關 ════════════════════════════ */
 .dtask-sync-btn{
@@ -1550,8 +1421,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
   font-size:13px; color:var(--t1); cursor:pointer;
 }
 .plan-ed-done input{ width:18px; height:18px; accent-color:var(--acc); }
-[data-theme="eink"] .dtask-auto-btn{ background:#eef; color:#004; }
-[data-theme="eink"] .dtask-auto-sel,[data-theme="eink"] .dtask-auto-input{ background:#fff; border-color:#999; color:#000; }
 
 /* ════ 【複習里程碑】分階段複習進度 ════════════════════════ */
 .ms-empty{ font-size:12px; color:var(--t2); line-height:1.7; text-align:center; padding:8px 0; }
@@ -1602,11 +1471,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
   background:var(--acc); color:#fff; border:none;
   border-radius:11px; font-size:14px; font-weight:700; cursor:pointer;
 }
-[data-theme="eink"] .ms-name{ color:#000; }
-[data-theme="eink"] .ms-item{ background:#f5f5f5; border-color:#ccc; }
-[data-theme="eink"] .ms-active{ background:#eaeaea; border-color:#888; }
-[data-theme="eink"] .ms-bar-fill{ background:#000; }
-[data-theme="eink"] .ms-ed-name,[data-theme="eink"] .ms-ed-date{ background:#fff; border-color:#999; color:#000; }
 
 /* ════ 【學習規劃】里程碑+計畫表合併卡（tab 切換）════════ */
 .planner-wrap{
@@ -1634,9 +1498,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
 .planner-edit svg{ width:16px; height:16px; }
 .planner-edit:active{ background:rgba(255,255,255,0.12); }
 .planner-panel{ padding:0 8px; }
-[data-theme="eink"] .planner-wrap{ background:#fff; border-color:#999; }
-[data-theme="eink"] .planner-tab.active{ background:#eaeaea; color:#000; }
-[data-theme="eink"] .planner-edit{ background:#eee; color:#000; }
 
 /* 每日任務：未設自動條件標示 */
 .dtask-noauto{
@@ -1644,7 +1505,6 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
   padding:1px 6px; border-radius:8px; background:rgba(255,255,255,0.06);
   vertical-align:middle;
 }
-[data-theme="eink"] .dtask-noauto{ background:none; border:1px solid #555; color:#000; }
 
 /* ════ 標記語法說明 + 驚嘆號鈕 ════════════════════════════ */
 .markup-help-btn{
@@ -1674,16 +1534,13 @@ mark.lv-hit.cur{ background:#d4a438; color:#121212; }
   margin-bottom:8px; line-height:1.6; word-break:break-all;
 }
 .mkhelp-eg-out{ font-size:14px; color:var(--t0); line-height:1.7; }
-[data-theme="eink"] .mkhelp-code{ background:#eef; color:#004; }
-[data-theme="eink"] .mkhelp-eg{ background:#f5f5f5; border-color:#ccc; }
 
 /* ════ 鍵盤操作焦點樣式（無障礙）════════════════════════════ */
 :focus-visible{ outline:2px solid #6ea8fe; outline-offset:2px; border-radius:4px; }
-[data-theme="eink"] :focus-visible{ outline:2px solid #000; }
 
 /* ════ 專業質感細節（v3.7.10）— 純新增，不動既有規則 ═══════════ */
 
-/* 深色模式字體平滑：深底淺字不抗鋸齒會顯粗糙（eink 於 eink.css 還原為銳利） */
+/* 深色模式字體平滑：深底淺字不抗鋸齒會顯粗糙 */
 body{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
 
 /* 文字選取色：與主色一致（預設藍底白字太突兀） */
@@ -1710,7 +1567,7 @@ h1,h2,h3,.sht span{ text-wrap:balance; }
 html, body{ overscroll-behavior-y: none; }
 
 /* 3. 按鈕與導覽元件防選字（長按不再反白選到 UI 文字；內容區不受影響） */
-button, .btn, .theme-btn, .hd-btn, .shx, .fab,
+button, .btn, .hd-btn, .shx, .fab,
 .tab, .chip, .qfb, .dtask-ring, .plan-nav-date{
   -webkit-user-select: none;
   user-select: none;
@@ -1721,10 +1578,6 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
    純新增，不改動既有樣式。 */
 .chip:active, .hd-btn:active, .zqb:active{ transform:scale(.96); }
 .chip, .hd-btn, .zqb{ -webkit-tap-highlight-color:transparent; }
-/* e-ink 不做縮放（電子紙重繪昂貴，改用邊框強調） */
-[data-theme="eink"] .chip:active,
-[data-theme="eink"] .hd-btn:active,
-[data-theme="eink"] .zqb:active{ transform:none; outline:2px solid #000; outline-offset:-2px; }
 
 /* ══ 篩選標籤：0 題時反灰停用 ═══════════════════════════════ */
 .chip.chip-off{
@@ -1736,10 +1589,6 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
   pointer-events:none;      /* 徹底擋住點擊，含觸控 */
 }
 .chip.chip-off:active{ transform:none; }
-[data-theme="eink"] .chip.chip-off{
-  opacity:1; color:#999; background:#fff;
-  border-style:dashed; border-color:#bbb;
-}
 
 /* ══ 題庫分組卡片：掌握度視覺化 ═══════════════════════════════
    以錯題佔比呈現，一眼看出哪個年度／科目最需要加強。 */
@@ -1762,21 +1611,13 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 .mst-none{ font-size:11px; color:var(--t2); margin-top:7px; opacity:.75; }
 
 /* e-ink：無彩色，改用填滿比例與粗細區分 */
-[data-theme="eink"] .mst-bar{ background:#e0e0e0; border:1px solid #999; }
-[data-theme="eink"] .mst-fill.good,
-[data-theme="eink"] .mst-fill.mid,
-[data-theme="eink"] .mst-fill.bad{ background:#000; }
-[data-theme="eink"] .mst-txt.good,
-[data-theme="eink"] .mst-txt.mid,
-[data-theme="eink"] .mst-txt.bad{ color:#000; }
-[data-theme="eink"] .mst-txt.bad{ font-weight:700; text-decoration:underline; }
+
 .mst-sub{ color:var(--t2); font-weight:400; margin-left:4px; opacity:.85; }
-[data-theme="eink"] .mst-sub{ color:#666; }
 
 /* 自動從內文擷取的引用：虛線框，與手動建立的區隔 */
 .chip.law-rel-chip.auto{ border-style:dashed; opacity:.9; }
 /* 一鍵連官方法規資料庫（資料庫第一層每筆一顆） */
-[data-theme="eink"] .lw-gov{ border-color:#000 !important; color:#000; }
+
 /* 官網原文鈕：放在法規資訊區左下，與右側刪除鈕保持距離避免誤觸 */
 .lw-gov{
   margin-top:6px; padding:4px 9px; border-radius:7px;
@@ -1785,7 +1626,6 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
   cursor:pointer; flex-shrink:0;
 }
 .lw-gov:active{ background:rgba(255,255,255,0.06); }
-[data-theme="eink"] .lw-gov{ border-color:#000; color:#000; }
 
 /* 搜尋範圍下拉：窄版，放在搜尋框左側 */
 .lsf-sel{
@@ -1799,7 +1639,6 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 .lsf-sel:focus{ outline:none; border-color:var(--acc); }
 /* 放大鏡維持在輸入框內（與題目管理一致）：下拉寬度+間距後的位置 */
 .sb.sb-with-sel .ic{ left:76px; }
-[data-theme="eink"] .lsf-sel{ background:#fff; color:#000; border-color:#000; }
 
 /* ══ 分析頁：AI 診斷／考題匯出 ═══════════════════════════════ */
 .ai-desc{ font-size:12px; color:var(--t2); line-height:1.65; margin:-2px 0 10px; }
@@ -1812,8 +1651,6 @@ button, .btn, .theme-btn, .hd-btn, .shx, .fab,
 .ai-info{ font-size:12px; color:var(--t2); margin-top:9px; line-height:1.6; }
 .ai-info.warn{ color:var(--org); }
 #ai-out .aipv{ max-height:260px; }
-[data-theme="eink"] .ai-grid select{ background:#fff; color:#000; border-color:#000; }
-[data-theme="eink"] .ai-info.warn{ color:#000; font-weight:700; }
 
 /* ══ 跨裝置調整（手機／平板／電腦）══════════════════════════════ */
 /* 電腦：內容欄置中 900px，選單鈕跟著靠在內容欄右側，不會飄到螢幕最右邊，
@@ -1890,9 +1727,6 @@ html[data-layout="desktop"] #fab-wrap{
 .cmb-it.on{background:rgba(110,168,254,.13);color:var(--acc)}
 .cmb-new{color:var(--acc);font-weight:600}
 .cmb-empty{padding:10px;font-size:12.5px;color:var(--t2)}
-[data-theme="eink"] .cmb-pop{background:#fff;border:1.5px solid #000;box-shadow:none}
-[data-theme="eink"] .cmb-it{color:#000}
-[data-theme="eink"] .cmb-it.on{background:#000;color:#fff}
 
 /* ── SOP 文字排版（v4.34）── */
 .sop{line-height:1.7}
@@ -1904,8 +1738,7 @@ html[data-layout="desktop"] #fab-wrap{
 .sop-jump span{font-size:12px;color:var(--t2);margin-right:2px}
 .sop-jump button{min-height:34px;padding:5px 11px;border-radius:999px;border:1px solid var(--bd);background:var(--bg2);color:var(--t0);font-size:12.5px;line-height:1.3;text-align:left}
 .sop .law-ln{margin-bottom:3px}
-[data-theme="eink"] .sop-h{background:none;border-left-color:#000;border-bottom:1px solid #000}
-[data-theme="eink"] .sop-jump button{background:#fff;border:1.5px solid #000;color:#000}
+
 .sop-flow{display:flex;flex-direction:column;align-items:center;padding:6px 0 4px}
 .sop-n{position:relative;width:min(100%,340px);padding:9px 12px;border:1.5px solid var(--acc);border-radius:6px;background:rgba(110,168,254,.07);text-align:center;font-size:13.5px;color:var(--t0)}
 .sop-n.term{width:auto;min-width:96px;border-radius:999px;background:var(--bg2);border-color:var(--t2)}
@@ -1941,9 +1774,6 @@ html[data-layout="desktop"] #fab-wrap{
 .sop-help summary{cursor:pointer;color:var(--t1)}
 .sop-help div{margin-top:5px;line-height:1.8}
 .sop-prev{margin-top:9px;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg1)}
-[data-theme="eink"] .sop-n,[data-theme="eink"] .sop-b{background:#fff;border-color:#000;color:#000}
-[data-theme="eink"] .sop-n.dec span{background:#fff;box-shadow:inset 0 0 0 2px #000}
-[data-theme="eink"] .sop-num,[data-theme="eink"] .sop-b b{background:#000;color:#fff}
 
 /* ── SOP 原檔頁面（v4.41）：PDF 每頁一張圖，和原檔一模一樣；可切換到文字排版 ── */
 .sopp-tabs{display:flex;gap:6px;margin:0 0 10px}
@@ -1960,9 +1790,6 @@ html[data-layout="desktop"] #fab-wrap{
 .sopp-txt{margin-top:4px;border:1px solid var(--bd);border-radius:8px;padding:8px 10px;font-size:13px}
 .sopp-txt summary{cursor:pointer;color:var(--t1);font-weight:600}
 .sopp-txt div{margin-top:8px;line-height:1.75;color:var(--t1);word-break:break-all}
-[data-theme="eink"] .sopp-tabs button{background:#fff;border:1.5px solid #000;color:#000}
-[data-theme="eink"] .sopp-tabs button.on{background:#000;color:#fff}
-[data-theme="eink"] .sopp-pg img{border-color:#000}
 
 /* ── SOP 整理版的圖（v4.42）：流程圖、附表。手機上至少 500px 寬、可左右滑動，字才看得清楚 ── */
 .sop-img{margin:8px 0 16px}
@@ -1974,7 +1801,7 @@ html[data-layout="desktop"] #fab-wrap{
 .sop-img.err .sop-img-sc,.sop-img.err .sop-img-tip{display:none}
 .sop-img.err .sopp-miss{display:inline}
 .sop-img.err figcaption{padding:18px 8px;border:1px dashed var(--bd);border-radius:6px}
-[data-theme="eink"] .sop-img-sc{border-color:#000}
+
 /* v4.43 SOP 流程圖 SVG（原檔線條＋真文字）：黑→文字色、白→底色，跟著主題；字可選取 */
 .sop-vec .sop-img-sc{background:var(--bg2)}
 .sop-vec svg{display:block;width:100%;min-width:500px;height:auto;padding:4px;box-sizing:border-box;-webkit-user-select:text;user-select:text}

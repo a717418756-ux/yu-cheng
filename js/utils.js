@@ -165,10 +165,15 @@ function askInput(t, s, def='', opts={}){
     ov.className = 'cov on'; ov.id = 'ask-in-ov'; ov.style.zIndex = '900';
     ov.innerHTML = '<div class="cbox" style="max-width:360px;width:100%">'+
       '<div class="cbt">'+esc(t)+'</div>'+(s?'<div class="cbs" style="white-space:pre-line">'+esc(s)+'</div>':'')+
-      '<input id="ask-in-val" style="width:100%;box-sizing:border-box;margin:0 0 14px;padding:11px 12px;border-radius:10px;'+
+      // opts.multiline（v4.59 書庫筆記）：多行輸入框，Enter 換行，按「確認」才送出
+      (opts.multiline
+        ? '<textarea id="ask-in-val" rows="5" style="width:100%;box-sizing:border-box;margin:0 0 14px;padding:11px 12px;border-radius:10px;'+
+          'background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:15px;line-height:1.6;resize:vertical;font-family:inherit"'+
+          ' placeholder="'+esc(opts.placeholder||'')+'">'+esc(String(def??''))+'</textarea>'
+        : '<input id="ask-in-val" style="width:100%;box-sizing:border-box;margin:0 0 14px;padding:11px 12px;border-radius:10px;'+
         'background:var(--bg2);border:1px solid var(--bd);color:var(--t0);font-size:15px"'+
         (opts.type==='number'?' type="number" inputmode="numeric" min="0"':' type="text"')+
-        ' placeholder="'+esc(opts.placeholder||'')+'" value="'+esc(String(def??''))+'">'+
+        ' placeholder="'+esc(opts.placeholder||'')+'" value="'+esc(String(def??''))+'">')+
       '<div class="cbn"><button class="btn bg bw" data-a="cn">取消</button>'+
       '<button class="btn bp bw" data-a="ok">'+esc(opts.okText||'確認')+'</button></div></div>';
     let done = false;
@@ -181,7 +186,7 @@ function askInput(t, s, def='', opts={}){
       else if(a === 'ok') finish(ov.querySelector('#ask-in-val').value);
     });
     ov.addEventListener('keydown', e=>{
-      if(e.key === 'Enter'){ e.preventDefault(); finish(ov.querySelector('#ask-in-val').value); }
+      if(e.key === 'Enter' && !(opts.multiline && !(e.ctrlKey || e.metaKey))){ e.preventDefault(); finish(ov.querySelector('#ask-in-val').value); }
       else if(e.key === 'Escape') finish(null);
     });
     document.body.appendChild(ov);
@@ -660,8 +665,8 @@ function parseBulkText(text){
   }));
 }
 
-// 捲動方式：電子紙一律直接跳到定位（平滑捲動在電子紙上是一連串殘影，又慢又糊）
-const scrollMode = () => document.documentElement.dataset.theme === 'eink' ? 'auto' : 'smooth';
+// 捲動方式（v4.59.0 拿掉電子紙模式後一律平滑捲動；保留函式給呼叫端）
+const scrollMode = () => 'smooth';
 
 // ── 7. 震動回饋（Haptic Feedback）──────────────────────────
 // 在支援的裝置上輕震，提供實體操作感；不支援則靜默忽略
@@ -669,8 +674,6 @@ const scrollMode = () => document.documentElement.dataset.theme === 'eink' ? 'au
 function haptic(type='light'){
   try{
     if(!navigator.vibrate) return;
-    // eink 模式不震動（Boox 等電子閱讀器多無馬達且追求安靜）
-    if(document.documentElement.dataset.theme === 'eink') return;
     const patterns = {
       light:   10,
       medium:  20,

@@ -72,6 +72,8 @@ async function renderBooks(){
     _B.bookOrder = await _loadBooksOrder();
     _B.allBooks = await _getBooksMetaList();
     _renderBooksPage();
+    // v4.59：沒有封面的 EPUB／PDF 等，從檔案補上封面與書背（背景慢慢做，只做一次）
+    if(typeof rdAutoCovers === 'function') setTimeout(() => rdAutoCovers().catch(()=>{}), 900);
   }catch(e){ logError('renderBooks',e); }
 }
 
@@ -155,7 +157,7 @@ function _renderBooksPage(){
     const emptyDiv = document.createElement('div');
     emptyDiv.className='empty books-empty';
     emptyDiv.innerHTML='<span class="ic">📚</span><span>' +
-      (_B.filter==='fav' ? '尚未收藏任何書籍' : '尚無書籍，點右上角＋新增（epub、PDF、txt）') + '</span>';
+      (_B.filter==='fav' ? '尚未收藏任何書籍' : '尚無書籍，點右上角＋新增（EPUB、PDF、MOBI、AZW3、FB2、CBZ、TXT）') + '</span>';
     el.appendChild(emptyDiv);
     return;
   }
@@ -201,34 +203,70 @@ function _renderBooksPage(){
 function _mkRecentSection(books){
   const wrap = document.createElement('div');
   wrap.className = 'shelf-recent-wrap';
-  wrap.innerHTML = `<div class="shelf-recent-title">📖 最近閱讀</div>`;
-  const row = document.createElement('div');
-  row.className = 'shelf-recent-row';
-  books.forEach(b=>{
-    const card = document.createElement('div');
-    card.className = 'shelf-recent-card';
-    card.onclick = ()=> openBookCover(b.id);
-    const cover = document.createElement('div');
-    cover.className = 'shelf-recent-cover';
-    if(b.coverThumb){
-      cover.innerHTML=`<img src="${b.coverThumb}" loading="lazy" decoding="async" alt="">`;
-    } else if(b.id){
-      // _B.allBooks 不含縮圖，非同步填充
-      _fillThumb(cover, b.id, 'cover');
-    } else {
-      cover.innerHTML=`<div class="shelf-recent-cover-placeholder">${esc(b.title||'')}</div>`;
-      const t = _SPINE_THEMES[_spineSeed(b.id) % _SPINE_THEMES.length];
-      cover.style.background=`linear-gradient(160deg,${t.bg},${t.dark})`;
-    }
-    const name = document.createElement('div');
-    name.className='shelf-recent-name';
-    name.textContent = b.title||'未命名';
-    card.appendChild(cover);
-    card.appendChild(name);
-    row.appendChild(card);
-  });
-  wrap.appendChild(row);
+  const [first, ...rest] = books;
+  // v4.59：繼續閱讀（最近讀的那本）：封面、書名、作者、進度、一鍵接著讀
+  const hero = document.createElement('div');
+  hero.className = 'shelf-hero';
+  const pct = _bookPct(first);
+  hero.innerHTML = `
+    <div class="shelf-hero-cover" onclick="openBookCover(${+first.id})"></div>
+    <div class="shelf-hero-info">
+      <div class="shelf-hero-kicker">繼續閱讀</div>
+      <div class="shelf-hero-title">${esc(first.title || '未命名')}</div>
+      ${first.author ? `<div class="shelf-hero-author">${esc(first.author)}</div>` : ''}
+      <div class="shelf-hero-prog"><i style="width:${pct}%"></i></div>
+      <div class="shelf-hero-meta">${pct ? '已讀 ' + pct + '%' : '還沒開始'}${first.lastRead ? '　·　' + _bookAgo(first.lastRead) : ''}</div>
+      <button class="shelf-hero-btn" onclick="openBookReader(${+first.id})">${pct ? '接著讀' : '開始閱讀'}</button>
+    </div>`;
+  _bookCoverInto(hero.querySelector('.shelf-hero-cover'), first);
+  wrap.appendChild(hero);
+  if(rest.length){
+    const ttl = document.createElement('div');
+    ttl.className = 'shelf-recent-title';
+    ttl.textContent = '最近閱讀';
+    wrap.appendChild(ttl);
+    const row = document.createElement('div');
+    row.className = 'shelf-recent-row';
+    rest.forEach(b=>{
+      const card = document.createElement('div');
+      card.className = 'shelf-recent-card';
+      card.onclick = ()=> openBookCover(b.id);
+      const cover = document.createElement('div');
+      cover.className = 'shelf-recent-cover';
+      _bookCoverInto(cover, b);
+      const p = _bookPct(b);
+      const bar = document.createElement('div');
+      bar.className = 'shelf-recent-prog';
+      bar.innerHTML = `<i style="width:${p}%"></i>`;
+      const name = document.createElement('div');
+      name.className = 'shelf-recent-name';
+      name.textContent = b.title || '未命名';
+      card.append(cover, bar, name);
+      row.appendChild(card);
+    });
+    wrap.appendChild(row);
+  }
   return wrap;
+}
+// 閱讀進度 0～100（新閱讀器存 progress；舊的 txt 沒有）
+function _bookPct(b){
+  const p = +b?.progress;
+  return p > 0 ? Math.max(1, Math.min(100, Math.round(p * 100))) : 0;
+}
+function _bookAgo(t){
+  const m = Math.floor((Date.now() - t) / 60000);
+  if(m < 1) return '剛剛';
+  if(m < 60) return m + ' 分鐘前';
+  const h = Math.floor(m / 60); if(h < 24) return h + ' 小時前';
+  const d = Math.floor(h / 24); if(d < 30) return d + ' 天前';
+  return new Date(t).toLocaleDateString('zh-TW');
+}
+// 封面：先放書名做的封面（依書號配色），有封面圖再換上
+function _bookCoverInto(el, b){
+  const t = _SPINE_THEMES[_spineSeed(b.id) % _SPINE_THEMES.length];
+  el.style.background = `linear-gradient(160deg,${t.bg},${t.dark})`;
+  el.innerHTML = `<div class="book-gen-cover"><b>${esc(b.title || '未命名')}</b>${b.author ? `<small>${esc(b.author)}</small>` : ''}</div>`;
+  if(b.id) _fillThumb(el, b.id, 'cover');
 }
 
 // ── 模式切換列 ───────────────────────────────────────────────
@@ -608,8 +646,8 @@ function openAddBook(){
           padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer">選擇檔案</button>
         <span id="ab-file-lbl" style="color:var(--t2);flex:1;white-space:nowrap;
           overflow:hidden;text-overflow:ellipsis">尚未選擇（可空）</span>
-        <input type="file" id="ab-file-inp" accept=".pdf,.epub,.txt" style="display:none"
-          onchange="document.getElementById('ab-file-lbl').textContent=this.files[0]?.name||'尚未選擇'">
+        <input type="file" id="ab-file-inp" accept=".pdf,.epub,.txt,.mobi,.azw3,.azw,.fb2,.fbz,.cbz" style="display:none"
+          onchange="_abFileChosen(this)">
       </label>
 
       <div style="display:flex;gap:8px">
@@ -623,6 +661,31 @@ function openAddBook(){
     </div>`;
   ov.onclick=e=>{if(e.target===ov) ov.remove();};
   document.body.appendChild(ov);
+}
+
+// v4.59：選了電子書檔 → 從檔案讀書名、作者、封面（欄位空白才填，自己打的不蓋掉）
+async function _abFileChosen(inp){
+  const f = inp.files[0];
+  const lbl = document.getElementById('ab-file-lbl');
+  if(lbl) lbl.textContent = f?.name || '尚未選擇';
+  window._abAutoCover = null;
+  if(!f || typeof rdBookInfo !== 'function') return;
+  const ext = f.name.split('.').pop().toLowerCase();
+  if(!rdSupports(ext)) return;
+  if(lbl) lbl.textContent = f.name + '（讀取書名、封面…）';
+  try{
+    const info = await rdBookInfo(f, ext);
+    if(inp.files[0] !== f) return;
+    const t = document.getElementById('ab-title'), a = document.getElementById('ab-author');
+    if(info?.title && t && !t.value.trim()) t.value = info.title;
+    if(info?.author && a && !a.value.trim()) a.value = info.author;
+    if(info?.cover && !document.getElementById('ab-cover-inp')?.files[0]){
+      window._abAutoCover = info.cover;
+      const prev = document.getElementById('ab-cover-preview');
+      if(prev){ const u = URL.createObjectURL(info.cover); prev.innerHTML = `<img src="${u}" style="width:100%;height:100%;object-fit:cover;border-radius:4px" onload="URL.revokeObjectURL(this.src)">`; }
+    }
+  }catch(_){}
+  if(lbl && inp.files[0] === f) lbl.textContent = f.name;
 }
 
 function previewBookCover(inp){
@@ -651,6 +714,10 @@ async function saveNewBook(){
 
   let coverThumb=null, spineThumb=null;
   const spineInp = document.getElementById('ab-spine-inp');
+  if(!coverInp?.files[0] && window._abAutoCover && typeof rdMakeThumbs === 'function'){
+    // v4.59：沒傳封面 → 用電子書檔裡的封面（PDF 用第一頁）
+    try{ ({ coverThumb, spineThumb } = (await rdMakeThumbs(window._abAutoCover, { widthMM, heightMM, thickMM })) || {}); }catch(_){}
+  }
   if(coverInp?.files[0]){
     const pxW=mmToPx(widthMM), pxH=mmToPx(heightMM), pxS=mmToPx(thickMM);
     coverThumb = await _compressImage(coverInp.files[0], 200, Math.round(200*pxH/pxW));
@@ -674,12 +741,14 @@ async function saveNewBook(){
     hasSpineImg: !!(spineInp?.files[0]),  // 有上傳書背圖（true）vs 模糊封面（false）
     blob:     fileInp?.files[0]||null,
     coverThumb, spineThumb,
+    ...(coverThumb ? { coverTried:1 } : {}),
     thickMM, heightMM, widthMM,
     tags:[], favorite:false, lastRead:null, lastPage:0,
     createdAt:Date.now(),
   };
   try{
     await dp('ebooks',book);
+    window._abAutoCover = null;
     toast('已新增：'+title);
     document.getElementById('add-book-ov')?.remove();
     renderBooks();
@@ -843,6 +912,9 @@ async function openBookDetail(id){
           <div style="font-size:11px;color:var(--t2)">
             ${ext||'—'} · ${_fmtSize(book.fileSize||0)||'—'}
           </div>
+          ${_bookPct(book) || book.annos?.length || book.marks?.length ? `<div class="book-det-stat">
+            ${_bookPct(book) ? `<div class="shelf-hero-prog"><i style="width:${_bookPct(book)}%"></i></div><span>已讀 ${_bookPct(book)}%</span>` : ''}
+            ${book.annos?.length ? `<span>✎ ${book.annos.length} 則重點</span>` : ''}${book.marks?.length ? `<span>🔖 ${book.marks.length} 個書籤</span>` : ''}</div>` : ''}
           <button onclick="_openBookEdit(${id})"
             style="margin-top:8px;padding:4px 10px;font-size:11px;
             background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
@@ -866,7 +938,7 @@ async function openBookDetail(id){
           ?`<button onclick="openBookReader(${id});document.getElementById('book-detail-ov').remove()"
               style="flex:2;padding:11px;background:rgba(37,98,200,0.85);color:#fff;
               border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700">
-              📖 閱讀</button>
+              📖 ${_bookPct(book) ? '接著讀（' + _bookPct(book) + '%）' : '閱讀'}</button>
             <button onclick="downloadBook(${id})"
               style="flex:1;padding:11px;background:rgba(255,255,255,0.08);border:1px solid var(--bd);
               color:var(--t1);border-radius:10px;cursor:pointer;font-size:13px">⬇</button>`
@@ -1013,7 +1085,7 @@ async function _detailToggleBookFav(id, btn){
 
 async function _attachBookFile(id){
   const inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = '.pdf,.epub,.txt';
+  inp.type = 'file'; inp.accept = '.pdf,.epub,.txt,.mobi,.azw3,.azw,.fb2,.fbz,.cbz';
   inp.onchange = async e=>{
     const file = e.target.files[0]; if(!file) return;
     try{
@@ -1077,9 +1149,12 @@ function _fmtSize(bytes){
 // ════════════════════════════════════════════════════════════
 // 【電子書閱讀器：開啟】
 // ════════════════════════════════════════════════════════════
-async function openBookReader(id){
+async function openBookReader(id, legacy){
   const book = await dg('ebooks', id);
   if(!book?.blob){toast('這本書沒有檔案本體（可能是備份缺檔），請在書籍詳情按「📎 附加檔案以閱讀」');return;}
+  // v4.59.0：EPUB、PDF、MOBI、AZW3、FB2、CBZ 改用新閱讀器（js/reader.js，foliate-js 引擎）；
+  //   新閱讀器打不開的 EPUB 才退回下面舊的 epub.js 閱讀器（legacy）
+  if(!legacy && typeof rdOpen === 'function' && rdSupports(book.fileType)) return rdOpen(book);
 
   const url = URL.createObjectURL(book.blob);
   const ext  = (book.fileType||'').toLowerCase();
@@ -1202,9 +1277,6 @@ async function openBookReader(id){
         <button onclick="_readerTheme('light')"
           style="flex:1;padding:6px;border-radius:8px;border:1px solid rgba(0,0,0,0.1);
           background:#f5f5f0;color:#222;font-size:11px;cursor:pointer">白色</button>
-        <button onclick="_readerTheme('eink')"
-          style="flex:1;padding:6px;border-radius:8px;border:1.5px solid #000;
-          background:#fff;color:#000;font-size:11px;font-weight:700;cursor:pointer">電子紙</button>
       </div>
     </div>`;
 
@@ -1214,10 +1286,6 @@ async function openBookReader(id){
   //   原本只有 epub 初始化完才加，txt、pdf 按返回會切換底下的頁面，閱讀器卻還蓋在上面
   document.documentElement.classList.add('reader-active');
 
-  // eink 模式：自動套用電子紙專屬主題（純黑粗體大字，最適合反射光閱讀）
-  if(document.documentElement.dataset.theme==='eink'){
-    setTimeout(()=>{ _readerTheme('eink'); }, 80);
-  }
 
   // 載入文字內容（txt / epub 純文字模式）
   if(ext==='txt'){
@@ -1363,42 +1431,14 @@ async function _initEpubReader(url, savedCfi, bookId){
       },
       'p': { 'text-indent': '2em', 'margin': '0.5em 0' },
     });
-    // ── eink 專用主題：電子紙最佳化 ──────────────────────────────
-    // 電子紙是反射光、無背光，且灰階層次少，所以：
-    //   ① 純白底 + 純黑字（最大對比，字最清晰）
-    //   ② 字重加粗到 500（電子紙細字會發灰，加粗才實）
-    //   ③ 字號比一般大 2px（Boox 多為高解析，字要夠大才舒適）
-    //   ④ 行高加大，字間呼吸感
-    const _einkFontSize = Math.max(_baseFontSize + 2, 19);
-    rendition.themes.register('eink', {
-      'body': {
-        'background': '#ffffff !important',
-        'color': '#000000 !important',
-        'font-family': "'Noto Serif TC', 'Noto Serif SC', '標楷體', 'DFKai-SB', Georgia, serif !important",
-        'font-size': _einkFontSize+'px',   // 同上：留 !important 會鎖死字級
-        'font-weight': '500 !important',
-        // 電子紙內建中文字型多半只有一種字重，500 常常無效 → 0.3px 描邊把筆畫加實（與 App 介面相同作法）
-        '-webkit-text-stroke': '.3px #000 !important',
-        'line-height': '1.95 !important',
-        'padding': '0 !important',
-        'margin': '0 !important',
-        '-webkit-font-smoothing': 'none !important',
-      },
-      'p': { 'text-indent': '2em', 'margin': '0.6em 0', 'color': '#000 !important' },
-      'h1,h2,h3,h4': { 'color': '#000 !important', 'font-weight': '700 !important', 'margin': '1em 0 0.5em' },
-      'a': { 'color': '#000 !important', 'text-decoration': 'underline !important' },
-      'span,div,li': { 'color': '#000 !important' },
-    });
-    // 依目前主題自動選用：eink 模式 → eink 主題，否則 dark
-    const _isEink = document.documentElement.getAttribute('data-theme') === 'eink';
-    rendition.themes.select(_isEink ? 'eink' : 'dark');
+    rendition.themes.select('dark');
 
     // ── 字級狀態同步 ────────────────────────────────────────────
-    // 主題實際套用的字級是依裝置算出的 _baseFontSize / _einkFontSize，
+    // 主題實際套用的字級是依裝置算出的 _baseFontSize，
     // 但 _readerFontSz 預設寫死 17，兩者不一致會導致：
     // 標籤顯示 17px、實際卻是 19px，按「+」變成 18px 反而字變小。
     // 這裡把狀態與標籤都校正成真正生效的值；若使用者先前調整過則沿用。
-    const _themeFontSz = _isEink ? _einkFontSize : _baseFontSize;
+    const _themeFontSz = _baseFontSize;
     try{
       const saved = parseInt(await getSetting('reader_font_size', 0), 10);
       _readerFontSz = (saved >= 12 && saved <= 28) ? saved : _themeFontSz;
@@ -1935,7 +1975,6 @@ function _readerTheme(theme){
     dark:  {bg:'#111',fg:'#e8e8e8'},
     sepia: {bg:'#2d2416',fg:'#d4b896'},
     light: {bg:'#f5f5f0',fg:'#222'},
-    eink:  {bg:'#ffffff',fg:'#000000'},
   };
   const t=themes[theme]||themes.dark;
   const ov=document.getElementById('book-reader-ov');
@@ -1945,7 +1984,7 @@ function _readerTheme(theme){
   if(txt){txt.style.background=t.bg;txt.style.color=t.fg;}
   // epub.js 主題切換
   if(window._epubRendition){
-    const epubTheme = (theme==='eink')?'eink':(theme==='light')?'light':(theme==='sepia')?'sepia':'dark';
+    const epubTheme = (theme==='light')?'light':(theme==='sepia')?'sepia':'dark';
     window._epubRendition.themes.select(epubTheme);
     // epub-viewer 容器背景
     const viewer = document.getElementById('epub-viewer');
@@ -1984,9 +2023,16 @@ function _readerTheme(theme){
   }
 }
 
+// 新閱讀器打不開的 EPUB：改用舊的 epub.js 閱讀器
+function _initEpubLegacy(rec){ return openBookReader(rec.id, true); }
+
 async function closeBookReader(id){
   const ov=document.getElementById('book-reader-ov');
   if(!ov) return;
+  if(ov.classList.contains('rd')){                       // v4.59 新閱讀器：返回鍵先關選單與面板
+    if(id == null && typeof rdBack === 'function' && rdBack()) return;
+    return rdClose();
+  }
   if(id == null) id = Number(ov.dataset.bookId);
   // 儲存閱讀位置
   try{

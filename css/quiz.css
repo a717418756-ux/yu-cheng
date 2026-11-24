@@ -1,28 +1,5 @@
 /* ── 淺色模式：FAB label 修正 ── */
 
-/* ── 主題切換按鈕（設定頁）── */
-#theme-switcher{
-  display:flex;gap:8px;padding:0 12px 12px;
-}
-.theme-btn{
-  flex:1;padding:10px 4px;border-radius:10px;
-  border:1px solid var(--bd);
-  background:var(--bg2);color:var(--t1);
-  font-size:12px;text-align:center;cursor:pointer;
-  line-height:1.5;font-weight:500;
-}
-.theme-btn.active{
-  border-color:var(--acc);
-  background:rgba(110,168,254,0.1);
-  color:var(--acc);font-weight:700;
-}
-[data-theme="eink"] .theme-btn{
-  background:var(--bg2);color:var(--t0);
-  border:1.5px solid var(--bd);font-size:14px;
-}
-[data-theme="eink"] .theme-btn.active{
-  border:2px solid var(--t0);background:var(--t0);color:var(--bg0);
-}
 
 /* ══ 影音庫美化 ══════════════════════════════════════════════*/
 
@@ -316,7 +293,6 @@
 
 /* 書庫模式列標題升級 */
 
-
 /* 影音庫空狀態文字 */
 #pg-media .empty{
   background:rgba(255,255,255,0.02);
@@ -344,9 +320,7 @@
   80%{ transform:translateX(2px); }
 }
 .qres-shake{ animation:qres-shake-kf .4s ease-in-out both; }
-/* eink / 減少動態：停用動畫（Boox 重繪慢，動畫造成殘影） */
-[data-theme="eink"] .qres-pop,
-[data-theme="eink"] .qres-shake{ animation:none !important; }
+
 @media (prefers-reduced-motion: reduce){
   .qres-pop, .qres-shake{ animation:none !important; }
 }
@@ -363,8 +337,6 @@
 }
 .q-bold{ font-weight:800; }
 .q-group-label{ font-size:0.85em; color:var(--t2); font-weight:700; }
-[data-theme="eink"] .q-blank{ border-bottom-color:#000; }
-[data-theme="eink"] .q-underline{ color:#000; }
 
 /* 段落首行縮排（標記 >> ）*/
 .q-indent{ display:inline; }
@@ -384,17 +356,12 @@
 /* 速讀篩選 */
 .spd-lbl{ font-size:12px; font-weight:700; color:var(--t2); margin:10px 0 6px; text-align:left; }
 .spd-chips{ display:flex; flex-wrap:wrap; gap:6px; }
-[data-theme="eink"] .spd-lbl{ font-size:15px; color:#000; }
-[data-theme="eink"] #spd-go{ background:#000; color:#fff; }
+
 .subj-item .subj-cnt,.spd-chips .subj-cnt{ font-size:12px; opacity:.75; font-variant-numeric:tabular-nums; }
-[data-theme="eink"] .subj-item{ background:#fff; border-color:#000; color:#000; }
-[data-theme="eink"] .subj-item.on{ background:#000; color:#fff; }
 
 /* ══ 筆記／結束測驗按鈕 ═════════════════════════════════════ */
 .qfb.qend{ font-size:13px; padding:0 12px; color:var(--t2); }
 .qfb.qend:active{ color:var(--t0); }
-[data-theme="eink"] .qfb.qnote.has-note{ color:#000; text-decoration:underline; }
-
 
 /* ══ 題目標註畫布（疊在題幹／選項上方）══════════════════════ */
 .qbody{ position:relative; }
@@ -452,7 +419,6 @@
 .qink-c-custom::-webkit-color-swatch-wrapper{ padding:0; }
 .qink-c-custom::-webkit-color-swatch{ border:none; border-radius:50%; }
 .qink-c-custom.on{ border-style:solid; border-color:#fff; }
-[data-theme="eink"] .qink-c-custom{ border-color:#000; }
 
 /* 粗細選擇 */
 .qink-sizes{ display:flex; gap:4px; margin-left:4px; }
@@ -470,17 +436,6 @@
 .qink-done{ background:var(--acc); color:#fff; border-color:var(--acc); }
 
 /* e-ink：純黑白高對比 */
-[data-theme="eink"] .qink-c{ border-color:#000; }
-[data-theme="eink"] .qink-c.on{ border-color:#000; box-shadow:0 0 0 2px #000; }
-[data-theme="eink"] .qink-s{ background:#fff; border-color:#000; }
-[data-theme="eink"] .qink-s.on,
-[data-theme="eink"] .qink-mode.on,
-[data-theme="eink"] .qink-done{ background:#000; color:#fff; border-color:#000; }
-[data-theme="eink"] .qink-s.on i{ color:#fff; }
-[data-theme="eink"] .qink-tools{
-  background:#fff; border:1.5px solid #000; box-shadow:none;
-  backdrop-filter:none; -webkit-backdrop-filter:none;
-}
 
 /* ══ 答題底列：統一為線性圖示，取代 emoji ══════════════════ */
 /* 容器：明確排版，避免各鈕互相擠壓導致文字折行 */
@@ -534,28 +489,8 @@
 .qfb.qend:active{ color:var(--t0); }
 
 /* e-ink：純黑白高對比，不用半透明 */
-[data-theme="eink"] .qfoot .qfb{
-  background:#fff; border:1.5px solid #000; color:#000;
-}
-[data-theme="eink"] .qfb.qink-btn.on,
-[data-theme="eink"] .qfb.qnxt{ background:#000; color:#fff; border-color:#000; }
-[data-theme="eink"] .qfb.qstar.on,
-[data-theme="eink"] .qfb.qink-btn.has-note,
-[data-theme="eink"] .qfb.qnote.has-note{
-  background:#fff; color:#000; border-width:2.5px;
-}
 
 /* ══ e-ink：熱力圖用邊框層次取代顏色深淺 ══════════════════════ */
-/* 電子紙全域 box-shadow:none !important，外框改用 border 才畫得出來 */
-[data-theme="eink"] .hm-cell{
-  border:1px solid #999;
-  border-radius:4px;
-}
-[data-theme="eink"] .hm-cell.hm-today{ border:2.5px solid #000; }
-[data-theme="eink"] .heatmap-dot{ border:1px solid #999; }
-[data-theme="eink"] .heatmap-wrap{
-  background:none; border:1.5px solid #000;
-}
 
 /* ══ 申論題：國考手寫答案卷 ═══════════════════════════════════
    模擬真實考卷：米白紙張、藍色格線、手寫體，並依申論標號縮排出層次。
@@ -607,7 +542,6 @@
 .es-ln.l1{ position:relative; }
 .es-ln.l1 > .es-mk{ position:absolute; left:-42px; width:36px; padding:0; text-align:center; }
 
-
 /* 關鍵概念檢測 */
 .es-kw{ margin-top:10px; padding:10px 12px; border-radius:10px; background:var(--bg2); }
 .es-kw-hd{ font-size:12px; color:var(--t2); margin-bottom:7px; }
@@ -627,19 +561,6 @@
 #qes-input{ line-height:1.95 !important; }
 
 /* e-ink：純黑白高對比 */
-/* e-ink：純白紙、黑墨、淺灰格線（電子紙無彩色，米白與藍會變髒灰） */
-[data-theme="eink"] .es-paper{ background:#fff; border:1.5px solid #000; box-shadow:none; }
-[data-theme="eink"] .es-paper-hd{ background:#fff; color:#000; border-bottom:1.5px solid #000; }
-[data-theme="eink"] .es-paper-body{
-  background-image:
-    linear-gradient(90deg, transparent 0 38px, #000 38px 39px, transparent 39px),
-    repeating-linear-gradient(
-      180deg, transparent 0, transparent 33px, #000 33px, #000 34px);
-}
-[data-theme="eink"] .es-ln{ color:#000; }
-[data-theme="eink"] .es-kw{ background:#fff; border:1.5px solid #000; }
-[data-theme="eink"] .es-kw-tag{ background:#fff; color:#000; border-color:#888; }
-[data-theme="eink"] .es-kw-tag.hit{ background:#000; color:#fff; border-color:#000; }
 
 /* ══ 限時模擬考：倒數計時器 ═══════════════════════════════════ */
 .mock-timer{
@@ -662,15 +583,6 @@
   animation:mockPulse 1.6s ease-in-out infinite;
 }
 @keyframes mockPulse{ 0%,100%{opacity:1} 50%{opacity:.62} }
-
-[data-theme="eink"] .mock-timer{
-  background:#fff; border:1.5px solid #000; color:#000;
-  backdrop-filter:none; -webkit-backdrop-filter:none;
-}
-/* 電子紙不做動畫（殘影＋耗電） */
-[data-theme="eink"] .mock-timer.warn{
-  background:#000; color:#fff; animation:none;
-}
 
 /* ── 完成畫面：成績環 + 統計格 ───────────────────────────── */
 .qd-ring{
@@ -697,8 +609,6 @@
 .qd-n{ font-size:20px; font-weight:800; color:var(--t0); font-variant-numeric:tabular-nums; line-height:1.1; }
 .qd-n small{ font-size:12px; font-weight:600; color:var(--t2); margin-left:1px; }
 .qd-l{ font-size:11px; color:var(--t2); margin-top:4px; white-space:nowrap; }
-[data-theme="eink"] .qd-ring{ background:conic-gradient(#000 calc(var(--p) * 1%), #ddd 0); }
-[data-theme="eink"] .qd-cell{ border-color:#000; }
 
 /* ── 法條 ↔ 考題 ─────────────────────────────────────────── */
 .lp-qs{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--bg2);border:1px solid var(--bd);
@@ -710,7 +620,7 @@
 .lp-qs-hint{font-size:11px;color:var(--t2)}
 .law-q-chip{font-size:11px}
 .qlaw-tag.auto{border-style:dashed;opacity:.9}
-[data-theme="eink"] .lp-qs{border:1.5px solid #000;background:#fff}
+
 /* 弱點法條排行（分析頁） */
 .wl-row{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) 38px auto;align-items:center;gap:8px;width:100%;
   background:none;border:none;border-bottom:1px solid var(--bd);padding:9px 2px;cursor:pointer;color:var(--t0);font-family:inherit;text-align:left}
@@ -722,7 +632,6 @@
 .wl-rate{font-size:12px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
 .wl-meta{font-size:11px;color:var(--t2);white-space:nowrap}
 .wl-hint{font-size:11px;color:var(--t2);margin-top:8px;line-height:1.6}
-[data-theme="eink"] .wl-bar{border:1px solid #000;background:#fff}
 
 /* ══ 限時模擬考：設定畫面 ═══════════════════════════════════ */
 .mk-body{padding:4px 18px 20px}
@@ -740,9 +649,6 @@
 .mk-hist-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mk-hist-r b{font-size:15px;font-variant-numeric:tabular-nums}
 .mk-hist-r small{color:var(--t2);font-size:11px}
-[data-theme="eink"] .mk-seg{border:1.5px solid #000}
-[data-theme="eink"] .mk-seg button{background:#fff;color:#000}
-[data-theme="eink"] .mk-seg button.on{background:#000;color:#fff}
 
 /* ── 模擬考成績單 ───────────────────────────────────────── */
 .qd-title{font-size:14px;font-weight:700;color:var(--t0);text-align:center}
@@ -762,17 +668,13 @@
 .qd-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:8px}
 .qd-legend i:first-child{margin-left:0}
 .qd-rule{font-size:11px;color:var(--t2);line-height:1.6;width:100%}
-[data-theme="eink"] .qd-map i{border:1px solid #000;background:#fff;color:#000}
-[data-theme="eink"] .qd-map i.x{background:#000;color:#fff}
-[data-theme="eink"] .qd-map i.b{border-style:dashed}
 
 /* ── 錯因標記 ───────────────────────────────────────────── */
 .qwhy{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
 .qwhy-t{font-size:12px;color:var(--t2);margin-right:2px}
 .qwhy-b{padding:7px 12px;min-height:34px;border-radius:18px;font-size:12.5px;font-weight:600;background:var(--bg2);color:var(--t2);border:1px solid var(--bd);font-family:inherit;cursor:pointer}
 .qwhy-b.on{background:rgba(224,92,87,.14);color:var(--red);border-color:var(--red)}
-[data-theme="eink"] .qwhy-b{background:#fff;color:#000;border:1.5px solid #000}
-[data-theme="eink"] .qwhy-b.on{background:#000;color:#fff}
+
 /* 分析頁：錯因分布 */
 .why-row{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) 34px auto;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd)}
 .why-row:last-of-type{border-bottom:none}
@@ -818,9 +720,6 @@
 .bk-hint .btn{flex:none;padding:6px 10px;font-size:12px;white-space:nowrap}
 .bk-x{flex:none;background:none;border:none;color:var(--t2);font-size:12px;padding:6px 4px;font-family:inherit;cursor:pointer}
 .wl-hint{font-size:11px}
-[data-theme="eink"] :is(.qamend,.bk-hint){background:#fff;border:1.5px solid #000;color:#000}
-[data-theme="eink"] :is(.qamend b,.cram-cat b,.cram-law b,.wk-weak b,.wk-d.up,.wk-d.dn){color:#000}
-[data-theme="eink"] :is(.cram-cat,.cram-law,.wk-cell,.rule-sel){background:#fff;border-color:#000;color:#000}
 
 /* ── v4.33：選科目畫面的考試別篩選 ── */
 .subj-exams{margin-top:10px;text-align:left}
@@ -830,5 +729,81 @@
 .subj-ex-chips::-webkit-scrollbar{display:none}
 .subj-ex{flex:none;padding:6px 11px;min-height:34px;border-radius:16px;border:1px solid var(--bd);background:var(--bg2);color:var(--t0);font-size:12.5px;font-family:inherit;cursor:pointer;white-space:nowrap}
 .subj-ex.on{background:rgba(110,168,254,.16);border-color:var(--acc);color:var(--acc)}
-[data-theme="eink"] .subj-ex{background:#fff;border-color:#000;color:#000}
-[data-theme="eink"] .subj-ex.on{background:#000;color:#fff}
+
+
+
+/* ══ v4.59.0 拿掉電子紙模式時，從舊 eink.css 搬回的一般樣式（不分模式都會用到；放在 quiz.css 最後＝原本 eink.css 的載入順序）══ */
+/* 書庫 藏書/收藏 切換 tab、倍速按鈕文字、影音庫分區標題與分隔線、影片大卡 */
+.shelf-section-tab{
+  background:none;border:none;cursor:pointer;
+  font-size:14px;font-weight:700;letter-spacing:.06em;
+  color:rgba(255,200,80,0.35);
+  padding:3px 6px;
+  transition:color .18s;
+  text-transform:uppercase;
+  font-size:11px;
+}
+.shelf-section-tab.on{
+  color:rgba(255,200,80,0.75);
+  text-decoration:underline;
+  text-decoration-thickness:1.5px;
+  text-underline-offset:3px;
+}
+.vpt-speed-btn > span{
+  color:var(--t1);
+  font-size:13px !important;
+  font-weight:700;
+}
+.media-sec-hd-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:28px 14px 10px;   /* 上方加大，離上面卡片列更遠 */
+  position:relative;
+}
+.media-sec-hd-big{
+  font-size:22px;
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-.02em;
+  -webkit-text-fill-color:#fff;
+  flex-shrink:0;
+}
+.media-sec-wrap{
+  position:relative;
+  padding-bottom:16px;  /* 讓 ::after 底部線跟下個 section 標題拉開距離 */
+}
+.media-sec-wrap::after{
+  content:'';
+  display:block;
+  height:1px;
+  margin:16px 14px 0;
+  background:linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.35) 15%,
+    rgba(255,255,255,0.5) 50%,
+    rgba(255,255,255,0.35) 85%,
+    transparent 100%
+  );
+}
+.media-hcard-featured{
+  width:220px;
+}
+.media-hcard-thumb.video.featured{
+  width:220px;
+  height:124px;
+  border-radius:12px;
+  flex-shrink:0;
+  box-shadow:
+    0 8px 24px rgba(0,0,0,0.65),
+    0 0 0 1px rgba(255,255,255,0.06);
+}
+#media-hd-title{
+  flex:1;
+  text-align:left;
+}
+#media-hd-title{
+  flex:1;
+  text-align:left;
+}

@@ -21,20 +21,13 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;700&family=Dancing+Script:wght@600;700&family=Cormorant+Garamond:ital,wght@1,400;1,500&display=swap">
 <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/books.css">
+  <link rel="stylesheet" href="css/reader.css">
   <link rel="stylesheet" href="css/media.css">
   <link rel="stylesheet" href="css/quiz.css">
-  <link rel="stylesheet" href="css/eink.css">
 <link rel="stylesheet" href="css/splash.css">
 <link rel="stylesheet" href="css/english.css">
 <link rel="stylesheet" href="css/fitness.css">
 <link rel="stylesheet" href="css/memory.css">
-<script>
-/* 早期主題套用：避免畫面閃白（IDB 非同步，先暫存到 localStorage） */
-(function(){
-  var t = localStorage.getItem('_themeCache') || 'dark';
-  if(t === 'eink') document.documentElement.setAttribute('data-theme', 'eink');
-})();
-</script>
 </head>
 <body>
 
@@ -631,12 +624,6 @@
 <div id="pg-set" class="page hide">
   <div class="hd"><div class="hdt">設定與資料</div></div>
   <div class="chips set-jump" id="set-jump"></div>
-  <!-- 顯示模式 -->
-  <div class="sec">顯示模式</div>
-  <div id="theme-switcher">
-    <button class="theme-btn" id="theme-btn-dark" onclick="setTheme('dark')">🌙<br>標準</button>
-    <button class="theme-btn" id="theme-btn-eink" onclick="setTheme('eink')">📖<br>電子紙</button>
-  </div>
   <div class="sec">題庫管理</div>
   <div class="srow"><div><div class="slb">選擇題選項隨機排列</div><div class="ssb">複習、模擬考時打亂選項，避免記位置；判分與解析字母自動換算。英文、國文及引用其他選項（以上皆是等）的題目維持原順序</div></div><input type="checkbox" id="set-shuffle" style="width:22px;height:22px;flex:none;margin-left:10px" onchange="setOptShuffle(this.checked)"></div>
   <div class="srow"><div><div class="slb">匯出題目 HTML</div><div class="ssb">選擇題（全部／錯題／科目）、申論題（全部／科目），可列印</div></div><button class="btn bg" style="padding:6px 10px;font-size:12px" onclick="openExport()">匯出</button></div>
@@ -1276,6 +1263,7 @@
 <script src="js/jszip.min.js"></script>
 <script src="js/epub.min.js"></script>
 <script src="js/books.js"></script>
+<script src="js/reader.js"></script><!-- v4.59 書庫閱讀器（foliate-js 引擎在 js/foliate/，開書時才載入） -->
 <script src="js/media.js"></script>
 <script src="js/youtube.js"></script>
 <script src="js/layout.js"></script>

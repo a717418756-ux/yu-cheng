@@ -151,19 +151,3 @@
   40%{transform:scale(1);opacity:1;background:rgba(255,255,255,.8)}
 }
 
-/* ══ 電子紙模式 ════════════════════════════════════════════════ */
-[data-theme="eink"] #splash{ background:#F6F4EE; }
-[data-theme="eink"] #splash-stars{ display:none; }
-[data-theme="eink"] .splash-streak{ display:none; }
-[data-theme="eink"] #splash-logo-wrap::after{
-  background:linear-gradient(to top,#F6F4EE 0%,transparent 100%);
-}
-[data-theme="eink"] #splash-tagline{ color:rgba(0,0,0,.78);text-shadow:none; }
-[data-theme="eink"] #splash-zh{ color:rgba(0,0,0,.82); }
-[data-theme="eink"] #splash-en-sub{ color:rgba(0,0,0,.4); }
-[data-theme="eink"] .splash-deco-line{
-  background:linear-gradient(90deg,transparent,rgba(0,0,0,.3),transparent);
-}
-[data-theme="eink"] .splash-deco-dot{ background:rgba(0,0,0,.35); }
-[data-theme="eink"] .splash-deco-center{ color:rgba(0,0,0,.3); }
-[data-theme="eink"] .sdot{ background:rgba(0,0,0,.2);animation:none;opacity:.3; }
