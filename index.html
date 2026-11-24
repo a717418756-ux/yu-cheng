@@ -355,6 +355,7 @@
   <div class="hd">
     <div><div class="hdt">資料庫</div></div>
     <div style="display:flex;gap:6px">
+      <button class="hd-btn bg" onclick="lnOpenAll()" title="所有法規的重點與筆記">🖍 重點</button>
       <button class="hd-btn bg" id="law-sort-btn" onclick="openLawSortMenu(this)">排序</button>
       <button class="hd-btn bg" id="db-sel-btn" onclick="toggleDbSelectMode()" title="選擇刪除">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -934,6 +935,8 @@
       <div id="lv-menu" style="display:none;position:absolute;right:0;top:calc(100%+4px);
         background:var(--bg1);border:1px solid var(--bd);border-radius:12px;
         padding:4px 0;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:200">
+        <button class="lv-menu-item" onclick="lnOpenAll(window.currentLawName);closeLvMenu()">🖍 重點筆記</button>
+        <button class="lv-menu-item" id="ln-cover-item" onclick="lnToggleCover();closeLvMenu()">🙈 遮住重點（背誦）</button>
         <button class="lv-menu-item" onclick="ttsReadLaw();closeLvMenu()">🔊 朗讀法條</button>
         <button class="lv-menu-item" id="lv-star-item" onclick="toggleLvFav();closeLvMenu()">☆ 收藏</button>
         <button class="lv-menu-item" onclick="editLawGroupInfo();closeLvMenu()">⚙ 編輯法規資訊</button>
@@ -1274,6 +1277,7 @@
 <script src="js/utils.js"></script>
 <script src="js/quiz.js"></script>
 <script src="js/data.js"></script>
+<script src="js/lawnote.js"></script><!-- v4.64 法規重點筆記 -->
 <script src="js/english.js"></script>
 <script src="js/memory.js"></script>
 <script src="js/predict.js"></script>

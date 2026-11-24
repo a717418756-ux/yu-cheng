@@ -2395,6 +2395,7 @@ async function openLawGroup(lawName, full){  try{
         +'<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'
         +'<div class="law-art-acts">'
           +'<button onclick="ttsArt('+l.id+')" class="law-tts-btn" aria-label="朗讀這一條">🔊</button>'
+          +'<button onclick="lnArtNote('+l.id+')" class="law-tts-btn" aria-label="這一條的筆記" title="這一條的筆記">📝</button>'
           +'<button onclick="editLawInView('+l.id+')" class="law-edit-btn">✏</button>'
           +'<button onclick="delLaw('+l.id+')" class="law-del-btn">🗑</button>'
         +'</div>'
@@ -2617,6 +2618,7 @@ function _lvFindFlash(card){
 
 function exitLaw(){
   closeLvFind();
+  window.lnOnExit?.();   // v4.64 重點筆記：收起工具列、取消遮住
   document.getElementById('lv').style.display='none';
   const cb = document.getElementById('lv-chapter-bar');
   if(cb){ cb.innerHTML=''; cb.style.display='none'; }
@@ -3315,6 +3317,8 @@ async function saveLaw(){  try{
     data.id=S.editLawId;
     data.favorite=ex?.favorite||false;
     data.createdAt=ex?.createdAt||Date.now();
+    // v4.64：表單沒有的欄位不能因為編輯而消失——重點筆記（marks）、SOP 原檔逐字文字與頁面（pagesText／pages）
+    for(const k of ['marks','pagesText','pages']) if(ex && ex[k] != null) data[k]=ex[k];
   }
   try{
     data.searchBlob = _lawBlob(data);   // 純文字搜尋索引

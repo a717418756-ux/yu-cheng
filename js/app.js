@@ -531,6 +531,9 @@ function _handleBackLayer(){
     return true;
   }
 
+  // 6-0) 法規重點筆記（v4.64）：總覽視窗、選字工具列
+  if(typeof window.lnBack === 'function' && window.lnBack()) return true;
+
   // 6-1) 法規頁的 ⋮ 選單、本法搜尋列：先收起，不直接離開法規頁
   const lvMenu = document.getElementById('lv-menu');
   if(lvMenu && lvMenu.style.display === 'block'){ _callIf('closeLvMenu'); return true; }
