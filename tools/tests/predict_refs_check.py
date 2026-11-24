@@ -3,7 +3,8 @@
 """核對 predict.json 每一個題目引用都對得到平台備份題庫的真題（考試、科目、年度、條文）。"""
 import json, collections, re, sys
 P = json.load(open(sys.argv[1], encoding='utf-8'))
-D = json.load(open(sys.argv[2], encoding='utf-8-sig'))
+import os as _os, sys as _sys; _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..')); from yc_backup_load import load as _yc_load  # 也讀壓縮過（gz1:）的備份
+D = _yc_load(sys.argv[2])
 qs = D['questions']
 byid = {str(q['id']): q for q in qs}
 byzuo = {}

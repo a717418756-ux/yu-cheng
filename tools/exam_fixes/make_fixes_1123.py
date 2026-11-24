@@ -52,7 +52,8 @@ NEW = {
 ANS = {4152: 'ABD', 4189: 'ABC', 5214: 'ABE'}
 
 if __name__ == '__main__':
-    P = json.load(open(sys.argv[1], encoding='utf8'))
+    import os as _os, sys as _sys; _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..')); from yc_backup_load import load as _yc_load  # 也讀壓縮過（gz1:）的備份
+    P = _yc_load(sys.argv[1])
     qs = {q['id']: q for q in P['questions']}
     fx_path = os.path.join(ROOT, 'data', 'exam_fixes.json')
     FX = json.load(open(fx_path, encoding='utf8'))

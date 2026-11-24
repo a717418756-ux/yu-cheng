@@ -941,7 +941,10 @@ async function localBackup(){
         });
         // 舊的 exam_data.json 先移進 history（檔名帶備份時間與裝置），再寫新的
         if(existing) await _archiveExam(dirHandle, existing);
-        await _writeFile(dirHandle, 'exam_data.json', examBody);
+        // v4.58.2：和雲端備份一樣 gzip 壓縮（gz1: 開頭的字串），中文 JSON 約剩 2～4 成；
+        //   還原（_readExamFile）、桌面掃題工具都認得 gz1:，舊的未壓縮檔照樣能還原
+        const examFile = await _gzPack(examBody);
+        await _writeFile(dirHandle, 'exam_data.json', examFile);
         _setAnchor('local', _summ({ exportedAt, meta }), 'backup');
 
         // ── 書庫、影音、學習區（參考書／教材影音）：每筆一個說明檔＋實際檔案 ──
@@ -957,7 +960,7 @@ async function localBackup(){
           '',
           '備份時間：' + _fmtAt(exportedAt),
           '裝置：' + meta.device,
-          '內容：exam_data.json（' + _mb(new Blob([examBody]).size) + '）＋ ebooks／media／refbooks／learnmedia 四個資料夾',
+          '內容：exam_data.json（' + _mb(new Blob([examFile]).size) + (examFile !== examBody ? '，壓縮前 ' + _mb(new Blob([examBody]).size) : '') + '）＋ ebooks／media／refbooks／learnmedia 四個資料夾',
           _skipN ? '其中 ' + _skipN + ' 個書籍、影音檔與資料夾裡的相同，沒有重寫。' : '',
           _badList.length ? '⚠ 有 ' + _badList.length + ' 個檔案在這台讀不到（可能存檔時 App 被關掉），沒有寫入，資料夾裡原本的檔案保留：' + _badList.slice(0, 5).join('、') + (_badList.length > 5 ? ' 等' : '') + '。這幾個請在影音庫或書庫刪除後重新加入。' : '',
           existing ? '上一份已移到 history 資料夾保留。' : '',

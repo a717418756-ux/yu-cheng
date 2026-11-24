@@ -42,7 +42,9 @@ console.log('fixed samples ok');
 
 const file = process.argv[2];
 if(file){
-  const d = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
+  // v4.58.2 起本機備份也是 gz1: 壓縮字串（同雲端備份）
+  const txt = fs.readFileSync(file, 'utf8').replace(/^﻿/, '').trim();
+  const d = JSON.parse(txt.startsWith('gz1:') ? require('zlib').gunzipSync(Buffer.from(txt.slice(4), 'base64')).toString('utf8') : txt);
   const qs = d.questions.filter(x => x.subject === '警察法規');
   const noLaw = qs.filter(x => !P.qLaws(x).length);
   console.log('警察法規題', qs.length, '・完全找不到法規名', noLaw.length);

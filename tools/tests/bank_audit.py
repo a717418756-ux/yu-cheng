@@ -3,7 +3,8 @@
 #   解析寫的正確選項與答案不一致、相關法條指到法規庫裡不存在的條號、各卷題號缺號、沒有解析的題目。
 import json, re, sys, collections
 src = sys.argv[1]; out = sys.argv[2] if len(sys.argv) > 2 else None
-D = json.load(open(src, encoding='utf-8-sig'))
+import os as _os, sys as _sys; _sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..')); from yc_backup_load import load as _yc_load  # 也讀壓縮過（gz1:）的備份
+D = _yc_load(src)
 Q = D['questions']; LAWS = D.get('laws') or []
 art = collections.defaultdict(set)
 for l in LAWS: art[l['lawName']].add(l['articleNumber'])

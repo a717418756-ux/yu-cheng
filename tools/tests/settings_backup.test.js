@@ -7,7 +7,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm'), assert = r
 
 // 第一個參數可指定別的 settings.js（例如改版前的那份，確認這些測試真的抓得到原本的問題）
 const SRC = fs.readFileSync(process.argv[2] || path.join(__dirname, '..', '..', 'js', 'settings.js'), 'utf8');
-const EXPOSE = ['_readExamFile', '_archiveExam', '_restoreTable', '_restoreDir', '_backupDir', '_sameFile'];
+const EXPOSE = ['_gzPack', '_readExamFile', '_archiveExam', '_restoreTable', '_restoreDir', '_backupDir', '_sameFile'];
 const END = 'window.Settings = Settings;';
 assert.strictEqual(SRC.split(END).length, 2, '找不到 IIFE 結尾');
 const code = SRC.replace(END, END + '\nwindow.__T = {' + EXPOSE.join(',') + '};');
@@ -52,6 +52,8 @@ const sandbox = {
   logError: () => {}, toast: () => {}, esc: s => String(s), _cacheInvalidate: () => {},
   art2n: () => 0, _lawBlob: () => '', askConfirm: async () => true, askInput: async () => '測試',
 };
+// Node 沒有 FileReader：補 readAsDataURL（_blobToBase64 用）
+sandbox.FileReader = class { readAsDataURL(b){ b.arrayBuffer().then(ab => { this.result = 'data:' + (b.type || 'application/octet-stream') + ';base64,' + Buffer.from(ab).toString('base64'); this.onload && this.onload(); }, e => { this.error = e; this.onerror && this.onerror(); }); } };
 sandbox.window = sandbox; sandbox.addEventListener = () => {};
 vm.createContext(sandbox);
 vm.runInContext(code, sandbox, { filename: 'settings.js' });
@@ -105,6 +107,25 @@ test('權限等讀取錯誤原樣往外丟（localBackup 會停下不寫），�
   // localBackup 的判斷寫在原始碼裡：只有 NotFoundError 當沒有檔、damaged 走 history、其他 throw
   assert(/if\(e\.name === 'NotFoundError'\)\{\}\s*else if\(e\.damaged\)[\s\S]{0,200}else throw e;/.test(SRC), 'localBackup 讀檔錯誤分支');
   assert(!/_readExamFile\(dirHandle, 'exam_data\.json'\)\.catch\(\(\)=>null\)/.test(SRC), '不能再把所有錯誤吞成 null');
+});
+
+test('v4.58.2 本機 exam_data.json 壓縮：寫進去的是 gz1:，讀回來內容一樣；舊的未壓縮檔照樣讀；history 原封不動', async () => {
+  const data = { version: 3, exportedAt: '2026-11-24T08:00:00.000Z', meta: { backupId: 'b1' },
+                 questions: Array.from({ length: 300 }, (_, i) => ({ id: i + 1, question: '依道路交通管理處罰條例第' + i + '條，下列何者正確？', answer: 'A' })),
+                 laws: [{ id: 1, lawName: '刑法', content: '第一條 行為之處罰，以行為時之法律有明文規定者為限。' }] };
+  const body = JSON.stringify(data), packed = await T._gzPack(body);
+  assert(packed.startsWith('gz1:'), '要壓縮');
+  assert(packed.length < body.length / 2, '壓縮後要明顯變小');
+  const d = new Dir('備份').put('exam_data.json', packed);
+  const r = await T._readExamFile(d, 'exam_data.json');
+  assert.deepStrictEqual(plain(r.data), data);
+  const old = await T._readExamFile(new Dir('舊').put('exam_data.json', body), 'exam_data.json');   // 舊版未壓縮
+  assert.deepStrictEqual(plain(old.data), data);
+  await T._archiveExam(d, r);                                     // 移進 history 的是原檔（壓縮的），還原舊版也讀得到
+  const hist = d.dirs.get('history'), idx = JSON.parse(await hist.text('index.json'));
+  assert.strictEqual(await hist.text(idx[0].file), packed);
+  assert.deepStrictEqual(plain((await T._readExamFile(hist, idx[0].file)).data), data);
+  assert(/const examFile = await _gzPack\(examBody\);\s*await _writeFile\(dirHandle, 'exam_data\.json', examFile\);/.test(SRC), 'localBackup 要寫壓縮後的內容');
 });
 
 // ── 附件身分 ──
