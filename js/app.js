@@ -729,6 +729,68 @@ function _showUpdateBanner(reg){
   document.body.appendChild(banner);
 }
 
+// ════════════════════════════════════════════════════════════
+// 【手動檢查更新】（v4.63）設定頁版本號旁的按鈕
+// ════════════════════════════════════════════════════════════
+//   背景偵測照舊（每 30 分鐘、回到前景時查一次，查到跳「發現新版本」）；這顆按鈕是「現在就查、有就直接換」：
+//   ① 先讀 GitHub 上 sw.js 的版本號（不走快取），知道最新版是幾版
+//   ② 網頁版：叫瀏覽器立刻重抓 sw.js；新版裝好就接管並重新載入（controllerchange → reload）
+//   ③ App 版：網頁檔包在 APK 裡，這裡換不了，只告訴你有沒有新版、要裝新的 APK
+const _YC_SITE = 'https://a717418756-ux.github.io/yu-cheng/';
+const _verNum = v => String(v || '').split('.').map(n => parseInt(n, 10) || 0);
+const _verNewer = (a, b) => { const x = _verNum(a), y = _verNum(b); for(let i = 0; i < 3; i++){ if((x[i]||0) !== (y[i]||0)) return (x[i]||0) > (y[i]||0); } return false; };
+async function _remoteVer(){
+  const native = !!(window.Capacitor?.isNativePlatform?.());
+  const url = (native ? _YC_SITE : './') + 'sw.js?check=' + Date.now();
+  const t = await fetch(url, { cache:'no-store' }).then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.text(); });
+  const m = t.match(/APP_VERSION\s*=\s*'([\d.]+)'/);
+  if(!m) throw new Error('讀不到版本號');
+  return m[1];
+}
+async function ycCheckUpdate(btn){
+  const cur = typeof APP_VERSION !== 'undefined' ? APP_VERSION : '';
+  const native = !!(window.Capacitor?.isNativePlatform?.());
+  const label = btn?.textContent;
+  const busy = t => { if(btn){ btn.disabled = !!t; btn.textContent = t || label; } };
+  busy('檢查中…');
+  try{
+    let remote = '';
+    try{ remote = await _remoteVer(); }catch(e){
+      if(!navigator.onLine){ toast('沒有網路，連上網路後再按一次'); return; }
+      if(native){ toast('連不到 GitHub，稍後再試'); return; }
+    }
+    if(native){
+      if(remote && _verNewer(remote, cur)) askConfirm('有新版 v' + remote, '目前是 v' + cur + '。App 版的程式包在安裝檔裡，要安裝新的 APK 才會更新（網頁版會自動更新）。', '知道了', '關閉', 'primary');
+      else toast('已是最新版 v' + cur);
+      return;
+    }
+    if(!('serviceWorker' in navigator)){ location.reload(); return; }
+    const reg = await navigator.serviceWorker.getRegistration();
+    if(!reg){ location.reload(); return; }
+    // 已經有裝好、等著的新版（之前按了「稍後」）→ 直接換
+    const take = w => { busy('更新中…'); w.postMessage({ type:'SKIP_WAITING' }); setTimeout(() => location.reload(), 4000); };
+    if(reg.waiting && navigator.serviceWorker.controller){ take(reg.waiting); return; }
+    if(remote && !_verNewer(remote, cur)){ toast('已是最新版 v' + cur); return; }
+    busy('下載新版…');
+    await reg.update().catch(() => {});
+    // 等新版裝好（下載全部程式檔，最多 60 秒）
+    const w = await new Promise(res => {
+      const done = () => res(reg.waiting || null);
+      const sw = reg.installing;
+      if(!sw) return done();
+      const tm = setTimeout(done, 60000);
+      sw.addEventListener('statechange', () => { if(sw.state === 'installed' || sw.state === 'redundant'){ clearTimeout(tm); done(); } });
+    });
+    if(w && navigator.serviceWorker.controller){ take(w); return; }
+    if(remote) toast('GitHub 上已是 v' + remote + '，但還在發布中，過幾分鐘再按一次');
+    else toast('沒有找到新版（目前 v' + cur + '）');
+  }catch(e){
+    logError?.('ycCheckUpdate', e);
+    toast('檢查更新失敗：' + (e.message || e));
+  }finally{ busy(''); }
+}
+window.ycCheckUpdate = ycCheckUpdate;
+
 // ════════ 公開 API ════════
 const App = {
   toggleZone, toggleZoneQuiz,

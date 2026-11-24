@@ -738,7 +738,8 @@ async function renderSet(){  _renderAzureKey().catch(()=>{}); _renderTtsEngine()
     const av = typeof APP_VERSION  !== 'undefined' ? APP_VERSION  : '';
     const dv = typeof DATA_VERSION !== 'undefined' ? DATA_VERSION : '';
     verInfoEl.innerHTML =
-      `程式版本：<b>v${av}</b>　題庫版本：<b>${dv}</b>`;
+      `程式版本：<b>v${av}</b>　題庫版本：<b>${dv}</b>`
+      + `<div><button class="btn" style="padding:6px 14px;font-size:12px" onclick="ycCheckUpdate(this)">🔄 檢查更新</button></div>`;
 
     // 診斷資訊：錯誤日誌
     const diagEl = document.getElementById('set-diag-info');
