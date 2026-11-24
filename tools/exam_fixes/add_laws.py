@@ -5,6 +5,8 @@
 
 v4.41 原檔頁面：先跑 import_sop_pdf.py（PDF → 每頁一張圖＋逐字文字，存在 sop/_pages.json），這裡再併進每筆資料：
   pages（每頁圖片的路徑）、pagesText（逐字文字，搜尋用）。App 預設顯示原檔頁面。
+  v4.62：有整理版（流程圖＋作業內容）的不再放 pages（原檔整頁和整理版重複、佔空間），只留 pagesText 給搜尋；
+  切不出整理版的（掃描檔等）才放 pages。
   ・LAWS 裡有手動排版的（.txt）：content 維持排版版，App 可切換「原檔／文字排版」
   ・_pages.json 有、LAWS 沒有的：自動建一筆，content 就是逐字文字（不重排、不改寫）
   ・LAWS_META 可替自動建立的補關鍵字、關聯法條、來源
@@ -52,7 +54,10 @@ if __name__ == '__main__':
         law = dict(it['law'])
         pg = PAGES.get(law['lawName'])
         if pg:
-            law['pages'], law['pagesText'] = pg['pages'], pg['pagesText']
+            # v4.62：有整理版就不放原檔整頁（pages），只留逐字文字給搜尋；切不出整理版的才放整頁圖
+            law['pagesText'] = pg['pagesText']
+            if pg.get('pages') and not pg.get('content'):
+                law['pages'] = pg['pages']
         # v4.42：有整理版（import_sop_pdf.py 從原檔切出的「流程圖＋完整作業內容」）就用它；
         #   手動重排的 .txt 會漏字、邏輯會跑掉，只留在 tools 當存檔，不再放進 App
         if pg and pg.get('content'):
@@ -67,5 +72,5 @@ if __name__ == '__main__':
         if prev:
             new['lawHash'] = sorted(prev)
         FX['fixes'] = [f for f in FX['fixes'] if f is not old] + [new]
-        print(('更新 ' if old else '新增 ') + law['lawName'], len(law['content']), '字', ('＋原檔 %d 頁' % len(law['pages'])) if pg else '')
+        print(('更新 ' if old else '新增 ') + law['lawName'], len(law['content']), '字', ('＋原檔 %d 頁' % len(law['pages'])) if law.get('pages') else '')
     json.dump(FX, open(fx_path, 'w', encoding='utf8', newline='\n'), ensure_ascii=False, indent=1)

@@ -4,8 +4,11 @@
   （以前的做法是讀懂後用 App 的流程語法重打，流程圖的箭頭只能靠解讀，會漏、邏輯會跑掉。）
 
   來源：Desktop\\Y.C\\原始資料庫\\作業程序SOP\\*.pdf，檔名「正式名稱_民國日期7碼.pdf」
-  產出：data/sop/<代碼>/01.png …   每頁一張圖（寬 1400、16 階灰階 PNG，約 0.1–0.2 MB）
-        tools/exam_fixes/sop/_pages.json   名稱 → { pages, pagesText, amendDate, file, sha1 }
+  產出：data/sop/<代碼>/NN.png     只有附表（表單）頁存成整頁圖（寬 1400、16 階灰階 PNG，約 0.1–0.2 MB）；
+                                    v4.62 起有整理版的 SOP 不再放「原檔整頁」（整理版逐字完整，整頁圖是重複的）。
+                                    切不出整理版的（掃描檔、版型不同）才每頁都存，App 照原檔整頁顯示
+        data/sop/<代碼>/fNN-xxxxxx.svg  流程圖（sop_svg.py：原檔線條＋真文字）
+        tools/exam_fixes/sop/_pages.json   名稱 → { pagesText, content, amendDate, file, sha1 }（沒有整理版時另有 pages）
         tools/exam_fixes/sop/_匯入核對表.md  每份的頁數、每頁字數、沒有文字層的頁（掃描檔）、與舊排版版的差異
   之後跑 add_laws.py 寫進 data/exam_fixes.json。
 
@@ -23,7 +26,7 @@ OUT = os.path.join(ROOT, 'data', 'sop')
 PAGES_JSON = os.path.join(HERE, 'sop', '_pages.json')
 REPORT = os.path.join(HERE, 'sop', '_匯入核對表.md')
 WIDTH = 1400
-VER = 6   # 產出格式版本：改了切版規則就加一，舊的會自動重做
+VER = 7   # 產出格式版本：改了切版規則就加一，舊的會自動重做
 PAGE_MARK = '〔原檔第 %d 頁〕'
 
 
@@ -144,8 +147,6 @@ def build_layout(doc, code, d):
                     out.append(''); out.append('【流程圖】'); flow_started = True
                 x0 = max(0, min(r.x0 for r in left) - 14); y1 = min(pg.rect.height, max(r.y1 for r in left) + 14)
                 cr = fitz.Rect(x0, hy, box.x0 - 4, y1)
-                # 單頁裁圖 fNN.png：v4.42 的內容引用它，手機還沒套用新版前要看得到，所以照樣產生（新版不引用）
-                render(pg, os.path.join(d, 'f%02d.png' % i), clip=cr)
                 # v4.43：流程圖用 SVG（原檔的線條＋真文字），可選字、可搜尋。
                 # v4.43：先放一個記號，全部頁面跑完再決定哪幾頁要用 A／B／C 接點連成一張（finish_flows）
                 flow_n += 1
@@ -255,10 +256,10 @@ def main():
         sha = hashlib.sha1(open(pdf, 'rb').read()).hexdigest()
         code = 'sop-' + hashlib.sha1(name.encode('utf8')).hexdigest()[:8]
         old = db.get(name)
-        if old and old.get('sha1') == sha and old.get('v') == VER and not redo and all(os.path.exists(os.path.join(ROOT, p)) for p in old['pages']):
-            total = sum(os.path.getsize(os.path.join(ROOT, p)) for p in old['pages'])
+        if old and old.get('sha1') == sha and old.get('v') == VER and not redo and all(os.path.exists(os.path.join(ROOT, p)) for p in old.get('imgs', [])):
+            total = sum(os.path.getsize(os.path.join(ROOT, p)) for p in old.get('imgs', []))
             rep.append('| %s | %s | %d | %d | %.1f MB | %s | 沒有變動 |' % (
-                name, ymd, len(old['pages']), len(norm(old['pagesText'])), total / 1048576, '、'.join(map(str, old.get('noText', []))) or '無'))
+                name, ymd, old.get('nPages', 0), len(norm(old['pagesText'])), total / 1048576, '、'.join(map(str, old.get('noText', []))) or '無'))
             continue
         doc = fitz.open(pdf)
         d = os.path.join(OUT, code)
@@ -266,11 +267,8 @@ def main():
         # 舊的流程圖 SVG 不刪：還沒套用新版內容的手機仍引用舊檔名（檔名帶 hash，不會互相覆蓋）
         for f in glob.glob(os.path.join(d, '*.png')):
             os.remove(f)
-        pages, texts, sizes, no_text, per = [], [], 0, [], []
+        texts, no_text, per = [], [], []
         for i, pg in enumerate(doc, 1):
-            fn = '%02d.png' % i
-            sizes += render(pg, os.path.join(d, fn))
-            pages.append('data/sop/%s/%s' % (code, fn))
             t = page_text(pg)
             # 核對：存進去的文字去掉空白後，必須和 PDF 文字層去掉空白後一字不差
             assert norm(t) == norm(pg.get_text()), '第 %d 頁文字與 PDF 不一致' % i
@@ -283,11 +281,21 @@ def main():
         amend = '民國%s年%s月%s日' % (ymd[:3], ymd[3:5], ymd[5:]) if ymd else ''
         JOIN_NOTES.clear()
         content, checks = build_layout(doc, code, d)
-        db[name] = dict(v=VER, pages=pages, pagesText=text, amendDate=amend, file=os.path.basename(pdf), sha1=sha, noText=no_text)
+        # 要存成圖的頁：有整理版 → 只有附表頁（整理版裡的圖片行）；沒有整理版 → 每一頁（App 顯示原檔整頁）
+        keep = sorted({int(x) for x in re.findall(r'data/sop/%s/(\d+)\.png' % code, content)}) if content else list(range(1, len(doc) + 1))
+        imgs, sizes = [], 0
+        for i in keep:
+            sizes += render(doc[i - 1], os.path.join(d, '%02d.png' % i))
+            imgs.append('data/sop/%s/%02d.png' % (code, i))
+        imgs += sorted(set(re.findall(r'data/sop/[\w\-]+/[\w\-]+\.svg', content or '')))
+        sizes += sum(os.path.getsize(os.path.join(ROOT, p)) for p in imgs if p.endswith('.svg'))
+        db[name] = dict(v=VER, pagesText=text, amendDate=amend, file=os.path.basename(pdf), sha1=sha, noText=no_text, nPages=len(doc), imgs=imgs)
         if content:
             db[name]['content'] = content
+        else:
+            db[name]['pages'] = imgs
         rep.append('| %s | %s | %d | %d | %.1f MB | %s | %s |' % (
-            name, ymd, len(pages), len(norm(text)) - sum(len(norm(PAGE_MARK % i)) for i in range(1, len(pages) + 1)),
+            name, ymd, len(doc), len(norm(text)) - sum(len(norm(PAGE_MARK % i)) for i in range(1, len(doc) + 1)),
             sizes / 1048576, '、'.join(map(str, no_text)) or '無', '更新' if old else '新增'))
         detail += ['', '## ' + name, '', '每頁字數：' + '、'.join('p%d %d' % (i + 1, n) for i, n in enumerate(per))]
         if content:
@@ -307,7 +315,7 @@ def main():
             miss = [ln for ln in page_text_all(doc) if len(norm(ln)) >= 4 and norm(ln) not in fmt]
             detail += ['', '與舊的文字排版版（`sop/%s.txt`）比較：PDF 共 %d 行文字，其中 %d 行在排版版裡找不到一模一樣的字句（排版版是重新斷句、改寫過的）。前 15 行：' % (
                 name, len(page_text_all(doc)), len(miss)), ''] + ['- ' + ln for ln in miss[:15]]
-        print(name, len(pages), '頁', '%.1f MB' % (sizes / 1048576))
+        print(name, len(doc), '頁', '圖 %d 個 %.2f MB' % (len(imgs), sizes / 1048576))
     json.dump(db, open(PAGES_JSON, 'w', encoding='utf8', newline='\n'), ensure_ascii=False, indent=1)
     open(REPORT, 'w', encoding='utf8', newline='\n').write('\n'.join(rep + detail) + '\n')
 

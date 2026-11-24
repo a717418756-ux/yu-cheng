@@ -1664,8 +1664,10 @@ function _lawText(l){
 //   l.pages：PDF 每一頁轉成的圖（tools/exam_fixes/import_sop_pdf.py），樣式、流程、箭頭和原檔完全一樣；
 //   l.pagesText：程式從 PDF 逐字抽出的文字，給搜尋用，可展開對照。兩者都不經人工重排。
 //   有手動排版的內容（content 與 pagesText 不同）時可切換「原檔／文字排版」，預設原檔。
+//   v4.62：有整理版（流程圖＋作業內容，逐字完整）的不再顯示「原檔整頁」——內容重複、佔空間；
+//   還沒套用新版資料、仍帶著 pages 的也一樣只顯示整理版。切不出整理版的（掃描檔等）照舊顯示原檔整頁
 function _lawContentHtml(l, fmt){
-  if(l && Array.isArray(l.pages) && l.pages.length){
+  if(l && Array.isArray(l.pages) && l.pages.length && !_isSopImport(l.content)){
     const hasFmt = !!l.content && l.content !== l.pagesText && !l.content.startsWith('data:');
     const imgs = l.pages.map((src, i) =>
       '<figure class="sopp-pg"><img src="' + esc(src) + '" alt="原檔第 ' + (i + 1) + ' 頁" decoding="async" onclick="openImgViewer(this.src)" '
@@ -1673,14 +1675,11 @@ function _lawContentHtml(l, fmt){
       + '<span class="sopp-miss">　這一頁還沒下載，連上網路後再開一次</span></figcaption></figure>').join('');
     const txt = l.pagesText ? '<details class="sopp-txt"><summary>原檔文字（逐字抽出，搜尋用）</summary><div>'
       + fmt(l.pagesText).split('\n').join('<br>') + '</div></details>' : '';
-    // v4.42 整理版（import_sop_pdf.py 切出的「流程圖＋完整作業內容」，content 裡有 ![…](data/sop/…) 圖片行）排第一、預設顯示；
-    //   「原檔整頁」留在第二個分頁對照。舊的手動排版（沒有圖片行）維持預設原檔
-    const imp = hasFmt && _isSopImport(l.content), dv = imp ? 'fmt' : 'orig';
+    // 舊的手動排版（沒有圖片行）：預設原檔，可切換文字排版
+    const dv = 'orig';
     const tab = (v, label) => '<button type="button"' + (v === dv ? ' class="on"' : '') + ' onclick="soppView(this,&quot;' + v + '&quot;)">' + label + '</button>';
     return '<div class="sopp" data-v="' + dv + '">'
-      + (hasFmt ? '<div class="sopp-tabs">' + (imp
-          ? tab('fmt', '📑 流程圖＋作業內容') + tab('orig', '📄 原檔整頁（' + l.pages.length + '）')
-          : tab('orig', '📄 原檔（' + l.pages.length + ' 頁）') + tab('fmt', '📝 文字排版')) + '</div>' : '')
+      + (hasFmt ? '<div class="sopp-tabs">' + tab('orig', '📄 原檔（' + l.pages.length + ' 頁）') + tab('fmt', '📝 文字排版') + '</div>' : '')
       + '<div class="sopp-orig">' + imgs + txt + '</div>'
       + (hasFmt ? '<div class="sopp-fmt">' + _lawContentText(l, fmt) + '</div>' : '')
       + '</div>';
@@ -2970,9 +2969,13 @@ async function applyExamFixes(){  try{
         // v4.41：內容沒變、只是補上原檔頁面（pages／pagesText）也要更新
         const samePg = JSON.stringify(l.pages || []) === JSON.stringify(nl.pages || []) && (l.pagesText || '') === (nl.pagesText || '');
         if(l.content === nl.content ? samePg : ![].concat(f.lawHash || []).includes(h(l.content))) continue;
-        const onlyPg = l.content === nl.content;
-        Object.assign(l, nl); l.searchBlob = _lawBlob(l); lawUpd.push(l);
-        lines.push('法規資料庫「' + nl.lawName + '」' + (onlyPg ? '加上原檔頁面（' + (nl.pages || []).length + ' 頁）' : '更新為新版'));
+        const onlyPg = l.content === nl.content, dropPg = (l.pages || []).filter(p => !(nl.pages || []).includes(p));
+        Object.assign(l, nl);
+        if(!nl.pages) delete l.pages;   // v4.62：新版不帶原檔整頁 → 一併拿掉
+        l.searchBlob = _lawBlob(l); lawUpd.push(l);
+        lines.push('法規資料庫「' + nl.lawName + '」' + (!onlyPg ? '更新為新版' : nl.pages?.length ? '加上原檔頁面（' + nl.pages.length + ' 頁）' : '拿掉原檔整頁（流程圖＋作業內容已完整）'));
+        // 看過而存在裝置裡的整頁圖（SOP 快取 yc-pages-v1）也刪掉，騰出空間；附表等仍在用的圖不動
+        if(dropPg.length && self.caches) caches.open('yc-pages-v1').then(c => Promise.all(dropPg.filter(p => !(nl.content || '').includes(p)).map(p => c.delete(p)))).catch(() => {});
       }
     }
     for(const f of lawFx) if(f.lawContent) for(const l of laws){
