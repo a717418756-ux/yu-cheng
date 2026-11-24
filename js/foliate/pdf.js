@@ -126,7 +126,7 @@ export const makePDF = async file => {
         isEvalSupported: false,
     }).promise
 
-    const book = { rendition: { layout: 'pre-paginated' }, ycTrusted: true, ycPdf: pdf }   // Y.C.：sandbox 見 fixed-layout.js；ycPdf 給 reader.js 做 PDF 全文搜尋
+    const book = { rendition: { layout: 'pre-paginated', spread: 'none' }, ycTrusted: true, ycPdf: pdf }   // Y.C.：sandbox 見 fixed-layout.js；ycPdf 給 reader.js 做 PDF 全文搜尋
 
     const { metadata, info } = await pdf.getMetadata() ?? {}
     // TODO: for better results, parse `metadata.getRaw()`

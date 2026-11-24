@@ -504,3 +504,31 @@
 /* 書籍資訊：進度、重點數 */
 .book-det-stat{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:8px; font-size:11.5px; color:var(--t2); }
 .book-det-stat .shelf-hero-prog{ width:100%; margin:0 0 2px; }
+
+/* ══ v4.60 書庫：排序、書架／封面切換、封面格、一次匯入多本、拖檔案匯入 ══ */
+.shelf-tools{ display:flex; align-items:center; gap:8px; }
+.shelf-sort{ appearance:none; -webkit-appearance:none; background:rgba(255,200,110,.08) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23d9a75a'/%3E%3C/svg%3E") no-repeat right 8px center;
+  border:1px solid rgba(255,200,110,.22); color:rgba(255,215,150,.85); font-size:12px; border-radius:8px; padding:5px 24px 5px 9px; }
+.shelf-sort option{ background:#1c120a; color:#f0e0c8; }
+.shelf-view-seg{ display:flex; border:1px solid rgba(255,200,110,.22); border-radius:8px; overflow:hidden; }
+.shelf-view-seg button{ display:flex; align-items:center; justify-content:center; width:32px; height:28px; border:none; background:none; color:rgba(255,215,150,.45); cursor:pointer; }
+.shelf-view-seg button.on{ background:rgba(255,200,110,.16); color:rgba(255,215,150,.95); }
+.book-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(104px, 1fr)); gap:18px 14px; padding:14px 14px 28px;
+  background:radial-gradient(ellipse at 50% 0%, rgba(255,160,60,.06), transparent 60%), linear-gradient(180deg,#1c0f07,#140a04); min-height:60vh; }
+.book-grid-card{ display:flex; flex-direction:column; gap:5px; cursor:pointer; min-width:0; border-radius:6px; }
+.book-grid-cover{ position:relative; aspect-ratio:2/3; border-radius:3px 6px 6px 3px; overflow:hidden;
+  box-shadow:-2px 0 0 rgba(0,0,0,.55), 4px 8px 18px rgba(0,0,0,.6), 0 0 0 .5px rgba(255,200,100,.1); transition:transform .15s; }
+.book-grid-cover::before{ content:''; position:absolute; top:0; left:0; width:4px; height:100%; z-index:1; pointer-events:none; background:linear-gradient(90deg, rgba(0,0,0,.5), transparent); }
+.book-grid-cover .book-thumb-fill{ position:absolute; inset:0; width:100%; height:100%; }
+.book-grid-card:active .book-grid-cover{ transform:translateY(-3px) scale(1.02); }
+.book-grid-title{ font-size:12.5px; line-height:1.35; color:#f0e2cc; font-weight:600; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.book-grid-sub{ display:flex; flex-wrap:wrap; gap:2px 6px; font-size:10.5px; color:rgba(240,226,204,.45); min-width:0; }
+.book-grid-sub .au{ flex-basis:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.book-grid-sub .fav{ color:#ec4899; }
+@media (min-width:700px){ .book-grid{ grid-template-columns:repeat(auto-fill, minmax(128px, 1fr)); gap:22px 18px; } }
+.ab-batch{ display:block; width:100%; text-align:left; margin:0 0 14px; padding:11px 14px; border-radius:12px; cursor:pointer;
+  background:rgba(37,98,200,.14); border:1px dashed rgba(110,168,254,.45); color:var(--t0); font-size:14px; font-weight:650; }
+.ab-batch small{ display:block; font-size:11.5px; font-weight:400; color:var(--t2); margin-top:3px; line-height:1.5; }
+#pg-books.book-drop{ outline:3px dashed rgba(255,200,110,.6); outline-offset:-10px; }
+#pg-books.book-drop::after{ content:'放開就匯入這些書'; position:fixed; left:50%; top:45%; transform:translate(-50%,-50%); z-index:50; pointer-events:none;
+  padding:14px 22px; border-radius:14px; background:rgba(20,12,6,.92); color:#ffd58a; font-size:16px; font-weight:700; }

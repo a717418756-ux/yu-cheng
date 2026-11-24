@@ -44,6 +44,7 @@ async function rdOpen(rec){
   _RD.opening = true;
   try{
     await _rdLoadPrefs();
+    await _rdFontsReady();
     const ext = String(rec.fileType || '').toLowerCase();
     Object.assign(_RD, { rec, id:rec.id, ext, loc:null, bars:false, sel:null, idxOf:new Map(), tocHref:'' });
     const ov = document.createElement('div');
@@ -81,6 +82,8 @@ async function rdOpen(rec){
     ov.querySelector('.rd-loading')?.remove();
     _rdRenderToc();
     _rdTicks();
+    _rdTimerStart();
+    if(_RD.prefs.ruler && !_RD.fixed) _rdRulerShow(true);
     if(!rec.lastCfi) _rdShowBars(true);                  // 第一次打開：先露出工具列，讓人知道在哪
   }catch(e){
     logError('rdOpen', e);
@@ -91,7 +94,7 @@ async function rdOpen(rec){
       <button class="rd-btn-pri" onclick="downloadBook(${+rec.id})">⬇ 下載檔案</button>`;
     // epub 打不開時改用舊的 epub.js 閱讀器試試
     if(String(rec.fileType).toLowerCase() === 'epub' && typeof _initEpubLegacy === 'function'){
-      _rdTeardown(true);
+      _rdTeardown();
       _initEpubLegacy(rec);
     }
   }finally{ _RD.opening = false; }
@@ -119,6 +122,7 @@ function _rdShell(rec){
     <button class="rd-ib" onclick="_rdSearchOpen()" aria-label="全書搜尋">${_RD_ICO.search}</button>
     <button class="rd-ib" id="rd-mark-btn" onclick="_rdToggleMark()" aria-label="書籤">${_RD_ICO.mark}</button>
     <button class="rd-ib" onclick="_rdTts()" id="tts-epub-btn" aria-label="朗讀">${_RD_ICO.tts}</button>
+    <button class="rd-ib" onclick="_rdTools()" aria-label="更多工具"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
   </header>
   <footer class="rd-bot" id="rd-bot">
     <div class="rd-prog">
@@ -138,6 +142,7 @@ function _rdShell(rec){
   <div class="rd-scrim" id="rd-scrim" onclick="_rdCloseLayers()"></div>
   <aside class="rd-side" id="rd-side"></aside>
   <section class="rd-sheet" id="rd-aa"></section>
+  <section class="rd-sheet" id="rd-tools"></section>
   <div class="rd-pop" id="rd-pop"></div>`;
 }
 
@@ -151,20 +156,24 @@ function _rdApplyChrome(){
   ov.dataset.ui = t.ui;
   ov.classList.toggle('rd-pdf-dark', !!(_RD.fixed && _RD.prefs.pdfDark));
 }
-function _rdApplyLayout(){
-  const r = _RD.view?.renderer; if(!r) return;
+function _rdApplyLayout(view){
+  view = view || _RD.view;
+  const r = view?.renderer; if(!r) return;
   const p = _RD.prefs;
-  if(_RD.fixed){ r.setAttribute('zoom', p.pdfZoom || 'fit-page'); return; }
+  if(view.isFixedLayout){ r.setAttribute('zoom', p.pdfZoom || 'fit-page'); return; }
   r.setAttribute('flow', p.flow === 'scrolled' ? 'scrolled' : 'paginated');
   r.setAttribute('gap', ((RD_MARGIN[p.margin] || RD_MARGIN.m).gap * 100) + '%');
   r.setAttribute('margin', '34px');
   r.setAttribute('max-inline-size', '720px');
-  r.setAttribute('max-column-count', p.cols === '1' ? '1' : '2');
+  r.setAttribute('max-column-count', p.cols === '1' || view !== _RD.view ? '1' : '2');
   r.toggleAttribute('animated', true);
 }
 function _rdBookCSS(){
-  const p = _RD.prefs, t = RD_THEMES[p.theme], f = RD_FONTS[p.font] || RD_FONTS.sans;
+  const p = _RD.prefs, t = RD_THEMES[p.theme];
+  const uf = String(p.font).startsWith('u:') ? _RDF.list.find(x => 'u:' + x.id === p.font) : null;
+  const f = uf ? { css:`"ycf-${uf.id}", "Noto Sans TC", sans-serif` } : (RD_FONTS[p.font] || RD_FONTS.sans);
   return `@namespace epub "http://www.idpf.org/2007/ops";
+  ${uf && _RDF.urls.get(uf.id) ? `@font-face { font-family:"ycf-${uf.id}"; src:url("${_RDF.urls.get(uf.id)}"); font-display:swap; }` : ''}
   html { color-scheme:${t.ui}; font-size:${p.fontSize}px !important; }
   html, body { background:${t.bg} !important; color:${t.fg} !important; }
   body *:not(img):not(svg):not(svg *):not(video) { color:inherit !important; background-color:transparent !important; }
@@ -181,10 +190,11 @@ function _rdBookCSS(){
   aside[epub|type~="footnote"], aside[epub|type~="endnote"], aside[epub|type~="rearnote"] { display:none; }`;
 }
 function _rdApplyStyles(){
-  const r = _RD.view?.renderer; if(!r) return;
   _rdApplyChrome();
-  if(_RD.fixed) return;
-  r.setStyles?.(_rdBookCSS());
+  for(const v of [_RD.view, _RD2.view]){
+    if(v?.renderer && !v.isFixedLayout) v.renderer.setStyles?.(_rdBookCSS());
+  }
+  _rdRulerPlace();
 }
 
 // ── 事件 ───────────────────────────────────────────────────────────
@@ -238,7 +248,7 @@ function _rdOnDocLoad({ doc, index }){
   doc.addEventListener('pointerup', onSel);
 }
 function _rdLayerOpen(){
-  return ['rd-side','rd-aa','rd-pop'].some(id => document.getElementById(id)?.classList.contains('on'));
+  return ['rd-side','rd-aa','rd-pop','rd-tools'].some(id => document.getElementById(id)?.classList.contains('on'));
 }
 function _rdShowBars(on){
   _RD.bars = !!on;
@@ -248,6 +258,7 @@ function _rdHideBars(){ if(_RD.bars) _rdShowBars(false); }
 function _rdKey(e){
   if(!_RD.view || e.target?.matches?.('input,textarea')) return;
   const k = e.key;
+  if(document.getElementById('rd-speed')){ if(k === ' '){ e.preventDefault(); _rdSpeedToggle(); } else if(k === 'Escape') _rdSpeedClose(); return; }
   if(k === 'ArrowLeft' || k === 'PageUp'){ e.preventDefault(); _RD.view.goLeft(); }
   else if(k === 'ArrowRight' || k === 'PageDown' || k === ' '){ e.preventDefault(); _RD.view.goRight(); }
   else if(k === 'Escape'){ if(_rdLayerOpen()) _rdCloseLayers(); else _rdShowBars(!_RD.bars); }
@@ -278,6 +289,7 @@ async function _rdOnLink(e){
 // ── 位置、進度 ─────────────────────────────────────────────────────
 function _rdOnRelocate(d){
   _RD.loc = d;
+  _RD.act = Date.now();
   const r = _RD.view.renderer;
   const pct = Math.round((d.fraction || 0) * 1000) / 10;
   const chap = d.tocItem?.label || '';
@@ -318,10 +330,11 @@ async function _rdSaveNow(extra){
     if(typeof _RD.loc?.fraction === 'number') b.progress = Math.round(_RD.loc.fraction * 10000) / 10000;
     b.lastRead = Date.now();
     if(extra) Object.assign(b, extra);
+    _rdAddTime(b);
     await dp('ebooks', b);
-    Object.assign(_RD.rec, { lastCfi:b.lastCfi, progress:b.progress, lastRead:b.lastRead, annos:b.annos, marks:b.marks });
+    Object.assign(_RD.rec, { lastCfi:b.lastCfi, progress:b.progress, lastRead:b.lastRead, annos:b.annos, marks:b.marks, readSec:b.readSec, readDays:b.readDays });
     const i = (_B.allBooks || []).findIndex(x => x.id === id);
-    if(i >= 0) Object.assign(_B.allBooks[i], { lastCfi:b.lastCfi, progress:b.progress, lastRead:b.lastRead });
+    if(i >= 0) Object.assign(_B.allBooks[i], { lastCfi:b.lastCfi, progress:b.progress, lastRead:b.lastRead, readSec:b.readSec, readDays:b.readDays });
   }catch(e){ logError('rdSave', e); }
 }
 function _rdTicks(){
@@ -476,6 +489,7 @@ function _rdSelPop(){
     <div class="rd-pop-row">
       <button onclick="_rdHighlight('yellow', true)">✎ 筆記</button>
       <button onclick="_rdCopySel()">複製</button>
+      <button onclick="_rdLookupSel()">查詢</button>
       <button onclick="_rdSearchSel()">搜尋</button>
       <button onclick="_rdSpeakSel()">朗讀</button>
     </div>`, _rdRangeRect(s.range, s.doc));
@@ -642,6 +656,8 @@ function _rdAa(){
       <div class="rd-row"><label>行距</label>${seg('lineHeight', [[1.5,'緊'],[1.8,'標準'],[2.1,'鬆'],[2.4,'很鬆']])}</div>
       <div class="rd-row"><label>邊距</label>${seg('margin', Object.entries(RD_MARGIN).map(([k, v]) => [k, v.name]))}</div>
       <div class="rd-row"><label>字型</label>${seg('font', Object.entries(RD_FONTS).map(([k, v]) => [k, v.name]))}</div>
+      <div class="rd-row"><label></label><div class="rd-fonts">${_RDF.list.map(f => `<button class="${p.font === 'u:' + f.id ? 'on' : ''}" onclick="_rdSet('font','u:${f.id}')" style="font-family:'ycf-${f.id}'">${esc(f.name)}<i onclick="event.stopPropagation();_rdFontDel('${f.id}')" aria-label="刪除字型">✕</i></button>`).join('')}
+        <button class="add" onclick="_rdFontImport()">＋ 匯入字型</button></div></div>
       <div class="rd-row"><label>翻頁</label>${seg('flow', [['paginated','左右翻頁'],['scrolled','上下捲動']])}</div>
       <div class="rd-row"><label>欄數</label>${seg('cols', [['auto','自動（寬螢幕兩欄）'],['1','單欄']])}</div>
       <div class="rd-row"><label>對齊</label>${seg('justify', [['true','左右對齊'],['false','靠左']])}</div>
@@ -655,13 +671,13 @@ function _rdSet(key, v){
   if(['justify','indent','pdfDark'].includes(key)) v = (v === true || v === 'true');
   p[key] = v;
   _rdSavePrefs();
-  if(['flow','margin','cols','pdfZoom'].includes(key)) _rdApplyLayout();
+  if(['flow','margin','cols','pdfZoom'].includes(key)){ _rdApplyLayout(); if(_RD2.view) _rdApplyLayout(_RD2.view); }
   _rdApplyStyles();
   _rdAa();
 }
 
 function _rdCloseLayers(){
-  ['rd-side','rd-aa'].forEach(id => document.getElementById(id)?.classList.remove('on'));
+  ['rd-side','rd-aa','rd-tools'].forEach(id => document.getElementById(id)?.classList.remove('on'));
   document.getElementById('rd-scrim')?.classList.remove('on');
   _rdPopHide();
   if(document.getElementById('rd-side')?.dataset.tab === 'search'){ _RD.searchGen++; try{ _RD.view?.clearSearch(); }catch(_){} }
@@ -699,11 +715,15 @@ const _RD_TTS = {
 // ── 關閉 ───────────────────────────────────────────────────────────
 // 返回鍵：先關選單、面板，再關閱讀器
 function rdBack(){
+  if(document.getElementById('rd-speed')){ _rdSpeedClose(); return true; }
   if(_rdLayerOpen()){ _rdCloseLayers(); return true; }
   return false;
 }
 function _rdTeardown(keepOv){
   document.removeEventListener('keydown', _rdKey);
+  clearInterval(_RD.timer); _RD.timer = null;
+  _rdSpeedClose(true);
+  _rdSplitClose(true);
   try{ _RD.view?.close?.(); }catch(_){}
   try{ _RD.view?.remove?.(); }catch(_){}
   _RD.view = null;
@@ -747,7 +767,10 @@ async function rdBookInfo(blob, ext){
     } else cover = await book.getCover?.() || null;
   }catch(_){ cover = null; }
   try{ book.destroy?.(); }catch(_){}
-  return { title:one(m.title).trim(), author:one(m.author).trim(), cover };
+  // PDF 的書名、作者欄常是範本留下的別份文件標題或建檔人的電腦帳號 → 不用，改用檔名（呼叫端處理）
+  if(book.ycPdf) return { title:'', author:'', cover };
+  const clean = t => t.replace(/\s+/g, ' ').replace(/(?<=[㐀-鿿])\s+(?=[㐀-鿿])/g, '').trim();
+  return { title:clean(one(m.title)), author:clean(one(m.author)), cover };
 }
 // 封面縮圖（寬 200，和手動上傳的一樣）＋模糊書背
 async function rdMakeThumbs(cover, rec){
@@ -787,4 +810,370 @@ async function rdAutoCovers(){
     toast('已從檔案補上 ' + n + ' 本書的封面');
     renderBooks();
   }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 【v4.60 閱讀工具】查詢（字典／維基百科／翻譯）、自訂字型、閱讀尺、速讀、並排閱讀、閱讀時間
+//   參考 Readest 的功能，程式自己寫；查詢只在按下時把選取的字送到該網站（萌典、維基百科、MyMemory、Free Dictionary）
+// ════════════════════════════════════════════════════════════════════
+
+// ── 查詢 ───────────────────────────────────────────────────────────
+const _RD_CJK = /[㐀-鿿豈-﫿]/;
+function _rdLookupSel(){
+  const t = (_RD.sel?.text || '').trim();
+  try{ _RD.sel?.doc?.getSelection().removeAllRanges(); }catch(_){}
+  _rdLookup(t);
+}
+function _rdLookup(text, tab){
+  text = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 480);
+  if(!text) return;
+  const cjk = _RD_CJK.test(text);
+  const word = cjk ? text.replace(/[\s，。、；：！？「」『』（）()《》〈〉…—·.,;:!?"'\[\]]/g, '') : text.replace(/[^A-Za-z'\- ]/g, '').trim();
+  tab = tab || ((cjk && word.length <= 6) || (!cjk && word && !/\s/.test(word)) ? 'dict' : 'tr');
+  _RD.lk = { text, word, cjk, tab };
+  const tabs = [['dict','字典'],['wiki','維基百科'],['tr','翻譯']];
+  _rdPopShow(`<div class="rd-lk">
+    <div class="rd-lk-hd"><div class="rd-seg">${tabs.map(([k, n]) => `<button class="${k === tab ? 'on' : ''}" onclick="_rdLookup(_RD.lk.text,'${k}')">${n}</button>`).join('')}</div>
+      <button class="rd-ib sm" onclick="_rdPopHide()" aria-label="關閉">✕</button></div>
+    <div class="rd-lk-q">${esc(text.length > 60 ? text.slice(0, 60) + '…' : text)}</div>
+    <div class="rd-lk-body" id="rd-lk-body"><div class="rd-empty">查詢中…</div></div></div>`, null, true);
+  if(!navigator.onLine){ document.getElementById('rd-lk-body').innerHTML = '<div class="rd-empty">目前沒有網路，連上網路後再查。</div>'; return; }
+  const gen = (_RD.lkGen = (_RD.lkGen || 0) + 1);
+  const put = html => { if(gen === _RD.lkGen){ const b = document.getElementById('rd-lk-body'); if(b) b.innerHTML = html; } };
+  (tab === 'dict' ? _rdDict(word || text, cjk) : tab === 'wiki' ? _rdWiki(cjk ? word || text : text, cjk) : _rdTranslate(text, cjk))
+    .then(put).catch(e => put(`<div class="rd-empty">查不到（${esc(e.message || String(e))}）</div>`));
+}
+async function _rdJson(url, opts){
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 12000);
+  try{
+    const r = await fetch(url, { ...(opts || {}), signal:ctl.signal });
+    if(r.status === 404) return null;
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  }catch(e){ if(e.name === 'AbortError') throw new Error('連線逾時'); throw e; }
+  finally{ clearTimeout(to); }
+}
+async function _rdDict(w, cjk){
+  if(cjk){
+    w = w.slice(0, 8);
+    const j = await _rdJson('https://www.moedict.tw/uni/' + encodeURIComponent(w));
+    if(!j || !j.heteronyms?.length) return `<div class="rd-empty">萌典沒有「${esc(w)}」這個詞。可以試試「維基百科」，或選短一點的詞。</div>`;
+    return j.heteronyms.slice(0, 3).map(h => `<div class="rd-dict">
+      <div class="rd-dict-hd"><b>${esc(j.title || w)}</b>${h.bopomofo ? `<span>${esc(h.bopomofo)}</span>` : ''}${h.pinyin ? `<span>${esc(h.pinyin)}</span>` : ''}</div>
+      <ol>${(h.definitions || []).slice(0, 8).map(d => `<li>${d.type ? `<em>${esc(d.type)}</em>` : ''}${esc(d.def || '')}
+        ${(d.example || []).slice(0, 1).map(x => `<div class="rd-dict-ex">${esc(x)}</div>`).join('')}</li>`).join('')}</ol></div>`).join('')
+      + `<div class="rd-src">資料：萌典（教育部《重編國語辭典修訂本》）· <a href="https://www.moedict.tw/${encodeURIComponent(w)}" target="_blank" rel="noopener">開啟網頁</a></div>`;
+  }
+  w = w.split(' ')[0].toLowerCase();
+  const j = await _rdJson('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(w));
+  if(!j || !j.length) return `<div class="rd-empty">字典沒有「${esc(w)}」。可以試試「翻譯」。</div>`;
+  const e = j[0], ph = e.phonetic || e.phonetics?.find(x => x.text)?.text || '';
+  return `<div class="rd-dict"><div class="rd-dict-hd"><b>${esc(e.word)}</b>${ph ? `<span>${esc(ph)}</span>` : ''}</div>
+    ${(e.meanings || []).slice(0, 4).map(m => `<div class="rd-dict-pos">${esc(m.partOfSpeech || '')}</div><ol>${(m.definitions || []).slice(0, 3).map(d => `<li>${esc(d.definition || '')}${d.example ? `<div class="rd-dict-ex">${esc(d.example)}</div>` : ''}</li>`).join('')}</ol>`).join('')}</div>
+    <div class="rd-src">資料：Free Dictionary API（Wiktionary）· 英文解釋看不懂可以按「翻譯」</div>`;
+}
+async function _rdWiki(q, cjk){
+  const host = cjk ? 'zh.wikipedia.org' : 'en.wikipedia.org';
+  const s = await _rdJson(`https://${host}/w/api.php?action=query&format=json&origin=*&list=search&srlimit=5&srsearch=${encodeURIComponent(q.slice(0, 80))}`);
+  const hits = s?.query?.search || [];
+  if(!hits.length) return `<div class="rd-empty">維基百科找不到「${esc(q)}」。</div>`;
+  const j = await _rdJson(`https://${host}/api/rest_v1/page/summary/${encodeURIComponent(hits[0].title)}`, cjk ? { headers:{ 'Accept-Language':'zh-TW' } } : undefined);
+  const url = j?.content_urls?.mobile?.page || `https://${host}/wiki/${encodeURIComponent(hits[0].title)}`;
+  return `<div class="rd-wiki"><b>${esc(j?.title || hits[0].title)}</b>${j?.description && !cjk ? `<small>${esc(j.description)}</small>` : ''}
+    <p>${esc(j?.extract || '（沒有摘要）')}</p></div>
+    ${hits.length > 1 ? `<div class="rd-wiki-more">其他：${hits.slice(1).map(h => `<button onclick="_rdLookup(${esc(JSON.stringify(h.title))},'wiki')">${esc(h.title)}</button>`).join('')}</div>` : ''}
+    <div class="rd-src">資料：維基百科（CC BY-SA，內容可能有誤，考試以法條、教材為準）· <a href="${esc(url)}" target="_blank" rel="noopener">開啟網頁</a></div>`;
+}
+async function _rdTranslate(text, cjk){
+  const pair = cjk ? 'zh-TW|en' : 'en|zh-TW';
+  const j = await _rdJson('https://api.mymemory.translated.net/get?langpair=' + encodeURIComponent(pair) + '&q=' + encodeURIComponent(text.slice(0, 480)));
+  const t = j?.responseData?.translatedText;
+  if(!t || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(t)) throw new Error(t ? '今天的免費翻譯額度用完了' : '沒有結果');
+  return `<div class="rd-tr">${esc(t)}</div>
+    <div class="rd-src">${cjk ? '中 → 英' : '英 → 中'}　資料：MyMemory 免費翻譯（每天有字數上限，機器翻譯僅供參考）·
+      <a href="https://translate.google.com/?sl=auto&tl=${cjk ? 'en' : 'zh-TW'}&text=${encodeURIComponent(text)}" target="_blank" rel="noopener">用 Google 翻譯開啟</a></div>`;
+}
+
+// ── 自訂字型（存在這台裝置的另一個小資料庫，不進備份；字型檔動輒幾 MB）────────
+const _RDF = { db:null, list:[], urls:new Map(), ready:false };
+function _rdFontDB(){
+  return _RDF.db || (_RDF.db = new Promise((res, rej) => {
+    const r = indexedDB.open('yc-reader-fonts', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('fonts', { keyPath:'id' });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+}
+function _rdFontTx(mode, fn){
+  return _rdFontDB().then(db => new Promise((res, rej) => {
+    const tx = db.transaction('fonts', mode), st = tx.objectStore('fonts');
+    const q = fn(st);
+    tx.oncomplete = () => res(q?.result); tx.onerror = () => rej(tx.error);
+  }));
+}
+async function _rdFontsReady(){
+  if(_RDF.ready) return;
+  try{
+    _RDF.list = (await _rdFontTx('readonly', st => st.getAll())) || [];
+    for(const f of _RDF.list) if(f.blob && !_RDF.urls.has(f.id)) _RDF.urls.set(f.id, URL.createObjectURL(f.blob));
+    // 設定面板的按鈕也用該字型顯示名稱
+    for(const f of _RDF.list){ try{ const ff = new FontFace('ycf-' + f.id, `url(${_RDF.urls.get(f.id)})`); document.fonts.add(ff); ff.load().catch(()=>{}); }catch(_){} }
+  }catch(e){ logError('rdFonts', e); }
+  _RDF.ready = true;
+}
+function _rdFontImport(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2';
+  inp.onchange = () => inp.files[0] && _rdFontAdd(inp.files[0]);
+  inp.click();
+}
+async function _rdFontAdd(f){
+  {
+    if(!/\.(ttf|otf|woff2?)$/i.test(f.name)){ toast('請選 TTF、OTF、WOFF 字型檔'); return; }
+    if(f.size > 40 * 1024 * 1024){ toast('字型檔太大（超過 40MB）'); return; }
+    const id = 'f' + Date.now().toString(36);
+    const name = f.name.replace(/\.(ttf|otf|woff2?)$/i, '').slice(0, 24);
+    try{
+      const ff = new FontFace('ycf-' + id, await f.arrayBuffer());
+      await ff.load();                                   // 先確認真的是能用的字型
+      document.fonts.add(ff);
+      await _rdFontTx('readwrite', st => st.put({ id, name, blob:f, at:Date.now() }));
+      _RDF.list.push({ id, name, blob:f }); _RDF.urls.set(id, URL.createObjectURL(f));
+      toast('已匯入字型：' + name);
+      _rdSet('font', 'u:' + id);
+    }catch(e){ toast('這個字型檔讀不了：' + (e.message || e)); }
+  }
+}
+async function _rdFontDel(id){
+  const f = _RDF.list.find(x => x.id === id); if(!f) return;
+  if(!await askConfirm('刪除字型', '刪除「' + f.name + '」？（只刪這台裝置裡的字型檔）', '刪除')) return;
+  await _rdFontTx('readwrite', st => st.delete(id));
+  _RDF.list = _RDF.list.filter(x => x.id !== id);
+  if(_RDF.urls.has(id)){ URL.revokeObjectURL(_RDF.urls.get(id)); _RDF.urls.delete(id); }
+  if(_RD.prefs.font === 'u:' + id) _rdSet('font', 'sans'); else _rdAa();
+}
+
+// ── 工具面板（⋯）──────────────────────────────────────────────────
+function _rdTools(){
+  const sh = document.getElementById('rd-tools'); if(!sh) return;
+  const p = _RD.prefs, r = _RD.rec;
+  const today = _rdToday(), sec = (r.readDays || {})[today] || 0;
+  const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return _rdToday(d); });
+  const max = Math.max(60, ...days.map(d => (r.readDays || {})[d] || 0));
+  sh.innerHTML = `<div class="rd-grab"></div>
+    <div class="rd-tool-grid">
+      <button class="${p.ruler ? 'on' : ''}" ${_RD.fixed ? 'disabled' : ''} onclick="_rdRulerShow(!_RD.prefs.ruler);_rdTools()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="9" width="20" height="6" rx="1.5"/><path d="M6 9v3M10 9v2M14 9v3M18 9v2"/></svg><span>閱讀尺</span><small>${p.ruler ? '開' : '關'}</small></button>
+      <button ${_RD.fixed ? 'disabled' : ''} onclick="_rdCloseLayers();_rdSpeedOpen()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span>速讀</span><small>一次一段</small></button>
+      <button onclick="_rdCloseLayers();_rdSplitPick()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg><span>並排閱讀</span><small>${_RD2.view ? '關閉並排' : '再開一本'}</small></button>
+      <button onclick="_rdCloseLayers();_rdLookupAsk()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M9 7h6M9 11h4"/></svg><span>查字典</span><small>萌典・維基</small></button>
+    </div>
+    <div class="rd-stat">
+      <div class="rd-stat-hd"><b>閱讀時間</b><span>這本累計 ${_rdFmtSec(r.readSec || 0)}　·　今天 ${_rdFmtSec(sec)}</span></div>
+      <div class="rd-stat-bars">${days.map(d => { const v = (r.readDays || {})[d] || 0; return `<div><i style="height:${Math.round(v / max * 100)}%"></i><small>${d.slice(8)}</small></div>`; }).join('')}</div>
+      <div class="rd-hint">只算書開著、而且最近 3 分鐘內有翻頁或點畫面的時間。</div>
+    </div>`;
+  sh.classList.add('on'); document.getElementById('rd-scrim')?.classList.add('on');
+}
+async function _rdLookupAsk(){
+  const q = await askInput('查字典', '輸入要查的詞（中文查萌典，英文查英文字典）', '');
+  if(q && q.trim()) _rdLookup(q.trim());
+}
+
+// ── 閱讀時間 ───────────────────────────────────────────────────────
+function _rdToday(d){ d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function _rdFmtSec(s){ s = Math.round(s || 0); if(s < 60) return s ? '不到 1 分鐘' : '0 分鐘'; const m = Math.round(s / 60); return m < 60 ? m + ' 分鐘' : Math.floor(m / 60) + ' 小時 ' + (m % 60) + ' 分'; }
+function _rdTimerStart(){
+  clearInterval(_RD.timer);
+  _RD.act = Date.now(); _RD.pend = 0;
+  _RD.timer = setInterval(() => {
+    if(document.visibilityState === 'visible' && Date.now() - (_RD.act || 0) < 180000) _RD.pend = (_RD.pend || 0) + 15;
+    if(_RD.pend >= 60) _rdSaveSoon();
+  }, 15000);
+}
+function _rdAddTime(b){
+  const add = _RD.pend || 0; if(!add) return;
+  _RD.pend = 0;
+  b.readSec = (b.readSec || 0) + add;
+  const days = { ...(b.readDays || {}) }, t = _rdToday();
+  days[t] = (days[t] || 0) + add;
+  const keys = Object.keys(days).sort();
+  while(keys.length > 120) delete days[keys.shift()];        // 只留最近約 4 個月
+  b.readDays = days;
+}
+
+// ── 閱讀尺：一條橫帶，其他地方變暗；右邊的把手可上下拖 ───────────────
+function _rdRulerShow(on){
+  _RD.prefs.ruler = !!on; _rdSavePrefs();
+  let el = document.getElementById('rd-ruler');
+  if(!on){ el?.remove(); return; }
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'rd-ruler'; el.className = 'rd-ruler';
+    el.innerHTML = '<i class="rd-ruler-grip" aria-label="拖曳閱讀尺"></i>';
+    document.querySelector('#book-reader-ov .rd-stage')?.appendChild(el);
+    const g = el.firstChild;
+    g.addEventListener('pointerdown', e => {
+      e.preventDefault(); g.setPointerCapture(e.pointerId);
+      const st = el.parentElement.getBoundingClientRect();
+      const mv = ev => { _RD.prefs.rulerY = Math.min(.95, Math.max(.03, (ev.clientY - st.top) / st.height)); _rdRulerPlace(); };
+      const up = () => { g.removeEventListener('pointermove', mv); g.removeEventListener('pointerup', up); _rdSavePrefs(); };
+      g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up);
+    });
+  }
+  _rdRulerPlace();
+}
+function _rdRulerPlace(){
+  const el = document.getElementById('rd-ruler'); if(!el || !_RD.prefs) return;
+  const p = _RD.prefs, h = Math.round(p.fontSize * p.lineHeight * 2 + 8);
+  el.style.height = h + 'px';
+  el.style.top = `calc(${((p.rulerY ?? .4) * 100).toFixed(2)}% - ${h / 2}px)`;
+}
+
+// ── 速讀：從這頁開始，一次顯示一小段，固定節奏往下走（Readest 的 speed reading）────
+const _RDS = { chunks:[], i:0, on:false, t:null };
+function _rdChunks(paras){
+  const out = [];
+  paras.forEach((p, pi) => {
+    const parts = p.text.match(/[^，。、；：！？,.;:!?]+[，。、；：！？,.;:!?」』）)]*|[，。、；：！？,.;:!?]+/g) || [p.text];
+    for(let s of parts){
+      s = s.trim(); if(!s) continue;
+      if(_RD_CJK.test(s)){
+        while(s.length > 9){ const n = s.length > 14 ? 6 : Math.ceil(s.length / 2); out.push({ t:s.slice(0, n), pi }); s = s.slice(n); }
+        out.push({ t:s, pi });
+      } else s.split(/\s+/).forEach(w => w && out.push({ t:w, pi }));
+    }
+  });
+  return out;
+}
+function _rdSpeedOpen(){
+  const paras = _RD_TTS.paras(true);
+  if(!paras.length){ toast('這頁沒有文字可以速讀'); return; }
+  _RDS.paras = paras; _RDS.chunks = _rdChunks(paras); _RDS.i = 0;
+  const ov = document.createElement('div');
+  ov.id = 'rd-speed'; ov.className = 'rd-speed';
+  ov.innerHTML = `<div class="rd-speed-top"><span id="rd-speed-pos"></span><button class="rd-ib sm" onclick="_rdSpeedClose()" aria-label="關閉">✕</button></div>
+    <div class="rd-speed-word" id="rd-speed-word" onclick="_rdSpeedToggle()"></div>
+    <div class="rd-speed-ctx" id="rd-speed-ctx"></div>
+    <div class="rd-speed-ctl">
+      <button class="rd-ib" onclick="_rdSpeedStep(-10)" aria-label="倒退">${_RD_ICO.prev}</button>
+      <button class="rd-speed-play" id="rd-speed-play" onclick="_rdSpeedToggle()">▶</button>
+      <button class="rd-ib" onclick="_rdSpeedStep(10)" aria-label="快轉">${_RD_ICO.next}</button>
+    </div>
+    <div class="rd-speed-rate"><span>慢</span><input type="range" min="150" max="1200" step="50" value="${_RD.prefs.speedCpm || 400}" oninput="_RD.prefs.speedCpm=+this.value;document.getElementById('rd-speed-cpm').textContent=this.value" onchange="_rdSavePrefs()"><span>快</span><b><i id="rd-speed-cpm">${_RD.prefs.speedCpm || 400}</i> 字／分</b></div>
+    <div class="rd-hint" style="text-align:center">點中間的字暫停／繼續；關掉時書會停在讀到的那一段</div>`;
+  document.getElementById('book-reader-ov')?.appendChild(ov);
+  _rdHideBars();
+  _rdSpeedShow();
+}
+function _rdSpeedShow(){
+  const c = _RDS.chunks[_RDS.i]; if(!c) return;
+  const w = document.getElementById('rd-speed-word'); if(w) w.textContent = c.t;
+  const pos = document.getElementById('rd-speed-pos'); if(pos) pos.textContent = `${_RDS.i + 1} / ${_RDS.chunks.length}　·　${_RD.loc?.tocItem?.label || ''}`;
+  const ctx = document.getElementById('rd-speed-ctx'); if(ctx) ctx.textContent = (_RDS.paras[c.pi]?.text || '').slice(0, 120);
+}
+function _rdSpeedToggle(){ _RDS.on ? _rdSpeedPause() : _rdSpeedPlay(); }
+function _rdSpeedPlay(){
+  _RDS.on = true; const b = document.getElementById('rd-speed-play'); if(b) b.textContent = '❚❚';
+  const tick = async () => {
+    if(!_RDS.on) return;
+    _RD.act = Date.now();
+    if(_RDS.i >= _RDS.chunks.length - 1){
+      // 這章讀完 → 換下一章接著讀
+      const ok = await _RD_TTS.next();
+      const paras = ok ? _RD_TTS.paras(false) : [];
+      if(!paras.length || !_RDS.on){ _rdSpeedPause(); if(!ok) toast('讀完了'); return; }
+      _RDS.paras = paras; _RDS.chunks = _rdChunks(paras); _RDS.i = 0;
+    } else _RDS.i++;
+    _rdSpeedShow();
+    const c = _RDS.chunks[_RDS.i], cpm = _RD.prefs.speedCpm || 400;
+    const n = _RD_CJK.test(c.t) ? c.t.replace(/[，。、；：！？「」『』（）\s]/g, '').length : 2.2;
+    let ms = Math.max(160, n / cpm * 60000);
+    if(/[。！？.!?]$/.test(c.t)) ms *= 1.7; else if(/[，、；：,;:]$/.test(c.t)) ms *= 1.3;
+    _RDS.t = setTimeout(tick, ms);
+  };
+  clearTimeout(_RDS.t); _RDS.t = setTimeout(tick, 400);
+}
+function _rdSpeedPause(){ _RDS.on = false; clearTimeout(_RDS.t); const b = document.getElementById('rd-speed-play'); if(b) b.textContent = '▶'; }
+function _rdSpeedStep(n){ _RDS.i = Math.min(_RDS.chunks.length - 1, Math.max(0, _RDS.i + n)); _rdSpeedShow(); }
+function _rdSpeedClose(silent){
+  _rdSpeedPause();
+  const ov = document.getElementById('rd-speed'); if(!ov) return;
+  ov.remove();
+  if(silent) return;
+  const c = _RDS.chunks[_RDS.i], el = c && _RDS.paras[c.pi]?.el;
+  if(el) _RD_TTS.show(el);                                   // 書翻到讀到的那一段
+}
+
+// ── 並排閱讀：再開一本，左右（橫放）或上下（直放）對照，例如教科書對法條 ──────────
+const _RD2 = { view:null, rec:null, loc:null, saveT:null };
+function _rdSplitPick(){
+  if(_RD2.view){ _rdSplitClose(); return; }
+  const list = (_B.allBooks || []).filter(b => b.id !== _RD.id && rdSupports(b.fileType))
+    .sort((a, b) => (b.lastRead || 0) - (a.lastRead || 0));
+  const side = document.getElementById('rd-side'); if(!side) return;
+  side.dataset.tab = 'split';
+  side.innerHTML = `<div class="rd-side-hd"><b style="flex:1;padding-left:4px">選一本並排閱讀</b><button class="rd-ib sm" onclick="_rdCloseLayers()" aria-label="關閉">✕</button></div>
+    <div class="rd-side-body">${list.length ? list.map(b => `<button class="rd-toc-it" onclick="_rdSplitOpen(${+b.id})">${esc(b.title || '未命名')}<small style="display:block;color:var(--rd-sub);font-size:12px">${esc((b.fileType || '').toUpperCase())}${b.author ? '・' + esc(b.author) : ''}${_bookPct?.(b) ? '・已讀 ' + _bookPct(b) + '%' : ''}</small></button>`).join('')
+      : '<div class="rd-empty">書庫裡沒有其他可以開的書。</div>'}</div>`;
+  side.classList.add('on'); document.getElementById('rd-scrim')?.classList.add('on');
+}
+async function _rdSplitOpen(id){
+  _rdCloseLayers(); _rdHideBars();
+  const rec = await dg('ebooks', id);
+  if(!rec?.blob){ toast('這本書沒有檔案'); return; }
+  const ov = document.getElementById('book-reader-ov'); if(!ov) return;
+  _rdSplitClose(true);
+  const wide = innerWidth > innerHeight;
+  ov.classList.add('rd-split', wide ? 'rd-split-h' : 'rd-split-v');
+  const pane = document.createElement('div');
+  pane.className = 'rd-pane2'; pane.id = 'rd-pane2';
+  pane.innerHTML = `<div class="rd-pane2-hd"><b>${esc(rec.title || '')}</b><span id="rd-pane2-pct"></span>
+    <button class="rd-ib sm" onclick="_rdSplitClose()" aria-label="關閉並排">✕</button></div><div class="rd-pane2-stage"><div class="rd-loading"><div class="rd-spin"></div></div></div>`;
+  ov.querySelector('.rd-stage').after(pane);
+  try{
+    const view = document.createElement('foliate-view');
+    pane.querySelector('.rd-pane2-stage').prepend(view);
+    Object.assign(_RD2, { view, rec, loc:null });
+    await view.open(new File([rec.blob], 'book.' + (rec.fileType || 'epub')));
+    if(_RD2.view !== view) return;
+    view.addEventListener('relocate', e => {
+      _RD2.loc = e.detail;
+      const el = document.getElementById('rd-pane2-pct');
+      if(el) el.textContent = Math.round((e.detail.fraction || 0) * 100) + '%';
+      clearTimeout(_RD2.saveT); _RD2.saveT = setTimeout(_rdSplitSave, 1500);
+    });
+    view.addEventListener('load', ({ detail:{ doc } }) => {
+      doc.addEventListener('click', e => {
+        if(e.target.closest?.('a[href]')) return;
+        const sel = doc.getSelection?.(); if(sel && !sel.isCollapsed) return;
+        const fr = doc.defaultView.frameElement?.getBoundingClientRect(), vr = view.getBoundingClientRect();
+        const x = (fr ? fr.left : 0) + e.clientX - vr.left;
+        if(x < vr.width * .4) view.goLeft(); else if(x > vr.width * .6) view.goRight();
+      });
+    });
+    _rdApplyLayout(view);
+    if(!view.isFixedLayout) view.renderer.setStyles?.(_rdBookCSS());
+    try{ await view.init({ lastLocation: rec.lastCfi || undefined }); }catch(_){ await view.init({}); }
+    pane.querySelector('.rd-loading')?.remove();
+  }catch(e){ toast('這本打不開：' + (e.message || e)); _rdSplitClose(true); }
+}
+async function _rdSplitSave(){
+  const r = _RD2.rec, l = _RD2.loc; if(!r || !l?.cfi) return;
+  try{
+    const b = await dg('ebooks', r.id); if(!b) return;
+    b.lastCfi = l.cfi; b.progress = Math.round((l.fraction || 0) * 10000) / 10000; b.lastRead = Date.now();
+    await dp('ebooks', b);
+    const i = (_B.allBooks || []).findIndex(x => x.id === r.id);
+    if(i >= 0) Object.assign(_B.allBooks[i], { lastCfi:b.lastCfi, progress:b.progress, lastRead:b.lastRead });
+  }catch(_){}
+}
+function _rdSplitClose(silent){
+  if(_RD2.saveT){ clearTimeout(_RD2.saveT); _RD2.saveT = null; _rdSplitSave(); }
+  try{ _RD2.view?.close?.(); }catch(_){}
+  _RD2.view = null; _RD2.rec = null; _RD2.loc = null;
+  document.getElementById('rd-pane2')?.remove();
+  document.getElementById('book-reader-ov')?.classList.remove('rd-split', 'rd-split-h', 'rd-split-v');
 }

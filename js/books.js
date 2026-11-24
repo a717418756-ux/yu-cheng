@@ -71,6 +71,9 @@ async function renderBooks(){
     // 載入書架排序（從 DB settings，含舊 localStorage 自動遷移）
     _B.bookOrder = await _loadBooksOrder();
     _B.allBooks = await _getBooksMetaList();
+    _B.view = await getSetting('books_view', 'shelf');
+    _B.sort = await getSetting('books_sort', 'custom');
+    _booksDropInit();
     _renderBooksPage();
     // v4.59：沒有封面的 EPUB／PDF 等，從檔案補上封面與書背（背景慢慢做，只做一次）
     if(typeof rdAutoCovers === 'function') setTimeout(() => rdAutoCovers().catch(()=>{}), 900);
@@ -164,10 +167,14 @@ function _renderBooksPage(){
 
   const batch = filtered.slice(0, (_B.page+1)*_B.PAGE);
 
-  // 只保留書架模式（spine）
-  const shelfEl = _mkShelf(batch, filtered.length);
-  el.appendChild(shelfEl);
-  if(_sortMode) _enableDragSort(shelfEl, _B.allBooks);
+  // v4.60：書架（書背）或封面格；拖曳排序只在書架
+  if(_B.view === 'grid' && !_sortMode){
+    el.appendChild(_mkGrid(batch));
+  } else {
+    const shelfEl = _mkShelf(batch, filtered.length);
+    el.appendChild(shelfEl);
+    if(_sortMode) _enableDragSort(shelfEl, _B.allBooks);
+  }
 
   // 批量模式：底部確認列
   if(_B.bulkMode){
@@ -215,7 +222,7 @@ function _mkRecentSection(books){
       <div class="shelf-hero-title">${esc(first.title || '未命名')}</div>
       ${first.author ? `<div class="shelf-hero-author">${esc(first.author)}</div>` : ''}
       <div class="shelf-hero-prog"><i style="width:${pct}%"></i></div>
-      <div class="shelf-hero-meta">${pct ? '已讀 ' + pct + '%' : '還沒開始'}${first.lastRead ? '　·　' + _bookAgo(first.lastRead) : ''}</div>
+      <div class="shelf-hero-meta">${pct ? '已讀 ' + pct + '%' : '還沒開始'}${first.lastRead ? '　·　' + _bookAgo(first.lastRead) : ''}${_booksTodaySec() >= 60 ? '　·　今天讀了 ' + Math.round(_booksTodaySec() / 60) + ' 分鐘' : ''}</div>
       <button class="shelf-hero-btn" onclick="openBookReader(${+first.id})">${pct ? '接著讀' : '開始閱讀'}</button>
     </div>`;
   _bookCoverInto(hero.querySelector('.shelf-hero-cover'), first);
@@ -247,6 +254,11 @@ function _mkRecentSection(books){
     wrap.appendChild(row);
   }
   return wrap;
+}
+// 今天所有書加起來讀了幾秒（新閱讀器記在每本書的 readDays）
+function _booksTodaySec(){
+  const d = new Date(), k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return (_B.allBooks || []).reduce((s, b) => s + ((b.readDays || {})[k] || 0), 0);
 }
 // 閱讀進度 0～100（新閱讀器存 progress；舊的 txt 沒有）
 function _bookPct(b){
@@ -282,8 +294,100 @@ function _mkModeBar(){
       <span style="color:rgba(255,200,80,0.3);font-size:14px;padding:0 4px">｜</span>
       <button class="shelf-section-tab${isShowingFav?' on':''}"
         onclick="toggleShelfSection('fav')">收藏</button>
+    </div>
+    <div class="shelf-tools">
+      <select class="shelf-sort" onchange="_booksSetSort(this.value)" aria-label="排序">
+        ${[['custom','自訂順序'],['recent','最近閱讀'],['title','書名'],['progress','閱讀進度'],['added','加入時間']]
+          .map(([v,n])=>`<option value="${v}"${(_B.sort||'custom')===v?' selected':''}>${n}</option>`).join('')}
+      </select>
+      <div class="shelf-view-seg">
+        <button class="${_B.view!=='grid'?'on':''}" onclick="_booksSetView('shelf')" aria-label="書架" title="書架"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v16M8 6v14M12 4v16M17 6l3 14M2 20h20"/></svg></button>
+        <button class="${_B.view==='grid'?'on':''}" onclick="_booksSetView('grid')" aria-label="封面" title="封面"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="9" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+      </div>
     </div>`;
   return bar;
+}
+
+function _booksSetSort(v){
+  _B.sort = v; _B.page = 0;
+  setSetting('books_sort', v).catch(()=>{});
+  if(v !== 'custom' && _sortMode){ const b = document.getElementById('books-sort-btn'); if(b) toggleBooksSort(b); return; }
+  _renderBooksPage();
+}
+function _booksSetView(v){
+  _B.view = v; _B.page = 0;
+  setSetting('books_view', v).catch(()=>{});
+  _renderBooksPage();
+}
+// 封面格（Readest 式）：封面、進度、書名、作者、格式
+function _mkGrid(books){
+  const g = document.createElement('div');
+  g.className = 'book-grid';
+  books.forEach(b => {
+    const card = document.createElement('div');
+    card.className = 'book-grid-card';
+    if(_B.bulkMode && _B.bulkSelected.has(b.id)) card.style.outline = '3px solid var(--acc)';
+    const pct = _bookPct(b);
+    card.innerHTML = `<div class="book-grid-cover"></div>
+      <div class="shelf-recent-prog"><i style="width:${pct}%"></i></div>
+      <div class="book-grid-title">${esc(b.title || '未命名')}</div>
+      <div class="book-grid-sub">${b.favorite ? '<span class="fav">♥</span>' : ''}<span>${esc((b.fileType || '').toUpperCase() || '—')}</span>${pct ? `<span>${pct}%</span>` : ''}${b.author ? `<span class="au">${esc(b.author)}</span>` : ''}</div>`;
+    _bookCoverInto(card.querySelector('.book-grid-cover'), b);
+    card.onclick = () => _B.bulkMode ? _toggleBookSelect(b.id, card) : openBookCover(b.id);
+    g.appendChild(card);
+  });
+  return g;
+}
+
+// ── 一次匯入多本（v4.60）：每本從檔案讀書名、作者、封面；TXT 用檔名當書名 ──
+function _booksBatchPick(){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.multiple = true;
+  inp.accept = '.pdf,.epub,.txt,.mobi,.azw3,.azw,.fb2,.fbz,.cbz';
+  inp.onchange = () => { document.getElementById('add-book-ov')?.remove(); _booksImport([...inp.files]); };
+  inp.click();
+}
+async function _booksImport(files){
+  const ok = ['pdf','epub','txt','mobi','azw3','azw','fb2','fbz','cbz'];
+  files = files.filter(f => ok.includes(f.name.split('.').pop().toLowerCase()));
+  if(!files.length){ toast('沒有可以匯入的電子書檔（EPUB、PDF、MOBI、AZW3、FB2、CBZ、TXT）'); return; }
+  const have = new Set((_B.allBooks || []).map(b => (b.title || '') + '|' + (b.fileSize || 0)));
+  let n = 0, skip = 0;
+  for(let i = 0; i < files.length; i++){
+    const f = files[i], ext = f.name.split('.').pop().toLowerCase();
+    toast(`匯入中 ${i + 1} / ${files.length}：${f.name}`);
+    let info = null, th = null;
+    if(typeof rdSupports === 'function' && rdSupports(ext)){
+      try{ info = await rdBookInfo(f, ext); }catch(_){}
+      try{ th = await rdMakeThumbs(info?.cover, {}); }catch(_){}
+    }
+    const title = (info?.title || f.name.replace(/\.[^.]+$/, '')).slice(0, 200);
+    if(have.has(title + '|' + f.size)){ skip++; continue; }           // 同書名、同大小：當成已經有了
+    const d = _BOOK_DEFAULT_MM;
+    await dp('ebooks', {
+      title, author:(info?.author || '').slice(0, 120), category:'', fileType:ext, fileSize:f.size, blob:f,
+      coverThumb:th?.coverThumb || null, spineThumb:th?.spineThumb || null, hasSpineImg:false,
+      ...(th ? { coverAuto:1 } : {}), coverTried:1,
+      thickMM:d.thickMM, heightMM:d.heightMM, widthMM:d.widthMM,
+      tags:[], favorite:false, lastRead:null, lastPage:0, createdAt:Date.now(),
+    });
+    have.add(title + '|' + f.size); n++;
+  }
+  toast(`已匯入 ${n} 本` + (skip ? `，${skip} 本書庫裡已經有了（略過）` : ''));
+  renderBooks();
+}
+// 電腦、平板：把檔案拖進書庫就匯入
+function _booksDropInit(){
+  const pg = document.getElementById('pg-books');
+  if(!pg || pg._dropOn) return;
+  pg._dropOn = true;
+  pg.addEventListener('dragover', e => { if([...(e.dataTransfer?.types || [])].includes('Files')){ e.preventDefault(); pg.classList.add('book-drop'); } });
+  pg.addEventListener('dragleave', e => { if(e.target === pg || !pg.contains(e.relatedTarget)) pg.classList.remove('book-drop'); });
+  pg.addEventListener('drop', e => {
+    if(!e.dataTransfer?.files?.length) return;
+    e.preventDefault(); pg.classList.remove('book-drop');
+    _booksImport([...e.dataTransfer.files]);
+  });
 }
 
 // 藏書 / 收藏 切換
@@ -501,6 +605,10 @@ function _pullBook(id, el){
 function _filteredBooks(){
   const kw = _B.kw.toLowerCase();
   let list = _getSortedBooks(_B.allBooks);
+  // v4.60 排序：自訂（拖曳排的順序）／最近閱讀／書名／進度／加入時間
+  const S = { recent:(a,b)=>(b.lastRead||0)-(a.lastRead||0), title:(a,b)=>String(a.title||'').localeCompare(String(b.title||''),'zh-Hant'),
+              progress:(a,b)=>(+b.progress||0)-(+a.progress||0), added:(a,b)=>(b.createdAt||0)-(a.createdAt||0) }[_B.sort];
+  if(S && !_sortMode) list = [...list].sort(S);
   if(_B.filter==='recent') list=[...list].filter(b=>b.lastRead).sort((a,b)=>(b.lastRead||0)-(a.lastRead||0));
   else if(_B.filter==='fav')  list=list.filter(b=>b.favorite);
   else if(_B.filter==='pdf')  list=list.filter(b=>b.fileType==='pdf');
@@ -639,6 +747,7 @@ function openAddBook(){
         輸入實際書本尺寸（mm）。預設為 A5 平裝書（210×148mm，厚20mm）
       </div>
 
+      <button onclick="_booksBatchPick()" class="ab-batch">📚 一次匯入多本<small>可多選檔案，自動帶入書名、作者、封面；之後再到書籍資訊修改</small></button>
       <label style="font-size:11px;color:var(--t2);display:flex;align-items:center;
         gap:8px;margin-bottom:16px">
         <button onclick="document.getElementById('ab-file-inp').click()"
@@ -677,7 +786,8 @@ async function _abFileChosen(inp){
     const info = await rdBookInfo(f, ext);
     if(inp.files[0] !== f) return;
     const t = document.getElementById('ab-title'), a = document.getElementById('ab-author');
-    if(info?.title && t && !t.value.trim()) t.value = info.title;
+    const tt = info?.title || f.name.replace(/\.[^.]+$/, '');   // PDF 用檔名
+    if(tt && t && !t.value.trim()) t.value = tt;
     if(info?.author && a && !a.value.trim()) a.value = info.author;
     if(info?.cover && !document.getElementById('ab-cover-inp')?.files[0]){
       window._abAutoCover = info.cover;
@@ -912,8 +1022,9 @@ async function openBookDetail(id){
           <div style="font-size:11px;color:var(--t2)">
             ${ext||'—'} · ${_fmtSize(book.fileSize||0)||'—'}
           </div>
-          ${_bookPct(book) || book.annos?.length || book.marks?.length ? `<div class="book-det-stat">
+          ${_bookPct(book) || book.annos?.length || book.marks?.length || book.readSec ? `<div class="book-det-stat">
             ${_bookPct(book) ? `<div class="shelf-hero-prog"><i style="width:${_bookPct(book)}%"></i></div><span>已讀 ${_bookPct(book)}%</span>` : ''}
+            ${book.readSec ? `<span>⏱ 讀了 ${typeof _rdFmtSec === 'function' ? _rdFmtSec(book.readSec) : Math.round(book.readSec / 60) + ' 分鐘'}</span>` : ''}
             ${book.annos?.length ? `<span>✎ ${book.annos.length} 則重點</span>` : ''}${book.marks?.length ? `<span>🔖 ${book.marks.length} 個書籤</span>` : ''}</div>` : ''}
           <button onclick="_openBookEdit(${id})"
             style="margin-top:8px;padding:4px 10px;font-size:11px;
