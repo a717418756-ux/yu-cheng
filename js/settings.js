@@ -723,7 +723,7 @@ async function removeGuessQs(){ try{
   renderSet();
 }catch(e){ logError('removeGuessQs', e); toast('移除失敗：' + e.message); }}
 
-async function renderSet(){  _renderAzureKey().catch(()=>{}); window._renderYtKey?.().catch(()=>{}); try{ _renderReviewAlgo(); }catch(e){} try{
+async function renderSet(){  _renderAzureKey().catch(()=>{}); _renderTtsEngine().catch(()=>{}); window._renderYtKey?.().catch(()=>{}); try{ _renderReviewAlgo(); }catch(e){} try{
   const[qs,ats,ls]=await Promise.all([da('questions'),da('attempts'),da('laws')]);
   const gRow = document.getElementById('guess-row'), gN = qs.filter(_isGuessQ).length;
   if(gRow){ gRow.style.display = gN ? '' : 'none'; const b = document.getElementById('guess-n'); if(b) b.textContent = gN; }
@@ -1268,6 +1268,59 @@ function _base64ToBlob(b64, mimeType='image/jpeg'){
   for(let i=0; i<bytes.length; i++) arr[i] = bytes.charCodeAt(i);
   return Promise.resolve(new Blob([arr], { type:mimeType }));
 }
+
+// ── 朗讀語音引擎（v4.61，只有 App）：目前用哪個系統語音引擎、中文聲音有幾個，一鍵開手機的語音設定 ──
+//   免費又自然：Google 語音服務的「中文（台灣）」高品質聲音；三星手機預設是三星引擎，換成 Google 通常比較自然
+async function _renderTtsEngine(){
+  const T = window.ycTtsNative, card = document.getElementById('tts-eng-card'), sec = document.getElementById('tts-eng-sec');
+  if(!T || !card){ return; }
+  sec.style.display = ''; card.style.display = '';
+  if(!card._bound){ card._bound = true; speechSynthesis.addEventListener?.('voiceschanged', () => window._renderTtsEngine()); }
+  let info = {};
+  try{ info = await T.engines(); }catch(_){}
+  const vs = (speechSynthesis.getVoices() || []).filter(v => v.lang === 'zh-TW');
+  const hq = vs.filter(v => (v.quality || 0) >= 400).length;
+  const isG = info.current === 'com.google.android.tts';
+  const NAMES = { 'com.google.android.tts':'Google 語音服務', 'com.samsung.SMT':'三星文字轉語音引擎' };
+  const nm = e => NAMES[e?.name] || e?.label || e?.name || '';
+  const label = nm({ name:info.current, label:info.currentLabel }) || '（沒有朗讀引擎）';
+  const others = (info.engines || []).filter(e => e.name !== info.current).map(nm).join('、');
+  const tip = isG
+    ? (vs.length ? '已經是 Google 語音服務，中文聲音免費、可離線。想換聲音，在「朗讀」面板的聲音選單裡選。'
+                 : '還沒有中文（台灣）聲音：按「下載語音」，在語言清單找「中文（台灣）」下載。')
+    : info.google
+      ? '建議改用「Google 語音服務」，中文聲音比較自然：①按「開啟語音設定」②「偏好引擎」選 Google 語音服務 ③回到 App 會自動套用。'
+      : '這台沒有 Google 語音服務。到 Play 商店免費安裝後，在語音設定把偏好引擎改成它，中文聲音會自然很多。';
+  card.innerHTML = `
+    <div class="tte-hd">
+      <div class="tte-ic">🗣</div>
+      <div class="tte-main"><small>目前的朗讀引擎</small><b>${esc(label)}</b></div>
+      <span class="tte-badge ${isG ? 'ok' : 'warn'}">${isG ? '✓ 推薦' : '可改善'}</span>
+    </div>
+    <div class="tte-stat"><span>中文（台灣）聲音 <b>${vs.length}</b> 個</span>${hq ? `<span>高品質 <b>${hq}</b> 個</span>` : ''}${others ? `<span>也裝了：${esc(others)}</span>` : ''}</div>
+    <div class="tte-tip">${tip}</div>
+    <div class="tte-btns">
+      ${!isG && !info.google ? `<button class="btn bp" onclick="_ttsEngAct('openStore')">安裝 Google 語音</button>` : `<button class="btn bp" onclick="_ttsEngAct('openSettings')">開啟語音設定</button>`}
+      <button class="btn bg" onclick="_ttsEngAct('installVoices')">下載語音</button>
+      <button class="btn bg" onclick="_ttsEngTry()">▶ 試聽</button>
+    </div>
+    <div class="tte-foot">系統語音免費、可離線；想要最自然的聲音，可在下方填 Azure 金鑰（每月 50 萬字免費）。</div>`;
+}
+async function _ttsEngAct(fn){
+  try{ await window.ycTtsNative[fn]({}); }catch(e){ toast(e.message || String(e)); }
+}
+function _ttsEngTry(){
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance('你好，這是目前的朗讀聲音。警察依法行使職權，以保障人民權益，維持公共秩序。');
+    u.lang = 'zh-TW';
+    const v = (speechSynthesis.getVoices() || []).filter(x => x.lang === 'zh-TW').sort((a, b) => (b.quality || 0) - (a.quality || 0))[0];
+    if(v) u.voice = v;
+    speechSynthesis.speak(u);
+  }catch(e){ toast('試聽失敗：' + (e.message || e)); }
+}
+window._ttsEngAct = _ttsEngAct; window._ttsEngTry = _ttsEngTry;   // 卡片按鈕的 onclick 要全域（settings.js 包在 IIFE 裡）
+window._renderTtsEngine = () => { if(!document.getElementById('pg-set')?.classList.contains('hide')) _renderTtsEngine().catch(()=>{}); };
 
 // ── Azure TTS Key 設定 ───────────────────────────────────────
 async function saveAzureKey(value){

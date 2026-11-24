@@ -221,13 +221,26 @@
     if(!live.size){ ss.speaking = false; ss.pending = false; }
     fire(u, e.type === 'error' ? 'error' : 'end', e.type === 'error' ? { error:'synthesis-failed' } : {});
   });
-  T.getVoices().then(r => {
-    voices = (r.voices || []).map(v => ({ voiceURI:v.name, name:v.lang + (v.local ? '' : '（需網路）') + '・' + v.name,
-      lang:v.lang, localService:!!v.local, default:v.name === r.default }));
+  // v4.61：聲音名稱改成看得懂的（中文（台灣）聲音 2・高品質・需網路），高品質排前面；換了引擎重讀清單
+  const LANG = { 'zh-TW':'中文（台灣）', 'zh-HK':'中文（香港）', 'zh-CN':'中文（大陸）', 'en-US':'英文（美國）', 'en-GB':'英文（英國）' };
+  const loadVoices = () => T.getVoices().then(r => {
+    const list = (r.voices || []).slice().sort((a, b) => (b.q || 0) - (a.q || 0) || (b.local ? 1 : 0) - (a.local ? 1 : 0));
+    const n = {};
+    voices = list.map(v => {
+      n[v.lang] = (n[v.lang] || 0) + 1;
+      const label = (LANG[v.lang] ? LANG[v.lang] + '聲音 ' : v.lang + ' 聲音 ') + n[v.lang] + ((v.q || 0) >= 400 ? '・高品質' : '') + (v.local ? '' : '・需網路');
+      return { voiceURI:v.name, name:label, lang:v.lang, localService:!!v.local, default:v.name === r.default, quality:v.q || 0 };
+    });
     const ev = new Event('voiceschanged');
     try{ if(typeof ss.onvoiceschanged === 'function') ss.onvoiceschanged(ev); }catch(e){ console.error(e); }
     ss.dispatchEvent(ev);
   }).catch(()=>{});
+  loadVoices();
+  T.addListener('engine', () => { loadVoices(); window._renderTtsEngine?.(); });
+  window.ycTtsNative = T;
+  window.ycTtsReload = loadVoices;
+  // 從手機設定回來（可能剛下載了聲音）：重讀聲音清單
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') loadVoices(); });
   window.speechSynthesis = ss;
   window.SpeechSynthesisUtterance = Utterance;
 })();
