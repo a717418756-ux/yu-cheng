@@ -1860,6 +1860,7 @@ async function renderDB(){  try{
   const PAGE = 50;
   let page = 0;
   el.innerHTML = '';
+  if(!kw && S.lawCat==='all' && !_dbSelMode) window.lrHome?.(el);   // v4.66 繼續閱讀、最近瀏覽
   artHits.sort((a,b)=>(a.lawName||'').localeCompare(b.lawName||'','zh-TW')
     || ((a.articleNumber||art2n(a.article||''))||0)-((b.articleNumber||art2n(b.article||''))||0)
     || (a.id||0)-(b.id||0));
@@ -1889,6 +1890,7 @@ async function renderDB(){  try{
           +'<div style="font-size:15px;font-weight:700;color:var(--t0)">'+esc(name)+'</div>'
           +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+catLabel+' · '+laws.length+' '+_lawUnit(laws)+(favCount?' · ⭐'+favCount:'')+'</div>'
           +orgLine
+          +(window.lrLine?.(name)||'')
           // 官網鈕放左側資訊區，與右側刪除鈕拉開距離，避免誤觸不可逆的刪除
           +'<button class="lw-gov" data-lawname="'+esc(name)+'" title="查全國法規資料庫原文">'
             +'🏛 官網原文</button>'
@@ -2394,6 +2396,7 @@ async function openLawGroup(lawName, full){  try{
       +'<div class="law-art-head">'
         +'<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'
         +'<div class="law-art-acts">'
+          +'<button onclick="lrCopy('+l.id+')" class="law-tts-btn" aria-label="複製這一條（含出處）" title="複製（含出處）">⧉</button>'
           +'<button onclick="ttsArt('+l.id+')" class="law-tts-btn" aria-label="朗讀這一條">🔊</button>'
           +'<button onclick="lnInk('+l.id+')" class="law-tts-btn law-ink-btn" aria-label="在這一條上手寫筆記" title="手寫筆記（可打字）">✍</button>'
           +'<button onclick="editLawInView('+l.id+')" class="law-edit-btn">✏</button>'
@@ -2552,6 +2555,7 @@ async function openLawGroup(lawName, full){  try{
   else if(!document.getElementById('lv-find').classList.contains('hide')) _lvFindRun();
   S.curLawName=lawName; // 供編輯按鈕使用
   document.getElementById('lv').style.display='flex';
+  window.lrOnOpen?.(lawName, !!_kw);   // v4.66 閱讀：回到上次那一條、目錄、條文引用可點
   }catch(e){ logError('openLawGroup',e); }}
 
 // ── 本法搜尋：在目前這部法規裡找字（反白、上下跳），或輸入條號直接跳到該條 ──
@@ -2617,6 +2621,7 @@ function _lvFindFlash(card){
 }
 
 function exitLaw(){
+  window.lrOnExit?.();   // v4.66 記下讀到哪一條
   closeLvFind();
   window.lnOnExit?.();   // v4.64 重點筆記：收起工具列、取消遮住
   document.getElementById('lv').style.display='none';

@@ -10,7 +10,7 @@
 const COLORS = ['#ff5a5a', '#ffd54a', '#4ade80', '#6ea8fe', '#111111', '#ffffff'];
 const CNAME  = { '#ff5a5a':'紅', '#ffd54a':'黃', '#4ade80':'綠', '#6ea8fe':'藍', '#111111':'黑', '#ffffff':'白' };
 const SIZES  = [1.6, 2.6, 4.5];
-const TSIZE  = { s:22, m:30, l:42 };            // 文字大小（畫布寬 800 時的字級）
+const TSIZE  = { s:36, m:50, l:70 };            // 文字大小（畫布寬 800 時的字級；手機上約 18／25／35px）
 const TOOLS  = [['pen', '✎ 筆'], ['line', '╱ 直線'], ['marker', '▭ 螢光'], ['eraser', '⌫ 橡皮'], ['text', 'T 文字']];
 const LS = 'yc_ink_pref';
 const pref = Object.assign({ c:'#ff5a5a', w:2.6, tool:'pen', ts:'m', tst:'plain', mini:false },
@@ -146,6 +146,7 @@ class Board{
   }
   stop(){
     _teClose(false);
+    this._sel(null);
     this.active = false;
     this.cv.classList.remove('on'); this.tl.classList.remove('on');
     this.host.classList.remove('ink-editing');
@@ -197,14 +198,16 @@ class Board{
 
   // ── 文字 ──
   _renderTxt(){
+    this._sel && this._sel(null);
     this.tl.querySelectorAll('.ink-t').forEach(x => x.remove());
     for(const t of this.txt) this.tl.appendChild(_tEl(t, this.W, this.H));
   }
   _tUpdate(t){
     const el = this.tl.querySelector(`.ink-t[data-id="${t.id}"]`);
     if(el) _tStyle(el, t, this.W, this.H); else this.tl.appendChild(_tEl(t, this.W, this.H));
+    if(this.sel === t.id) this._selPos();
   }
-  _tRemove(id){ this.txt = this.txt.filter(t => t.id !== id); this.tl.querySelector(`.ink-t[data-id="${id}"]`)?.remove(); }
+  _tRemove(id){ this.txt = this.txt.filter(t => t.id !== id); this.tl.querySelector(`.ink-t[data-id="${id}"]`)?.remove(); if(this.sel === id) this._sel(null); }
 
   // ── 繪圖 ──
   _tmpCv(){
@@ -300,6 +303,7 @@ class Board{
         pan = avg(); return;
       }
       if(pts.size > 1) return;
+      if(this.sel){ this._sel(null); if(pref.tool === 'text'){ pts.delete(e.pointerId); return; } }
       if(pref.tool === 'text'){ st = { pid:e.pointerId, tool:'text', at:pos(e) }; return; }
       st = { pid:e.pointerId, tool:pref.tool, path:[pos(e)], w:widthFor(pref.tool), color:pref.c };
       preview();
@@ -331,35 +335,100 @@ class Board{
     cv.addEventListener('pointercancel', up);
     cv.addEventListener('lostpointercapture', e => { if(pts.has(e.pointerId)) up({ pointerId:e.pointerId, type:'pointerup' }); });
 
-    // 文字方塊：拖曳移動、點一下編輯
+    // 文字方塊（像手機相簿的文字）：點一下選取 → 拖曳移動、拖右下角縮放、再點一下編輯；選取框上有 ✎ 🗑
+    //   觸控時瀏覽器可能把拖曳當捲動而取消（pointercancel）：在 touchstart 擋掉，拖曳改聽 window，取消也不會誤開編輯
     let drag = null;
-    this.tl.addEventListener('pointerdown', e => {
-      const el = e.target.closest('.ink-t');
-      if(!this.active || !el) return;
-      e.preventDefault(); e.stopPropagation();
-      const t = this.txt.find(x => x.id === el.dataset.id); if(!t) return;
-      try{ el.setPointerCapture(e.pointerId); }catch(_){}
-      drag = { el, t, sx:e.clientX, sy:e.clientY, ox:t.x, oy:t.y, moved:false, before:JSON.stringify(this.txt) };
-    });
-    this.tl.addEventListener('pointermove', e => {
-      if(!drag) return;
+    const tlTouch = e => { if(this.active && (drag || e.target.closest?.('.ink-t, .ink-sel'))) e.preventDefault(); };
+    this.tl.addEventListener('touchstart', tlTouch, { passive:false });
+    this.tl.addEventListener('touchmove', tlTouch, { passive:false });
+    const tMove = e => {
+      if(!drag || e.pointerId !== drag.pid) return;
       e.preventDefault();
       const r = this.tl.getBoundingClientRect();
-      const dx = (e.clientX - drag.sx) * (this.W / r.width), dy = (e.clientY - drag.sy) * (this.H / r.height);
-      if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
-      drag.moved = true; drag.el.classList.add('drag');
-      drag.t.x = Math.max(0, Math.min(this.W - 20, drag.ox + dx));
-      drag.t.y = Math.max(0, Math.min(this.H - 10, drag.oy + dy));
-      _tStyle(drag.el, drag.t, this.W, this.H);
-    });
-    const tup = () => {
-      if(!drag) return;
-      const d = drag; drag = null; d.el.classList.remove('drag');
-      if(d.moved){ this.und.push({ t:d.before }); this.red = []; if(this.und.length > this.maxUndo) this.und.shift(); this.dirty = true; _barState(); }
-      else _teOpen(this, d.t, null);
+      const ddx = e.clientX - drag.sx, ddy = e.clientY - drag.sy;
+      if(!drag.moved && Math.hypot(ddx, ddy) < 5) return;
+      drag.moved = true;
+      const t = drag.t;
+      if(drag.mode === 'size'){
+        // 往右下拉變大、往左上變小（依對角線長度比例）
+        const d0 = Math.hypot(drag.w0, drag.h0) || 1;
+        const k = Math.max(0.3, (d0 + (ddx * drag.w0 + ddy * drag.h0) / d0) / d0);
+        const kk = this.o.stretch ? 1 : this.W / 800;
+        t.s = Math.max(14 * kk, Math.min(200 * kk, drag.s0 * k));
+      }else{
+        t.x = Math.max(0, Math.min(this.W - 20, drag.ox + ddx * (this.W / r.width)));
+        // 整段文字留在畫布裡（法規不會跑到下一條）
+        const eh = drag.h0 * (this.H / r.height);
+        t.y = Math.max(0, Math.min(Math.max(0, this.H - eh), drag.oy + ddy * (this.H / r.height)));
+      }
+      drag.el.classList.add('drag');
+      _tStyle(drag.el, t, this.W, this.H);
+      this._selPos();
     };
-    this.tl.addEventListener('pointerup', tup);
-    this.tl.addEventListener('pointercancel', tup);
+    const tUp = e => {
+      if(!drag || e.pointerId !== drag.pid) return;
+      const d = drag; drag = null;
+      window.removeEventListener('pointermove', tMove, true);
+      window.removeEventListener('pointerup', tUp, true);
+      window.removeEventListener('pointercancel', tUp, true);
+      d.el.classList.remove('drag');
+      if(d.moved){
+        this.und.push({ t:d.before }); this.red = []; if(this.und.length > this.maxUndo) this.und.shift();
+        this.dirty = true; _barState(); this._sel(d.t.id);
+        return;
+      }
+      if(e.type === 'pointercancel' || d.mode === 'size') return;
+      if(this.sel === d.t.id) _teOpen(this, d.t, null);   // 已選取 → 編輯
+      else this._sel(d.t.id);                             // 第一次點 → 選取
+    };
+    this.tl.addEventListener('pointerdown', e => {
+      if(!this.active) return;
+      const btn = e.target.closest('.ink-sel button');
+      if(btn){ e.preventDefault(); e.stopPropagation(); return; }   // 選取框上的按鈕由 click 處理
+      const knob = e.target.closest('.ink-knob');
+      const el = knob ? this.tl.querySelector(`.ink-t[data-id="${this.sel}"]`) : e.target.closest('.ink-t');
+      if(!el) return;
+      e.preventDefault(); e.stopPropagation();
+      const t = this.txt.find(x => x.id === el.dataset.id); if(!t) return;
+      drag = { pid:e.pointerId, el, t, mode: knob ? 'size' : 'move', sx:e.clientX, sy:e.clientY, ox:t.x, oy:t.y,
+        s0:t.s, w0:el.offsetWidth, h0:el.offsetHeight, moved:false, before:JSON.stringify(this.txt) };
+      window.addEventListener('pointermove', tMove, true);
+      window.addEventListener('pointerup', tUp, true);
+      window.addEventListener('pointercancel', tUp, true);
+    });
+    this.tl.addEventListener('click', e => {
+      const b = e.target.closest('.ink-sel button'); if(!b || !this.active) return;
+      e.stopPropagation();
+      const t = this.txt.find(x => x.id === this.sel); if(!t) return;
+      if(b.dataset.a === 'edit') _teOpen(this, t, null);
+      else if(b.dataset.a === 'del'){
+        const before = JSON.stringify(this.txt);
+        this._tRemove(t.id); this._sel(null);
+        this.und.push({ t:before }); this.red = []; this.dirty = true; _barState();
+      }
+    });
+  }
+  // 選取框：跟著文字走，上方 ✎ 編輯、🗑 刪除，右下角拖曳縮放
+  _sel(id){
+    this.sel = id || null;
+    this.tl.querySelectorAll('.ink-t.sel').forEach(x => x.classList.remove('sel'));
+    let box = this.tl.querySelector('.ink-sel');
+    if(!this.sel){ box?.remove(); return; }
+    this.tl.querySelector(`.ink-t[data-id="${this.sel}"]`)?.classList.add('sel');
+    if(!box){
+      box = document.createElement('div'); box.className = 'ink-sel';
+      box.innerHTML = '<div class="ink-sel-bar"><button type="button" data-a="edit">✎ 編輯</button><button type="button" data-a="del">🗑</button></div><i class="ink-knob" title="拖曳縮放"></i>';
+      this.tl.appendChild(box);
+    }
+    this._selPos();
+  }
+  _selPos(){
+    const box = this.tl.querySelector('.ink-sel'); if(!box) return;
+    const el = this.tl.querySelector(`.ink-t[data-id="${this.sel}"]`);
+    if(!el){ box.remove(); this.sel = null; return; }
+    box.style.left = el.offsetLeft + 'px'; box.style.top = el.offsetTop + 'px';
+    box.style.width = el.offsetWidth + 'px'; box.style.height = el.offsetHeight + 'px';
+    box.classList.toggle('below', el.offsetTop < 34);   // 太靠上 → 按鈕放下面
   }
 }
 
@@ -410,7 +479,7 @@ function _barState(){
   b.querySelector('#ink-und')?.classList.toggle('dim', !cur.und.length);
   b.querySelector('#ink-red')?.classList.toggle('dim', !cur.red.length);
   const tip = b.querySelector('#ink-tip');
-  if(tip) tip.textContent = pref.tool === 'text' ? '點一下要放文字的地方；文字可拖曳移動，點一下修改'
+  if(tip) tip.textContent = pref.tool === 'text' ? '點一下放文字；點文字選取後可拖曳移動、拉右下角縮放，再點一下修改'
     : (cur.o.pan ? (penSeen ? '手寫筆畫圖、手指捲動' : '兩指可上下捲動') : '');
   const mn = b.querySelector('.ink-mname'); if(mn) mn.textContent = (TOOLS.find(t => t[0] === pref.tool) || ['', ''])[1];
   const md = b.querySelector('.ink-mini .ink-dot'); if(md) md.style.setProperty('--c', pref.c);
@@ -436,7 +505,10 @@ function _teEl(){
   let o = document.getElementById('ink-te');
   if(!o){
     o = document.createElement('div'); o.id = 'ink-te';
-    o.addEventListener('pointerdown', e => e.stopPropagation());
+    o.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      if(e.target.closest('button')) e.preventDefault();
+    });
     document.body.appendChild(o);
   }
   return o;
@@ -500,7 +572,7 @@ function _teClose(commit){
     return;
   }
   if(!t.t.trim()){ board._tRemove(t.id); if(isNew) return; }
-  else board._tUpdate(t);
+  else{ board._tUpdate(t); board._sel(t.id); }
   if(JSON.stringify(board.txt) !== before){ board.und.push({ t:before }); board.red = []; if(board.und.length > board.maxUndo) board.und.shift(); board.dirty = true; _barState(); }
 }
 Object.assign(api, {

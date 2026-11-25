@@ -874,6 +874,11 @@
       </div>
       <div id="lv-count" style="font-size:11px;color:var(--t2);flex-shrink:0;white-space:nowrap"></div>
     </div>
+    <!-- v4.66 目錄、閱讀設定 -->
+    <button class="vpc-btn vpc-sm" onclick="lrToc()" aria-label="目錄" title="目錄" style="color:var(--t2)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>
+    </button>
+    <button class="vpc-btn vpc-sm" onclick="lrSettings()" aria-label="閱讀設定" title="字級、行距、紙張" style="color:var(--t2);font-weight:700;font-size:14px">Aa</button>
     <!-- 本法搜尋 -->
     <button class="vpc-btn vpc-sm" onclick="toggleLvFind()" aria-label="在本法搜尋" title="在本法搜尋" style="color:var(--t2)">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -1248,6 +1253,7 @@
 <script src="js/data.js"></script>
 <script src="js/ink.js"></script><!-- v4.65 手寫標註引擎（答題、法規共用） -->
 <script src="js/lawnote.js"></script><!-- 法規手寫筆記（v4.65）＋舊的選字重點 -->
+<script src="js/lawread.js"></script><!-- v4.66 法規閱讀：繼續閱讀、目錄、閱讀設定、引用可點、複製 -->
 <script src="js/english.js"></script>
 <script src="js/memory.js"></script>
 <script src="js/predict.js"></script>
