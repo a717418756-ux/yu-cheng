@@ -543,7 +543,15 @@ function _teOpen(board, t, at){
   board.tl.querySelector(`.ink-t[data-id="${t.id}"]`)?.classList.add('editing');
   board._tUpdate(t);
   const ta = o.querySelector('#ink-te-ta');
-  ta.addEventListener('input', () => { t.t = ta.value; board._tUpdate(t); board.tl.querySelector(`.ink-t[data-id="${t.id}"]`)?.classList.add('editing'); });
+  te.ta = ta;
+  // 中文輸入法（注音、拼音、手寫）打的字在送出前是「組字中」：每個階段都同步；
+  // 編輯框關掉之後鍵盤才送來的事件（例如收起時把組字中的字清掉）一律不理，免得把打好的字洗掉
+  const sync = () => {
+    if(!te || te.t !== t) return;
+    t.t = ta.value; board._tUpdate(t);
+    board.tl.querySelector(`.ink-t[data-id="${t.id}"]`)?.classList.add('editing');
+  };
+  ['input', 'compositionupdate', 'compositionend', 'keyup'].forEach(n => ta.addEventListener(n, sync));
   // 要在點擊當下 focus，手機才會跳出鍵盤
   const focus = () => { try{ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }catch(_){} };
   focus(); setTimeout(focus, 30);
@@ -561,7 +569,9 @@ if(window.visualViewport){ visualViewport.addEventListener('resize', _tePos); vi
 // commit=true：保留目前內容（按「好了」或切到別處）；false：取消
 function _teClose(commit){
   if(!te) return;
-  const { board, t, isNew, before, orig } = te; te = null;
+  const { board, t, isNew, before, orig, ta } = te;
+  if(commit && ta) t.t = ta.value;   // 收起鍵盤前先拿框裡看得到的字（含還在組字的中文）
+  te = null;
   document.getElementById('ink-te')?.classList.remove('on');
   document.getElementById('ink-bar')?.classList.remove('te-hide');
   try{ document.activeElement?.blur?.(); }catch(_){}
