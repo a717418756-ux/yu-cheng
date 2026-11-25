@@ -374,67 +374,6 @@
    畫到一半線就斷掉。要捲動長題目時關閉標註模式即可（標註是短暫動作）。 */
 .qink.on{ pointer-events:auto; touch-action:none; }
 
-/* 標註工具列：只在標註模式顯示 */
-/* 標註工具列：必須 fixed 脫離版面流程。
-   原本用 position:sticky 且排在題目容器最前面，開啟標註模式時會佔掉
-   約 50px 高度把題目整個往下推；按完成後題目移回，筆跡卻留在原位置
-   → 看起來就是「儲存後位移」。改 fixed 後版面完全不受影響。 */
-.qink-tools{
-  display:none; position:fixed; z-index:30;
-  left:50%; transform:translateX(-50%);
-  bottom:calc(72px + env(safe-area-inset-bottom, 0px));
-  gap:6px; padding:6px;
-  background:rgba(22,22,28,0.94);
-  border:1px solid rgba(255,255,255,0.12);
-  border-radius:14px;
-  box-shadow:0 8px 28px rgba(0,0,0,0.55);
-  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
-}
-.qink.on ~ .qink-tools{ display:flex; flex-direction:column; gap:7px; }
-.qink-tools .btn{
-  padding:6px 11px; font-size:12px; font-weight:600;
-  border-radius:9px; min-width:auto;
-}
-.qink-row{ display:flex; align-items:center; gap:6px; justify-content:center; flex-wrap:nowrap; }
-
-/* 顏色選擇 */
-.qink-colors{ display:flex; gap:5px; }
-.qink-c{
-  width:26px; height:26px; min-width:26px; border-radius:50%;
-  /* 用 !important 確保不被全站 button 預設樣式蓋掉（顏色是這顆鈕的唯一意義） */
-  background:var(--c) !important;
-  border:2px solid rgba(255,255,255,0.3);
-  cursor:pointer; padding:0; flex-shrink:0;
-  display:inline-block; appearance:none; -webkit-appearance:none;
-  box-sizing:border-box;
-}
-.qink-c.on{ border-color:#fff; box-shadow:0 0 0 2px var(--c); }
-/* 自訂顏色：原生色票選擇器，外觀與其他色鈕一致 */
-.qink-c-custom{
-  width:26px; height:26px; min-width:26px; border-radius:50%;
-  padding:0; border:2px dashed rgba(255,255,255,0.45);
-  background:transparent; cursor:pointer; flex-shrink:0;
-  appearance:none; -webkit-appearance:none; box-sizing:border-box;
-}
-.qink-c-custom::-webkit-color-swatch-wrapper{ padding:0; }
-.qink-c-custom::-webkit-color-swatch{ border:none; border-radius:50%; }
-.qink-c-custom.on{ border-style:solid; border-color:#fff; }
-
-/* 粗細選擇 */
-.qink-sizes{ display:flex; gap:4px; margin-left:4px; }
-.qink-s{
-  width:28px; height:24px; border-radius:7px; padding:0;
-  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
-  display:inline-flex; align-items:center; justify-content:center; cursor:pointer;
-}
-.qink-s i{ display:block; width:15px; background:currentColor; border-radius:3px; color:var(--t1); }
-.qink-s.on{ background:var(--acc); border-color:var(--acc); }
-.qink-s.on i{ color:#fff; }
-
-/* 筆型切換 */
-.qink-mode.on{ background:var(--acc); color:#fff; border-color:var(--acc); }
-.qink-done{ background:var(--acc); color:#fff; border-color:var(--acc); }
-
 /* e-ink：純黑白高對比 */
 
 /* ══ 答題底列：統一為線性圖示，取代 emoji ══════════════════ */

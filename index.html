@@ -355,7 +355,7 @@
   <div class="hd">
     <div><div class="hdt">資料庫</div></div>
     <div style="display:flex;gap:6px">
-      <button class="hd-btn bg" onclick="lnOpenAll()" title="所有法規的重點與筆記">🖍 重點</button>
+      <button class="hd-btn bg" onclick="lnOpenAll()" title="所有法規的手寫筆記">📝 筆記</button>
       <button class="hd-btn bg" id="law-sort-btn" onclick="openLawSortMenu(this)">排序</button>
       <button class="hd-btn bg" id="db-sel-btn" onclick="toggleDbSelectMode()" title="選擇刪除">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -824,37 +824,6 @@
   <div class="qbody" id="qbody">
     <!-- 題目標註畫布：疊在題幹／選項上方，可直接圈畫重點（如紙本刷題） -->
     <canvas id="qink" class="qink"></canvas>
-    <div class="qink-tools" id="qink-tools">
-      <!-- 第一列：顏色 + 粗細 -->
-      <div class="qink-row">
-        <div class="qink-colors" id="qink-colors">
-          <button class="qink-c on" data-c="#ff5a5a" style="--c:#ff5a5a" onclick="inkColor(this)" aria-label="紅"></button>
-          <button class="qink-c"    data-c="#ffd54a" style="--c:#ffd54a" onclick="inkColor(this)" aria-label="黃"></button>
-          <button class="qink-c"    data-c="#4ade80" style="--c:#4ade80" onclick="inkColor(this)" aria-label="綠"></button>
-          <button class="qink-c"    data-c="#6ea8fe" style="--c:#6ea8fe" onclick="inkColor(this)" aria-label="藍"></button>
-          <button class="qink-c"    data-c="#111111" style="--c:#111111" onclick="inkColor(this)" aria-label="黑"></button>
-          <input type="color" class="qink-c-custom" id="qink-c-custom" value="#ff8c00"
-                 oninput="inkCustomColor(this)" aria-label="自訂顏色" title="自訂顏色">
-        </div>
-        <div class="qink-sizes" id="qink-sizes">
-          <button class="qink-s"    data-w="1.6" onclick="inkSize(this)" aria-label="細"><i style="height:2px"></i></button>
-          <button class="qink-s on" data-w="2.6" onclick="inkSize(this)" aria-label="中"><i style="height:4px"></i></button>
-          <button class="qink-s"    data-w="4.5" onclick="inkSize(this)" aria-label="粗"><i style="height:7px"></i></button>
-        </div>
-      </div>
-      <!-- 第二列：筆型 -->
-      <div class="qink-row">
-        <button class="btn br bw qink-mode on" id="qink-m-pen"    onclick="inkMode('pen')">✎ 手繪</button>
-        <button class="btn br bw qink-mode"    id="qink-m-line"   onclick="inkMode('line')">╱ 直線</button>
-        <button class="btn br bw qink-mode"    id="qink-m-marker" onclick="inkMode('marker')">▭ 螢光</button>
-      </div>
-      <!-- 第三列：動作 -->
-      <div class="qink-row">
-        <button class="btn br bw" onclick="inkUndo()">↶ 復原</button>
-        <button class="btn br bw" onclick="inkClear()">清除</button>
-        <button class="btn br bw qink-done" onclick="toggleInk()">✓ 完成</button>
-      </div>
-    </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span id="qbadge" class="badge"></span><span id="qmeta" style="font-size:11px;color:var(--t2)"></span></div>
     <div id="q-type-hint" style="font-size:12px;color:var(--acc);margin-bottom:7px;font-weight:600;min-height:18px"></div>
     <!-- 題組共同題幹（有 groupStem 才顯示） -->
@@ -935,8 +904,8 @@
       <div id="lv-menu" style="display:none;position:absolute;right:0;top:calc(100%+4px);
         background:var(--bg1);border:1px solid var(--bd);border-radius:12px;
         padding:4px 0;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:200">
-        <button class="lv-menu-item" onclick="lnOpenAll(window.currentLawName);closeLvMenu()">🖍 重點筆記</button>
-        <button class="lv-menu-item" id="ln-cover-item" onclick="lnToggleCover();closeLvMenu()">🙈 遮住重點（背誦）</button>
+        <button class="lv-menu-item" onclick="lnOpenAll(window.currentLawName);closeLvMenu()">📝 筆記總覽</button>
+        <button class="lv-menu-item" id="ln-cover-item" style="display:none" onclick="lnToggleCover();closeLvMenu()">🙈 遮住重點（背誦）</button>
         <button class="lv-menu-item" onclick="ttsReadLaw();closeLvMenu()">🔊 朗讀法條</button>
         <button class="lv-menu-item" id="lv-star-item" onclick="toggleLvFav();closeLvMenu()">☆ 收藏</button>
         <button class="lv-menu-item" onclick="editLawGroupInfo();closeLvMenu()">⚙ 編輯法規資訊</button>
@@ -1277,7 +1246,8 @@
 <script src="js/utils.js"></script>
 <script src="js/quiz.js"></script>
 <script src="js/data.js"></script>
-<script src="js/lawnote.js"></script><!-- v4.64 法規重點筆記 -->
+<script src="js/ink.js"></script><!-- v4.65 手寫標註引擎（答題、法規共用） -->
+<script src="js/lawnote.js"></script><!-- 法規手寫筆記（v4.65）＋舊的選字重點 -->
 <script src="js/english.js"></script>
 <script src="js/memory.js"></script>
 <script src="js/predict.js"></script>

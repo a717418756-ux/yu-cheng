@@ -2395,7 +2395,7 @@ async function openLawGroup(lawName, full){  try{
         +'<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'
         +'<div class="law-art-acts">'
           +'<button onclick="ttsArt('+l.id+')" class="law-tts-btn" aria-label="朗讀這一條">🔊</button>'
-          +'<button onclick="lnArtNote('+l.id+')" class="law-tts-btn" aria-label="這一條的筆記" title="這一條的筆記">📝</button>'
+          +'<button onclick="lnInk('+l.id+')" class="law-tts-btn law-ink-btn" aria-label="在這一條上手寫筆記" title="手寫筆記（可打字）">✍</button>'
           +'<button onclick="editLawInView('+l.id+')" class="law-edit-btn">✏</button>'
           +'<button onclick="delLaw('+l.id+')" class="law-del-btn">🗑</button>'
         +'</div>'
@@ -3318,7 +3318,7 @@ async function saveLaw(){  try{
     data.favorite=ex?.favorite||false;
     data.createdAt=ex?.createdAt||Date.now();
     // v4.64：表單沒有的欄位不能因為編輯而消失——重點筆記（marks）、SOP 原檔逐字文字與頁面（pagesText／pages）
-    for(const k of ['marks','pagesText','pages']) if(ex && ex[k] != null) data[k]=ex[k];
+    for(const k of ['marks','ink','pagesText','pages']) if(ex && ex[k] != null) data[k]=ex[k];   // ink：v4.65 手寫筆記
   }
   try{
     data.searchBlob = _lawBlob(data);   // 純文字搜尋索引
