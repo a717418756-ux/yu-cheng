@@ -507,7 +507,8 @@ async function renderList(){  try{
   el.innerHTML='';
 
   if(!fl.length){
-    el.innerHTML='<div class="empty"><span class="ic">📭</span><span>尚無題目</span></div>';
+    el.innerHTML='<div class="empty"><span class="ic">📭</span><span>'+(kw?'找不到符合的題目':'尚無題目')+'</span></div>';
+    if(kw) window.ycS2TRetry?.('si', renderList);   // v4.67 打簡體字 → 轉繁體再找
     return;
   }
 
@@ -1832,6 +1833,7 @@ async function renderDB(){  try{
       ? '<div class="empty"><span class="ic">🔍</span><span>查無符合的法規或條文</span></div>'
       : '<div class="empty"><span class="ic">🗄</span><span>尚無資料</span></div>';
     if(lc) lc.textContent='';
+    if(kw) window.ycS2TRetry?.('lsi', renderDB);   // v4.67 打簡體字 → 轉繁體再找
     return;
   }
 
@@ -2395,6 +2397,7 @@ async function openLawGroup(lawName, full){  try{
     return '<div data-law-id="'+l.id+'" data-an="'+(l.articleNumber||art2n(l.article||''))+'" class="law-art-card"'+dynStyle+'>'
       +'<div class="law-art-head">'
         +'<span>'+_hl(l.article||'')+(l.title?' — '+_hl(l.title):'')+'</span>'
+        +(window.lpAmendBadge?.(l)||'')   // v4.67 修法前後對照
         +'<div class="law-art-acts">'
           +'<button onclick="lrCopy('+l.id+')" class="law-tts-btn" aria-label="複製這一條（含出處）" title="複製（含出處）">⧉</button>'
           +'<button onclick="ttsArt('+l.id+')" class="law-tts-btn" aria-label="朗讀這一條">🔊</button>'
@@ -2602,7 +2605,7 @@ function _lvFindRun(){
       hit.replaceWith(mk); _lvFindHits.push(mk);
     }
   }
-  if(!_lvFindHits.length){ n.textContent='找不到'; return; }
+  if(!_lvFindHits.length){ n.textContent='找不到'; window.ycS2TRetry?.('lv-find-q', _lvFindRun); return; }   // v4.67 簡體轉繁體
   lvFindStep(1);
 }
 function lvFindStep(d){
@@ -3323,7 +3326,7 @@ async function saveLaw(){  try{
     data.favorite=ex?.favorite||false;
     data.createdAt=ex?.createdAt||Date.now();
     // v4.64：表單沒有的欄位不能因為編輯而消失——重點筆記（marks）、SOP 原檔逐字文字與頁面（pagesText／pages）
-    for(const k of ['marks','ink','pagesText','pages']) if(ex && ex[k] != null) data[k]=ex[k];   // ink：v4.65 手寫筆記
+    for(const k of ['marks','ink','pagesText','pages','prevContent','prevDate']) if(ex && ex[k] != null) data[k]=ex[k];   // prev*：v4.67 修法前後對照   // ink：v4.65 手寫筆記
   }
   try{
     data.searchBlob = _lawBlob(data);   // 純文字搜尋索引

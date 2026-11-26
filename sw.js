@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.66.1';
+const APP_VERSION = '4.67.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 const PAGES_CACHE = 'yc-pages-v1';   // SOP 原檔頁面圖：不跟版本走，更新 App 不清
 
@@ -47,9 +47,11 @@ const CORE_ASSETS = [
   './js/utils.js',
   './js/quiz.js',
   './js/data.js',
+  './js/lib/perfect-freehand.js',
   './js/ink.js',
   './js/lawnote.js',
   './js/lawread.js',
+  './js/lawplus.js',
   './js/english.js',
   './js/fitness.js',
   './js/dtask.js',

@@ -153,7 +153,7 @@ function _tocItems(){
         const b = el.querySelector('.law-art-body');
         sub = (b ? b.textContent : '').replace(/\s+/g, '').slice(0, 22);
       }
-      out.push({ el, t:'a', label:head, sub });
+      out.push({ el, t:'a', label:head, sub, amd:!!el.querySelector('.lp-amd') });
     }else out.push({ el, t:'h', label:el.textContent.trim().replace(/^[編章節]\s*(?=第)/, '').slice(0, 40), lv:parseFloat(el.style.marginLeft) || 0 });   // 去掉前面的「章」小標
   });
   return out;
@@ -162,19 +162,22 @@ let _toc = [];
 window.lrToc = () => {
   if(document.getElementById('lr-toc')?.classList.contains('on')){ _tocClose(); return; }
   _setClose();
-  _toc = _tocItems();
+  _toc = _tocItems(); _tocQ = ''; _tocAmd = false;
   let o = document.getElementById('lr-toc');
   if(!o){
     o = document.createElement('div'); o.id = 'lr-toc';
     o.addEventListener('click', e => { if(e.target === o) _tocClose(); });
     document.body.appendChild(o);
   }
+  const nAmd = _toc.filter(x => x.amd).length;
   o.innerHTML = `<div class="lr-toc-p"><div class="lr-toc-hd"><b>📑 目錄</b><span>${_toc.filter(x => x.t === 'a').length} 條</span>
+      <button class="lr-toc-map" onclick="lpMap()" title="把這部法規畫成心智圖">🧠 心智圖</button>
       <button onclick="lrTocClose()" aria-label="關閉">✕</button></div>
     <input type="search" class="lr-toc-q" placeholder="篩選條號、條名、內容" oninput="_lrTocF(this.value)">
+    ${nAmd ? `<label class="lr-toc-amd"><input type="checkbox" onchange="_lrTocAmd(this.checked)"> 只看本次修正的條文（${nAmd} 條）</label>` : ''}
     <div class="lr-toc-l">${_toc.map((x, i) => x.t === 'h'
       ? `<div class="lr-toc-h" style="padding-left:${10 + Math.min(24, x.lv)}px" data-i="${i}" onclick="_lrTocGo(${i})">${_e(x.label)}</div>`
-      : `<div class="lr-toc-a" data-i="${i}" onclick="_lrTocGo(${i})"><b>${_e(x.label)}</b>${x.sub ? `<span>${_e(x.sub)}</span>` : ''}</div>`).join('')}</div></div>`;
+      : `<div class="lr-toc-a" data-i="${i}" onclick="_lrTocGo(${i})"><b>${_e(x.label)}${x.amd ? '<i class="lr-toc-m">修</i>' : ''}</b>${x.sub ? `<span>${_e(x.sub)}</span>` : ''}</div>`).join('')}</div></div>`;
   o.classList.add('on');
   _tocMark(true);
 };
@@ -192,13 +195,18 @@ window._lrTocGo = i => {
   x.el.scrollIntoView({ block:'start' });
   if(x.t === 'a'){ x.el.classList.remove('lv-flash'); void x.el.offsetWidth; x.el.classList.add('lv-flash'); }
 };
-window._lrTocF = q => {
-  q = q.trim().toLowerCase();
+let _tocQ = '', _tocAmd = false;
+window._lrTocF = q => { _tocQ = q.trim().toLowerCase(); _tocFilter(); };
+window._lrTocAmd = on => { _tocAmd = !!on; _tocFilter(); };   // v4.67 只看本次修正
+function _tocFilter(){
+  const q = _tocQ;
   document.querySelectorAll('#lr-toc .lr-toc-a, #lr-toc .lr-toc-h').forEach(el => {
     const x = _toc[+el.dataset.i];
-    el.style.display = !q || (x.t === 'a' && (x.label + x.sub + (x.el.textContent || '')).toLowerCase().includes(q)) ? '' : 'none';
+    const ok = (!q || (x.t === 'a' && (x.label + x.sub + (x.el.textContent || '')).toLowerCase().includes(q)))
+      && (!_tocAmd || (x.t === 'a' && x.amd));
+    el.style.display = (!q && !_tocAmd) || ok ? '' : 'none';
   });
-};
+}
 function _tocClose(){ document.getElementById('lr-toc')?.classList.remove('on'); }
 window.lrTocClose = _tocClose;
 

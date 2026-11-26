@@ -534,6 +534,7 @@ function _handleBackLayer(){
   // 6-0) 法規重點筆記（v4.64）：總覽視窗、選字工具列
   // v4.65：手寫標註（答題、法規）：先關文字框、再結束標註並存檔
   if(window.YCInk && window.YCInk.back()) return true;
+  if(typeof window.lpBack === 'function' && window.lpBack()) return true;   // v4.67 修法對照、心智圖
   if(typeof window.lrBack === 'function' && window.lrBack()) return true;   // v4.66 法規目錄、閱讀設定
   if(typeof window.lnBack === 'function' && window.lnBack()) return true;
 

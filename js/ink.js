@@ -228,7 +228,9 @@ class Board{
     let pan = null;  // 捲動中：{ y, x }
     const pos = e => {
       const r = cv.getBoundingClientRect();
-      return { x:(e.clientX - r.left) * (this.W / r.width), y:(e.clientY - r.top) * (this.H / r.height) };
+      // p：筆壓（S Pen 等手寫筆才有真的壓力；手指、滑鼠交給 perfect-freehand 依速度模擬）
+      const p = e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 0.5;
+      return { x:(e.clientX - r.left) * (this.W / r.width), y:(e.clientY - r.top) * (this.H / r.height), p };
     };
     const scroller = () => {
       let el = this.host.parentElement;
@@ -247,7 +249,26 @@ class Board{
       if(tool === 'eraser') return Math.max(14, pref.w * 7) * k;
       return pref.w * k;
     };
+    // 筆：用 perfect-freehand（MIT，js/lib/perfect-freehand.js）把軌跡變成「有粗細變化」的筆畫外框再填色，
+    //   手寫筆依真實筆壓、手指依速度（快細慢粗），像紙上的鋼筆
+    const PF = () => window.PerfectFreehand && window.PerfectFreehand.getStroke;
+    const drawFree = (ctx, s) => {
+      const o = PF()(s.path.map(q => [q.x, q.y, q.p]), {
+        size: s.w * 1.7, thinning: s.pen ? 0.65 : 0.5, smoothing: 0.55, streamline: 0.4,
+        simulatePressure: !s.pen, last: !!s.done,
+      });
+      if(!o.length) return;
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.moveTo(o[0][0], o[0][1]);
+      for(let i = 1; i < o.length; i++){
+        const a = o[i], b = o[(i + 1) % o.length];
+        ctx.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+      }
+      ctx.closePath(); ctx.fill();
+    };
     const drawPath = (ctx, s) => {
+      if(s.tool === 'pen' && PF()){ try{ drawFree(ctx, s); return; }catch(_){} }
       const p = s.path;
       ctx.lineCap = s.tool === 'marker' ? 'butt' : 'round'; ctx.lineJoin = 'round';
       ctx.lineWidth = s.w; ctx.strokeStyle = s.tool === 'eraser' ? '#888' : s.color;
@@ -279,13 +300,13 @@ class Board{
       for(const p of (s.tool === 'line' ? [s.path[0], s.path[s.path.length - 1]] : s.path)){
         x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
       }
-      const m = s.w + 4;
+      const m = s.w * 2 + 4;
       this._push(this._snap([x0 - m, y0 - m, x1 - x0 + 2 * m, y1 - y0 + 2 * m], false));
       const ctx = this.ctx;
       ctx.save();
       if(s.tool === 'eraser') ctx.globalCompositeOperation = 'destination-out';
       if(s.tool === 'marker') ctx.globalAlpha = 0.35;
-      drawPath(ctx, Object.assign({}, s, { color: s.tool === 'eraser' ? '#000' : s.color }));
+      drawPath(ctx, Object.assign({}, s, { color: s.tool === 'eraser' ? '#000' : s.color, done:true }));
       ctx.restore();
     };
     const cancel = () => { st = null; const t = this._tmp; if(t) t.getContext('2d').clearRect(0, 0, t.width, t.height); };
@@ -305,7 +326,7 @@ class Board{
       if(pts.size > 1) return;
       if(this.sel){ this._sel(null); if(pref.tool === 'text'){ pts.delete(e.pointerId); return; } }
       if(pref.tool === 'text'){ st = { pid:e.pointerId, tool:'text', at:pos(e) }; return; }
-      st = { pid:e.pointerId, tool:pref.tool, path:[pos(e)], w:widthFor(pref.tool), color:pref.c };
+      st = { pid:e.pointerId, tool:pref.tool, path:[pos(e)], w:widthFor(pref.tool), color:pref.c, pen:e.pointerType === 'pen' };
       preview();
     });
     cv.addEventListener('pointermove', e => {

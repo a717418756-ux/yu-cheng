@@ -2052,3 +2052,41 @@ html[data-layout="desktop"] #fab-wrap{
   #lv .qhd .vpc-btn.vpc-sm{ padding-left:6px; padding-right:6px; min-width:34px; }
   #lv #lv-mode-btn{ padding:4px 3px !important; }
 }
+
+/* ══ v4.67 開源套件整合（js/lawplus.js）══════════════════════════════ */
+/* 修法前後對照 */
+.lp-amd{ margin-left:6px; padding:1px 6px; font-size:11px; font-weight:700; line-height:1.5; border-radius:6px; cursor:pointer;
+  color:#ffb74d; background:rgba(255,183,77,.14); border:1px solid rgba(255,183,77,.5); vertical-align:2px; flex-shrink:0; }
+.law-art-head > .lp-amd{ margin-right:auto; }
+.lp-ov{ display:none; position:fixed; inset:0; z-index:645; background:rgba(0,0,0,.5); }
+.lp-ov.on{ display:flex; align-items:flex-end; justify-content:center; }
+.lp-p{ width:min(640px, 100vw); max-height:86vh; display:flex; flex-direction:column; gap:8px; box-sizing:border-box;
+  background:var(--bg1); border-radius:16px 16px 0 0; padding:12px 14px calc(14px + env(safe-area-inset-bottom)); box-shadow:0 -8px 30px rgba(0,0,0,.5); }
+.lp-hd{ display:flex; align-items:center; gap:8px; }
+.lp-hd b{ font-size:16px; color:var(--t0); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lp-hd button{ background:none; border:none; color:var(--t1); font-size:18px; padding:4px 8px; cursor:pointer; }
+.lp-sub{ font-size:13px; color:var(--t1); font-weight:600; }
+.lp-dates{ display:flex; flex-wrap:wrap; gap:6px; font-size:12px; color:var(--t2); }
+.lp-del{ color:#ff8a80; } .lp-add{ color:#69f0ae; }
+.lp-seg{ display:flex; gap:4px; }
+.lp-seg button{ flex:1; padding:7px 0; font-size:13px; border-radius:9px; cursor:pointer; background:var(--bg2); border:1px solid var(--bd); color:var(--t1); }
+.lp-seg button.on{ background:var(--acc); border-color:var(--acc); color:#fff; font-weight:700; }
+.lp-body{ overflow-y:auto; min-height:80px; }
+.lp-dsum{ font-size:12px; color:var(--t2); margin-bottom:6px; }
+.lp-dtxt{ font-size:15px; line-height:1.95; color:var(--t0); white-space:pre-wrap; word-break:break-word; }
+.lp-dtxt del{ color:#ff8a80; background:rgba(255,82,82,.14); text-decoration:line-through; text-decoration-thickness:2px; }
+.lp-dtxt ins{ color:#b9f6ca; background:rgba(105,240,174,.16); text-decoration:underline; text-decoration-color:#69f0ae; text-underline-offset:3px; }
+.lp-note{ font-size:11px; color:var(--t2); line-height:1.6; }
+/* 目錄：心智圖鈕、只看修正 */
+.lr-toc-map{ font-size:12px !important; padding:5px 9px !important; border-radius:8px; background:var(--bg2) !important; border:1px solid var(--bd) !important; color:var(--t0) !important; }
+.lr-toc-amd{ display:flex; align-items:center; gap:6px; margin:0 14px 8px; font-size:13px; color:#ffb74d; }
+.lr-toc-m{ font-style:normal; font-size:10px; color:#ffb74d; border:1px solid rgba(255,183,77,.6); border-radius:4px; padding:0 3px; margin-left:5px; vertical-align:1px; }
+/* 法規心智圖（markmap） */
+#lp-map.on{ align-items:stretch; }
+.lp-mp{ position:absolute; inset:0; display:flex; flex-direction:column; background:var(--bg0, #121212); }
+.lp-mp .lp-hd{ padding:10px 10px 6px 14px; border-bottom:1px solid var(--bd); }
+.lp-mhint{ font-size:11px; color:var(--t2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+@media (max-width:560px){ .lp-mhint{ display:none; } }
+#lp-svg{ flex:1; width:100%; min-height:0; touch-action:none;
+  --markmap-text-color:#e6e6e6; --markmap-circle-open-bg:#2a2a2a; --markmap-font:500 15px/20px system-ui, sans-serif; }
+#lp-svg .lp-mi{ cursor:pointer; text-decoration:underline dotted rgba(110,168,254,.7); text-underline-offset:3px; }
