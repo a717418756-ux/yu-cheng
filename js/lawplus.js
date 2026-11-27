@@ -128,7 +128,8 @@ window.lpMap = async () => {
 };
 // 點條文 → 關掉心智圖、跳到那一條
 document.addEventListener('click', e => {
-  const t = e.target.closest?.('#lp-map .lp-mi'); if(!t) return;
+  // 條文名稱換行時，點到行與行之間或字旁空白，target 是外層 div（不是 .lp-mi），也要算點到這一條
+  const t = e.target.closest?.('#lp-map .lp-mi') || e.target.closest?.('#lp-map foreignObject')?.querySelector('.lp-mi'); if(!t) return;
   const el = _mmItems[+t.dataset.i]; if(!el) return;
   e.preventDefault(); e.stopPropagation();
   _close('lp-map');

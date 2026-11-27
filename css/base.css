@@ -2005,7 +2005,7 @@ html[data-layout="desktop"] #fab-wrap{
 .lr-toc-hd b{ font-size:16px; color:var(--t0); }
 .lr-toc-hd span{ flex:1; font-size:12px; color:var(--t2); }
 .lr-toc-hd button{ background:none; border:none; color:var(--t1); font-size:18px; padding:4px 8px; cursor:pointer; }
-.lr-toc-q{ margin:0 12px 8px; padding:9px 12px; border-radius:10px; background:var(--bg2); border:1px solid var(--bd); color:var(--t0); font-size:14px; }
+.lr-toc-q{ width:calc(100% - 24px); box-sizing:border-box; margin:0 12px 8px; padding:9px 12px; border-radius:10px; background:var(--bg2); border:1px solid var(--bd); color:var(--t0); font-size:14px; }
 .lr-toc-l{ flex:1; overflow-y:auto; padding:0 6px 20px; }
 .lr-toc-h{ font-size:13px; font-weight:700; color:var(--pur, #b39ddb); padding:10px 10px 4px; cursor:pointer; }
 .lr-toc-a{ padding:8px 10px; border-radius:8px; cursor:pointer; display:flex; gap:8px; align-items:baseline; }
@@ -2080,6 +2080,7 @@ html[data-layout="desktop"] #fab-wrap{
 /* 目錄：心智圖鈕、只看修正 */
 .lr-toc-map{ font-size:12px !important; padding:5px 9px !important; border-radius:8px; background:var(--bg2) !important; border:1px solid var(--bd) !important; color:var(--t0) !important; }
 .lr-toc-amd{ display:flex; align-items:center; gap:6px; margin:0 14px 8px; font-size:13px; color:#ffb74d; }
+.lr-toc-amd input{ width:auto; flex:none; margin:0; }   /* 全域 input 寬 100%：勾選框不要被撐開 */
 .lr-toc-m{ font-style:normal; font-size:10px; color:#ffb74d; border:1px solid rgba(255,183,77,.6); border-radius:4px; padding:0 3px; margin-left:5px; vertical-align:1px; }
 /* 法規心智圖（markmap） */
 #lp-map.on{ align-items:stretch; }
