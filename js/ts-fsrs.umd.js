@@ -1,9 +1,26 @@
-// ts-fsrs 5.2.3（MIT License, https://github.com/open-spaced-repetition/ts-fsrs）— FSRS 間隔重複排程，v4.56.0 本機內附（離線可用）
+// ts-fsrs 5.4.2（MIT License, https://github.com/open-spaced-repetition/ts-fsrs）— FSRS 間隔重複排程，v4.56.0 本機內附（離線可用）；v4.68 由 5.2.3 升級，9000 組作答序列比對排程間隔完全相同
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
   typeof define === 'function' && define.amd ? define(['exports'], factory) :
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.FSRS = {}));
 })(this, (function (exports) { 'use strict';
+
+  class FSRSError extends Error {
+    constructor(message = "FSRS Error") {
+      var _a;
+      super(message);
+      this.name = "FSRSError";
+      (_a = Error.captureStackTrace) == null ? void 0 : _a.call(Error, this, FSRSError);
+    }
+  }
+  class FSRSValidationError extends FSRSError {
+    constructor(message) {
+      var _a;
+      super(message);
+      this.name = "FSRSValidationError";
+      (_a = Error.captureStackTrace) == null ? void 0 : _a.call(Error, this, FSRSValidationError);
+    }
+  }
 
   var State = /* @__PURE__ */ ((State2) => {
     State2[State2["New"] = 0] = "New";
@@ -54,13 +71,13 @@
         const restOfString = value.slice(1).toLowerCase();
         const ret = Rating[`${firstLetter}${restOfString}`];
         if (ret === void 0) {
-          throw new Error(`Invalid rating:[${value}]`);
+          throw new FSRSValidationError(`Invalid rating:[${value}]`);
         }
         return ret;
       } else if (typeof value === "number") {
         return value;
       }
-      throw new Error(`Invalid rating:[${value}]`);
+      throw new FSRSValidationError(`Invalid rating:[${value}]`);
     }
     static state(value) {
       if (typeof value === "string") {
@@ -68,15 +85,18 @@
         const restOfString = value.slice(1).toLowerCase();
         const ret = State[`${firstLetter}${restOfString}`];
         if (ret === void 0) {
-          throw new Error(`Invalid state:[${value}]`);
+          throw new FSRSValidationError(`Invalid state:[${value}]`);
         }
         return ret;
       } else if (typeof value === "number") {
         return value;
       }
-      throw new Error(`Invalid state:[${value}]`);
+      throw new FSRSValidationError(`Invalid state:[${value}]`);
     }
     static time(value) {
+      if (value instanceof Date) {
+        return value;
+      }
       const date = new Date(value);
       if (typeof value === "object" && value !== null && !Number.isNaN(Date.parse(value) || +date)) {
         return date;
@@ -85,12 +105,12 @@
         if (!Number.isNaN(timestamp)) {
           return new Date(timestamp);
         } else {
-          throw new Error(`Invalid date:[${value}]`);
+          throw new FSRSValidationError(`Invalid date:[${value}]`);
         }
       } else if (typeof value === "number") {
         return new Date(value);
       }
-      throw new Error(`Invalid date:[${value}]`);
+      throw new FSRSValidationError(`Invalid date:[${value}]`);
     }
     static review_log(log) {
       return __spreadProps$2(__spreadValues$2({}, log), {
@@ -102,15 +122,19 @@
     }
   }
 
+  /* istanbul ignore next -- @preserve */
   Date.prototype.scheduler = function(t, isDay) {
     return date_scheduler(this, t, isDay);
   };
+  /* istanbul ignore next -- @preserve */
   Date.prototype.diff = function(pre, unit) {
     return date_diff(this, pre, unit);
   };
+  /* istanbul ignore next -- @preserve */
   Date.prototype.format = function() {
     return formatDate(this);
   };
+  /* istanbul ignore next -- @preserve */
   Date.prototype.dueFormat = function(last_review, unit, timeUnit) {
     return show_diff_message(this, last_review, unit, timeUnit);
   };
@@ -121,7 +145,7 @@
   }
   function date_diff(now, pre, unit) {
     if (!now || !pre) {
-      throw new Error("Invalid date");
+      throw new FSRSValidationError("Invalid date");
     }
     const diff = TypeConvert.time(now).getTime() - TypeConvert.time(pre).getTime();
     let r = 0;
@@ -170,12 +194,15 @@
     }
     return `${Math.floor(diff)}${unit ? timeUnit[i] : ""}`;
   }
+  /* istanbul ignore next -- @preserve */
   function fixDate(value) {
     return TypeConvert.time(value);
   }
+  /* istanbul ignore next -- @preserve */
   function fixState(value) {
     return TypeConvert.state(value);
   }
+  /* istanbul ignore next -- @preserve */
   function fixRating(value) {
     return TypeConvert.rating(value);
   }
@@ -219,6 +246,10 @@
   function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
   }
+  function roundTo(num, decimals) {
+    const factor = 10 ** decimals;
+    return Math.round(num * factor) / factor;
+  }
   function dateDiffInDays(last, cur) {
     const utc1 = Date.UTC(
       last.getUTCFullYear(),
@@ -240,7 +271,7 @@
     const unit = step.slice(-1);
     const value = parseInt(step.slice(0, -1), 10);
     if (Number.isNaN(value) || !Number.isFinite(value) || value < 0) {
-      throw new Error(`Invalid step value: ${step}`);
+      throw new FSRSValidationError(`Invalid step value: ${step}`);
     }
     switch (unit) {
       case "m":
@@ -250,7 +281,9 @@
       case "d":
         return value * 1440;
       default:
-        throw new Error(`Invalid step unit: ${step}, expected m/h/d`);
+        throw new FSRSValidationError(
+          `Invalid step unit: ${step}, expected m/h/d`
+        );
     }
   };
   const BasicLearningStepsStrategy = (params, state, cur_step) => {
@@ -351,8 +384,8 @@
       this.init();
     }
     checkGrade(grade) {
-      if (!Number.isFinite(grade) || grade < 0 || grade > 4) {
-        throw new Error(`Invalid grade "${grade}",expected 1-4`);
+      if (!Number.isFinite(grade) || grade < 1 || grade > 4) {
+        throw new FSRSValidationError(`Invalid grade "${grade}",expected 1-4`);
       }
     }
     init() {
@@ -498,7 +531,7 @@
     return prng;
   }
 
-  const version="5.2.3";
+  const version="5.4.2";
 
   const default_request_retention = 0.9;
   const default_maximum_interval = 36500;
@@ -569,27 +602,35 @@
   ];
 
   const clipParameters = (parameters, numRelearningSteps, enableShortTerm = default_enable_short_term) => {
-    let w17_w18_ceiling = W17_W18_Ceiling;
-    if (Math.max(0, numRelearningSteps) > 1) {
-      const value = -(Math.log(parameters[11]) + Math.log(Math.pow(2, parameters[13]) - 1) + parameters[14] * 0.3) / numRelearningSteps;
-      w17_w18_ceiling = clamp(+value.toFixed(8), 0.01, 2);
-    }
-    const clip = CLAMP_PARAMETERS(w17_w18_ceiling, enableShortTerm).slice(
+    const clip = CLAMP_PARAMETERS(W17_W18_Ceiling, enableShortTerm).slice(
       0,
       parameters.length
     );
+    if (Math.max(0, numRelearningSteps) > 1) {
+      const w11 = clamp(parameters[11] || 0, clip[11][0], clip[11][1]);
+      const w13 = clamp(parameters[13] || 0, clip[13][0], clip[13][1]);
+      const w14 = clamp(parameters[14] || 0, clip[14][0], clip[14][1]);
+      const value = -(Math.log(w11) + Math.log(Math.pow(2, w13) - 1) + w14 * 0.3) / numRelearningSteps;
+      const w17_w18_ceiling = clamp(
+        roundTo(Math.sqrt(Math.max(value, 0)), 8),
+        0.01,
+        W17_W18_Ceiling
+      );
+      if (clip[17]) clip[17] = [clip[17][0], w17_w18_ceiling];
+      if (clip[18]) clip[18] = [clip[18][0], w17_w18_ceiling];
+    }
     return clip.map(
       ([min, max], index) => clamp(parameters[index] || 0, min, max)
     );
   };
   const checkParameters = (parameters) => {
-    const invalid = parameters.find(
-      (param) => !Number.isFinite(param) && !Number.isNaN(param)
-    );
+    const invalid = parameters.find((param) => !Number.isFinite(param));
     if (invalid !== void 0) {
-      throw Error(`Non-finite or NaN value in parameters ${parameters}`);
+      throw new FSRSValidationError(
+        `Non-finite or NaN value in parameters ${parameters}`
+      );
     } else if (![17, 19, 21].includes(parameters.length)) {
-      throw Error(
+      throw new FSRSValidationError(
         `Invalid parameter length: ${parameters.length}. Must be 17, 19 or 21 for FSRSv4, 5 and 6 respectively.`
       );
     }
@@ -676,17 +717,26 @@
   const computeDecayFactor = (decayOrParams) => {
     const decay = typeof decayOrParams === "number" ? -decayOrParams : -decayOrParams[20];
     const factor = Math.exp(Math.pow(decay, -1) * Math.log(0.9)) - 1;
-    return { decay, factor: +factor.toFixed(8) };
+    return { decay, factor: roundTo(factor, 8) };
   };
   function forgetting_curve(decayOrParams, elapsed_days, stability) {
     const { decay, factor } = computeDecayFactor(decayOrParams);
-    return +Math.pow(1 + factor * elapsed_days / stability, decay).toFixed(8);
+    return roundTo(Math.pow(1 + factor * elapsed_days / stability, decay), 8);
   }
   class FSRSAlgorithm {
     constructor(params) {
       __publicField$3(this, "param");
       __publicField$3(this, "intervalModifier");
       __publicField$3(this, "_seed");
+      __publicField$3(this, "prepare_parameters", (params) => {
+        const generated = generatorParameters(params);
+        generated.w = clipParameters(
+          Array.from(generated.w),
+          generated.relearning_steps.length,
+          generated.enable_short_term
+        );
+        return generated;
+      });
       /**
        * The formula used is :
        * $$R(t,S) = (1 + \text{FACTOR} \times \frac{t}{9 \cdot S})^{\text{DECAY}}$$
@@ -696,7 +746,7 @@
        */
       __publicField$3(this, "forgetting_curve");
       this.param = new Proxy(
-        generatorParameters(params),
+        this.prepare_parameters(params),
         this.params_handler_proxy()
       );
       this.intervalModifier = this.calculate_interval_modifier(
@@ -719,10 +769,12 @@
      */
     calculate_interval_modifier(request_retention) {
       if (request_retention <= 0 || request_retention > 1) {
-        throw new Error("Requested retention rate should be in the range (0,1]");
+        throw new FSRSValidationError(
+          "Requested retention rate should be in the range (0,1]"
+        );
       }
       const { decay, factor } = computeDecayFactor(this.param.w);
-      return +((Math.pow(request_retention, 1 / decay) - 1) / factor).toFixed(8);
+      return roundTo((Math.pow(request_retention, 1 / decay) - 1) / factor, 8);
     }
     /**
      * Get the parameters of the algorithm.
@@ -751,6 +803,11 @@
               target.relearning_steps.length,
               target.enable_short_term
             );
+            value = clipParameters(
+              Array.from(value),
+              target.relearning_steps.length,
+              target.enable_short_term
+            );
             _this.forgetting_curve = forgetting_curve.bind(this, value);
             _this.intervalModifier = _this.calculate_interval_modifier(
               Number(target.request_retention)
@@ -762,7 +819,7 @@
       };
     }
     update_parameters(params) {
-      const _params = generatorParameters(params);
+      const _params = this.prepare_parameters(params);
       for (const key in _params) {
         const paramKey = key;
         this.param[paramKey] = _params[paramKey];
@@ -789,8 +846,9 @@
      * @return {number} Difficulty $$D \in [1,10]$$
      */
     init_difficulty(g) {
-      const d = this.param.w[4] - Math.exp((g - 1) * this.param.w[5]) + 1;
-      return +d.toFixed(8);
+      const w = this.param.w;
+      const d = w[4] - Math.exp((g - 1) * w[5]) + 1;
+      return roundTo(d, 8);
     }
     /**
      * If fuzzing is disabled or ivl is less than 2.5, it returns the original interval.
@@ -825,7 +883,7 @@
      * @see https://github.com/open-spaced-repetition/fsrs4anki/issues/697
      */
     linear_damping(delta_d, old_d) {
-      return +(delta_d * (10 - old_d) / 9).toFixed(8);
+      return roundTo(delta_d * (10 - old_d) / 9, 8);
     }
     /**
      * The formula used is :
@@ -853,9 +911,8 @@
      * @return {number} difficulty
      */
     mean_reversion(init, current) {
-      return +(this.param.w[7] * init + (1 - this.param.w[7]) * current).toFixed(
-        8
-      );
+      const w = this.param.w;
+      return roundTo(w[7] * init + (1 - w[7]) * current, 8);
     }
     /**
      * The formula used is :
@@ -867,13 +924,17 @@
      * @return {number} S^\prime_r new stability after recall
      */
     next_recall_stability(d, s, r, g) {
-      const hard_penalty = Rating.Hard === g ? this.param.w[15] : 1;
-      const easy_bound = Rating.Easy === g ? this.param.w[16] : 1;
-      return +clamp(
-        s * (1 + Math.exp(this.param.w[8]) * (11 - d) * Math.pow(s, -this.param.w[9]) * (Math.exp((1 - r) * this.param.w[10]) - 1) * hard_penalty * easy_bound),
-        S_MIN,
-        36500
-      ).toFixed(8);
+      const w = this.param.w;
+      const hard_penalty = Rating.Hard === g ? w[15] : 1;
+      const easy_bound = Rating.Easy === g ? w[16] : 1;
+      return roundTo(
+        clamp(
+          s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp((1 - r) * w[10]) - 1) * hard_penalty * easy_bound),
+          S_MIN,
+          36500
+        ),
+        8
+      );
     }
     /**
      * The formula used is :
@@ -886,11 +947,15 @@
      * @return {number} S^\prime_f new stability after forgetting
      */
     next_forget_stability(d, s, r) {
-      return +clamp(
-        this.param.w[11] * Math.pow(d, -this.param.w[12]) * (Math.pow(s + 1, this.param.w[13]) - 1) * Math.exp((1 - r) * this.param.w[14]),
-        S_MIN,
-        36500
-      ).toFixed(8);
+      const w = this.param.w;
+      return roundTo(
+        clamp(
+          w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp((1 - r) * w[14]),
+          S_MIN,
+          36500
+        ),
+        8
+      );
     }
     /**
      * The formula used is :
@@ -899,9 +964,10 @@
      * @param {Grade} g Grade (Rating[0.again,1.hard,2.good,3.easy])
      */
     next_short_term_stability(s, g) {
-      const sinc = Math.pow(s, -this.param.w[19]) * Math.exp(this.param.w[17] * (g - 3 + this.param.w[18]));
-      const maskedSinc = g >= 3 ? Math.max(sinc, 1) : sinc;
-      return +clamp(s * maskedSinc, S_MIN, 36500).toFixed(8);
+      const w = this.param.w;
+      const sinc = Math.pow(s, -w[19]) * Math.exp(w[17] * (g - 3 + w[18]));
+      const maskedSinc = g >= Rating.Hard ? Math.max(sinc, 1) : sinc;
+      return roundTo(clamp(s * maskedSinc, S_MIN, 36500), 8);
     }
     /**
      * Calculates the next state of memory based on the current state, time elapsed, and grade.
@@ -909,18 +975,19 @@
      * @param memory_state - The current state of memory, which can be null.
      * @param t - The time elapsed since the last review.
      * @param {Rating} g Grade (Rating[0.Manual,1.Again,2.Hard,3.Good,4.Easy])
+     * @param r - Optional retrievability value. If not provided, it will be calculated.
      * @returns The next state of memory with updated difficulty and stability.
      */
-    next_state(memory_state, t, g) {
+    next_state(memory_state, t, g, r) {
       const { difficulty: d, stability: s } = memory_state != null ? memory_state : {
         difficulty: 0,
         stability: 0
       };
       if (t < 0) {
-        throw new Error(`Invalid delta_t "${t}"`);
+        throw new FSRSValidationError(`Invalid delta_t "${t}"`);
       }
       if (g < 0 || g > 4) {
-        throw new Error(`Invalid grade "${g}"`);
+        throw new FSRSValidationError(`Invalid grade "${g}"`);
       }
       if (d === 0 && s === 0) {
         return {
@@ -935,26 +1002,26 @@
         };
       }
       if (d < 1 || s < S_MIN) {
-        throw new Error(
+        throw new FSRSValidationError(
           `Invalid memory state { difficulty: ${d}, stability: ${s} }`
         );
       }
-      const r = this.forgetting_curve(t, s);
-      const s_after_success = this.next_recall_stability(d, s, r, g);
-      const s_after_fail = this.next_forget_stability(d, s, r);
-      const s_after_short_term = this.next_short_term_stability(s, g);
-      let new_s = s_after_success;
-      if (g === 1) {
+      const w = this.param.w;
+      r = typeof r === "number" ? r : this.forgetting_curve(t, s);
+      let new_s;
+      if (t === 0 && this.param.enable_short_term) {
+        new_s = this.next_short_term_stability(s, g);
+      } else if (g === 1) {
+        const s_after_fail = this.next_forget_stability(d, s, r);
         let [w_17, w_18] = [0, 0];
         if (this.param.enable_short_term) {
-          w_17 = this.param.w[17];
-          w_18 = this.param.w[18];
+          w_17 = w[17];
+          w_18 = w[18];
         }
         const next_s_min = s / Math.exp(w_17 * w_18);
-        new_s = clamp(+next_s_min.toFixed(8), S_MIN, s_after_fail);
-      }
-      if (t === 0 && this.param.enable_short_term) {
-        new_s = s_after_short_term;
+        new_s = clamp(roundTo(next_s_min, 8), S_MIN, s_after_fail);
+      } else {
+        new_s = this.next_recall_stability(d, s, r, g);
       }
       const new_d = this.next_difficulty(d, g);
       return { difficulty: new_d, stability: new_s };
@@ -984,9 +1051,7 @@
       const steps_strategy = this.learningStepsStrategy(
         parameters,
         card.state,
-        // In the original learning steps setup (Again = 5m, Hard = 10m, Good = FSRS),
-        // not adding 1 can cause slight variations in the memory state’s ds.
-        this.current.state === State.Learning && grade !== Rating.Again && grade !== Rating.Hard ? card.learning_steps + 1 : card.learning_steps
+        card.learning_steps
       );
       const scheduled_minutes = Math.max(
         0,
@@ -1043,9 +1108,7 @@
       if (exist) {
         return exist;
       }
-      const next = TypeConvert.card(this.current);
-      next.difficulty = clamp(this.algorithm.init_difficulty(grade), 1, 10);
-      next.stability = this.algorithm.init_stability(grade);
+      const next = this.next_ds(this.elapsed_days, grade);
       this.applyLearningSteps(next, grade, State.Learning);
       const item = {
         card: next,
@@ -1059,14 +1122,11 @@
       if (exist) {
         return exist;
       }
-      const { state, difficulty, stability } = this.last;
-      const next = TypeConvert.card(this.current);
-      next.difficulty = this.algorithm.next_difficulty(difficulty, grade);
-      next.stability = this.algorithm.next_short_term_stability(stability, grade);
+      const next = this.next_ds(this.elapsed_days, grade);
       this.applyLearningSteps(
         next,
         grade,
-        state
+        this.last.state
         /** Learning or Relearning */
       );
       const item = {
@@ -1082,21 +1142,14 @@
         return exist;
       }
       const interval = this.elapsed_days;
-      const { difficulty, stability } = this.last;
-      const retrievability = this.algorithm.forgetting_curve(interval, stability);
-      const next_again = TypeConvert.card(this.current);
-      const next_hard = TypeConvert.card(this.current);
-      const next_good = TypeConvert.card(this.current);
-      const next_easy = TypeConvert.card(this.current);
-      this.next_ds(
-        next_again,
-        next_hard,
-        next_good,
-        next_easy,
-        difficulty,
-        stability,
-        retrievability
+      const retrievability = this.algorithm.forgetting_curve(
+        interval,
+        this.current.stability
       );
+      const next_again = this.next_ds(interval, Rating.Again, retrievability);
+      const next_hard = this.next_ds(interval, Rating.Hard, retrievability);
+      const next_good = this.next_ds(interval, Rating.Good, retrievability);
+      const next_easy = this.next_ds(interval, Rating.Easy, retrievability);
       this.next_interval(next_hard, next_good, next_easy, interval);
       this.next_state(next_hard, next_good, next_easy);
       this.applyLearningSteps(next_again, Rating.Again, State.Relearning);
@@ -1126,50 +1179,20 @@
     /**
      * Review next_ds
      */
-    next_ds(next_again, next_hard, next_good, next_easy, difficulty, stability, retrievability) {
-      next_again.difficulty = this.algorithm.next_difficulty(
-        difficulty,
-        Rating.Again
+    next_ds(t, g, r) {
+      const next_state = this.algorithm.next_state(
+        {
+          difficulty: this.current.difficulty,
+          stability: this.current.stability
+        },
+        t,
+        g,
+        r
       );
-      const nextSMin = stability / Math.exp(
-        this.algorithm.parameters.w[17] * this.algorithm.parameters.w[18]
-      );
-      const s_after_fail = this.algorithm.next_forget_stability(
-        difficulty,
-        stability,
-        retrievability
-      );
-      next_again.stability = clamp(+nextSMin.toFixed(8), S_MIN, s_after_fail);
-      next_hard.difficulty = this.algorithm.next_difficulty(
-        difficulty,
-        Rating.Hard
-      );
-      next_hard.stability = this.algorithm.next_recall_stability(
-        difficulty,
-        stability,
-        retrievability,
-        Rating.Hard
-      );
-      next_good.difficulty = this.algorithm.next_difficulty(
-        difficulty,
-        Rating.Good
-      );
-      next_good.stability = this.algorithm.next_recall_stability(
-        difficulty,
-        stability,
-        retrievability,
-        Rating.Good
-      );
-      next_easy.difficulty = this.algorithm.next_difficulty(
-        difficulty,
-        Rating.Easy
-      );
-      next_easy.stability = this.algorithm.next_recall_stability(
-        difficulty,
-        stability,
-        retrievability,
-        Rating.Easy
-      );
+      const card = TypeConvert.card(this.current);
+      card.difficulty = next_state.difficulty;
+      card.stability = next_state.stability;
+      return card;
     }
     /**
      * Review next_interval
@@ -1212,12 +1235,11 @@
       }
       this.current.scheduled_days = 0;
       this.current.elapsed_days = 0;
-      const next_again = TypeConvert.card(this.current);
-      const next_hard = TypeConvert.card(this.current);
-      const next_good = TypeConvert.card(this.current);
-      const next_easy = TypeConvert.card(this.current);
-      this.init_ds(next_again, next_hard, next_good, next_easy);
       const first_interval = 0;
+      const next_again = this.next_ds(first_interval, Rating.Again);
+      const next_hard = this.next_ds(first_interval, Rating.Hard);
+      const next_good = this.next_ds(first_interval, Rating.Good);
+      const next_easy = this.next_ds(first_interval, Rating.Easy);
       this.next_interval(
         next_again,
         next_hard,
@@ -1229,31 +1251,20 @@
       this.update_next(next_again, next_hard, next_good, next_easy);
       return this.next.get(grade);
     }
-    init_ds(next_again, next_hard, next_good, next_easy) {
-      next_again.difficulty = clamp(
-        this.algorithm.init_difficulty(Rating.Again),
-        1,
-        10
+    next_ds(t, g, r) {
+      const next_state = this.algorithm.next_state(
+        {
+          difficulty: this.current.difficulty,
+          stability: this.current.stability
+        },
+        t,
+        g,
+        r
       );
-      next_again.stability = this.algorithm.init_stability(Rating.Again);
-      next_hard.difficulty = clamp(
-        this.algorithm.init_difficulty(Rating.Hard),
-        1,
-        10
-      );
-      next_hard.stability = this.algorithm.init_stability(Rating.Hard);
-      next_good.difficulty = clamp(
-        this.algorithm.init_difficulty(Rating.Good),
-        1,
-        10
-      );
-      next_good.stability = this.algorithm.init_stability(Rating.Good);
-      next_easy.difficulty = clamp(
-        this.algorithm.init_difficulty(Rating.Easy),
-        1,
-        10
-      );
-      next_easy.stability = this.algorithm.init_stability(Rating.Easy);
+      const card = TypeConvert.card(this.current);
+      card.difficulty = next_state.difficulty;
+      card.stability = next_state.stability;
+      return card;
     }
     /**
      * @see https://github.com/open-spaced-repetition/ts-fsrs/issues/98#issuecomment-2241923194
@@ -1267,71 +1278,19 @@
         return exist;
       }
       const interval = this.elapsed_days;
-      const { difficulty, stability } = this.last;
-      const retrievability = this.algorithm.forgetting_curve(interval, stability);
-      const next_again = TypeConvert.card(this.current);
-      const next_hard = TypeConvert.card(this.current);
-      const next_good = TypeConvert.card(this.current);
-      const next_easy = TypeConvert.card(this.current);
-      this.next_ds(
-        next_again,
-        next_hard,
-        next_good,
-        next_easy,
-        difficulty,
-        stability,
-        retrievability
+      const retrievability = this.algorithm.forgetting_curve(
+        interval,
+        this.current.stability
       );
+      const next_again = this.next_ds(interval, Rating.Again, retrievability);
+      const next_hard = this.next_ds(interval, Rating.Hard, retrievability);
+      const next_good = this.next_ds(interval, Rating.Good, retrievability);
+      const next_easy = this.next_ds(interval, Rating.Easy, retrievability);
       this.next_interval(next_again, next_hard, next_good, next_easy, interval);
       this.next_state(next_again, next_hard, next_good, next_easy);
       next_again.lapses += 1;
       this.update_next(next_again, next_hard, next_good, next_easy);
       return this.next.get(grade);
-    }
-    /**
-     * Review next_ds
-     */
-    next_ds(next_again, next_hard, next_good, next_easy, difficulty, stability, retrievability) {
-      next_again.difficulty = this.algorithm.next_difficulty(
-        difficulty,
-        Rating.Again
-      );
-      const s_after_fail = this.algorithm.next_forget_stability(
-        difficulty,
-        stability,
-        retrievability
-      );
-      next_again.stability = clamp(stability, S_MIN, s_after_fail);
-      next_hard.difficulty = this.algorithm.next_difficulty(
-        difficulty,
-        Rating.Hard
-      );
-      next_hard.stability = this.algorithm.next_recall_stability(
-        difficulty,
-        stability,
-        retrievability,
-        Rating.Hard
-      );
-      next_good.difficulty = this.algorithm.next_difficulty(
-        difficulty,
-        Rating.Good
-      );
-      next_good.stability = this.algorithm.next_recall_stability(
-        difficulty,
-        stability,
-        retrievability,
-        Rating.Good
-      );
-      next_easy.difficulty = this.algorithm.next_difficulty(
-        difficulty,
-        Rating.Easy
-      );
-      next_easy.stability = this.algorithm.next_recall_stability(
-        difficulty,
-        stability,
-        retrievability,
-        Rating.Easy
-      );
     }
     /**
      * Review/New next_interval
@@ -1448,7 +1407,9 @@
      */
     handleManualRating(card, state, reviewed, elapsed_days, stability, difficulty, due) {
       if (typeof state === "undefined") {
-        throw new Error("reschedule: state is required for manual rating");
+        throw new FSRSValidationError(
+          "reschedule: state is required for manual rating"
+        );
       }
       let log;
       let next_card;
@@ -1469,7 +1430,9 @@
         next_card.last_review = reviewed;
       } else {
         if (typeof due === "undefined") {
-          throw new Error("reschedule: due is required for manual rating");
+          throw new FSRSValidationError(
+            "reschedule: due is required for manual rating"
+          );
         }
         const scheduled_days = date_diff(due, reviewed, "days");
         log = {
@@ -1578,6 +1541,9 @@
   };
   var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
   var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+  function applyAfterHandler(value, afterHandler) {
+    return typeof afterHandler === "function" ? afterHandler(value) : value;
+  }
   class FSRS extends FSRSAlgorithm {
     constructor(param) {
       super(param);
@@ -1599,6 +1565,11 @@
           } else if (prop === "w") {
             value = migrateParameters(
               value,
+              target.relearning_steps.length,
+              target.enable_short_term
+            );
+            value = clipParameters(
+              Array.from(value),
               target.relearning_steps.length,
               target.enable_short_term
             );
@@ -1693,11 +1664,7 @@
     repeat(card, now, afterHandler) {
       const instance = this.getScheduler(card, now);
       const recordLog = instance.preview();
-      if (afterHandler && typeof afterHandler === "function") {
-        return afterHandler(recordLog);
-      } else {
-        return recordLog;
-      }
+      return applyAfterHandler(recordLog, afterHandler);
     }
     /**
      * Display the collection of cards and logs for the card scheduled at the current time, after applying a specific grade rating.
@@ -1757,14 +1724,10 @@
       const instance = this.getScheduler(card, now);
       const g = TypeConvert.rating(grade);
       if (g === Rating.Manual) {
-        throw new Error("Cannot review a manual rating");
+        throw new FSRSValidationError("Cannot review a manual rating");
       }
       const recordLogItem = instance.review(g);
-      if (afterHandler && typeof afterHandler === "function") {
-        return afterHandler(recordLogItem);
-      } else {
-        return recordLogItem;
-      }
+      return applyAfterHandler(recordLogItem, afterHandler);
     }
     /**
      * Get the retrievability of the card
@@ -1809,7 +1772,7 @@
       const processedCard = TypeConvert.card(card);
       const processedLog = TypeConvert.review_log(log);
       if (processedLog.rating === Rating.Manual) {
-        throw new Error("Cannot rollback a manual rating");
+        throw new FSRSValidationError("Cannot rollback a manual rating");
       }
       let last_due;
       let last_review;
@@ -1840,11 +1803,7 @@
         state: processedLog.state,
         last_review
       });
-      if (afterHandler && typeof afterHandler === "function") {
-        return afterHandler(prevCard);
-      } else {
-        return prevCard;
-      }
+      return applyAfterHandler(prevCard, afterHandler);
     }
     /**
      *
@@ -1926,11 +1885,7 @@
         last_review: processedCard.last_review
       });
       const recordLogItem = { card: forget_card, log: forget_log };
-      if (afterHandler && typeof afterHandler === "function") {
-        return afterHandler(recordLogItem);
-      } else {
-        return recordLogItem;
-      }
+      return applyAfterHandler(recordLogItem, afterHandler);
     }
     /**
      * Reschedules the current card and returns the rescheduled collections and reschedule item.
@@ -1997,15 +1952,9 @@
         len ? collections[len - 1] : void 0,
         updateMemoryState
       );
-      if (recordLogHandler && typeof recordLogHandler === "function") {
-        return {
-          collections: collections.map(recordLogHandler),
-          reschedule_item: manual_item ? recordLogHandler(manual_item) : null
-        };
-      }
       return {
-        collections,
-        reschedule_item: manual_item
+        collections: typeof recordLogHandler === "function" ? collections.map(recordLogHandler) : collections,
+        reschedule_item: manual_item ? applyAfterHandler(manual_item, recordLogHandler) : null
       };
     }
   }
@@ -2057,6 +2006,8 @@
   exports.generatorParameters = generatorParameters;
   exports.get_fuzz_range = get_fuzz_range;
   exports.migrateParameters = migrateParameters;
+  exports.roundTo = roundTo;
   exports.show_diff_message = show_diff_message;
 
 }));
+//# sourceMappingURL=index.umd.js.map

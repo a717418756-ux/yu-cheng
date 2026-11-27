@@ -508,7 +508,8 @@ async function renderList(){  try{
 
   if(!fl.length){
     el.innerHTML='<div class="empty"><span class="ic">📭</span><span>'+(kw?'找不到符合的題目':'尚無題目')+'</span></div>';
-    if(kw) window.ycS2TRetry?.('si', renderList);   // v4.67 打簡體字 → 轉繁體再找
+    // v4.67 打簡體字 → 轉繁體再找；v4.68 沒換字（或換了還是沒有）→ 列出相近的題目
+    if(kw) Promise.resolve(window.ycS2TRetry?.('si', renderList)).then(r => { if(!r) window.ycFuzzyQs?.(kw, el); }).catch(()=>{});
     return;
   }
 
@@ -1833,7 +1834,9 @@ async function renderDB(){  try{
       ? '<div class="empty"><span class="ic">🔍</span><span>查無符合的法規或條文</span></div>'
       : '<div class="empty"><span class="ic">🗄</span><span>尚無資料</span></div>';
     if(lc) lc.textContent='';
-    if(kw) window.ycS2TRetry?.('lsi', renderDB);   // v4.67 打簡體字 → 轉繁體再找
+    // v4.67 打簡體字 → 轉繁體再找；v4.68 沒換字（或換了還是沒有）→ 列出相近的條文
+    if(kw && !sec) Promise.resolve(window.ycS2TRetry?.('lsi', renderDB)).then(r => { if(!r) window.ycFuzzyLaws?.(kw, el); }).catch(()=>{});
+    else if(kw) window.ycS2TRetry?.('lsi', renderDB);
     return;
   }
 
@@ -2627,6 +2630,7 @@ function exitLaw(){
   window.lrOnExit?.();   // v4.66 記下讀到哪一條
   closeLvFind();
   window.lnOnExit?.();   // v4.64 重點筆記：收起工具列、取消遮住
+  window.lpOnExit?.();   // v4.68 數字挖空：離開法規就關掉
   document.getElementById('lv').style.display='none';
   const cb = document.getElementById('lv-chapter-bar');
   if(cb){ cb.innerHTML=''; cb.style.display='none'; }

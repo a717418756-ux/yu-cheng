@@ -1,6 +1,6 @@
 # Y.C. 多功能專用平台
 
-> 警察特考備考 PWA｜版本 **4.67.0**
+> 警察特考備考 PWA｜版本 **4.68.0**
 > 離線可用．資料存本機
 
 ---
@@ -51,7 +51,7 @@
 - **解析更正（v4.52.0）**：稽核找到的 3 題解析與官方答案矛盾（4152、4189、5214），依官方答案改寫解析，答案不動，`tools/exam_fixes/make_fixes_1123.py` 產生、設定「考古題答案更正」套用；2 題選項重複（1508、2825）經對照原卷確認原卷如此，不改。
 - **影音庫 YouTube（v4.53.0，`js/youtube.js`）**：影音庫上方「▶ 搜尋 YouTube」。搜尋用 YouTube Data API v3（設定填自己的金鑰，存在本機設定、還原時不覆蓋已設定的；搜尋一次 100 額度、每天 10,000），貼影片／播放清單網址不需要金鑰（清單需要）。播放用官方 IFrame 播放器（要連網；不下載、不去廣告、不隱藏畫面）。收進影音庫的存在 leisuremedia（`ytId`、`ytChannel`、`note`、縮圖網址、沒有檔案本體），同分類依建立時間連續播放、記住 lastPos；SW 對 YouTube／googleapis 一律直連不快取。
 - **三星健康、App 相容層（v4.57.0）**：YcHealth（Kotlin，Health Connect connect-client 1.1.0：讀步數／運動／活動消耗／總消耗／基礎代謝／飲食；三星健康沒寫活動消耗時以 總消耗－基礎代謝 計算（v4.57.1），列出所有來源的當天運動與各自熱量，寫運動＋活動消耗、飲食，刪本 App 的紀錄）；`js/fitness.js` App 版改讀 Health Connect（healthLogs 每天的 `hc` 欄位）；`js/folder-native.js` 另補 `dl()` 存到下載／Y.C.、`window.open` 開 App 內檔案改視窗顯示、以 YcTts（Android TextToSpeech）補 `speechSynthesis`。App minSdk 26。
-- **FSRS、資料夾 App 版、跳過片段、歌詞（v4.56.0）**：`js/ts-fsrs.umd.js`（ts-fsrs 5.2.3，MIT，本機內附）＋ db.js `reviewSchedule`／`reviewRescore`（題目欄位 `fsrs`，`nextReview` 照舊；localStorage `review_algo`、`review_ret`）；`js/folder-native.js` 在 App 裡以 YcFolder 原生外掛（Storage Access Framework）補上 `showDirectoryPicker`，settings.js 備份還原不改流程；YcPlayer 內建 SponsorBlock（`sb`、`sbCats`）與系統子母畫面；歌詞用 LRCLIB 搜尋，標題解析在 `_ytSongGuess`。
+- **FSRS、資料夾 App 版、跳過片段、歌詞（v4.56.0）**：`js/ts-fsrs.umd.js`（ts-fsrs 5.4.2，MIT，本機內附；v4.68 由 5.2.3 升級）＋ db.js `reviewSchedule`／`reviewRescore`（題目欄位 `fsrs`，`nextReview` 照舊；localStorage `review_algo`、`review_ret`）；`js/folder-native.js` 在 App 裡以 YcFolder 原生外掛（Storage Access Framework）補上 `showDirectoryPicker`，settings.js 備份還原不改流程；YcPlayer 內建 SponsorBlock（`sb`、`sbCats`）與系統子母畫面；歌詞用 LRCLIB 搜尋，標題解析在 `_ytSongGuess`。
 - **YouTube 訂閱、紀錄、字幕、小視窗（v4.55.0）**：搜尋建議與篩選；頻道訂閱與動態（設定 `yt_subs`，可匯入 NewPipe／Takeout）；觀看紀錄（設定 `yt_hist`，最多 300 筆）；App 版字幕（NewPipe 字幕網址改 `fmt=srv1`，雙語顯示用 YcPlayer.setCues、逐字稿、.srt 下載，下載影片可附字幕 `subs`）；浮動小視窗（原生畫面跟著 `#yt-float`）；清單播完原生端自動接相關影片（`autoplay`、`exclude`＝看過的）。YouTube 自動翻譯字幕常被拒（HTTP 429），預設不開。
 - **Android App 版（v4.54.0，專案在 `E:\YC-app`，只在本機）**：Capacitor 8 外殼包同一份網頁；原生外掛 YtNative（NewPipeExtractor：搜尋、串流、分段下載、MediaMuxer 合併 mp4／webm、另存到下載資料夾、系統列顏色）與 YcPlayer（Media3 ExoPlayer＋MediaSessionService：背景播放、通知列控制、畫面疊在網頁上）。`js/youtube.js` 偵測到外掛才走 App 版路徑，瀏覽器版不受影響。打包：`E:\YC-app\build-apk.ps1`。
 - **📈 趨勢**：出題風格（多選、否定、數字、案例題比例，全期 vs 近3次）與讀法建議；**🧭 近三年出題理由回測**（每題為何會考：常考條文、首次出題、近3年修法、釋憲／憲判、實務見解、時事議題、作業規定與學理）；**🔁 交互驗證**（只看本考試、兩考試合併、合併＋近3次加權，哪種排名押前 50 條隔年蓋得最多）；最近兩年才首次出現的條文（回測顯示單看新考點預測力不高，只當補充）、警佐班考得最多的條文
@@ -230,6 +230,16 @@ v4.37.0 起可自訂類別：新增資料、大量新增、變更類別的選單
 | 簡體搜尋 | 資料庫搜尋、題目搜尋、本法搜尋找不到、而且有中文時，自動轉繁體再找一次（提示轉成什麼） | opencc-js 1.4.2 cn2t（MIT、字典 Apache-2.0） |
 
 四個套件都放在本機 `js/lib/`（不從網路 CDN 載入）。perfect-freehand 很小，跟著頁面載入；其他三個第一次用到才載入，之後由 Service Worker 快取，離線可用。授權說明見 `js/lib/LICENSES.md`。
+
+### 優化與新增（v4.68.0）
+
+| 項目 | 內容 |
+|---|---|
+| 相近結果 | 資料庫（法規）、題目搜尋**一筆都沒有**時，改用「相鄰兩個字」比對，列出六成以上字詞有出現的條文／題目（最多 20 筆，依相符程度），標「沒有完全符合的」。原本的搜尋結果完全不變。點條文打開整部法規並跳到那一條；題目可 ▶ 練習、✏ 編輯。`js/lawplus.js` `ycFuzzyLaws`／`ycFuzzyQs`。FlexSearch（Apache-2.0）實測中文逐字切、排序不準，沒有採用 |
+| 數字挖空 | 法規頁 ⋮ →「🔢 數字挖空（背誦）」：期間、金額、年齡、倍數、百分比、幾分之幾變成色塊，點一下顯示。條號、項次（第十條、前二項）與「同一」「單一」不遮。只換顏色不改寬度，手寫筆記位置不跑掉；用本法搜尋或離開法規自動關閉。`lpCloze` |
+| 診斷 | 設定最下方：資料是否「永久保存」（網頁版向瀏覽器申請，空間不足時不會被自動清除；App 版本來就不會清）、錯誤紀錄。沒被攔到的錯誤也會記（`window` error／unhandledrejection），存在 localStorage `yc_err_log`（50 筆，重開還在），網址參數會去掉；可「複製」給 Claude、「清除」 |
+| 套件更新 | Dexie 4.0.8 → 4.4.7、Chart.js 4.4.0 → 4.6.2、ts-fsrs 5.2.3 → 5.4.2（9000 組作答序列比對，排程間隔完全相同）。ts-fsrs 6.x 是大改版，沒有升 |
+| 評估後沒做 | FSRS 個人化參數（fsrs-browser）：需要網站送出 COOP/COEP 標頭（GitHub Pages 無法設定，硬開會讓 YouTube 播放失效），而且作答紀錄要約 1000 筆以上才準。英文跟讀評分：平台已有 🎙 跟讀（Azure 發音評估），不重複加語音辨識套件 |
 
 ### 法規閱讀（v4.66.0，`js/lawread.js`）
 

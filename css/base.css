@@ -2091,3 +2091,6 @@ html[data-layout="desktop"] #fab-wrap{
 #lp-svg{ flex:1; width:100%; min-height:0; touch-action:none;
   --markmap-text-color:#e6e6e6; --markmap-circle-open-bg:#2a2a2a; --markmap-font:500 15px/20px system-ui, sans-serif; }
 #lp-svg .lp-mi{ cursor:pointer; text-decoration:underline dotted rgba(110,168,254,.7); text-underline-offset:3px; }
+/* v4.68 數字挖空：只換顏色、不加寬度（手寫筆記位置不跑掉）；點一下顯示（虛線底） */
+#lbody.lp-cz-on .lp-cz{ color:transparent; background:rgba(255,183,77,.55); border-radius:3px; cursor:pointer; -webkit-user-select:none; user-select:none; }
+#lbody.lp-cz-on .lp-cz.lp-czs{ color:inherit; background:none; text-decoration:underline dashed #ffb74d; text-underline-offset:3px; }

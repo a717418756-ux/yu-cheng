@@ -161,7 +161,141 @@ window.ycS2TRetry = async (inputId, rerun) => {
   inp.value = t;
   toast('找不到，已把簡體轉成繁體再找：' + t);
   try{ await rerun(); }catch(_){}
+  return true;   // 已經換字重搜（重搜的結果自己處理後續，例如相近結果）
 };
+
+// ── ④找不到時列出「相近結果」（v4.68）──────────────────────────
+//   原本的搜尋（每個詞都要出現）結果完全不變；只有「一筆都沒有」時，改用「相鄰兩個字」比對，
+//   列出大部分字詞都有出現的條文、題目，依相符程度排序，標明「不完全符合」。
+//   FlexSearch（Apache-2.0）實測過：中文逐字切，「臨檢要件」排出一堆無關條文，所以不用套件，自己比對。
+const _fzNorm = s => String(s || '').replace(/身份/g, '身分').replace(/台(?=[灣北中南東])/g, '臺')
+  .replace(/[\s　、，。；：「」『』（）()【】〔〕﹝﹞\[\]\-—_.,;:!?！？…·]/g, '').toLowerCase();
+const _bi = s => { const a = new Set(); for(let i = 0; i < s.length - 1; i++) a.add(s.slice(i, i + 2)); if(s.length === 1) a.add(s); return [...a]; };
+// 選項、關鍵字可能是陣列、物件（{A:…}）或字串
+const _flat = v => Array.isArray(v) ? v.join(' ') : (v && typeof v === 'object') ? Object.values(v).join(' ') : String(v || '');
+const _fzCache = new WeakMap();   // 資料陣列 → 正規化後的文字（陣列換了才重算）
+function _fzRank(arr, q, prep, lim){
+  const qb = _bi(_fzNorm(q)); if(qb.length < 2) return [];   // 太短（一兩個字）不猜
+  let docs = _fzCache.get(arr);
+  if(!docs){ docs = arr.map(x => ({ x, f:prep(x).map(([v, w]) => [_fzNorm(v), w]) })); _fzCache.set(arr, docs); }
+  const out = [];
+  for(const d of docs){
+    let hit = 0, s = 0;
+    for(const b of qb){
+      let best = 0;
+      for(const [v, w] of d.f) if(w > best && v.includes(b)) best = w;
+      if(best){ hit++; s += best; }
+    }
+    const cov = hit / qb.length;
+    if(cov < 0.6) continue;   // 六成以上的字詞有出現才列
+    const len = d.f.reduce((n, [v]) => n + v.length, 0);
+    out.push({ x:d.x, sc:cov * 10 + s / qb.length - Math.min(len, 600) / 3000 });
+  }
+  return out.sort((a, b) => b.sc - a.sc).slice(0, lim).map(o => o.x);
+}
+// 搜尋框的字還是同一個、清單還是「找不到」才畫（使用者已經改字就不畫）
+const _fzStill = (inputId, el, kw) => {
+  const v = document.getElementById(inputId)?.value;
+  // 同 data.js 的 _kwNorm（全形英數轉半形、小寫、去頭尾空白；那個在 data.js 模組內，這裡拿不到）
+  const norm = String(v || '').replace(/[０-９Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).toLowerCase().trim();
+  return norm === kw && el.isConnected && el.querySelector(':scope > .empty') && !el.querySelector('.yc-fz');
+};
+const _fzHead = n => '<div class="law-search-head yc-fz">沒有完全符合的，以下 ' + n + ' 筆是大部分字詞有出現的（依相符程度）</div>';
+window.ycFuzzyLaws = async (kw, el) => {
+  const ls = (await da('laws')).filter(l => !String(l.content || '').startsWith('data:')
+    && (typeof S !== 'object' || !S.lawCat || S.lawCat === 'all' || l.category === S.lawCat));
+  const r = _fzRank(ls, kw, l => [[l.lawName, 1.5], [l.title, 2], [l.content, 1]], 20);
+  if(!r.length || !_fzStill('lsi', el, kw)) return;
+  el.insertAdjacentHTML('beforeend', _fzHead(r.length) + r.map(l =>
+    '<div class="card law-search-card yc-fz-i" onclick="ycFuzzyOpenLaw(' + l.id + ')">'
+    + '<div class="law-search-lawname">' + _e(l.lawName || '') + '</div>'
+    + '<div class="law-search-article">' + _e(l.article || '') + (l.title ? ' <span class="law-search-title">' + _e(l.title) + '</span>' : '') + '</div>'
+    + '<div class="law-search-preview">' + _e(String(l.content || '').slice(0, 80)) + '</div></div>').join(''));
+};
+// 打開整部法規、跳到那一條並閃一下
+window.ycFuzzyOpenLaw = async id => {
+  const l = await _db.laws.get(id); if(!l) return;
+  await openLawGroup(l.lawName, true);
+  setTimeout(() => {
+    const c = document.querySelector('#lbody [data-law-id="' + id + '"]'); if(!c) return;
+    c.scrollIntoView({ block:'start' });
+    c.classList.remove('lv-flash'); void c.offsetWidth; c.classList.add('lv-flash');
+  }, 350);
+};
+window.ycFuzzyQs = async (kw, el) => {
+  const qs = await da('questions');
+  const r = _fzRank(qs, kw, q => [[q.stem, 2], [q.groupStem, 1], [_flat(q.options), 1], [_flat(q.keywords), 2]], 20);
+  if(!r.length || !_fzStill('si', el, kw)) return;
+  el.insertAdjacentHTML('beforeend', _fzHead(r.length) + r.map(q =>
+    '<div class="qc yc-fz-i"><div class="qch"><span class="badge ' + (q.type === 'mc' ? 'bmc' : 'bes') + '">' + (q.type === 'mc' ? '選擇' : '申論') + '</span>'
+    + (q.year ? '<span class="tag">' + _e(q.year) + '</span>' : '') + (q.exam ? '<span class="tag">' + _e(q.exam) + '</span>' : '')
+    + '<span class="tag">' + _e(q.subject || '未分類') + '</span></div>'
+    + '<div class="qst">' + _e(String(q.stem || '').slice(0, 100)) + '</div>'
+    + '<div class="qa"><button class="qabn" onclick="editQ(' + q.id + ')">✏ 編輯</button>'
+    + '<button class="qabn" data-qid="' + q.id + '" onclick="startSingleQ(this)">▶ 練習</button></div></div>').join(''));
+};
+
+// ── ⑤數字挖空（背誦，v4.68）────────────────────────────────────
+//   ⋮ 選單「🔢 數字挖空」：條文裡的期間、金額、年齡、倍數、百分比等數字變成色塊，點一下顯示。
+//   只改畫面（包一層 span、不加寬度），不改資料；手寫筆記位置不會跑掉。「第十條」「前二項」這類條號、項次，「同一」「單一」這類詞不遮。
+const _N = '[零〇一二兩三四五六七八九十百千萬億0-9０-９]';
+const _CZ_RE = new RegExp(
+  '(?<![第前後同任單唯統逐])(?:百分之' + _N + '+(?:點' + _N + '+)?|' + _N + '+分之' + _N + '+|'
+  + _N + '+(?:[.,，．]' + _N + '+)*(?=(?:個月|個工作日|小時|分鐘|日|天|月|年|週|星期|歲|萬元|億元|千元|元|倍|次|公尺|公里|公分|公斤|公克|毫升|毫克|人|名|張|件|輛|公升|度)))', 'g');
+let _cz = false, _czObs = null, _czT = 0;
+function _czWrap(root){
+  let n = 0;
+  root.querySelectorAll('.law-art-body').forEach(body => {
+    const w = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, { acceptNode: t =>
+      t.parentElement.closest('.lp-cz, a, button, textarea, input, .ink-tl, [contenteditable]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const nodes = []; while(w.nextNode()) nodes.push(w.currentNode);
+    for(const t of nodes){
+      const s = t.nodeValue; _CZ_RE.lastIndex = 0;
+      if(!_CZ_RE.test(s)) continue;
+      _CZ_RE.lastIndex = 0;
+      const f = document.createDocumentFragment(); let last = 0, m;
+      while((m = _CZ_RE.exec(s))){
+        if(m.index > last) f.appendChild(document.createTextNode(s.slice(last, m.index)));
+        const sp = document.createElement('span'); sp.className = 'lp-cz'; sp.textContent = m[0];
+        f.appendChild(sp); n++; last = m.index + m[0].length;
+      }
+      if(last < s.length) f.appendChild(document.createTextNode(s.slice(last)));
+      t.replaceWith(f);
+    }
+  });
+  return n;
+}
+function _czUnwrap(){
+  document.querySelectorAll('#lbody .lp-cz').forEach(sp => { const p = sp.parentNode; sp.replaceWith(document.createTextNode(sp.textContent)); p?.normalize?.(); });
+}
+function _czSync(){
+  const it = document.getElementById('lp-cz-item');
+  if(it) it.textContent = _cz ? '👁 顯示全部數字' : '🔢 數字挖空（背誦）';
+  document.getElementById('lbody')?.classList.toggle('lp-cz-on', _cz);
+}
+window.lpCloze = on => {
+  const lb = document.getElementById('lbody'); if(!lb) return;
+  _cz = on == null ? !_cz : !!on;
+  if(_cz){
+    const n = _czWrap(lb);
+    // 條文分批載入、編輯後重畫：新出現的條文也遮（自己包 span 引起的變動再掃一次也不會重複包）
+    _czObs = _czObs || new MutationObserver(() => { clearTimeout(_czT); _czT = setTimeout(() => { if(_cz) _czWrap(lb); }, 80); });
+    _czObs.observe(lb, { childList:true, subtree:true });
+    toast(n ? '已遮住 ' + n + ' 個數字，點色塊顯示' : '這部法規畫面上沒有可遮的數字（期間、金額等）');
+  }else{
+    _czObs?.disconnect(); _czUnwrap();
+  }
+  _czSync();
+};
+// 點色塊 → 顯示／再遮
+document.addEventListener('click', e => {
+  const sp = e.target.closest?.('#lbody.lp-cz-on .lp-cz'); if(!sp) return;
+  e.stopPropagation(); e.preventDefault();
+  sp.classList.toggle('lp-czs');
+}, true);
+// 用「本法搜尋」時先關掉挖空（數字被拆開，找「三日」會找不到）；離開法規也關掉
+document.addEventListener('focusin', e => { if(_cz && e.target?.id === 'lv-find-q'){ window.lpCloze(false); toast('已關閉數字挖空，方便搜尋'); } });
+window.lpOnExit = () => { if(_cz) window.lpCloze(false); };
 
 // 返回鍵：先關對照、心智圖
 window.lpBack = () => {

@@ -741,19 +741,27 @@ async function renderSet(){  _renderAzureKey().catch(()=>{}); _renderTtsEngine()
       `程式版本：<b>v${av}</b>　題庫版本：<b>${dv}</b>`
       + `<div><button class="btn" style="padding:6px 14px;font-size:12px" onclick="ycCheckUpdate(this)">🔄 檢查更新</button></div>`;
 
-    // 診斷資訊：錯誤日誌
+    // 診斷資訊（v4.68）：資料保存狀態＋錯誤紀錄（存在本機，重開還在；可複製給 Claude、可清除）
     const diagEl = document.getElementById('set-diag-info');
     if(diagEl){
+      const ps = (window.ycPersist||{}).state;
+      const psHtml = ps === 'persisted' ? '<span style="color:var(--grn)">✓ 資料已設為永久保存（空間不足時瀏覽器不會自動清除）</span>'
+        : ps === 'best-effort' ? '<span style="color:var(--t2)">資料保存：一般（瀏覽器未同意永久保存；把網頁「加到主畫面」安裝後較容易取得。請定期備份）</span>'
+        : '';
       const errs = typeof _errLog !== 'undefined' ? _errLog : [];
+      let errHtml;
       if(errs.length === 0){
-        diagEl.innerHTML = '<span style="color:var(--grn)">✓ 無錯誤記錄</span>';
+        errHtml = '<span style="color:var(--grn)">✓ 無錯誤記錄</span>';
       } else {
-        const errHtml = errs.slice(-5).reverse().map(e=>
+        errHtml = `<div style="color:var(--t2);font-size:11px;margin-bottom:4px">錯誤紀錄 ${errs.length} 筆（顯示最後 5 筆）
+            <button class="btn" style="padding:2px 8px;font-size:11px" onclick="navigator.clipboard?.writeText(ycErrText()).then(()=>toast('已複製錯誤紀錄'),()=>toast('複製失敗'))">複製</button>
+            <button class="btn" style="padding:2px 8px;font-size:11px" onclick="ycErrClear();renderSet()">清除</button></div>`
+          + errs.slice(-5).reverse().map(e=>
           `<div style="color:var(--red2,#c00);font-size:11px;border-left:2px solid var(--red);padding-left:6px;margin-bottom:4px">` +
-          `<b>${esc(e.ctx)}</b>：${esc(e.msg)}<br><span style="color:var(--t2)">${esc(e.t.replace('T',' ').slice(0,19))}</span></div>`
+          `<b>${esc(e.ctx)}</b>：${esc(e.msg)}<br><span style="color:var(--t2)">${esc(String(e.t).replace('T',' ').slice(0,19))}${e.v ? '・v' + esc(e.v) : ''}</span></div>`
         ).join('');
-        diagEl.innerHTML = `<div style="color:var(--t2);font-size:11px;margin-bottom:4px">最近 ${errs.length} 筆錯誤（顯示最後5筆）：</div>${errHtml}`;
       }
+      diagEl.innerHTML = (psHtml ? '<div style="margin-bottom:4px">' + psHtml + '</div>' : '') + errHtml;
     }
   }
   }catch(e){ logError('renderSet',e); }}

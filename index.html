@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.json">
 <title>Y.C. 多功能專用平台</title>
-<script src="js/chart.umd.min.js"></script><!-- Chart.js 4.4.0（本機一份，與 cdnjs SRI 相同；App 離線也能開） -->
+<script src="js/chart.umd.min.js"></script><!-- Chart.js 4.6.2（本機一份，npm 原檔；App 離線也能開；v4.68 由 4.4.0 升級） -->
 <!-- Google Fonts：電子紙標楷體備援 + 英文 serif -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -791,6 +791,7 @@
   <div class="srow"><div><div class="slb" style="color:var(--red)">刪除全部題目</div><div class="ssb">無法復原</div></div><button class="btn br" style="padding:6px 10px;font-size:12px" onclick="cfm('刪除全部題目','無法復原，確定嗎？',delAll)">全刪</button></div>
   <div style="text-align:center;padding:20px;font-size:11px;color:var(--t2)">
     <div id="set-ver-info" style="line-height:2;margin-bottom:4px"></div>
+    <div id="set-diag-info" style="margin:6px 0 4px;font-size:12px"></div><!-- v4.68 診斷：資料保存狀態、錯誤紀錄 -->
     
 </div>
 </div>
@@ -911,6 +912,7 @@
         padding:4px 0;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:200">
         <button class="lv-menu-item" onclick="lnOpenAll(window.currentLawName);closeLvMenu()">📝 筆記總覽</button>
         <button class="lv-menu-item" id="ln-cover-item" style="display:none" onclick="lnToggleCover();closeLvMenu()">🙈 遮住重點（背誦）</button>
+        <button class="lv-menu-item" id="lp-cz-item" onclick="lpCloze();closeLvMenu()">🔢 數字挖空（背誦）</button>
         <button class="lv-menu-item" onclick="ttsReadLaw();closeLvMenu()">🔊 朗讀法條</button>
         <button class="lv-menu-item" id="lv-star-item" onclick="toggleLvFav();closeLvMenu()">☆ 收藏</button>
         <button class="lv-menu-item" onclick="editLawGroupInfo();closeLvMenu()">⚙ 編輯法規資訊</button>
@@ -1237,7 +1239,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- Dexie（必須在 db.js 之前載入）-->
-<script src="js/dexie.min.js"></script><!-- Dexie 4.0.8（本機一份，與 cdnjs SRI 相同） -->
+<script src="js/dexie.min.js"></script><!-- Dexie 4.4.7（本機一份，npm 原檔；v4.68 由 4.0.8 升級） -->
 <!-- JS 模組（載入順序不可更動）-->
 <script src="js/ts-fsrs.umd.js"></script>
 <script src="js/db.js"></script>
