@@ -228,7 +228,7 @@ class Board{
     let pan = null;  // 捲動中：{ y, x }
     const pos = e => {
       const r = cv.getBoundingClientRect();
-      // p：筆壓（S Pen 等手寫筆才有真的壓力；手指、滑鼠交給 perfect-freehand 依速度模擬）
+      // p：筆壓（S Pen 等手寫筆才有真的壓力；手指、滑鼠固定 0.5＝粗細不變）
       const p = e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 0.5;
       return { x:(e.clientX - r.left) * (this.W / r.width), y:(e.clientY - r.top) * (this.H / r.height), p };
     };
@@ -249,13 +249,13 @@ class Board{
       if(tool === 'eraser') return Math.max(14, pref.w * 7) * k;
       return pref.w * k;
     };
-    // 筆：用 perfect-freehand（MIT，js/lib/perfect-freehand.js）把軌跡變成「有粗細變化」的筆畫外框再填色，
-    //   手寫筆依真實筆壓、手指依速度（快細慢粗），像紙上的鋼筆
+    // 筆：用 perfect-freehand（MIT，js/lib/perfect-freehand.js）把軌跡變成平滑的筆畫外框再填色。
+    //   手寫筆（S Pen）依真實筆壓變粗細；手指、滑鼠粗細固定（v4.67.2 起不再依速度模擬：寫慢會變粗，不好寫字）
     const PF = () => window.PerfectFreehand && window.PerfectFreehand.getStroke;
     const drawFree = (ctx, s) => {
       const o = PF()(s.path.map(q => [q.x, q.y, q.p]), {
-        size: s.w * 1.7, thinning: s.pen ? 0.65 : 0.5, smoothing: 0.55, streamline: 0.4,
-        simulatePressure: !s.pen, last: !!s.done,
+        size: s.w * 1.5, thinning: s.pen ? 0.6 : 0, smoothing: 0.55, streamline: 0.4,
+        simulatePressure: false, last: !!s.done,
       });
       if(!o.length) return;
       ctx.fillStyle = s.color;
