@@ -508,8 +508,7 @@ async function renderList(){  try{
 
   if(!fl.length){
     el.innerHTML='<div class="empty"><span class="ic">📭</span><span>'+(kw?'找不到符合的題目':'尚無題目')+'</span></div>';
-    // v4.67 打簡體字 → 轉繁體再找；v4.68 沒換字（或換了還是沒有）→ 列出相近的題目
-    if(kw) Promise.resolve(window.ycS2TRetry?.('si', renderList)).then(r => { if(!r) window.ycFuzzyQs?.(kw, el); }).catch(()=>{});
+    if(kw) Promise.resolve(window.ycFuzzyQs?.(kw, el)).catch(()=>{});   // v4.68 列出相近的題目（v4.69 拿掉簡體轉繁體）
     return;
   }
 
@@ -1834,9 +1833,7 @@ async function renderDB(){  try{
       ? '<div class="empty"><span class="ic">🔍</span><span>查無符合的法規或條文</span></div>'
       : '<div class="empty"><span class="ic">🗄</span><span>尚無資料</span></div>';
     if(lc) lc.textContent='';
-    // v4.67 打簡體字 → 轉繁體再找；v4.68 沒換字（或換了還是沒有）→ 列出相近的條文
-    if(kw && !sec) Promise.resolve(window.ycS2TRetry?.('lsi', renderDB)).then(r => { if(!r) window.ycFuzzyLaws?.(kw, el); }).catch(()=>{});
-    else if(kw) window.ycS2TRetry?.('lsi', renderDB);
+    if(kw && !sec) Promise.resolve(window.ycFuzzyLaws?.(kw, el)).catch(()=>{});   // v4.68 列出相近的條文（v4.69 拿掉簡體轉繁體）
     return;
   }
 
@@ -2608,7 +2605,7 @@ function _lvFindRun(){
       hit.replaceWith(mk); _lvFindHits.push(mk);
     }
   }
-  if(!_lvFindHits.length){ n.textContent='找不到'; window.ycS2TRetry?.('lv-find-q', _lvFindRun); return; }   // v4.67 簡體轉繁體
+  if(!_lvFindHits.length){ n.textContent='找不到'; return; }
   lvFindStep(1);
 }
 function lvFindStep(d){
@@ -3330,7 +3327,7 @@ async function saveLaw(){  try{
     data.favorite=ex?.favorite||false;
     data.createdAt=ex?.createdAt||Date.now();
     // v4.64：表單沒有的欄位不能因為編輯而消失——重點筆記（marks）、SOP 原檔逐字文字與頁面（pagesText／pages）
-    for(const k of ['marks','ink','pagesText','pages','prevContent','prevDate']) if(ex && ex[k] != null) data[k]=ex[k];   // prev*：v4.67 修法前後對照   // ink：v4.65 手寫筆記
+    for(const k of ['marks','ink','pagesText','pages','prevContent','prevDate','cz']) if(ex && ex[k] != null) data[k]=ex[k];   // cz：v4.69 背誦模式的挖空調整   // prev*：v4.67 修法前後對照   // ink：v4.65 手寫筆記
   }
   try{
     data.searchBlob = _lawBlob(data);   // 純文字搜尋索引

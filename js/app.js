@@ -589,7 +589,8 @@ function _handleBackLayer(){
 }
 
 // Android App 外殼的返回鍵（MainActivity 呼叫）：有可關的層或上一頁就處理並回 true，沒有就回 false（App 退到背景）
-window._ycNativeBack = () => { try{ return !!_handleBackLayer(); }catch(e){ logError('nativeBack', e); return false; } };
+//   v4.69：沒有可關的層、要退到背景前，有還沒備份的資料先問一次（ycExitGuard 顯示提醒就回 true，App 留在前景）
+window._ycNativeBack = () => { try{ return !!_handleBackLayer() || !!window.ycExitGuard?.(); }catch(e){ logError('nativeBack', e); return false; } };
 
 function _initBackHandler(){
   _pushBackGuard();   // 一次性推入 60 筆緩衝，之後不再需要動態補回
@@ -600,6 +601,8 @@ function _initBackHandler(){
       // 不需要我們的 JS 補回任何東西——這是徹底避免時序問題的關鍵。
       if(_handleBackLayer()) return;
 
+      // v4.69 有還沒備份的資料：第一次按返回先問要不要備份（每次開 App 只問一次）
+      if(window.ycExitGuard?.()) return;
       // 已在首頁且沒有更多層級 → 真正離開 App。
       // 同步呼叫（不用 setTimeout）：這是延續同一次使用者操作的自然導覽，
       // 不是「新增歷史紀錄」，不受 popstate 處理中呼叫 pushState 會被
@@ -636,7 +639,7 @@ async function init(){  try{
     errDiv.className = 'app-err-banner';
     errDiv.innerHTML = '⚠ 資料庫初始化失敗<br><span style="font-size:11px;color:#888">'+esc(String(e.message||e))+'</span><br><button id="init-reload-btn" style="margin-top:8px;padding:6px 14px;background:#3a1212;border:1px solid #e05c57;color:#e05c57;border-radius:6px;cursor:pointer;font-size:12px">重新載入</button>';
     document.body.appendChild(errDiv);
-    document.getElementById('init-reload-btn')?.addEventListener('click', ()=>location.reload());
+    document.getElementById('init-reload-btn')?.addEventListener('click', ()=>ycReload());
     // 仍嘗試顯示首頁框架
     try{ _initFabDelegation(); goPage('home', null); _initBackHandler(); }catch(_){}
     // 即使出錯也要關閉 splash
@@ -686,7 +689,7 @@ if('serviceWorker' in navigator){
   // 新 SW 接管後自動 reload
   let _swRefreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', ()=>{
-    if(!_swRefreshing){ _swRefreshing = true; location.reload(); }
+    if(!_swRefreshing){ _swRefreshing = true; ycReload(); }
   });
 }
 
@@ -771,11 +774,11 @@ async function ycCheckUpdate(btn){
       else toast('已是最新版 v' + cur);
       return;
     }
-    if(!('serviceWorker' in navigator)){ location.reload(); return; }
+    if(!('serviceWorker' in navigator)){ ycReload(); return; }
     const reg = await navigator.serviceWorker.getRegistration();
-    if(!reg){ location.reload(); return; }
+    if(!reg){ ycReload(); return; }
     // 已經有裝好、等著的新版（之前按了「稍後」）→ 直接換
-    const take = w => { busy('更新中…'); w.postMessage({ type:'SKIP_WAITING' }); setTimeout(() => location.reload(), 4000); };
+    const take = w => { busy('更新中…'); w.postMessage({ type:'SKIP_WAITING' }); setTimeout(() => ycReload(), 4000); };
     if(reg.waiting && navigator.serviceWorker.controller){ take(reg.waiting); return; }
     if(remote && !_verNewer(remote, cur)){ toast('已是最新版 v' + cur); return; }
     busy('下載新版…');

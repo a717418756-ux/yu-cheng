@@ -280,6 +280,7 @@ function _setAnchor(target, sum, op){
   const a = _ls.get(_ANCHOR_KEY) || {};
   a[target] = { id: sum.id || '', at: sum.at, device: sum.device, deviceId: sum.deviceId, op, when: new Date().toISOString() };
   _ls.set(_ANCHOR_KEY, a);
+  window.ycDirtyReset?.();   // v4.69 備份成功／還原到最新：還沒備份的變動歸零
 }
 
 // 備份檔的 meta（寫進備份）
@@ -436,7 +437,7 @@ async function restoreSnapshot(){ try{
     const data = snap.data;
     if(!await _snapOrAsk('復原快照')) return;
     await _restoreAll(data, _SNAP_TABLES);
-    _showDoneDialog('已復原 ✓', ['資料已回到 ' + _fmtAt(new Date(snap.createdAt).toISOString()) + ' 的狀態。', '', '按「知道了」後會重新整理頁面。'], () => location.reload());
+    _showDoneDialog('已復原 ✓', ['資料已回到 ' + _fmtAt(new Date(snap.createdAt).toISOString()) + ' 的狀態。', '', '按「知道了」後會重新整理頁面。'], () => ycReload());
   });
 }catch(e){ logError('restoreSnapshot', e); toast('復原失敗：' + e.message); }}
 
@@ -636,7 +637,7 @@ async function gdriveRestore(){ try{
         '',
         '還原前的資料已存成快照，需要時可到設定頁「復原」。',
         '按「知道了」後會重新整理頁面。',
-      ], ()=> location.reload());
+      ], ()=> ycReload());
     } catch(innerErr){
       logError('gdriveRestore-inner', innerErr);
       _showDoneDialog('雲端還原失敗 ✗', ['寫入失敗：' + innerErr.message, '', '這台的題庫、法規、作答紀錄維持原樣（整批寫入，失敗會整批復原）。', '電子書、影音不受雲端還原影響。']);
@@ -1227,7 +1228,7 @@ async function localRestore(){
         catch(e){
           logError('localRestore-exam', e); _ls.set(_RS_KEY, null);
           _showDoneDialog('還原失敗 ✗', ['題庫、法規、作答紀錄寫入失敗：' + e.message, '',
-            '這台的資料維持原樣（題庫、法規、作答紀錄、電子書、影音都沒有變動）。', '常見原因：裝置空間不足。'], ()=> location.reload());
+            '這台的資料維持原樣（題庫、法規、作答紀錄、電子書、影音都沒有變動）。', '常見原因：裝置空間不足。'], ()=> ycReload());
           return;
         }
       }
@@ -1251,7 +1252,7 @@ async function localRestore(){
         '',
         examData ? '還原前的資料已存成快照，需要時可到設定頁「復原」（書庫、影音檔案不在快照內）。' : '',
         '按「知道了」後會重新整理頁面。',
-      ], ()=> location.reload());
+      ], ()=> ycReload());
     });
   }catch(e){
     if(e.name === 'AbortError') return;

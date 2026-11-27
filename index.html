@@ -911,8 +911,7 @@
         background:var(--bg1);border:1px solid var(--bd);border-radius:12px;
         padding:4px 0;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:200">
         <button class="lv-menu-item" onclick="lnOpenAll(window.currentLawName);closeLvMenu()">📝 筆記總覽</button>
-        <button class="lv-menu-item" id="ln-cover-item" style="display:none" onclick="lnToggleCover();closeLvMenu()">🙈 遮住重點（背誦）</button>
-        <button class="lv-menu-item" id="lp-cz-item" onclick="lpCloze();closeLvMenu()">🔢 數字挖空（背誦）</button>
+        <button class="lv-menu-item" id="lp-cz-item" onclick="closeLvMenu();lpRecite()">🙈 背誦模式</button><!-- v4.69 合併「遮住重點」「數字挖空」：數字、法律用語、我的挖空、舊重點，可調整 -->
         <button class="lv-menu-item" onclick="ttsReadLaw();closeLvMenu()">🔊 朗讀法條</button>
         <button class="lv-menu-item" id="lv-star-item" onclick="toggleLvFav();closeLvMenu()">☆ 收藏</button>
         <button class="lv-menu-item" onclick="editLawGroupInfo();closeLvMenu()">⚙ 編輯法規資訊</button>
@@ -1257,7 +1256,7 @@
 <script src="js/ink.js"></script><!-- v4.65 手寫標註引擎（答題、法規共用） -->
 <script src="js/lawnote.js"></script><!-- 法規手寫筆記（v4.65）＋舊的選字重點 -->
 <script src="js/lawread.js"></script>
-<script src="js/lawplus.js"></script><!-- v4.67 修法前後對照、心智圖、簡體搜尋（套件在 js/lib，用到才載入） --><!-- v4.66 法規閱讀：繼續閱讀、目錄、閱讀設定、引用可點、複製 -->
+<script src="js/lawplus.js"></script><!-- v4.67 修法前後對照、心智圖（套件在 js/lib，用到才載入）；v4.68 相近結果、背誦模式 --><!-- v4.66 法規閱讀：繼續閱讀、目錄、閱讀設定、引用可點、複製 -->
 <script src="js/english.js"></script>
 <script src="js/memory.js"></script>
 <script src="js/predict.js"></script>

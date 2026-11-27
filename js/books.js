@@ -1433,7 +1433,7 @@ async function _initEpubReader(url, savedCfi, bookId){
     const el=document.getElementById('epub-viewer');
     if(el) el.innerHTML=`<div style="padding:30px;text-align:center;color:rgba(255,255,255,0.4)">
       epub.js 載入失敗，請確認網路連線後重試。<br><br>
-      <button onclick="location.reload()" style="padding:8px 20px;background:rgba(37,98,200,0.8);
+      <button onclick="ycReload()" style="padding:8px 20px;background:rgba(37,98,200,0.8);
       color:#fff;border:none;border-radius:8px;cursor:pointer">重新載入</button></div>`;
     return;
   }

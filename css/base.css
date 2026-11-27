@@ -2091,6 +2091,19 @@ html[data-layout="desktop"] #fab-wrap{
 #lp-svg{ flex:1; width:100%; min-height:0; touch-action:none;
   --markmap-text-color:#e6e6e6; --markmap-circle-open-bg:#2a2a2a; --markmap-font:500 15px/20px system-ui, sans-serif; }
 #lp-svg .lp-mi{ cursor:pointer; text-decoration:underline dotted rgba(110,168,254,.7); text-underline-offset:3px; }
-/* v4.68 數字挖空：只換顏色、不加寬度（手寫筆記位置不跑掉）；點一下顯示（虛線底） */
-#lbody.lp-cz-on .lp-cz{ color:transparent; background:rgba(255,183,77,.55); border-radius:3px; cursor:pointer; -webkit-user-select:none; user-select:none; }
-#lbody.lp-cz-on .lp-cz.lp-czs{ color:inherit; background:none; text-decoration:underline dashed #ffb74d; text-underline-offset:3px; }
+/* v4.69 背誦模式：只換顏色、不加寬度（手寫筆記位置不跑掉）；點一下顯示（虛線底）；自己加的挖空偏藍；調整時看得到原文 */
+#lbody.lp-rc .lp-cz{ color:transparent; background:rgba(255,183,77,.55); border-radius:3px; cursor:pointer; -webkit-user-select:none; user-select:none; }
+#lbody.lp-rc .lp-cz.lp-czm{ background:rgba(110,168,254,.55); }
+#lbody.lp-rc .lp-cz.lp-czs{ color:inherit; background:none; text-decoration:underline dashed #ffb74d; text-underline-offset:3px; }
+#lbody.lp-rc.lp-adj .lp-cz{ color:inherit; background:rgba(255,183,77,.25); outline:1px dashed #ffb74d; text-decoration:line-through rgba(255,183,77,.0); }
+#lbody.lp-rc.lp-adj .lp-cz.lp-czm{ background:rgba(110,168,254,.25); outline-color:#6ea8fe; }
+#lbody.lp-adj .law-art-body{ -webkit-user-select:text; user-select:text; }
+.lp-rck{ display:flex; align-items:center; gap:8px; padding:7px 2px; font-size:14px; }
+.lp-rck input{ width:auto; flex:none; margin:0; }
+.lp-rcx{ margin-left:8px; padding:2px 10px; border-radius:8px; border:1px solid var(--bd); background:var(--bg2); color:var(--t0); font-size:12px; }
+#lp-rc-bar{ position:fixed; left:50%; bottom:calc(14px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:520; display:none; align-items:center; gap:10px;
+  max-width:calc(100vw - 24px); padding:8px 10px 8px 14px; border-radius:14px; background:var(--bg1); border:1px solid #ffb74d; box-shadow:0 6px 20px rgba(0,0,0,.45); font-size:13px; color:var(--t0); }
+#lp-rc-bar.on{ display:flex; }
+#lp-rc-bar button{ flex:none; padding:6px 14px; border-radius:10px; border:none; background:#ffb74d; color:#222; font-weight:700; }
+#lp-rc-add{ position:fixed; z-index:530; display:none; padding:7px 12px; border-radius:10px; border:none; background:#6ea8fe; color:#111; font-weight:700; font-size:13px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+#lp-rc-add.on{ display:block; }

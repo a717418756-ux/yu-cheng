@@ -3,7 +3,7 @@
 //     條文標題旁出現「修」，點開看紅綠對照（jsdiff，BSD-3，js/lib/diff.min.js）。
 //   ②法規心智圖：把目前這部法規的編章節＋每一條畫成可展開收合的心智圖（markmap，MIT＋d3，ISC），
 //     點條文直接跳過去。
-//   ③簡體搜尋：搜尋找不到、而且打的是中文時，自動把簡體轉繁體再找一次（opencc-js，MIT／Apache-2.0）。
+//   ③（v4.69 拿掉）簡體搜尋：使用者打繁體，用不到，省下 1.1 MB。
 //   套件都放在本機 js/lib/，第一次用到才載入（之後離線可用），平常不佔開啟速度。
 (function(){
 'use strict';
@@ -139,31 +139,6 @@ document.addEventListener('click', e => {
 window.lpMapFit = () => _mm?.fit?.();
 window.lpMapClose = () => _close('lp-map');
 
-// ── ③簡體搜尋 → 自動轉繁體 ──────────────────────────────────────
-let _cv = null;
-window.ycS2T = async text => {
-  if(!_cv){
-    await loadScript('js/lib/opencc-cn2t.js');
-    _cv = window.OpenCC.Converter({ from:'cn', to:'tw' });
-  }
-  return _cv(text);
-};
-// 搜尋沒結果時呼叫：有中文 → 轉繁體；和原本不同才換掉搜尋框的字再搜一次（同一個詞只試一次）
-const _tried = new Set();
-window.ycS2TRetry = async (inputId, rerun) => {
-  const inp = document.getElementById(inputId); if(!inp) return;
-  const q = inp.value || '';
-  if(!/[一-鿿]/.test(q) || _tried.has(inputId + '\u0000' + q)) return;
-  _tried.add(inputId + '\u0000' + q);
-  let t;
-  try{ t = await window.ycS2T(q); }catch(_){ return; }
-  if(!t || t === q || inp.value !== q) return;   // 沒有簡體字，或使用者已經改了字
-  inp.value = t;
-  toast('找不到，已把簡體轉成繁體再找：' + t);
-  try{ await rerun(); }catch(_){}
-  return true;   // 已經換字重搜（重搜的結果自己處理後續，例如相近結果）
-};
-
 // ── ④找不到時列出「相近結果」（v4.68）──────────────────────────
 //   原本的搜尋（每個詞都要出現）結果完全不變；只有「一筆都沒有」時，改用「相鄰兩個字」比對，
 //   列出大部分字詞都有出現的條文、題目，依相符程度排序，標明「不完全符合」。
@@ -235,72 +210,265 @@ window.ycFuzzyQs = async (kw, el) => {
     + '<button class="qabn" data-qid="' + q.id + '" onclick="startSingleQ(this)">▶ 練習</button></div></div>').join(''));
 };
 
-// ── ⑤數字挖空（背誦，v4.68）────────────────────────────────────
-//   ⋮ 選單「🔢 數字挖空」：條文裡的期間、金額、年齡、倍數、百分比等數字變成色塊，點一下顯示。
-//   只改畫面（包一層 span、不加寬度），不改資料；手寫筆記位置不會跑掉。「第十條」「前二項」這類條號、項次，「同一」「單一」這類詞不遮。
+// ── ⑤背誦模式（v4.69：數字挖空＋法律用語＋我的挖空＋舊重點，一個入口，可調整）────────
+//   ⋮ 選單「🙈 背誦模式」：勾要遮哪些 → 條文裡變成色塊，點一下顯示。
+//   ✎ 調整：點色塊＝這個不要遮；選取一段字＝加進「我的挖空」。調整存在那一條的 cz 欄位（隨備份），條文內容一個字都不改。
+//     cz = { add:[{t:'文字', n:第幾次出現}], off:[{t, n}] }；條文更新後原文還在就照樣遮，找不到的在背誦模式視窗列出、可清掉。
+//   只改畫面（包一層 span、不加寬度），手寫筆記位置不跑掉。「第十條」「前二項」這類條號、項次，「同一」「單一」不遮。
 const _N = '[零〇一二兩三四五六七八九十百千萬億0-9０-９]';
-const _CZ_RE = new RegExp(
-  '(?<![第前後同任單唯統逐])(?:百分之' + _N + '+(?:點' + _N + '+)?|' + _N + '+分之' + _N + '+|'
-  + _N + '+(?:[.,，．]' + _N + '+)*(?=(?:個月|個工作日|小時|分鐘|日|天|月|年|週|星期|歲|萬元|億元|千元|元|倍|次|公尺|公里|公分|公斤|公克|毫升|毫克|人|名|張|件|輛|公升|度)))', 'g');
-let _cz = false, _czObs = null, _czT = 0;
-function _czWrap(root){
-  let n = 0;
-  root.querySelectorAll('.law-art-body').forEach(body => {
-    const w = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, { acceptNode: t =>
-      t.parentElement.closest('.lp-cz, a, button, textarea, input, .ink-tl, [contenteditable]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
-    const nodes = []; while(w.nextNode()) nodes.push(w.currentNode);
-    for(const t of nodes){
-      const s = t.nodeValue; _CZ_RE.lastIndex = 0;
-      if(!_CZ_RE.test(s)) continue;
-      _CZ_RE.lastIndex = 0;
-      const f = document.createDocumentFragment(); let last = 0, m;
-      while((m = _CZ_RE.exec(s))){
-        if(m.index > last) f.appendChild(document.createTextNode(s.slice(last, m.index)));
-        const sp = document.createElement('span'); sp.className = 'lp-cz'; sp.textContent = m[0];
-        f.appendChild(sp); n++; last = m.index + m[0].length;
-      }
-      if(last < s.length) f.appendChild(document.createTextNode(s.slice(last)));
-      t.replaceWith(f);
+const _RX = {
+  num: new RegExp('(?<![第前後同任單唯統逐])(?:百分之' + _N + '+(?:點' + _N + '+)?|' + _N + '+分之' + _N + '+|'
+    + _N + '+(?:[.,，．]' + _N + '+)*(?=(?:個月|個工作日|小時|分鐘|日|天|月|年|週|星期|歲|萬元|億元|千元|元|倍|次|公尺|公里|公分|公斤|公克|毫升|毫克|人|名|張|件|輛|公升|度)))', 'g'),
+  // 法律用語：考題最愛考「應」「得」「不得」的差別。取得、獲得、相應、適應這類一般用詞不遮（遮錯可用 ✎ 調整拿掉）
+  word: /不得|準用|除外|(?<![取獲所習心懂值記使覺顯難曉博贏求免非捨])得(?![知悉到])|(?<![相對適反供因回答呼效報理順感照])應(?![用徵變付考允聘])|(?<=^|[。，；：、\n])但/g,
+};
+const _RC_LS = 'yc_recite';
+const _rcPref = Object.assign({ num:true, word:false, mine:true, old:true },
+  (() => { try{ return JSON.parse(localStorage.getItem(_RC_LS) || '{}') || {}; }catch(_){ return {}; } })());
+const _rcSave = () => { try{ localStorage.setItem(_RC_LS, JSON.stringify(_rcPref)); }catch(_){} };
+let _rc = false, _adj = false, _rcObs = null, _rcT = 0;
+const _cz = new Map();   // 條文 id → { add, off }（目前這部法規）
+const _nth = (s, t, end) => { let n = 0, i = -1; while((i = s.indexOf(t, i + 1)) >= 0 && i < end) n++; return n; };
+const _at = (s, t, n) => { let i = -1; for(let k = 0; k <= n; k++){ i = s.indexOf(t, i + 1); if(i < 0) return -1; } return i; };
+function _unwrap(body){
+  body.querySelectorAll('.lp-cz').forEach(sp => sp.replaceWith(document.createTextNode(sp.textContent)));
+  body.normalize();
+  delete body.dataset.rcn;
+}
+// 一條條文：算出要遮的範圍（以整條文字的位置），再包成 span（跨好幾個文字節點的拆段包，同一組 data-g）
+function _wrap(body){
+  const card = body.closest('.law-art-card'); const id = card ? +card.dataset.lawId : 0;
+  const s = body.textContent, cz = _cz.get(id) || { add:[], off:[] };
+  const offSet = new Set(cz.off.map(o => o.t + '\u0000' + o.n));
+  const rs = [];
+  for(const k of ['num', 'word']){
+    if(!_rcPref[k]) continue;
+    const re = _RX[k]; re.lastIndex = 0; let m;
+    while((m = re.exec(s))){
+      if(!m[0]){ re.lastIndex++; continue; }
+      const n = _nth(s, m[0], m.index);
+      if(!offSet.has(m[0] + '\u0000' + n)) rs.push({ a:m.index, b:m.index + m[0].length, k, t:m[0], n });
     }
+  }
+  if(_rcPref.mine) for(const x of cz.add){ const i = _at(s, x.t, x.n); if(i >= 0) rs.push({ a:i, b:i + x.t.length, k:'mine', t:x.t, n:x.n }); }
+  // 重疊時「我的挖空」優先，其他照位置先後
+  rs.sort((x, y) => x.a - y.a || (y.k === 'mine') - (x.k === 'mine'));
+  const keep = []; let end = -1;
+  for(const r of rs) if(r.a >= end){ keep.push(r); end = r.b; }
+  // 文字節點與位置對照
+  const nodes = [], w = document.createTreeWalker(body, NodeFilter.SHOW_TEXT); let pos = 0;
+  while(w.nextNode()){ const t = w.currentNode; nodes.push({ t, a:pos, b:pos + t.nodeValue.length }); pos += t.nodeValue.length; }
+  let cnt = 0;
+  keep.forEach((r, gi) => {
+    for(const nd of nodes){
+      if(nd.b <= r.a || nd.a >= r.b) continue;
+      const p = nd.t.parentElement;
+      if(p && p.closest('textarea, input, button, .ink-tl')) continue;
+      const x0 = Math.max(r.a, nd.a) - nd.a, x1 = Math.min(r.b, nd.b) - nd.a;
+      let mid = nd.t;
+      if(x0 > 0) mid = mid.splitText(x0);
+      const rest = mid.splitText(x1 - x0);
+      const sp = document.createElement('span');
+      sp.className = 'lp-cz' + (r.k === 'mine' ? ' lp-czm' : '');
+      sp.dataset.g = gi; sp.dataset.k = r.k; sp.dataset.t = r.t; sp.dataset.n = r.n;
+      mid.replaceWith(sp); sp.appendChild(mid); cnt++;
+      // 這個節點切剩的部分（從範圍結尾開始）留給後面的範圍
+      nd.t = rest; nd.a = nd.a + x1;
+    }
+  });
+  body.dataset.rcn = cnt;
+  return keep.length;
+}
+function _applyAll(force){
+  const lb = document.getElementById('lbody'); if(!lb) return 0;
+  let n = 0;
+  lb.querySelectorAll('.law-art-body').forEach(body => {
+    if(!force && body.dataset.rcn != null && body.querySelectorAll('.lp-cz').length === +body.dataset.rcn) return;
+    _unwrap(body); n += _wrap(body);
   });
   return n;
 }
-function _czUnwrap(){
-  document.querySelectorAll('#lbody .lp-cz').forEach(sp => { const p = sp.parentNode; sp.replaceWith(document.createTextNode(sp.textContent)); p?.normalize?.(); });
+async function _loadCz(){
+  _cz.clear();
+  const ids = [...document.querySelectorAll('#lbody .law-art-card')].map(c => +c.dataset.lawId).filter(Boolean);
+  const rows = await _db.laws.bulkGet(ids);
+  for(const r of rows) if(r && r.cz) _cz.set(r.id, { add:r.cz.add || [], off:r.cz.off || [] });
 }
-function _czSync(){
+async function _saveCz(id){
+  const rec = await _db.laws.get(id); if(!rec) return;
+  const c = _cz.get(id);
+  if(c && (c.add.length || c.off.length)) rec.cz = { add:c.add, off:c.off }; else delete rec.cz;
+  await dp('laws', rec);
+}
+function _sync(){
+  const lb = document.getElementById('lbody');
+  lb?.classList.toggle('lp-rc', _rc);
+  lb?.classList.toggle('lp-adj', _rc && _adj);
   const it = document.getElementById('lp-cz-item');
-  if(it) it.textContent = _cz ? '👁 顯示全部數字' : '🔢 數字挖空（背誦）';
-  document.getElementById('lbody')?.classList.toggle('lp-cz-on', _cz);
+  if(it) it.textContent = _rc ? '🙈 背誦模式（開啟中）' : '🙈 背誦模式';
+  let bar = document.getElementById('lp-rc-bar');
+  if(_rc && _adj){
+    if(!bar){ bar = document.createElement('div'); bar.id = 'lp-rc-bar'; document.body.appendChild(bar); }
+    bar.innerHTML = '<span>✎ 調整挖空：點色塊＝不要遮；選取文字＝加挖空</span><button onclick="lpReciteAdj(false)">完成</button>';
+    bar.classList.add('on');
+  }else bar?.classList.remove('on');
+  if(!_adj) _addBtn(null);
 }
-window.lpCloze = on => {
+// 舊重點（v4.64 的選字重點）照 lawnote 的「遮住重點」
+function _oldCover(on){
+  const lb = document.getElementById('lbody'); if(!lb || !lb.querySelector('.ln-mk')) return;
+  if(lb.classList.contains('ln-cover') !== !!on) window.lnToggleCover?.();
+}
+async function _start(){
+  await _loadCz();
+  _rc = true;
+  const lb = document.getElementById('lbody');
+  const n = _applyAll(true);
+  _rcObs = _rcObs || new MutationObserver(() => { clearTimeout(_rcT); _rcT = setTimeout(() => { if(_rc) _applyAll(false); }, 80); });
+  _rcObs.observe(lb, { childList:true, subtree:true });
+  _oldCover(_rcPref.old);
+  _sync();
+  return n;
+}
+function _stop(){
+  _rc = false; _adj = false;
+  _rcObs?.disconnect();
+  document.querySelectorAll('#lbody .law-art-body').forEach(_unwrap);
+  _oldCover(false);
+  _sync();
+}
+// 背誦模式視窗
+window.lpRecite = async () => {
   const lb = document.getElementById('lbody'); if(!lb) return;
-  _cz = on == null ? !_cz : !!on;
-  if(_cz){
-    const n = _czWrap(lb);
-    // 條文分批載入、編輯後重畫：新出現的條文也遮（自己包 span 引起的變動再掃一次也不會重複包）
-    _czObs = _czObs || new MutationObserver(() => { clearTimeout(_czT); _czT = setTimeout(() => { if(_cz) _czWrap(lb); }, 80); });
-    _czObs.observe(lb, { childList:true, subtree:true });
-    toast(n ? '已遮住 ' + n + ' 個數字，點色塊顯示' : '這部法規畫面上沒有可遮的數字（期間、金額等）');
-  }else{
-    _czObs?.disconnect(); _czUnwrap();
+  window.closeLvMenu?.();
+  if(!_rc) await _loadCz();
+  // 自訂挖空找不到原文的（條文更新過）
+  let lost = 0;
+  for(const [id, c] of _cz){
+    const body = lb.querySelector('.law-art-card[data-law-id="' + id + '"] .law-art-body'); if(!body) continue;
+    const s = body.textContent;
+    lost += c.add.filter(x => _at(s, x.t, x.n) < 0).length;
   }
-  _czSync();
+  const hasOld = !!lb.querySelector('.ln-mk');
+  const ck = (k, label) => '<label class="lp-rck"><input type="checkbox" ' + (_rcPref[k] ? 'checked' : '') + ' onchange="lpRecitePref(\'' + k + '\',this.checked)"> ' + label + '</label>';
+  _sheet('lp-rc', '<div class="lp-p">'
+    + '<div class="lp-hd"><b>🙈 背誦模式</b><button onclick="lpReciteClose()" aria-label="關閉">✕</button></div>'
+    + '<div class="lp-sub">勾要遮的，條文裡變成色塊，點一下顯示</div>'
+    + ck('num', '數字（期間、金額、年齡、倍數、百分比）')
+    + ck('word', '法律用語（應、得、不得、準用、除外、但）')
+    + ck('mine', '我的挖空（自己加的）')
+    + (hasOld ? ck('old', '舊重點（以前選字畫的）') : '')
+    + (lost ? '<div class="lp-note" style="color:#ffb74d">有 ' + lost + ' 個自己加的挖空，條文更新後找不到原文，不會遮。<button class="lp-rcx" onclick="lpReciteClearLost()">清掉</button></div>' : '')
+    + '<div class="lp-seg" style="margin-top:12px">'
+    + '<button class="on" onclick="lpReciteGo()">' + (_rc ? '套用' : '開始背誦') + '</button>'
+    + '<button onclick="lpReciteAdj(true)">✎ 調整挖空</button>'
+    + (_rc ? '<button onclick="lpReciteOff()">關閉背誦</button>' : '')
+    + '</div>'
+    + '<div class="lp-note">遮錯了：按「✎ 調整挖空」，點那個色塊就不遮；想多遮：調整時選取那段字，按「＋ 挖空」。調整存在這部法規的資料裡（會跟著備份），條文內容不會改。</div>'
+    + '</div>');
 };
-// 點色塊 → 顯示／再遮
-document.addEventListener('click', e => {
-  const sp = e.target.closest?.('#lbody.lp-cz-on .lp-cz'); if(!sp) return;
+window.lpRecitePref = (k, v) => { _rcPref[k] = !!v; _rcSave(); };
+window.lpReciteClose = () => _close('lp-rc');
+window.lpReciteGo = async () => {
+  _close('lp-rc');
+  const n = await _start();
+  toast(n ? '已遮住 ' + n + ' 處，點色塊顯示' : '照目前勾的項目，這部法規沒有要遮的地方');
+};
+window.lpReciteOff = () => { _close('lp-rc'); _stop(); toast('已關閉背誦模式'); };
+window.lpReciteAdj = async on => {
+  _close('lp-rc');
+  if(on && !_rc) await _start();
+  _adj = !!on;
+  document.querySelectorAll('#lbody .lp-czs').forEach(x => x.classList.remove('lp-czs'));
+  _sync();
+  if(on) toast('點色塊＝不要遮；選取文字＝加挖空');
+};
+window.lpReciteClearLost = async () => {
+  const lb = document.getElementById('lbody');
+  for(const [id, c] of _cz){
+    const body = lb.querySelector('.law-art-card[data-law-id="' + id + '"] .law-art-body'); if(!body) continue;
+    const s = body.textContent, before = c.add.length;
+    c.add = c.add.filter(x => _at(s, x.t, x.n) >= 0);
+    if(c.add.length !== before) await _saveCz(id);
+  }
+  toast('已清掉找不到原文的挖空'); window.lpRecite();
+};
+// 點色塊：背誦時＝顯示／再遮；調整時＝不要遮這個
+document.addEventListener('click', async e => {
+  const sp = e.target.closest?.('#lbody.lp-rc .lp-cz'); if(!sp) return;
   e.stopPropagation(); e.preventDefault();
-  sp.classList.toggle('lp-czs');
+  const body = sp.closest('.law-art-body');
+  if(!_adj){ body.querySelectorAll('.lp-cz[data-g="' + sp.dataset.g + '"]').forEach(x => x.classList.toggle('lp-czs')); return; }
+  const id = +sp.closest('.law-art-card').dataset.lawId; if(!id) return;
+  const c = _cz.get(id) || { add:[], off:[] }; _cz.set(id, c);
+  const t = sp.dataset.t, n = +sp.dataset.n;
+  if(sp.dataset.k === 'mine') c.add = c.add.filter(x => !(x.t === t && x.n === n));
+  else if(!c.off.some(x => x.t === t && x.n === n)) c.off.push({ t, n });
+  _unwrap(body); _wrap(body);
+  await _saveCz(id);
+  toast('這個不遮了');
 }, true);
-// 用「本法搜尋」時先關掉挖空（數字被拆開，找「三日」會找不到）；離開法規也關掉
-document.addEventListener('focusin', e => { if(_cz && e.target?.id === 'lv-find-q'){ window.lpCloze(false); toast('已關閉數字挖空，方便搜尋'); } });
-window.lpOnExit = () => { if(_cz) window.lpCloze(false); };
+// 調整時選取文字 → 浮出「＋ 挖空」
+let _selT = 0, _selInfo = null;
+function _addBtn(info){
+  _selInfo = info;
+  let b = document.getElementById('lp-rc-add');
+  if(!info){ b?.classList.remove('on'); return; }
+  if(!b){
+    b = document.createElement('button'); b.id = 'lp-rc-add';
+    b.addEventListener('mousedown', e => e.preventDefault());   // 按下去不要把選取清掉
+    b.addEventListener('click', () => window.lpReciteAddSel());
+    document.body.appendChild(b);
+  }
+  b.textContent = '＋ 挖空「' + (info.t.length > 8 ? info.t.slice(0, 8) + '…' : info.t) + '」';
+  b.style.left = Math.max(8, Math.min(innerWidth - 190, info.x)) + 'px';
+  b.style.top = Math.max(8, info.y - 46) + 'px';
+  b.classList.add('on');
+}
+document.addEventListener('selectionchange', () => {
+  if(!_adj) return;
+  clearTimeout(_selT);
+  _selT = setTimeout(() => {
+    const sel = getSelection();
+    if(!sel || sel.isCollapsed || !sel.rangeCount){ _addBtn(null); return; }
+    const r = sel.getRangeAt(0);
+    const el = n => n.nodeType === 1 ? n : n.parentElement;
+    const b0 = el(r.startContainer)?.closest('.law-art-body'), b1 = el(r.endContainer)?.closest('.law-art-body');
+    const t = sel.toString();
+    if(!b0 || b0 !== b1 || !t.trim() || t.length > 60 || !document.getElementById('lbody')?.contains(b0)){ _addBtn(null); return; }
+    const pre = document.createRange(); pre.selectNodeContents(b0); pre.setEnd(r.startContainer, r.startOffset);
+    const rc = r.getBoundingClientRect();
+    _addBtn({ body:b0, t, start:pre.toString().length, x:rc.left, y:rc.top });
+  }, 250);
+});
+window.lpReciteAddSel = async () => {
+  const info = _selInfo; if(!info) return;
+  const body = info.body, id = +body.closest('.law-art-card')?.dataset.lawId; if(!id) return;
+  const s = body.textContent;
+  if(s.substr(info.start, info.t.length) !== info.t){ toast('選取的位置變了，請再選一次'); _addBtn(null); return; }
+  const n = _nth(s, info.t, info.start);
+  const c = _cz.get(id) || { add:[], off:[] }; _cz.set(id, c);
+  if(!c.add.some(x => x.t === info.t && x.n === n)) c.add.push({ t:info.t, n });
+  c.off = c.off.filter(x => !(x.t === info.t && x.n === n));
+  if(!_rcPref.mine){ _rcPref.mine = true; _rcSave(); }
+  getSelection()?.removeAllRanges(); _addBtn(null);
+  _unwrap(body); _wrap(body);
+  await _saveCz(id);
+  toast('已加進我的挖空');
+};
+// 用「本法搜尋」時先關掉（字被拆開，找「三日」會找不到）；離開法規也關掉
+document.addEventListener('focusin', e => { if(_rc && e.target?.id === 'lv-find-q'){ _stop(); toast('已關閉背誦模式，方便搜尋'); } });
+window.lpOnExit = () => { _close('lp-rc'); if(_rc) _stop(); };
+// v4.68 的入口名稱（數字挖空）保留：開＝只要有勾數字就開始背誦
+window.lpCloze = on => { if(on === false || (on == null && _rc)) _stop(); else { _rcPref.num = true; _rcSave(); window.lpReciteGo(); } };
 
 // 返回鍵：先關對照、心智圖
 window.lpBack = () => {
   if(_isOn('lp-diff')){ _close('lp-diff'); return true; }
   if(_isOn('lp-map')){ _close('lp-map'); return true; }
+  if(_isOn('yc-exit')){ _close('yc-exit'); return true; }   // v4.69 離開前備份提醒（coach.js）
+  if(_isOn('lp-rc')){ _close('lp-rc'); return true; }
+  if(_adj){ window.lpReciteAdj(false); return true; }   // 調整挖空中 → 回到背誦
   return false;
 };
 })();

@@ -241,23 +241,59 @@ async function setExamRule(i, v){
   toast(ex + '：模擬考預設' + (v === 'none' ? '不倒扣' : '答錯倒扣'));
 }
 
-// ════════ 💾 備份提醒（首頁）════════
-//   這台裝置超過 7 天沒有備份或還原（雲端、資料夾都算）且有作答紀錄 → 首頁顯示一行提醒；可延後 3 天。
+// ════════ 💾 備份提醒（首頁＋離開前，v4.69 共用同一個判斷）════════
+//   「還沒備份的變動」由 db.js 記（作答、題目、法規與筆記…有新增修改就算；備份成功歸零）。
+//   首頁：有變動、而且上次備份超過 3 天（或這台還沒備份過且作答 20 筆以上）→ 顯示一行；可延後 3 天。
+//   離開：在首頁按返回要離開、而且有變動 → 問一次要不要先備份（每次開 App 只問一次，不擋第二次）。
+const _bkLast = () => {
+  let an = {}; try{ an = JSON.parse(localStorage.getItem('yc_sync_anchor') || '{}') || {}; }catch(e){}
+  return Math.max(0, ...['cloud', 'local'].map(k => an[k] && an[k].when ? Date.parse(an[k].when) || 0 : 0));
+};
+const _bkWhat = d => (d.a ? d.a + ' 筆作答' : '') + (d.a && d.o ? '、' : '') + (d.o ? d.o + ' 項題目／法規／筆記的修改' : '');
 async function _renderBkHint(){
   const box = document.getElementById('bk-hint');
   if(!box) return;
   box.innerHTML = '';
-  let an = {}; try{ an = JSON.parse(localStorage.getItem('yc_sync_anchor') || '{}') || {}; }catch(e){}
-  const last = Math.max(0, ...['cloud', 'local'].map(k => an[k] && an[k].when ? Date.parse(an[k].when) || 0 : 0));
   const snooze = +localStorage.getItem('bkHintLater') || 0;
   if(Date.now() < snooze) return;
+  const d = window.ycDirty ? window.ycDirty() : { a:0, o:0 };
+  if(!(d.a || d.o)) return;
+  const last = _bkLast();
   const days = last ? Math.floor((Date.now() - last) / DAY) : -1;
-  if(last && days < 7) return;
-  let n = 0; try{ n = (await da('attempts')).length; }catch(e){}
-  if(n < 20) return;
-  box.innerHTML = '<div class="bk-hint"><span>💾 ' + (last ? '已經 ' + days + ' 天沒有備份' : '這台裝置還沒有備份過') + '（作答紀錄 ' + n + ' 筆）</span>' +
+  if(last && days < 3) return;
+  if(!last){ let n = 0; try{ n = (await da('attempts')).length; }catch(e){} if(n < 20) return; }
+  box.innerHTML = '<div class="bk-hint"><span>💾 ' + (last ? days + ' 天沒有備份' : '這台裝置還沒有備份過') + '，有 ' + _bkWhat(d) + '還沒備份</span>' +
     '<button class="btn bg" onclick="bkHintGo()">去備份</button><button class="bk-x" onclick="bkHintLater()">稍後</button></div>';
 }
+let _exitAsked = false;
+window.ycExitGuard = () => {
+  if(_exitAsked) return false;
+  const d = window.ycDirty ? window.ycDirty() : { a:0, o:0 };
+  if(!(d.a || d.o)) return false;
+  _exitAsked = true;
+  const last = _bkLast(), days = last ? Math.floor((Date.now() - last) / DAY) : -1;
+  let o = document.getElementById('yc-exit');
+  if(!o){
+    o = document.createElement('div'); o.id = 'yc-exit'; o.className = 'lp-ov';
+    o.addEventListener('click', e => { if(e.target === o) o.classList.remove('on'); });
+    document.body.appendChild(o);
+  }
+  o.innerHTML = '<div class="lp-p"><div class="lp-hd"><b>💾 還沒備份</b><button onclick="ycExitDo(0)" aria-label="關閉">✕</button></div>'
+    + '<div class="lp-sub" style="line-height:1.7">有 ' + _bkWhat(d) + '還沒備份。<br>' + (last ? '上次備份：' + (days ? days + ' 天前' : '今天') : '這台裝置還沒有備份過') + '</div>'
+    + '<div class="lp-seg" style="margin-top:12px"><button class="on" onclick="ycExitDo(1)">☁ 先備份</button><button onclick="ycExitDo(2)">直接離開</button><button onclick="ycExitDo(0)">取消</button></div>'
+    + '<div class="lp-note">從多工畫面把 App 滑掉時系統不會通知，沒辦法提醒；首頁也會顯示備份提醒。</div></div>';
+  o.classList.add('on');
+  return true;
+};
+window.ycExitDo = k => {   // 0 取消、1 先備份、2 直接離開
+  document.getElementById('yc-exit')?.classList.remove('on');
+  if(k === 1){ bkHintGo(); setTimeout(() => { try{ window.gdriveBackup?.(); }catch(e){ logError('exitBackup', e); } }, 300); }
+  else if(k === 2){   // App：退到背景（同返回鍵沒有可關的層）；網頁：照原本的返回
+    const yf = window.Capacitor?.Plugins?.YcFolder;
+    if(yf?.moveToBack) yf.moveToBack().catch(() => {}); else { try{ history.back(); }catch(e){} }
+  }
+  else _exitAsked = false;   // 取消：下次按返回離開時再問
+};
 function bkHintGo(){
   goPage('set');
   setTimeout(() => { const s = [...document.querySelectorAll('#pg-set .sec')].find(x => /雲端同步/.test(x.textContent)); if(s) s.scrollIntoView({ block:'start' }); }, 80);

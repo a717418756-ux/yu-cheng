@@ -8,6 +8,5 @@ v4.67.0 起放在本機，從 npm 官方套件原檔複製，沒有修改內容�
 | diff.min.js | diff（jsdiff）8.0.4 | BSD-3-Clause，© 2009-2015 Kevin Decker | https://github.com/kpdecker/jsdiff |
 | d3.min.js | d3 7.9.0 | ISC，© 2010-2023 Mike Bostock | https://github.com/d3/d3 |
 | markmap-view.js | markmap-view 0.18.12（browser 版） | MIT，© 2020 Gerald | https://github.com/markmap/markmap |
-| opencc-cn2t.js | opencc-js 1.4.2（umd/cn2t，簡→繁） | 程式 MIT（© 2020-2021 The nk2028 Project）；字典資料 Apache-2.0（OpenCC） | https://github.com/nk2028/opencc-js |
 
 更新方式：`npm i 套件@版本 --ignore-scripts` 後從 `node_modules/<套件>/dist/` 複製同名檔案，改 README 與本表的版本號，並升 `sw.js` 的 APP_VERSION。
