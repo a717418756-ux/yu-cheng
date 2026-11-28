@@ -1,4 +1,7 @@
-// ══ memory.js — 記憶庫（考試區）══════════════════════════════════
+// ══ memory.js — 考點記憶庫（考試區；v4.74 由「記憶庫」＋「考古題排名」合併）══════════════════
+//   上方選考試（警大二技／警佐班（佐二類）／警正升官等）→ 只列這個考試題庫裡真的有的科目 →
+//   分頁＝考點排名（predict.js：⚖ 法條排名、📚 法規、🎯 考試範圍、🧩 題型、📈 趨勢）＋記憶庫（法條樹、篇章練習、對照表…）。
+//   記憶庫資料已刪掉三個考試都沒考過的內容（tools/prune_memory.py，清單 docs/考點記憶庫_刪除清單.md）。
 // 依賴：db.js(getSetting/setSetting/da), utils.js(esc/toast), data.js(showLawPop), quiz.js(startQWithPool)
 // 資料：data/memory/index.json ＋ 各科 *.min.json（tools/build_data.py 產生）
 //   刑法、刑訴、勤務取自 Promotion 升官等記憶樹；警察法規、憲法另行整理。
@@ -31,25 +34,35 @@ const TAG_CLS = { '必考':'must', '易錯':'trap', '口訣':'mn', '新法':'new
 
 let _index = null;          // index.json
 const _subj = {};           // id → 科目資料
-let _cur = { sid:'police', tab:'tree', recall:false, cardOnlyWeak:false, cardIdx:0, cardFlip:false, cardCh:'', exam:'二技' };
-// 記住上次看的科目與分頁（只存本機）
+let _cur = { sid:'police', tab:'pr:articles', recall:false, cardOnlyWeak:false, cardIdx:0, cardFlip:false, cardCh:'', exam:'二技', ks:'police', crim:'criminal' };
+// v4.74 考點記憶庫的科目（考試的科目名＝題庫 subject）：mem＝對到的記憶庫科目；packOnly＝只有二技預測資料包的題型分析（國文、英文）
+const KSUBJ = [
+  { id:'police',   name:'警察法規',         ex:'警察法規',         mem:['police'] },
+  { id:'const',    name:'憲法、法學緒論',   ex:'憲法、法學緒論',   mem:['constitution'] },
+  { id:'crim',     name:'刑法與刑事訴訟法', ex:'刑法與刑事訴訟法', mem:['criminal', 'procedure'] },
+  { id:'duty',     name:'警察勤務',         ex:'警察勤務',         mem:['duty'] },
+  { id:'admin',    name:'行政法',           ex:'行政法',           mem:[] },
+  { id:'deadline', name:'期限時效',         ex:null,               mem:['deadline'] },
+  { id:'chinese',  name:'國文',             ex:'國文',             mem:[], packOnly:true },
+  { id:'english',  name:'英文',             ex:'英文',             mem:[], packOnly:true },
+];
+const EXAMS = [['二技', '警大二技'], ['警佐', '警佐班（佐二類）'], ['升官', '警正升官等']];
+// 記住上次看的考試、科目與分頁（只存本機）
 try{
   const st = JSON.parse(localStorage.getItem('memState') || '{}');
-  if(typeof st.sid === 'string') _cur.sid = st.sid;
-  if(TABS.concat(AUDIT_TABS).some(t => t[0] === st.tab)) _cur.tab = st.tab;
-  // 考試別：記憶庫自己記的優先，沒有就跟考古題排名一樣
-  const pr = JSON.parse(localStorage.getItem('prState') || '{}');
-  if(['二技', '警佐', '全部'].includes(st.exam)) _cur.exam = st.exam;
-  else if(pr.exam === '二技' || pr.exam === '警佐') _cur.exam = pr.exam;
+  if(EXAMS.some(x => x[0] === st.exam)) _cur.exam = st.exam;
+  if(KSUBJ.some(x => x.id === st.ks)) _cur.ks = st.ks;
+  if(typeof st.tab === 'string') _cur.tab = st.tab;
+  if(st.crim === 'criminal' || st.crim === 'procedure') _cur.crim = st.crim;
 }catch(e){}
 function _saveState(){
-  try{
-    localStorage.setItem('memState', JSON.stringify({ sid:_cur.sid, tab:_cur.tab, exam:_cur.exam }));
-    // 二技／警佐班 同步給考古題排名（「全部」只有記憶庫有）
-    if(_cur.exam !== '全部'){ const pr = JSON.parse(localStorage.getItem('prState') || '{}'); if(pr.exam !== _cur.exam){ pr.exam = _cur.exam; localStorage.setItem('prState', JSON.stringify(pr)); } }
-  }catch(e){}
+  try{ localStorage.setItem('memState', JSON.stringify({ exam:_cur.exam, ks:_cur.ks, tab:_cur.tab, crim:_cur.crim })); }catch(e){}
 }
-const _EXAM_NAME = { '二技':'警大二技', '警佐':'警佐班' };
+const _EXAM_NAME = { '二技':'警大二技', '警佐':'警佐班', '升官':'升官等' };
+const _EXAM_KEY = { '二技':'e2', '警佐':'zuo', '升官':'up' };
+const _ks = () => KSUBJ.find(x => x.id === _cur.ks) || KSUBJ[0];
+// 目前科目對到的記憶庫科目（刑法與刑事訴訟法 → 刑法／刑訴 其中一個）
+const _memSid = () => { const k = _ks(); return k.mem.length > 1 ? (k.mem.includes(_cur.crim) ? _cur.crim : k.mem[0]) : (k.mem[0] || null); };
 let _heat = null;           // 'law|articleN' → { e2:{c,r,last,ids}, zuo:{c,r,last,ids} }（題庫即時統計）
 let _prog = null;           // 閃卡熟練度
 
@@ -70,7 +83,7 @@ async function _loadSubj(sid){
 // ════════ 考古題依關聯法條統計（v4.73，記憶庫 🔥 與考古題排名共用）════════
 //   題庫裡考試別＝警大二技／警佐班的題目，每一題的 relatedLaws 解析成「法規全名|條號」（同一題同一條只算一次），
 //   猜題（標籤「猜題」）不算。近3年＝該考試題庫裡最新的 3 個年度。題庫更正、匯入後自動更新（依題目陣列重算）。
-const _STAT_EXAMS = { e2:'警大二技', zuo:'警佐班' };
+const _STAT_EXAMS = { e2:'警大二技', zuo:'警佐班', up:'升官等' };
 let _stats = null, _statsSrc = null;
 async function examStats(){
   let qs = []; try{ qs = await da('questions'); }catch(e){}
@@ -114,19 +127,18 @@ async function _loadHeat(){
   try{
     const st = await examStats();
     _heat = {};
-    for(const k of ['e2', 'zuo']) for(const [key, a] of st[k].arts){
+    for(const k of ['e2', 'zuo', 'up']) for(const [key, a] of st[k].arts){
       (_heat[key] || (_heat[key] = {}))[k] = { c:a.count, r:a.recent, last:a.last, ids:a.ids };
     }
   }catch(e){ logError('memory.heat', e); _heat = _heat || {}; }
   return _heat;
 }
-// 目前考試別下這一條的題數與題目
+// 目前考試別下這一條的題數與題目（另外兩個考試放在說明裡）
 function _heatOf(h){
   if(!h) return null;
-  const e2 = h.e2 || { c:0, r:0, ids:[] }, zuo = h.zuo || { c:0, r:0, ids:[] };
-  if(_cur.exam === '二技') return { c:e2.c, ids:e2.ids, e2, zuo };
-  if(_cur.exam === '警佐') return { c:zuo.c, ids:zuo.ids, e2, zuo };
-  return { c:e2.c + zuo.c, ids:[...e2.ids, ...zuo.ids], e2, zuo };
+  const z = k => h[k] || { c:0, r:0, ids:[] };
+  const cur = z(_EXAM_KEY[_cur.exam]);
+  return { c:cur.c, ids:cur.ids, e2:z('e2'), zuo:z('zuo'), up:z('up') };
 }
 async function _loadProg(){
   if(!_prog){
@@ -197,7 +209,7 @@ function _refChips(ref){
   return parseRefs(ref).map(r => {
     if(!r.ref) return '<span class="mem-ref plain">' + esc(r.label) + '</span>';
     const h = _heatOf(r.key && _heat && _heat[r.key]);
-    const hot = h && h.c ? ' <b class="mem-hot" data-hq="' + esc(h.ids.join(',')) + '" data-hl="' + esc(r.label) + '" title="警大二技 ' + h.e2.c + ' 題（近3年 ' + h.e2.r + '）・警佐班 ' + h.zuo.c + ' 題（近3年 ' + h.zuo.r + '）・點 🔥 練這幾題">🔥' + h.c + '</b>' : '';
+    const hot = h && h.c ? ' <b class="mem-hot" data-hq="' + esc(h.ids.join(',')) + '" data-hl="' + esc(r.label) + '" title="警大二技 ' + h.e2.c + ' 題・警佐班 ' + h.zuo.c + ' 題・升官等 ' + h.up.c + ' 題・點 🔥 練這幾題">🔥' + h.c + '</b>' : '';
     return '<button class="mem-ref" data-ref="' + esc(r.ref) + '">' + esc(r.label) + hot + '</button>';
   }).join('');
 }
@@ -206,14 +218,12 @@ function _refChips(ref){
 async function renderMemory(){
   const el = document.getElementById('mem-body');
   if(!el) return;
-  // v4.73：考試別和考古題排名共用，每次進來重讀（「兩者合計」只有記憶庫有，選了就維持）
-  try{ const pr = JSON.parse(localStorage.getItem('prState') || '{}'); if(_cur.exam !== '全部' && (pr.exam === '二技' || pr.exam === '警佐')) _cur.exam = pr.exam; }catch(e){}
   try{
     await Promise.all([_loadIndex(), _loadHeat(), _loadProg()]);
     _initDelegation();
     _renderExam();
-    _renderSubjChips();
-    _renderTabs();
+    await _renderSubjChips();
+    await _renderTabs();
     await _renderBody();
   }catch(e){
     logError('renderMemory', e);
@@ -223,37 +233,67 @@ async function renderMemory(){
 // 考試別（v4.73）：🔥 題數、篇章練習只算這個考試的考古題
 function _renderExam(){
   const box = document.getElementById('mem-exam'); if(!box) return;
-  box.innerHTML = [['二技', '警大二技'], ['警佐', '警佐班（佐二類）'], ['全部', '兩者合計']].map(([k, t]) =>
+  box.innerHTML = EXAMS.map(([k, t]) =>
     '<button class="' + (k === _cur.exam ? 'on' : '') + '" data-mexam="' + k + '">' + t + '</button>').join('');
 }
-function _renderSubjChips(){
+// 這個考試真的有的科目：題庫裡有這個考試、這一科的題目（國文、英文只有二技有題型分析；期限時效跨科，三個考試都有）
+async function _subjList(){
+  const st = await examStats(), sj = st[_EXAM_KEY[_cur.exam]].bySubj;
+  const out = [];
+  for(const k of KSUBJ){
+    if(!k.ex){ out.push(k); continue; }
+    if(!(sj[k.ex] && sj[k.ex].n)) continue;
+    if(k.packOnly){ const v = window.predictViews ? await predictViews(_cur.exam, k.ex) : []; if(!v.length) continue; }
+    out.push(k);
+  }
+  return out;
+}
+async function _renderSubjChips(){
   const box = document.getElementById('mem-subj');
-  if(!_index.subjects.some(s => s.id === _cur.sid)) _cur.sid = _index.subjects[0].id;
-  box.innerHTML = _index.subjects.map(s =>
-    '<button class="chip' + (s.id===_cur.sid?' on':'') + '" data-sid="' + s.id + '">' + esc(s.name) + '</button>').join('');
+  const list = await _subjList();
+  if(!list.some(k => k.id === _cur.ks)) _cur.ks = list[0].id;
+  box.innerHTML = list.map(k =>
+    '<button class="chip' + (k.id===_cur.ks?' on':'') + '" data-ksubj="' + k.id + '">' + esc(k.name) + '</button>').join('');
   box.querySelector('.on')?.scrollIntoView({ block:'nearest', inline:'center' });
+  _cur.sid = _memSid() || _cur.sid;
 }
-function _tabs(){
-  const s = _index && _index.subjects.find(x => x.id === _cur.sid);
-  return s && s.audit ? TABS.concat(AUDIT_TABS) : TABS;
+// 分頁：考點排名（predict.js）＋記憶庫（這一科有記憶樹才有）
+async function _tabs(){
+  const k = _ks();
+  const pr = k.ex && window.predictViews ? (await predictViews(_cur.exam, k.ex)).map(([v, t]) => ['pr:' + v, t]) : [];
+  const sid = _memSid();
+  const mem = sid ? (_index.subjects.find(x => x.id === sid)?.audit ? TABS.concat(AUDIT_TABS) : TABS) : [];
+  return pr.concat(mem);
 }
-function _renderTabs(){
+async function _renderTabs(){
   const box = document.getElementById('mem-tabs');
-  const tabs = _tabs();
-  if(!tabs.some(t => t[0] === _cur.tab)) _cur.tab = 'tree';
+  const tabs = await _tabs();
+  if(!tabs.some(t => t[0] === _cur.tab)) _cur.tab = tabs[0] ? tabs[0][0] : 'tree';
   box.innerHTML = tabs.map(([k, t]) =>
     '<button class="mem-tab' + (k===_cur.tab?' on':'') + '" data-tab="' + k + '">' + t + '</button>').join('');
+  box.querySelector('.on')?.scrollIntoView({ block:'nearest', inline:'center' });
 }
 async function _renderBody(keep){
   const el = document.getElementById('mem-body');
   _saveState();
+  // 考點排名分頁：交給 predict.js 畫在這裡
+  if(_cur.tab.startsWith('pr:')){
+    el.scrollTop = 0;
+    await predictRenderInto(el, _cur.exam, _ks().ex, _cur.tab.slice(3));
+    return;
+  }
+  const sid = _memSid(); if(!sid){ el.innerHTML = '<div class="mem-empty">這一科沒有記憶樹</div>'; return; }
+  _cur.sid = sid;
   const d = await _loadSubj(_cur.sid);
+  // 刑法與刑事訴訟法：記憶樹分刑法、刑訴兩份
+  const crim = _ks().mem.length > 1 ? '<div class="pr-seg mem-crim">' + _ks().mem.map(m =>
+    '<button class="' + (m === sid ? 'on' : '') + '" data-crim="' + m + '">' + esc((_index.subjects.find(x => x.id === m) || {}).name || m) + '</button>').join('') + '</div>' : '';
   if(_cur.tab === 'tot' || _cur.tab === 'exam'){
     if(!_audit) el.innerHTML = '<div class="mem-empty">載入 GPT 復核資料…</div>';
     try{
       const [au, qm] = await Promise.all([_loadAudit(), _qmap()]);
       const top = el.scrollTop;
-      el.innerHTML = _cur.tab === 'tot' ? _rTot(au, qm) : _rExam(au, qm);
+      el.innerHTML = crim + (_cur.tab === 'tot' ? _rTot(au, qm) : _rExam(au, qm));
       el.scrollTop = keep ? top : 0;
     }catch(e){
       logError('memory.audit', e);
@@ -266,12 +306,12 @@ async function _renderBody(keep){
     const top = el.scrollTop;
     _chap = await _chapData(d);
     if(_cur.tab !== 'chap' || _cur.sid !== d.id) return;
-    el.innerHTML = _rChap(d, _chap);
+    el.innerHTML = crim + _rChap(d, _chap);
     el.scrollTop = keep ? top : 0;
     return;
   }
-  const fn = { tree:_rTree, cmp:_rCmp, trap:_rTrap, num:_rNum, card:_rCard, upd:_rUpd }[_cur.tab];
-  el.innerHTML = fn(d);
+  const fn = { tree:_rTree, cmp:_rCmp, trap:_rTrap, num:_rNum, card:_rCard, upd:_rUpd }[_cur.tab] || _rTree;
+  el.innerHTML = crim + fn(d);
   el.scrollTop = 0;
 }
 
@@ -283,7 +323,7 @@ function _rTree(d){
     '<button class="btn ' + (_cur.recall?'bp':'bg') + '" data-act="recall" title="遮住說明，點一下才顯示">🙈 挖空回想' + (_cur.recall?'中':'') + '</button>' +
     '</div>';
   const intro = d.intro ? '<div class="mem-intro">' + esc(d.intro) + (d.source ? '<div class="mem-src">來源：' + esc(d.source) + '</div>' : '') + '</div>' : '';
-  const exName = _cur.exam === '全部' ? '警大二技＋警佐班' : _EXAM_NAME[_cur.exam];
+  const exName = _EXAM_NAME[_cur.exam];
   const legend = '<div class="mem-legend"><span class="mem-tag must">必考</span><span class="mem-tag trap">易錯</span><span class="mem-tag mn">口訣</span><span class="mem-tag new">新法</span><span class="mem-hot">🔥N</span>＝' + exName + '考過題數（依題庫每題的關聯法條）・點 🔥 練那幾題・點法條看條文</div>';
   return tools + intro + legend + d.chapters.map((ch, i) =>
     '<details class="mem-ch"' + (i===0?' open':'') + ' id="mem-ch-' + ch.id + '">' +
@@ -309,12 +349,28 @@ function _rNodes(nodes, path){
 //   對應方式：篇章樹上出現的法條（法規全名|條號）、釋字／憲判字號，與題目的關聯法條有交集即歸入；
 //   一題可能同時屬於好幾章。沒有關聯法條的觀念題、學理題，或法條不在任何一章的題目，一律列在最後的「其他」（不用關鍵字硬猜，免得歸錯章）。
 const _SUBJ_EXAM = { police:['警察法規'], constitution:['憲法、法學緒論'], criminal:['刑法與刑事訴訟法'], procedure:['刑法與刑事訴訟法'], duty:['警察勤務'], deadline:['警察法規', '行政法'] };
-const _plainKey = s => String(s||'').replace(/[第號\s　]/g, '').replace(/^司法院|^大法官/, '');
+// 釋字、憲判字號統一寫法（「113憲判5」「113年憲判字第5號」→ 113憲判5；「釋字第670號」→ 釋字670）；和 tools/prune_memory.py 同一套
+const _plainKey = s => {
+  const t = String(s||'');
+  let m = t.match(/釋字\s*(?:第)?\s*(\d+)/); if(m) return '釋字' + m[1];
+  m = t.match(/(\d+)\s*年?\s*憲判\s*字?\s*(?:第)?\s*(\d+)/); if(m) return m[1] + '憲判' + m[2];
+  return t.replace(/[第號\s　]/g, '').replace(/^司法院|^大法官/, '');
+};
 function _refKeys(refs){
   const keys = new Set();
-  (refs||[]).forEach(x => parseRefs(typeof x === 'string' ? x : (x && x.ref) || '').forEach(r => {
-    if(r.key) keys.add(r.key); else if(r.ref) keys.add('p:' + _plainKey(r.ref));
-  }));
+  (refs||[]).forEach(x => {
+    const raw = typeof x === 'string' ? x : (x && x.ref) || '';
+    parseRefs(raw).forEach(r => {
+      if(r.key) keys.add(r.key); else if(r.ref) keys.add('p:' + _plainKey(r.ref));
+    });
+    // v4.74 範圍「刑訴§299～§304」：中間每一條都算（篇章對應、刪除判斷同一套）
+    String(raw).split(/[、；;，,]/).forEach(part => {
+      const m = part.match(/^(.*?)§\s*(\d+)\s*[～~至到]\s*§?\s*(\d+)/);
+      if(!m) return;
+      const law = _fullLaw(m[1]); const a = +m[2], b = +m[3];
+      if(law && b > a && b - a <= 60) for(let k = a + 1; k <= b; k++) keys.add(law + '|' + (k * 1000));
+    });
+  });
   return keys;
 }
 function _chKeys(ch){
@@ -334,7 +390,7 @@ async function _chapData(d){
   const hit = (set, ks) => { for(const k of ks) if(set.has(k)) return true; return false; };
   const un = [];
   let qs = []; try{ qs = await da('questions'); }catch(e){}
-  const exam = _cur.exam === '全部' ? null : _EXAM_NAME[_cur.exam];   // v4.73：只算這個考試的考古題（全部＝所有考試別）
+  const exam = _EXAM_NAME[_cur.exam];   // v4.73：只算這個考試的考古題
   qs.filter(q => names.includes(q.subject) && !(q.tags||[]).includes('猜題') && (!exam || q.exam === exam)).forEach(q => {
     const ks = _refKeys(q.relatedLaws);
     let any = false;
@@ -362,7 +418,7 @@ function _rChap(d, cd){
       '</div></div>';
   };
   const total = new Set(cd.chs.flatMap(c => c.exam.map(q => q.id))).size;
-  const exLabel = _cur.exam === '全部' ? '所有考試別（含升官等、三等）' : _EXAM_NAME[_cur.exam];
+  const exLabel = _EXAM_NAME[_cur.exam];
   return '<div class="mem-intro">📝 <b>篇章練習</b>（' + exLabel + '）：讀完一章，直接練那一章的考古題。題目依「關聯法條」自動對到篇章（共對到 ' + total + ' 題），一題可能屬於好幾章；' +
     '沒有關聯法條的觀念題、學理題歸在最後的「其他」。作答會照常記入複習進度。<div class="mem-src">「待加強」＝答錯過、之後還沒再答對的題目。</div></div>' +
     cd.chs.map((c, i) => row(c.ch.title, c.ch.lead, c.exam, i)).join('') +
@@ -374,7 +430,7 @@ async function _chapGo(i, kind){
   const c = i < 0 ? { ch:{ title:'其他' }, exam:cd.un } : cd.chs[i];
   if(!c) return;
   if(kind === 'tree'){
-    _cur.tab = 'tree'; _renderTabs(); await _renderBody();
+    _cur.tab = 'tree'; await _renderTabs(); await _renderBody();
     const el = document.getElementById('mem-ch-' + c.ch.id);
     if(el){ document.querySelectorAll('#mem-body details.mem-ch').forEach(x => x.open = x === el); el.scrollIntoView({ block:'start' }); }
     return;
@@ -751,8 +807,10 @@ async function openMemoryAt(key){
     if(d.chapters.some(ch => walk(ch.tree, ch, ch.id))) break;
   }
   if(!found){ toast('記憶樹裡沒有引用這一條'); return false; }
+  const ks = KSUBJ.find(k => k.mem.includes(found.sid));
+  if(ks){ _cur.ks = ks.id; if(ks.mem.length > 1) _cur.crim = found.sid; }
   _cur.sid = found.sid; _cur.tab = 'tree';
-  goPage('memory');
+  if(S.page === 'memory') await renderMemory(); else goPage('memory');
   setTimeout(() => {
     const ch = document.getElementById('mem-ch-' + found.ch);
     if(ch) ch.open = true;
@@ -786,16 +844,19 @@ function _initDelegation(){
   page._memBound = true;
   page.addEventListener('click', e => {
     // v4.73：點 🔥 練這一條在目前考試別考過的題目（不開條文）
+    if(e.target.closest('.pr-scope')) return;   // 考點排名分頁的按鈕由 predict.js 處理
     const hq = e.target.closest('.mem-hot[data-hq]');
-    if(hq){ e.preventDefault(); e.stopPropagation(); _practiceQ(hq.dataset.hq.split(','), (_cur.exam === '全部' ? '' : _EXAM_NAME[_cur.exam] + ' ') + (hq.dataset.hl || '')); return; }
+    if(hq){ e.preventDefault(); e.stopPropagation(); _practiceQ(hq.dataset.hq.split(','), _EXAM_NAME[_cur.exam] + ' ' + (hq.dataset.hl || '')); return; }
     const mx = e.target.closest('[data-mexam]');
-    if(mx){ _cur.exam = mx.dataset.mexam; _saveState(); _renderExam(); _renderBody(); return; }
+    if(mx){ _cur.exam = mx.dataset.mexam; _chap = null; _clearSearch(); (async () => { _renderExam(); await _renderSubjChips(); await _renderTabs(); await _renderBody(); })(); return; }
+    const ksb = e.target.closest('[data-ksubj]');
+    if(ksb){ _cur.ks = ksb.dataset.ksubj; _cur.cardIdx = 0; _cur.cardFlip = false; _cur.cardCh = ''; _clearSearch(); (async () => { await _renderSubjChips(); await _renderTabs(); await _renderBody(); })(); return; }
+    const cr = e.target.closest('[data-crim]');
+    if(cr){ _cur.crim = cr.dataset.crim; _cur.cardIdx = 0; _cur.cardFlip = false; _cur.cardCh = ''; _renderBody(); return; }
     const ref = e.target.closest('.mem-ref[data-ref]');
     if(ref){ e.preventDefault(); e.stopPropagation(); showLawPop(ref.dataset.ref); return; }
-    const sid = e.target.closest('[data-sid]');
-    if(sid){ _cur.sid = sid.dataset.sid; _cur.cardIdx = 0; _cur.cardFlip = false; _cur.cardCh = ''; _clearSearch(); _renderSubjChips(); _renderTabs(); _renderBody(); return; }
     const tab = e.target.closest('[data-tab]');
-    if(tab){ _cur.tab = tab.dataset.tab; _clearSearch(); _renderTabs(); _renderBody(); return; }
+    if(tab){ _cur.tab = tab.dataset.tab; _clearSearch(); (async () => { await _renderTabs(); await _renderBody(); })(); return; }
     const rv = e.target.closest('[data-reveal].hidden');
     if(rv){ rv.classList.remove('hidden'); return; }
     // 自我測驗：點卡片任一處把這張卡的答案都打開

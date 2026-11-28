@@ -157,8 +157,7 @@ let _fabOpen = false;
 // v4.38：改為底部導覽列（首頁／測驗／題庫／資料庫／更多）。原本的圓形選單鈕隱藏，
 //   它的彈出清單改由「更多」開啟，列出導覽列上沒有的考試區頁面與設定
 const _F_MORE = [
-  {pg:'memory',  icon:'🧠', label:'記憶庫'},
-  {pg:'predict', icon:'📈', label:'考古題排名'},
+  {pg:'memory',  icon:'🧠', label:'考點記憶庫'},   // v4.74 記憶庫＋考古題排名合併
   {pg:'stats',   icon:'📊', label:'分析'},
   {pg:'set',     icon:'⚙️', label:'設定'},
 ];
@@ -323,6 +322,7 @@ let _staticOv = null;   // 頁面載入時就存在的浮層（第一次換頁�
 function goPage(pg, btn, fromBack){
   // bulk 是 overlay，不跳頁，直接開啟後返回
   if(pg==='bulk'){ openBulkQ(); return; }
+  if(pg==='predict') pg = 'memory';   // v4.74 考古題排名併入考點記憶庫
   // 換頁時收掉上一頁殘留的浮層（法條彈窗、底部面板），避免蓋在新頁面上
   const lp = document.getElementById('lawpop-ov');
   if(lp) lp.style.display = 'none';

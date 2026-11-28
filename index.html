@@ -239,21 +239,12 @@
         </div>
         <span class="zpanel-main-arrow" style="margin-left:auto">›</span>
       </button>
-      <!-- 記憶庫：法條樹、對照表、易錯爭點、數字口訣、閃卡 -->
+      <!-- v4.74 考點記憶庫：記憶庫＋考古題排名合併（二技／警佐班／升官等） -->
       <button class="zpanel-row" onclick="fabGo('memory')">
         <span class="zpanel-row-icon">🧠</span>
         <div class="zpanel-row-text">
-          <div class="t">記憶庫</div>
-          <div class="s">法條樹・對照表・易錯爭點・數字口訣・閃卡</div>
-        </div>
-        <span class="zpanel-main-arrow" style="margin-left:auto">›</span>
-      </button>
-      <!-- 考古題排名：依歷屆考古題統計的高頻法條、趨勢與練習 -->
-      <button class="zpanel-row" onclick="fabGo('predict')">
-        <span class="zpanel-row-icon">📈</span>
-        <div class="zpanel-row-text">
-          <div class="t">考古題排名</div>
-          <div class="s">歷屆高頻法條・趨勢・練對應考古題</div>
+          <div class="t">考點記憶庫</div>
+          <div class="s">二技・警佐班・升官等：法條排名・法條樹・篇章練習・口訣・閃卡</div>
         </div>
         <span class="zpanel-main-arrow" style="margin-left:auto">›</span>
       </button>
@@ -546,25 +537,19 @@
   <div id="eng-list" style="padding:8px 12px"></div>
 </div>
 
-<!-- MEMORY 記憶庫（考試區） -->
+<!-- MEMORY 考點記憶庫（考試區；v4.74 記憶庫＋考古題排名合併） -->
 <div id="pg-memory" class="page hide">
   <div class="hd">
-    <div class="hdt">記憶庫</div>
-    <input class="mem-search" id="mem-search" type="search" placeholder="搜尋全部科目（如：管束、§88-1）" aria-label="搜尋記憶庫">
+    <div class="hdt">考點記憶庫</div>
+    <input class="mem-search" id="mem-search" type="search" placeholder="搜尋記憶樹（如：管束、§88-1）" aria-label="搜尋考點記憶庫">
   </div>
-  <div class="pr-seg" id="mem-exam" role="tablist" aria-label="考試別"></div><!-- v4.73 🔥、篇章練習依考試別 -->
+  <div class="pr-seg" id="mem-exam" role="tablist" aria-label="考試別"></div><!-- 警大二技／警佐班（佐二類）／警正升官等 -->
   <div class="chips" id="mem-subj"></div>
   <div class="mem-tabs" id="mem-tabs"></div>
   <div id="mem-body"></div>
 </div>
 
-<!-- PREDICT 考古題排名（考試區） -->
-<div id="pg-predict" class="page hide">
-  <div class="hd"><div class="hdt">考古題排名</div></div>
-  <div class="pr-seg" id="pr-exam" role="tablist" aria-label="考試別"></div>
-  <div class="chips" id="pr-subj"></div>
-  <div id="pr-body"></div>
-</div>
+<!-- v4.74：考古題排名併入考點記憶庫（pg-memory），舊的 pg-predict 拿掉 -->
 
 <!-- ENGEXAM 考試英文重點（成長區・英語學習庫） -->
 <div id="pg-engexam" class="page hide">

@@ -37,6 +37,14 @@ def dump(obj, p):
 
 def build_memory(promo_dir):
     extras = load(os.path.join(MEM, '_extras.json'))
+    # v4.74 考點記憶庫：有 _tested.json（tools/prune_memory.py 從題庫產生）就刪掉警大二技、警佐班、升官等都沒考過的內容
+    tp = os.path.join(MEM, '_tested.json')
+    pr = None
+    if os.path.exists(tp):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from prune_memory import Pruner
+        tested = load(tp)
+        pr = Pruner(tested)
     index = []
     for sid, name in SUBJECTS:
         if sid in extras:
@@ -53,12 +61,15 @@ def build_memory(promo_dir):
             d.setdefault('mnemonics', []).extend(extras[sid].get('mnemonics', []))
             d.setdefault('traps', []).extend(extras[sid].get('traps', []))
             d['source'] = 'Promotion 升官等記憶樹 ' + d.get('updated', '')
-            dump(d, os.path.join(MEM, sid + '.min.json'))
+            dump(pr.subject(sid, d) if pr else d, os.path.join(MEM, sid + '.min.json'))
         else:
             d = load(os.path.join(MEM, sid + '.json'))
-            dump(d, os.path.join(MEM, sid + '.min.json'))
+            dump(pr.subject(sid, d) if pr else d, os.path.join(MEM, sid + '.min.json'))
         index.append({'id': sid, 'name': name, **({'audit': True} if d.get('audit') else {})})
     dump({'subjects': index}, os.path.join(MEM, 'index.json'))
+    if pr:
+        pr.report(os.path.join(ROOT, 'docs', '考點記憶庫_刪除清單.md'), tested)
+        print('刪除', len(pr.removed), '項；保留沒考過的新法', len(pr.kept_new), '項 → docs/考點記憶庫_刪除清單.md')
 
 
 def _trim_rank(r):
