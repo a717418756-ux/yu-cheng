@@ -84,13 +84,43 @@ async function _loadSubj(sid){
 //   題庫裡考試別＝警大二技／警佐班的題目，每一題的 relatedLaws 解析成「法規全名|條號」（同一題同一條只算一次），
 //   猜題（標籤「猜題」）不算。近3年＝該考試題庫裡最新的 3 個年度。題庫更正、匯入後自動更新（依題目陣列重算）。
 const _STAT_EXAMS = { e2:'警大二技', zuo:'警佐班', up:'升官等' };
+// ── v4.75 二技舊範圍：108 學年度起二技警察法規範圍刪除行政執行法、加入集會遊行法（107、115 學年度簡章；題庫逐年也看得到）。
+//   105–107 年只考行政執行法（沒有引用現行範圍法律或其相關命令）的題目＝舊範圍，預設不算進排名、🔥、篇章練習、考試範圍；
+//   同時引用職權法等現行範圍法律的（例如即時強制）照樣算。可在畫面上切換「包含」。
+const _E2_SCOPE = ['警察法', '警械使用條例', '警察職權行使法', '社會秩序維護法', '集會遊行法'];
+function _qLawNames(q){
+  const out = new Set();
+  (q.relatedLaws||[]).forEach(x => parseRefs(typeof x === 'string' ? x : (x && x.ref) || '').forEach(r => {
+    if(r.key) out.add(r.key.split('|')[0]); else if(r.ref && r.plain && !/釋字|憲判/.test(r.ref)) out.add(r.ref.replace(/第.*$/, ''));
+  }));
+  return [...out];
+}
+function _inE2Scope(law){
+  if(_E2_SCOPE.includes(law)) return true;
+  const f = window._predictScope && _predictScope.family && _predictScope.family(law);
+  return !!(f && _E2_SCOPE.includes(f.law));
+}
+function kdOldScope(q){
+  if(!q || q.exam !== '警大二技' || q.subject !== '警察法規' || !(+q.year < 108)) return false;
+  const laws = _qLawNames(q);
+  return laws.some(l => /^行政執行法/.test(l)) && !laws.some(_inE2Scope);
+}
+let _incOld = false;
+try{ _incOld = localStorage.getItem('kd_inc_old') === '1'; }catch(e){}
+const kdIncOld = () => _incOld;
+function kdSetIncOld(v){ _incOld = !!v; _stats = null; try{ localStorage.setItem('kd_inc_old', _incOld ? '1' : '0'); }catch(e){} }
 let _stats = null, _statsSrc = null;
 async function examStats(){
   let qs = []; try{ qs = await da('questions'); }catch(e){}
   if(_stats && _statsSrc === qs) return _stats;
   const out = {};
   for(const [k, ex] of Object.entries(_STAT_EXAMS)){
-    const list = qs.filter(q => q.exam === ex && !(q.tags||[]).includes('猜題'));
+    const oldEx = {};
+    const list = qs.filter(q => {
+      if(q.exam !== ex || (q.tags||[]).includes('猜題')) return false;
+      if(!_incOld && kdOldScope(q)){ oldEx[q.subject] = (oldEx[q.subject] || 0) + 1; return false; }
+      return true;
+    });
     const years = [...new Set(list.map(q => String(q.year || '')).filter(Boolean))].sort((a, b) => a - b);
     const recent = new Set(years.slice(-3));
     const arts = new Map(), laws = new Map(), bySubj = {};
@@ -117,7 +147,7 @@ async function examStats(){
       }
       for(const law of ls){ bump(laws, law, { law }, q); bump(sj.laws, law, { law }, q); }
     }
-    out[k] = { exam:ex, years, recent:[...recent], total:list.length, linked, arts, laws, bySubj };
+    out[k] = { exam:ex, years, recent:[...recent], total:list.length, linked, arts, laws, bySubj, oldEx };
   }
   _stats = out; _statsSrc = qs;
   return out;
@@ -391,7 +421,7 @@ async function _chapData(d){
   const un = [];
   let qs = []; try{ qs = await da('questions'); }catch(e){}
   const exam = _EXAM_NAME[_cur.exam];   // v4.73：只算這個考試的考古題
-  qs.filter(q => names.includes(q.subject) && !(q.tags||[]).includes('猜題') && (!exam || q.exam === exam)).forEach(q => {
+  qs.filter(q => names.includes(q.subject) && !(q.tags||[]).includes('猜題') && (!exam || q.exam === exam) && (_incOld || !kdOldScope(q))).forEach(q => {
     const ks = _refKeys(q.relatedLaws);
     let any = false;
     if(ks.size) chs.forEach(c => { if(hit(c.keys, ks)){ c.exam.push(q); any = true; } });
@@ -923,6 +953,6 @@ function _clearSearch(){
   if(inp && inp.value) inp.value = '';
 }
 
-const Memory = { renderMemory, memSearch, openMemoryAt, memoryKeys, examStats };
+const Memory = { renderMemory, memSearch, openMemoryAt, memoryKeys, examStats, kdOldScope, kdIncOld, kdSetIncOld };
 Object.assign(window, Memory);
 })();

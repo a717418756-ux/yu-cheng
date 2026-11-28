@@ -22,7 +22,7 @@
 
 let _data = null;
 let _keys = null;                         // 記憶樹引用到的法條（顯示 🌳 用）
-let _cur = { si:0, k:20, sort:'count', onlyWrong:false, view:'articles', exam:'二技', scope:'', scopeOwn:false, scopeRel:false, n:0 };   // n：每次練習題數（0＝全部）
+let _cur = { si:0, k:20, sort:'count', onlyWrong:false, view:'articles', exam:'二技', scope:'', scopeOwn:true, scopeRel:false, n:0 };   // v4.75 考試範圍預設只看所選考試的歷屆題   // n：每次練習題數（0＝全部）
 // 記住上次的考試別、科目、分頁、押前幾條、練習題數（只存本機；讀不到就用預設）
 try{
   const st = JSON.parse(localStorage.getItem('prState') || '{}');
@@ -39,6 +39,7 @@ const _isUp = () => _cur.exam === '升官';
 const _EXAM_LABEL = { '二技':'警大二技', '警佐':'警佐班', '升官':'升官等' };
 // 預測資料包裡的科目（升官等、行政法等資料包沒有的，給一個只有名稱的科目）
 const _packSubj = name => (_data && _data.subjects.find(x => x.name === name)) || { name };
+let _lastExam = null;   // 上一次畫的考試（換考試才重設考試範圍）
 let _host = null;   // { el, name }：考點記憶庫裡目前畫排名的位置
 async function _load(){
   if(!_data){
@@ -86,7 +87,9 @@ async function predictRenderInto(el, exam, name, view){
     await _load();
     _bind(el.closest('.page'));
     _host = { el, name };
-    _cur.exam = exam; _cur.view = view;
+    // 換考試時，考試範圍跟著換成那個考試的公告範圍
+    if(_lastExam !== exam) _cur.scope = { '二技':'2tech', '警佐':'zuo', '升官':'up' }[exam] || '';
+    _lastExam = exam; _cur.exam = exam; _cur.view = view;
     const i = _data.subjects.findIndex(x => x.name === name); _cur.si = i < 0 ? 0 : i;
     await _rBody();
   }catch(e){
@@ -170,7 +173,16 @@ async function _bankRows(s, kind){
 }
 function _srcNote(ex, sj){
   return '<div class="mem-prog">依題庫 ' + esc(ex.exam) + ' 的考古題統計：本科 ' + sj.n + ' 題，其中 ' + sj.linked + ' 題有標關聯法條（其餘多是觀念、學理題，不列入）；' +
-    '近3年＝' + ex.recent.join('、') + ' 年。題庫更正後會自動更新。</div>';
+    '近3年＝' + ex.recent.join('、') + ' 年。題庫更正後會自動更新。</div>' + _oldNote(ex);
+}
+// v4.75 二技警察法規：108 學年度起不考行政執行法 → 105–107 年只考行政執行法的題目預設排除，可切換
+function _oldNote(ex){
+  if(_cur.exam !== '二技' || !_host || _host.name !== '警察法規') return '';
+  const n = (ex.oldEx || {})['警察法規'] || 0, inc = kdIncOld();
+  if(!n && !inc) return '';
+  return '<div class="mem-prog">📅 二技 108 學年度起警察法規範圍<b>刪除行政執行法</b>、加入集會遊行法。' +
+    (inc ? '目前<b>包含</b> 105–107 年只考行政執行法的舊範圍題目。' : '已排除 105–107 年只考行政執行法的 <b>' + n + '</b> 題（同時考職權法等現行範圍的照樣算）。') +
+    ' <button class="btn bg" data-act="incold" style="padding:3px 10px;font-size:12px">' + (inc ? '改成排除' : '改成包含') + '</button></div>';
 }
 
 // ⚖ 法條（v4.73：二技、警佐班都依題庫的關聯法條統計）
@@ -307,6 +319,7 @@ function _family(name){
 }
 // 題目引用的法規名：優先用 relatedLaws；沒有時從題幹、解析、關鍵字找法規全名
 const _SCAN_NAMES = [..._SCOPE_LAWS, ..._SCOPE_LAWS.map(l => l + '施行細則'), ...Object.keys(_RELATED)].sort((a, b) => b.length - a.length);
+// （延伸考點只看題目的關聯法條，不從文字猜：見 _rScope）
 function _qLaws(q){
   const refs = (q.relatedLaws||[]).map(r => _refLaw(r && r.ref)).filter(Boolean);
   if(refs.length) return [...new Set(refs)];
@@ -333,7 +346,7 @@ async function _rScope(s){
   // 每題最近一次有判對錯的作答（id 越大越新）→ 每部法律的「做過／答對率」
   const last = new Map();
   ats.slice().sort((a, b) => (a.id||0) - (b.id||0)).forEach(a => { if(typeof a.correct === 'boolean') last.set(String(a.qid), a.correct); });
-  const all = qs.filter(q => q.subject === '警察法規' && (!wrong || wrong.has(String(q.id))));
+  const all = qs.filter(q => q.subject === '警察法規' && (!wrong || wrong.has(String(q.id))) && !(sc.id === '2tech' && !kdIncOld() && kdOldScope(q)));
   const pool = _cur.scopeOwn && sc.src ? all.filter(q => q.exam === sc.src) : all;
   const withRel = sc.related || _cur.scopeRel;
   const per = new Map(sc.laws.map(l => [l, { own:[], rel:[], by:{} }]));
@@ -371,13 +384,37 @@ async function _rScope(s){
       '<div class="pr-acts">' + (list.length ? '<button class="go" data-scopelaw="' + esc(l) + '">▶ 練習 ' + list.length + ' 題</button>' : '<span class="pr-meta">題庫裡沒有這部法律的題目</span>') + '</div>' +
     '</div></div>';
   }).join('') + '</div>';
+  // v4.75 警察法延伸考點：不在公告範圍、但從警察法、職權法、警械條例延伸出去，三個考試年年都有
+  _scopePools.ext = {};
+  const extRows = _EXT.map(([law, why]) => {
+    const list = out.filter(q => _qLaws(q).includes(law));
+    _scopePools.ext[law] = list;
+    return [law, why, list];
+  }).filter(r => r[2].length);
+  const extAll = [...new Set(extRows.flatMap(r => r[2]))];
+  _scopePools.extAll = extAll;
+  if(extRows.length) h += '<div class="sec">🔗 警察法延伸考點（不在公告範圍，但年年出現）</div>' +
+    '<div class="mem-prog">這些題目引用的法律不在範圍內，題目卻是從範圍內的法律延伸出去的（例如警察法第 11 條的人事制度、作業規定的法律性質）。' +
+    (_cur.scopeOwn && sc.src ? esc(sc.src) + '歷屆題共 ' + extAll.length + ' 題。' : '所有考試共 ' + extAll.length + ' 題。') + '</div>' +
+    '<div class="mem-tools"><button class="btn bp" data-act="extall" style="flex:1">▶ 練全部延伸考點（' + extAll.length + ' 題）</button></div>' +
+    '<div class="card">' + extRows.map(([law, why, list]) =>
+      '<div class="pr-row"><div class="pr-main"><div class="pr-title">' + esc(law) + '</div><div class="pr-meta">' + esc(why) + '・' + list.length + ' 題</div>' +
+      '<div class="pr-acts"><button class="go" data-scopeext="' + esc(law) + '">▶ 練習 ' + list.length + ' 題</button></div></div></div>').join('') + '</div>';
   const ol = Object.entries(outLaws).sort((a, b) => b[1] - a[1]).slice(0, 8);
   h += '<div class="mem-prog">' + (_cur.scopeOwn && sc.src ? esc(sc.src) + '歷屆題' : '題庫警察法規題') + '中有 <b>' + out.length + '</b> 題不在這個範圍' +
     (ol.length ? '，引用最多的是：' + ol.map(([k, v]) => esc(k) + ' ' + v).join('、') : '') + '。' +
     (_cur.scopeOwn && sc.src && out.length ? '這些是這個考試以前考過、但不在上面公告法律裡的題目，可當補充。' : '') + '</div>';
   return h;
 }
-let _scopePools = { all:[], laws:{} };
+let _scopePools = { all:[], laws:{}, ext:{}, extAll:[] };
+// 延伸考點：範圍外法律 → 從哪裡延伸（依 v4.75 三考覆核）
+const _EXT = [
+  ['警察人員人事條例', '警察法第 11 條（人事制度）'],
+  ['警察教育條例', '警察法（警察教育）'],
+  ['行政程序法', '作業規定、要點的法律性質（行程法第 159 條）、行政處分'],
+  ['國家賠償法', '違法行使職權、違法使用警械的賠償（職權法第 31 條、警械條例第 11 條）'],
+  ['中華民國憲法', '警察機關的意義、人身自由與基本權（憲法第 8 條等）'],
+];
 function _practicePool(list, label){
   const pool = list.slice();
   if(!pool.length){ toast(_cur.onlyWrong ? '這個範圍沒有答錯過的題目' : '題庫裡沒有這個範圍的題目'); return; }
@@ -516,7 +553,7 @@ function _bind(page){
   page._prBound = true;
   page.addEventListener('click', e => {
     if(!e.target.closest('.pr-scope')) return;
-    const t = e.target.closest('[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem],[data-scope],[data-scopelaw],[data-n]');
+    const t = e.target.closest('[data-k],[data-sort],[data-act],[data-qids],[data-zkeys],[data-ref],[data-mem],[data-scope],[data-scopelaw],[data-scopeext],[data-n]');
     if(!t) return;
     const ds = t.dataset;
     if(ds.k != null){ _cur.k = +ds.k; _rBody(); }   // _rBody 內會存狀態
@@ -533,6 +570,9 @@ function _bind(page){
     else if(ds.act === 'goeng') goPage('engexam');
     else if(ds.act === 'scopeown'){ _cur.scopeOwn = !_cur.scopeOwn; _rBody(); }
     else if(ds.act === 'scoperel'){ _cur.scopeRel = !_cur.scopeRel; _rBody(); }
+    else if(ds.act === 'incold'){ kdSetIncOld(!kdIncOld()); _rBody(); }
+    else if(ds.act === 'extall') _practicePool(_scopePools.extAll || [], '警察法延伸考點');
+    else if(ds.scopeext) _practicePool((_scopePools.ext || {})[ds.scopeext] || [], ds.scopeext + '（延伸考點）');
     else if(ds.act === 'scopeall'){ const sc = _SCOPES.find(x => x.id === _cur.scope); _practicePool(_scopePools.all, (sc ? sc.name : '考試範圍') + ' 範圍內'); }
     else if(ds.act === 'zpractice'){
       const s = _data.subjects[_cur.si];
