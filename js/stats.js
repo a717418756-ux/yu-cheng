@@ -93,6 +93,7 @@ async function _renderWeakLaws(){
 }
 
 async function renderStats(){  try{
+  window.lrStats?.(document.getElementById('lr-stats')).catch?.(e => logError('lrStats', e));   // v4.70 法規閱讀紀錄
   const [qs, ats] = await Promise.all([da('questions'), da('attempts')]);
   const qById = new Map(qs.map(q => [q.id, q]));
   const answered = ats.filter(_isAnswered);

@@ -2107,3 +2107,17 @@ html[data-layout="desktop"] #fab-wrap{
 #lp-rc-bar button{ flex:none; padding:6px 14px; border-radius:10px; border:none; background:#ffb74d; color:#222; font-weight:700; }
 #lp-rc-add{ position:fixed; z-index:530; display:none; padding:7px 12px; border-radius:10px; border:none; background:#6ea8fe; color:#111; font-weight:700; font-size:13px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
 #lp-rc-add.on{ display:block; }
+/* v4.70 分析頁：法規閱讀紀錄 */
+.lr-st-empty{ font-size:13px; color:var(--t2); line-height:1.6; }
+.lr-st-sum{ font-size:13px; color:var(--t1,var(--t0)); margin-bottom:10px; }
+.lr-st-days{ display:flex; gap:6px; align-items:flex-end; height:84px; margin-bottom:12px; }
+.lr-st-d{ flex:1; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; position:relative; }
+.lr-st-d i{ display:block; width:100%; max-width:28px; min-height:2px; border-radius:4px 4px 0 0; background:var(--acc); }
+.lr-st-d span{ font-size:11px; color:var(--t2); margin-top:3px; }
+.lr-st-d b{ position:absolute; top:0; font-size:10px; font-weight:600; color:var(--t2); }
+.lr-st-h{ font-size:12px; font-weight:700; color:var(--t2); margin:6px 0; }
+.lr-st-l{ padding:8px 0; border-top:1px solid var(--bd); cursor:pointer; }
+.lr-st-n{ display:flex; justify-content:space-between; gap:8px; font-size:14px; }
+.lr-st-n span{ flex:none; color:var(--acc); font-size:13px; }
+.lr-st-m{ font-size:12px; color:var(--t2); margin-top:2px; }
+.lr-st-l .lr-mini{ margin-top:5px; }

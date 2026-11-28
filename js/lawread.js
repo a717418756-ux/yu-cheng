@@ -7,6 +7,7 @@
 //   ⑤條文裡的「第X條」「○○法第X條」可以點：跳出那一條的小視窗（不用離開目前位置）。
 //   ⑥每一條 ⧉ 複製：連同出處（法規名＋條號＋條名），貼到筆記、報告直接可用。
 //   讀到哪裡存在 settings 的 law_read（隨備份、雲端同步）；閱讀設定存在 localStorage（每台裝置各自）。
+//   ⑦（v4.70）閱讀紀錄：每天每部法規讀了多久、讀過的範圍，settings 的 law_log；分析頁「📖 法規閱讀」。
 (function(){
 'use strict';
 
@@ -42,6 +43,98 @@ function _save(soon){
 }
 _load();
 
+// ── 閱讀紀錄（v4.70）─────────────────────────────────────────────
+//   每天、每部法規只記一筆：讀了幾秒、這天讀過的範圍（最前面、最後面那一條）。不記每次翻頁，資料很小
+//   （每天讀 5 部約 400 字元，一年約 150 KB，壓縮後更小）。存在 settings 的 law_log（隨備份；不算「還沒備份的變動」）。
+//   計時：法規頁開著、畫面在前景、最近 3 分鐘內有捲動或點畫面才算，每 15 秒累計一次，每分鐘存一次、離開法規時馬上存。
+//   180 天以前的每日紀錄併成每月一筆（只留秒數）。
+//   law_log = { d:{ 'YYYY-MM-DD':{ 法規名:[秒, 最前k, 最後k, 最前條號, 最後條號, 共幾條] } }, m:{ 'YYYY-MM':{ 法規名:秒 } } }
+const LG = { log:null, dirty:false, act:0, tick:0, saveT:0 };
+const _day = (t = new Date()) => t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+async function _lgLoad(){
+  if(LG.log) return LG.log;
+  try{ const v = await getSetting('law_log', null); LG.log = (v && typeof v === 'object') ? v : {}; }catch(_){ LG.log = {}; }
+  LG.log.d = LG.log.d || {}; LG.log.m = LG.log.m || {};
+  return LG.log;
+}
+function _lgSave(now){
+  if(!LG.dirty || !LG.log) return;
+  clearTimeout(LG.saveT);
+  LG.saveT = setTimeout(() => {
+    LG.dirty = false;
+    // 180 天以前的每日紀錄併成每月
+    const cut = _day(new Date(_now() - 180 * 86400000));
+    for(const d of Object.keys(LG.log.d)){
+      if(d >= cut) continue;
+      const mo = LG.log.m[d.slice(0, 7)] || (LG.log.m[d.slice(0, 7)] = {});
+      for(const [n, r] of Object.entries(LG.log.d[d])) mo[n] = (mo[n] || 0) + (r[0] || 0);
+      delete LG.log.d[d];
+    }
+    setSetting('law_log', LG.log).catch?.(() => {});
+  }, now ? 0 : 60000);
+}
+function _lgRow(name){
+  const d = _day(), day = LG.log.d[d] || (LG.log.d[d] = {});
+  return day[name] || (day[name] = [0, -1, -1, '', '', 0]);
+}
+// 讀到哪：_track 每次算出畫面最上面那一條時呼叫
+function _lgPos(name, k, n, label){
+  if(!LG.log || !name) return;
+  const r = _lgRow(name);
+  if(r[1] < 0 || k < r[1]){ r[1] = k; r[3] = label; }
+  if(k > r[2]){ r[2] = k; r[4] = label; }
+  r[5] = n;
+  LG.dirty = true;
+}
+const _lgOpen = () => { const lv = document.getElementById('lv'); return !!(LR.cur && lv && lv.dataset.lrOpen === '1' && lv.style.display !== 'none'); };
+const _lgActive = () => { LG.act = _now(); };
+['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => document.addEventListener(ev, _lgActive, { passive:true, capture:true }));
+LG.tick = setInterval(() => {
+  if(document.hidden || !_lgOpen() || _now() - LG.act > 180000 || !LG.log) return;
+  _lgRow(LR.cur)[0] += 15; LG.dirty = true;
+  _lgSave();
+}, 15000);
+document.addEventListener('visibilitychange', () => { if(document.hidden) _lgSave(true); });
+_lgLoad();
+
+// 分析頁「📖 法規閱讀」
+const _min = s => s >= 3600 ? (s / 3600).toFixed(1) + ' 小時' : s < 60 ? '不到 1 分' : Math.round(s / 60) + ' 分';
+window.lrStats = async el => {
+  if(!el) return;
+  const lg = await _lgLoad(); await _load();
+  const today = new Date(), days = [];
+  for(let i = 6; i >= 0; i--) days.push(_day(new Date(today.getTime() - i * 86400000)));
+  const cut30 = _day(new Date(today.getTime() - 29 * 86400000));
+  const per = {}; let tot30 = 0, nDays = 0;
+  for(const [d, row] of Object.entries(lg.d)){
+    if(d < cut30) continue;
+    let ds = 0;
+    for(const [n, r] of Object.entries(row)){
+      const p = per[n] || (per[n] = { s:0, last:'', r:null });
+      p.s += r[0] || 0; ds += r[0] || 0;
+      if(d >= p.last){ p.last = d; p.r = r; }
+    }
+    tot30 += ds; if(ds >= 60) nDays++;
+  }
+  if(!tot30){ el.innerHTML = '<div class="lr-st-empty">還沒有法規閱讀紀錄。打開法規、畫面有在捲動或點，就會開始記（每天每部法規一筆）。</div>'; return; }
+  const dsec = days.map(d => Object.values(lg.d[d] || {}).reduce((a, r) => a + (r[0] || 0), 0));
+  const mx = Math.max(60, ...dsec);
+  const wk = ['日', '一', '二', '三', '四', '五', '六'];
+  const top = Object.entries(per).sort((a, b) => b[1].s - a[1].s).slice(0, 10);
+  el.innerHTML = '<div class="lr-st-sum">近 30 天讀了 <b>' + _min(tot30) + '</b>・' + nDays + ' 天有讀（每天 1 分鐘以上）・' + Object.keys(per).length + ' 部法規</div>'
+    + '<div class="lr-st-days">' + days.map((d, i) => '<div class="lr-st-d"><i style="height:' + Math.round(dsec[i] / mx * 100) + '%"></i><span>'
+      + (i === 6 ? '今' : wk[new Date(d + 'T12:00').getDay()]) + '</span><b>' + (dsec[i] >= 60 ? Math.round(dsec[i] / 60) : '') + '</b></div>').join('') + '</div>'
+    + '<div class="lr-st-h">讀最久的法規（近 30 天）</div>'
+    + top.map(([n, p]) => {
+      const r = p.r, cur = LR.read[n];
+      const rng = r && r[1] >= 0 ? (r[3] === r[4] ? r[3] : r[3] + '～' + r[4]) : '';
+      return '<div class="lr-st-l" onclick="lrResume(\'' + _ej(n) + '\')"><div class="lr-st-n"><b>' + _e(n) + '</b><span>' + _min(p.s) + '</span></div>'
+        + '<div class="lr-st-m">' + (rng ? '最近一次（' + p.last.slice(5).replace('-', '/') + '）讀 ' + _e(rng) : '最近一次 ' + p.last.slice(5).replace('-', '/'))
+        + (cur ? '・目前讀到 ' + _e(cur.art || '') + '（' + (cur.pct || 0) + '%）' : '') + '</div>'
+        + (cur ? '<span class="lr-mini"><i style="width:' + (cur.pct || 0) + '%"></i></span>' : '') + '</div>';
+    }).join('');
+};
+
 // ── 讀到哪一條 ───────────────────────────────────────────────
 const _lb = () => document.getElementById('lbody');
 const _cards = () => [...(_lb()?.querySelectorAll('.law-art-card') || [])];
@@ -67,6 +160,7 @@ function _track(){
   const t = _topCard(); if(!t) return;
   const id = t.card.dataset.lawId;
   LR.read[name] = { id: /^\d+$/.test(id) ? +id : id, an:+t.card.dataset.an || 0, art:_artLabel(t.card), k:t.k, n:t.n, pct:Math.round(pct), at:_now() };
+  _lgPos(name, t.k, t.n, _artLabel(t.card).split(' — ')[0].trim());   // v4.70 閱讀紀錄：這天讀過的範圍（只記條號，不含條名）
   _save();
   _tocMark();
 }
@@ -77,6 +171,7 @@ window.lrOnOpen = async (lawName, hasKw) => {
   await _load();
   const fresh = LR.cur !== lawName || document.getElementById('lv')?.dataset.lrOpen !== '1';
   LR.cur = lawName; LR.full = !hasKw;
+  LG.act = _now();   // 打開法規算一次操作（開始計時）
   const lv = document.getElementById('lv'); if(lv) lv.dataset.lrOpen = '1';
   _applyPrefs();
   _ensureUi();
@@ -97,6 +192,7 @@ window.lrOnOpen = async (lawName, hasKw) => {
 window.lrOnExit = () => {
   if(LR.cur && LR.full !== false) _track();
   _save(true);
+  _lgSave(true);   // v4.70 閱讀紀錄：離開法規馬上存
   const lv = document.getElementById('lv'); if(lv) lv.dataset.lrOpen = '';
   _tocClose(); _setClose();
 };
