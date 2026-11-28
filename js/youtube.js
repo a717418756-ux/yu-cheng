@@ -853,6 +853,7 @@ function _ytEnsureOverlay(){
 function _ytStart(){
   const it = _YT.cur = _YT.queue[_YT.qi];
   if(!it) return;
+  window._ypOnStart?.();   // v4.71 A-B 段落是上一部的，清掉（ytplus.js）
   _ytRenderPlayerInfo();
   // 看到一半的從上次位置接著看（最後 10 秒內就從頭）
   const start = it.lastPos > 5 && !(it.duration && it.lastPos > it.duration - 10) ? Math.floor(it.lastPos) : 0;
@@ -1152,6 +1153,7 @@ function _ytState(e){
   } else if(e.data === S_.PAUSED){ _ytSavePos(); }
   else if(e.data === S_.ENDED){
     _ytSavePos(true);
+    if(window._ypStopAfter?.()) return;   // v4.71 睡眠定時「這部播完就停」
     if(_YT.loop){ try{ _YT.player.seekTo(0, true); _YT.player.playVideo(); }catch(_){} }
     else if(_YT.qi < _YT.queue.length - 1) ytNext();
   }
@@ -1249,6 +1251,7 @@ function _ytRenderPlayerInfo(){
       ${it.type === 'audio' ? `<button onclick="ytLyrics()" class="${_YT.subs && _YT.subs.lyrics && _YT.subs.ytId === it.ytId ? 'on' : ''}" aria-label="歌詞">♪ 歌詞</button>` : ''}
     </div>` : ''}
     ${it.note ? `<div class="ytp-note">${_ytNoteHtml(it.note)}</div>` : ''}
+    ${window._ypRow?.() || ''}
     <div id="ytp-sb" class="ytp-sb" hidden></div>
     <div id="ytp-tr" class="ytp-tr" hidden></div>
     ${q.length > 1 ? `<div class="ytp-qhd">播放清單・${_YT.qi + 1}／${q.length}${_YT.loop ? '（單部重複中）' : '（播完自動接下一部）'}</div>
@@ -1299,6 +1302,7 @@ async function closeYtPlayer(bg){
     if(S.page === 'media' && !document.getElementById('yt-search-ov')) _renderMediaPage();
     return;
   }
+  window._ypOnClose?.();   // v4.71 睡眠定時、A-B 一起清掉
   _YT.bg = false; _ytMiniRemove(); _ytFloatRemove(); _YT.subs = null; _ytNPLast = ''; clearInterval(_YT.sbT); clearInterval(_YT.ifT); _YT.sbSegs = null;
   clearInterval(_YT.timer); _YT.timer = null;
   await _ytSavePos();
@@ -1345,7 +1349,7 @@ async function _ytNPStart(it, start){
       _YT.player = _ytNPAdapter();
       const ex = (await _ytHist()).slice(0, 200).map(h => h.ytId);
       await P.open({ items:_ytNPItems(), index:_YT.qi, start, maxHeight:_ytMaxH(), rate:_YT.rate, loop:_YT.loop, rect:_ytNPRect(),
-        autoplay:_ytAuto(), exclude:ex, ..._ytSbNative() });
+        autoplay:_ytAuto(), exclude:ex, ..._ytSbNative(), ...(window._ypNative?.() || {}) });   // v4.71 跳過靜音、音量平均
       _YT.npOpen = true;
     }
   }catch(e){ toast('播放器開啟失敗：' + e.message); return; }
@@ -1415,6 +1419,7 @@ function _ytNPInit(){
       _ytSubAuto(_YT.cur);
     }
     _YT.npPos = s.pos; _YT.npDur = s.dur; _YT.npPlaying = s.playing;
+    window._ypNPState?.(s);   // v4.71 睡眠定時剩幾分
     if(s.playing && Date.now() - (_YT.npSaved || 0) > 10000){ _YT.npSaved = Date.now(); _ytSavePos(); }
     if(s.ended) _ytSavePos(true);
     _ytMiniUpdate();
@@ -1439,6 +1444,7 @@ function _ytNPInit(){
     _ytStartIframe(it, start);
   });
   P.addListener('fullscreen', () => ytFull());
+  P.addListener('sleep', () => window._ypSleepFired?.());   // v4.71 睡眠定時到了
   P.addListener('segments', e => { _YT.sbSegs = { ytId:e.ytId, segs:e.segments || [] }; _ytRenderSbLine(); });
   P.addListener('skipped', e => _ytSbToast(e));
   P.addListener('pip', e => { if(!e.in){ _ytNPLast = ''; _ytNPSync(); } });

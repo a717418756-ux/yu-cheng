@@ -1,6 +1,6 @@
 # Y.C. 多功能專用平台
 
-> 警察特考備考 PWA｜版本 **4.70.0**
+> 警察特考備考 PWA｜版本 **4.71.0**
 > 離線可用．資料存本機
 
 ---
@@ -49,6 +49,7 @@
 - **每次練習題數（v4.51.0）**：法條、警佐班法條、考試範圍的練習可選每次 20／50／100 題或全部；考試範圍每部法律顯示做過幾題與最近一次答對率
 - **題庫稽核（v4.51.0）**：`python -X utf8 tools/tests/bank_audit.py <exam_data.json> [報告.md]` 唯讀檢查答案、選項、重複、缺號、解析與答案矛盾、相關法條條號；最近一次報告 `docs/題庫稽核_2026-11-22.md`；持續優化進度記在 `tools/優化進度.md`
 - **解析更正（v4.52.0）**：稽核找到的 3 題解析與官方答案矛盾（4152、4189、5214），依官方答案改寫解析，答案不動，`tools/exam_fixes/make_fixes_1123.py` 產生、設定「考古題答案更正」套用；2 題選項重複（1508、2825）經對照原卷確認原卷如此，不改。
+- **YouTube 讀書輔助（v4.71.0，`js/ytplus.js`）**：參考 RiMusic（GPL-3）、Spotube（BSD-4）、ncspot 的操作方式，程式自己寫、沒有用它們的程式碼。播放器資訊區多一排：⏾ 睡眠定時（15／30／45／60／90 分鐘、這部播完就停；App 由原生播放器計時，關螢幕也準）、A-B 段落重複（按一下記 A、再按記 B，換部自動取消）、☰ 待播清單（↑↓、⤴ 下一個播、✕ 移除；App 用 `YcPlayer.setQueue` 同步原生清單）；App 另有 🔇 跳過靜音（ExoPlayer `setSkipSilenceEnabled`）、🔊 音量平均（`LoudnessEnhancer` +6 dB，內建限幅），兩個開關記在 localStorage `yt_play_prefs`。鍵盤：空白／K 播放暫停、←→（J／L）倒退快轉 10 秒、Shift+N／P 下一部上一部、Shift+< > 調速度、A／B 設段落；輸入框打字、有選單開著時不搶按鍵。原生 `YcPlayer.control` 新增 `skipSilence`、`level`、`ab`、`sleep`，`state` 事件多 `sleepLeft`、`stopAfter`，新事件 `sleep`
 - **影音庫 YouTube（v4.53.0，`js/youtube.js`）**：影音庫上方「▶ 搜尋 YouTube」。搜尋用 YouTube Data API v3（設定填自己的金鑰，存在本機設定、還原時不覆蓋已設定的；搜尋一次 100 額度、每天 10,000），貼影片／播放清單網址不需要金鑰（清單需要）。播放用官方 IFrame 播放器（要連網；不下載、不去廣告、不隱藏畫面）。收進影音庫的存在 leisuremedia（`ytId`、`ytChannel`、`note`、縮圖網址、沒有檔案本體），同分類依建立時間連續播放、記住 lastPos；SW 對 YouTube／googleapis 一律直連不快取。
 - **三星健康、App 相容層（v4.57.0）**：YcHealth（Kotlin，Health Connect connect-client 1.1.0：讀步數／運動／活動消耗／總消耗／基礎代謝／飲食；三星健康沒寫活動消耗時以 總消耗－基礎代謝 計算（v4.57.1），列出所有來源的當天運動與各自熱量，寫運動＋活動消耗、飲食，刪本 App 的紀錄）；`js/fitness.js` App 版改讀 Health Connect（healthLogs 每天的 `hc` 欄位）；`js/folder-native.js` 另補 `dl()` 存到下載／Y.C.、`window.open` 開 App 內檔案改視窗顯示、以 YcTts（Android TextToSpeech）補 `speechSynthesis`。App minSdk 26。
 - **FSRS、資料夾 App 版、跳過片段、歌詞（v4.56.0）**：`js/ts-fsrs.umd.js`（ts-fsrs 5.4.2，MIT，本機內附；v4.68 由 5.2.3 升級）＋ db.js `reviewSchedule`／`reviewRescore`（題目欄位 `fsrs`，`nextReview` 照舊；localStorage `review_algo`、`review_ret`）；`js/folder-native.js` 在 App 裡以 YcFolder 原生外掛（Storage Access Framework）補上 `showDirectoryPicker`，settings.js 備份還原不改流程；YcPlayer 內建 SponsorBlock（`sb`、`sbCats`）與系統子母畫面；歌詞用 LRCLIB 搜尋，標題解析在 `_ytSongGuess`。

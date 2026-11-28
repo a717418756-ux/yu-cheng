@@ -7,7 +7,7 @@
      - 從此部署後不需手動清快取
    ══════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '4.70.0';
+const APP_VERSION = '4.71.0';
 const CACHE_NAME  = `yc-cache-${APP_VERSION}`;
 const PAGES_CACHE = 'yc-pages-v1';   // SOP 原檔頁面圖：不跟版本走，更新 App 不清
 
@@ -44,6 +44,7 @@ const CORE_ASSETS = [
   './js/foliate/vendor/fflate.js',
   './js/media.js',
   './js/youtube.js',
+  './js/ytplus.js',
   './js/utils.js',
   './js/quiz.js',
   './js/data.js',
