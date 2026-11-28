@@ -13,9 +13,58 @@ const SIZES  = [1.6, 2.6, 4.5];
 const TSIZE  = { s:36, m:50, l:70 };            // 文字大小（畫布寬 800 時的字級；手機上約 18／25／35px）
 const TOOLS  = [['pen', '✎ 筆'], ['line', '╱ 直線'], ['marker', '▭ 螢光'], ['eraser', '⌫ 橡皮'], ['text', 'T 文字']];
 const LS = 'yc_ink_pref';
-const pref = Object.assign({ c:'#ff5a5a', w:2.6, tool:'pen', ts:'m', tst:'plain', mini:false },
+// v4.72：fav＝常用的三支筆（點一下換、長按存成目前的筆）；shape＝畫完停住半秒變成標準圖形（參考 GoodNotes、Notability）
+const FAV0 = [{ tool:'pen', c:'#ff5a5a', w:1.6 }, { tool:'marker', c:'#ffd54a', w:2.6 }, { tool:'pen', c:'#6ea8fe', w:2.6 }];
+const pref = Object.assign({ c:'#ff5a5a', w:2.6, tool:'pen', ts:'m', tst:'plain', mini:false, shape:true, fav:FAV0 },
   (() => { try{ return JSON.parse(localStorage.getItem(LS) || '{}') || {}; }catch(_){ return {}; } })());
 if(!TOOLS.some(t => t[0] === pref.tool)) pref.tool = 'pen';
+if(!Array.isArray(pref.fav) || pref.fav.length !== 3) pref.fav = FAV0.map(f => ({ ...f }));
+
+// ── 自動圖形（v4.72）：筆、螢光筆畫完停住 → 認得是直線、圓（橢圓）、方框就換成整齊的 ──────────
+//   太小的筆畫（寫字的一筆）不認；認不出來就照原樣
+function _shapeOf(path){
+  if(!path || path.length < 6) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, L = 0;
+  path.forEach((p, i) => {
+    x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
+    if(i) L += Math.hypot(p.x - path[i - 1].x, p.y - path[i - 1].y);
+  });
+  const w = x1 - x0, h = y1 - y0, diag = Math.hypot(w, h);
+  if(diag < 60 || L < 60) return null;
+  const a = path[0], b = path[path.length - 1], se = Math.hypot(b.x - a.x, b.y - a.y);
+  const P = (x, y) => ({ x, y, p:0.5 });
+  // 直線：頭尾距離幾乎等於總長、每一點離直線都很近
+  if(se / L > 0.9){
+    let dev = 0;
+    for(const p of path) dev = Math.max(dev, Math.abs((b.x - a.x) * (a.y - p.y) - (a.x - p.x) * (b.y - a.y)) / (se || 1));
+    if(dev / se < 0.08){ const pts = []; for(let i = 0; i <= 24; i++) pts.push(P(a.x + (b.x - a.x) * i / 24, a.y + (b.y - a.y) * i / 24)); return { type:'line', pts }; }
+    return null;
+  }
+  // 封閉的：頭尾接近
+  if(se > 0.22 * L || w < 20 || h < 20) return null;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = w / 2, ry = h / 2;
+  let eErr = 0, near = 0;
+  for(const p of path){
+    eErr += Math.abs(Math.hypot((p.x - cx) / rx, (p.y - cy) / ry) - 1);
+    const d = Math.min(p.x - x0, x1 - p.x, p.y - y0, y1 - p.y);
+    if(d < Math.min(w, h) * 0.1) near++;
+  }
+  eErr /= path.length;
+  const pts = [];
+  if(near / path.length > 0.85){   // 方框：幾乎每一點都貼著外框
+    const cs = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]];
+    for(let k = 0; k < 4; k++) for(let i = 0; i < 16; i++) pts.push(P(cs[k][0] + (cs[k + 1][0] - cs[k][0]) * i / 16, cs[k][1] + (cs[k + 1][1] - cs[k][1]) * i / 16));
+    pts.push(P(x0, y0), P(x0 + 1, y0));
+    return { type:'rect', pts };
+  }
+  if(eErr < 0.13){                 // 圓、橢圓：從起筆的角度開始畫一圈
+    const t0 = Math.atan2((a.y - cy) / ry, (a.x - cx) / rx);
+    for(let i = 0; i <= 72; i++){ const t = t0 + i / 72 * Math.PI * 2; pts.push(P(cx + rx * Math.cos(t), cy + ry * Math.sin(t))); }
+    pts.push(pts[1]);
+    return { type:'ellipse', pts };
+  }
+  return null;
+}
 const savePref = () => { try{ localStorage.setItem(LS, JSON.stringify(pref)); }catch(_){} };
 const _esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const _newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -293,6 +342,7 @@ class Board{
       drawPath(c, st);
     };
     const commit = () => {
+      clearTimeout(holdT);
       const s = st; st = null;
       const t = this._tmp; if(t) t.getContext('2d').clearRect(0, 0, t.width, t.height);
       if(!s || !s.path.length) return;
@@ -309,7 +359,20 @@ class Board{
       drawPath(ctx, Object.assign({}, s, { color: s.tool === 'eraser' ? '#000' : s.color, done:true }));
       ctx.restore();
     };
-    const cancel = () => { st = null; const t = this._tmp; if(t) t.getContext('2d').clearRect(0, 0, t.width, t.height); };
+    const cancel = () => { clearTimeout(holdT); st = null; const t = this._tmp; if(t) t.getContext('2d').clearRect(0, 0, t.width, t.height); };
+    // 筆停住 0.6 秒 → 試著變成圖形
+    let holdT = 0, holdAt = null;
+    const holdArm = () => {
+      clearTimeout(holdT);
+      if(!pref.shape || !st || (st.tool !== 'pen' && st.tool !== 'marker')) return;
+      holdT = setTimeout(() => {
+        if(!st || st.shaped || (st.tool !== 'pen' && st.tool !== 'marker')) return;
+        const sh = _shapeOf(st.path); if(!sh) return;
+        st.path = sh.pts; st.shaped = sh.type; st.pen = false;
+        try{ navigator.vibrate?.(12); }catch(_){}
+        preview();
+      }, 600);
+    };
 
     cv.addEventListener('pointerdown', e => {
       if(!this.active) return;
@@ -327,6 +390,7 @@ class Board{
       if(this.sel){ this._sel(null); if(pref.tool === 'text'){ pts.delete(e.pointerId); return; } }
       if(pref.tool === 'text'){ st = { pid:e.pointerId, tool:'text', at:pos(e) }; return; }
       st = { pid:e.pointerId, tool:pref.tool, path:[pos(e)], w:widthFor(pref.tool), color:pref.c, pen:e.pointerType === 'pen' };
+      holdAt = st.path[0]; holdArm();
       preview();
     });
     cv.addEventListener('pointermove', e => {
@@ -339,8 +403,11 @@ class Board{
         pan = a; return;
       }
       if(!st || st.pid !== e.pointerId || st.tool === 'text') return;
+      if(st.shaped) return;   // 已經變成圖形：放開前不再改
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
       for(const ev of (evs.length ? evs : [e])) st.path.push(pos(ev));
+      const lp = st.path[st.path.length - 1];
+      if(!holdAt || Math.hypot(lp.x - holdAt.x, lp.y - holdAt.y) > 4 * scale()){ holdAt = lp; holdArm(); }   // 還在動：重新計時
       preview();
     });
     const up = e => {
@@ -467,8 +534,13 @@ function _bar(board){
   const b = _barEl();
   b.style.bottom = `calc(${board.o.barBottom ?? 14}px + env(safe-area-inset-bottom, 0px))`;
   const custom = !COLORS.includes(pref.c);
+  const favs = pref.fav.map((f, i) => `<button class="ink-fav${_favOn(f) ? ' on' : ''}" data-i="${i}" style="--c:${f.c}"
+      onpointerdown="YCInk._favDown(${i})" onpointerup="YCInk._favUp(${i})" onpointerleave="YCInk._favCancel()" oncontextmenu="return false"
+      aria-label="常用筆 ${i + 1}（長按存成目前的筆）"><i style="height:${f.w < 2 ? 2 : f.w < 3.5 ? 4 : 7}px"></i><span>${f.tool === 'marker' ? '▭' : f.tool === 'line' ? '╱' : '✎'}</span></button>`).join('');
   b.innerHTML = `
     <div class="ink-full">
+      <div class="ink-row ink-favs"><span class="ink-favl">常用</span>${favs}
+        <button class="ink-b ink-shp${pref.shape ? ' on' : ''}" onclick="YCInk._shape()" title="畫完停住半秒變成直線、圓、方框">◯ 自動圖形</button></div>
       <div class="ink-row">
         <div class="ink-cs">${COLORS.map(c => `<button class="ink-c${pref.c === c ? ' on' : ''}" style="--c:${c}" data-c="${c}" onclick="YCInk._c('${c}')" aria-label="${CNAME[c]}"></button>`).join('')}
           <input type="color" class="ink-c ink-cc${custom ? ' on' : ''}" value="${custom ? pref.c : '#ff8c00'}" oninput="YCInk._c(this.value,1)" aria-label="自訂顏色" title="自訂顏色"></div>
@@ -486,6 +558,7 @@ function _bar(board){
     </div>
     <div class="ink-mini">
       <span class="ink-dot" style="--c:${pref.c}"></span><span class="ink-mname"></span>
+      ${pref.fav.map((f, i) => `<button class="ink-fav ink-favm${_favOn(f) ? ' on' : ''}" data-i="${i}" style="--c:${f.c}" onclick="YCInk._fav(${i})" aria-label="常用筆 ${i + 1}"><span>${f.tool === 'marker' ? '▭' : '✎'}</span></button>`).join('')}
       <button class="ink-b" onclick="YCInk._undo()" aria-label="復原">↶</button>
       <button class="ink-b" onclick="YCInk._mini(0)">▴ 工具</button>
       <button class="ink-b ink-done" onclick="YCInk._done()">✓ 完成</button>
@@ -495,6 +568,8 @@ function _bar(board){
   _barState();
 }
 function _barHide(){ document.getElementById('ink-bar')?.classList.remove('on'); }
+const _favOn = f => !!f && f.tool === pref.tool && f.c === pref.c && f.w === pref.w;
+function _favSync(){ document.querySelectorAll('#ink-bar .ink-fav').forEach(x => x.classList.toggle('on', _favOn(pref.fav[+x.dataset.i]))); }
 function _barState(){
   const b = document.getElementById('ink-bar'); if(!b || !cur) return;
   b.querySelector('#ink-und')?.classList.toggle('dim', !cur.und.length);
@@ -504,7 +579,9 @@ function _barState(){
     : (cur.o.pan ? (penSeen ? '手寫筆畫圖、手指捲動' : '兩指可上下捲動') : '');
   const mn = b.querySelector('.ink-mname'); if(mn) mn.textContent = (TOOLS.find(t => t[0] === pref.tool) || ['', ''])[1];
   const md = b.querySelector('.ink-mini .ink-dot'); if(md) md.style.setProperty('--c', pref.c);
+  _favSync();
 }
+let favT = 0, favLong = false;
 const api = {
   _c(c, custom){
     pref.c = c; savePref();
@@ -518,6 +595,25 @@ const api = {
   _undo(){ cur?.undo(); }, _redo(){ cur?.redo(); }, _clear(){ cur?.clearAll(); },
   _mini(on){ pref.mini = !!on; savePref(); document.getElementById('ink-bar')?.classList.toggle('mini', !!on); },
   _done(){ cur?._finish(); },
+  // 常用筆：點一下換成那支；長按 0.6 秒把目前的筆存進去
+  _fav(i){
+    const f = pref.fav[i]; if(!f) return;
+    pref.tool = f.tool; pref.c = f.c; pref.w = f.w; savePref();
+    if(cur) _bar(cur);
+    cur?._cursor();
+  },
+  _favDown(i){ favLong = false; clearTimeout(favT); favT = setTimeout(() => {
+    favLong = true;
+    if(pref.tool === 'eraser' || pref.tool === 'text'){ _toast('橡皮擦、文字不能存成常用筆'); return; }
+    pref.fav[i] = { tool:pref.tool, c:pref.c, w:pref.w }; savePref();
+    try{ navigator.vibrate?.(15); }catch(_){}
+    _toast('已把目前的筆存成常用 ' + (i + 1));
+    if(cur) _bar(cur);
+  }, 600); },
+  _favUp(i){ clearTimeout(favT); if(!favLong) api._fav(i); favLong = false; },
+  _favCancel(){ clearTimeout(favT); },
+  _shape(){ pref.shape = !pref.shape; savePref(); document.querySelector('#ink-bar .ink-shp')?.classList.toggle('on', pref.shape);
+    _toast(pref.shape ? '自動圖形：開（畫完停住半秒變成直線、圓、方框）' : '自動圖形：關'); },
 };
 
 // ── 文字編輯框（螢幕上方，鍵盤擋不到）────────────────────────────

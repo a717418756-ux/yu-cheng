@@ -223,7 +223,7 @@ const _RX = {
   word: /不得|準用|除外|(?<![取獲所習心懂值記使覺顯難曉博贏求免非捨])得(?![知悉到])|(?<![相對適反供因回答呼效報理順感照])應(?![用徵變付考允聘])|(?<=^|[。，；：、\n])但/g,
 };
 const _RC_LS = 'yc_recite';
-const _rcPref = Object.assign({ num:true, word:false, mine:true, old:true },
+const _rcPref = Object.assign({ num:true, word:false, mine:true, old:true, ink:false },   // ink：v4.72 手寫筆記也遮（參考 GoodNotes 的遮蓋膠帶）
   (() => { try{ return JSON.parse(localStorage.getItem(_RC_LS) || '{}') || {}; }catch(_){ return {}; } })());
 const _rcSave = () => { try{ localStorage.setItem(_RC_LS, JSON.stringify(_rcPref)); }catch(_){} };
 let _rc = false, _adj = false, _rcObs = null, _rcT = 0;
@@ -279,8 +279,25 @@ function _wrap(body){
   body.dataset.rcn = cnt;
   return keep.length;
 }
+// v4.72 手寫筆記也遮：筆記變模糊，卡片右下角「👁 筆記」點一下才看得清楚
+function _inkBtns(){
+  const lb = document.getElementById('lbody'); if(!lb) return;
+  const on = _rc && _rcPref.ink;
+  lb.classList.toggle('lp-rc-ink', on);
+  lb.querySelectorAll('.law-art-card').forEach(card => {
+    const has = !!card.querySelector(':scope > .ink-view');
+    let b = card.querySelector(':scope > .lp-inkb');
+    if(on && has && !b){
+      b = document.createElement('button'); b.className = 'lp-inkb'; b.type = 'button'; b.textContent = '👁 筆記';
+      b.setAttribute('aria-label', '顯示這一條的手寫筆記');
+      b.addEventListener('click', e => { e.stopPropagation(); card.classList.toggle('lp-ink-show'); b.textContent = card.classList.contains('lp-ink-show') ? '🙈 遮住' : '👁 筆記'; });
+      card.appendChild(b);
+    }else if((!on || !has) && b){ b.remove(); card.classList.remove('lp-ink-show'); }
+  });
+}
 function _applyAll(force){
   const lb = document.getElementById('lbody'); if(!lb) return 0;
+  _inkBtns();
   let n = 0;
   lb.querySelectorAll('.law-art-body').forEach(body => {
     if(!force && body.dataset.rcn != null && body.querySelectorAll('.lp-cz').length === +body.dataset.rcn) return;
@@ -332,6 +349,9 @@ async function _start(){
 }
 function _stop(){
   _rc = false; _adj = false;
+  document.querySelectorAll('#lbody .lp-inkb').forEach(b => b.remove());
+  document.querySelectorAll('#lbody .lp-ink-show').forEach(c => c.classList.remove('lp-ink-show'));
+  document.getElementById('lbody')?.classList.remove('lp-rc-ink');
   _rcObs?.disconnect();
   document.querySelectorAll('#lbody .law-art-body').forEach(_unwrap);
   _oldCover(false);
@@ -357,6 +377,7 @@ window.lpRecite = async () => {
     + ck('num', '數字（期間、金額、年齡、倍數、百分比）')
     + ck('word', '法律用語（應、得、不得、準用、除外、但）')
     + ck('mine', '我的挖空（自己加的）')
+    + (lb.querySelector('.law-art-card > .ink-view') ? ck('ink', '手寫筆記（變模糊，點卡片右下「👁 筆記」才看得清楚）') : '')
     + (hasOld ? ck('old', '舊重點（以前選字畫的）') : '')
     + (lost ? '<div class="lp-note" style="color:#ffb74d">有 ' + lost + ' 個自己加的挖空，條文更新後找不到原文，不會遮。<button class="lp-rcx" onclick="lpReciteClearLost()">清掉</button></div>' : '')
     + '<div class="lp-seg" style="margin-top:12px">'
@@ -461,6 +482,53 @@ document.addEventListener('focusin', e => { if(_rc && e.target?.id === 'lv-find-
 window.lpOnExit = () => { _close('lp-rc'); if(_rc) _stop(); };
 // v4.68 的入口名稱（數字挖空）保留：開＝只要有勾數字就開始背誦
 window.lpCloze = on => { if(on === false || (on == null && _rc)) _stop(); else { _rcPref.num = true; _rcSave(); window.lpReciteGo(); } };
+
+// ── ⑥筆記存成圖片（v4.72，html-to-image，MIT，js/lib/html-to-image.js，用到才載入）──────────
+//   這部法規有手寫筆記的條文，連同條文照畫面的樣子存成 PNG（列印、傳給別人）；條文多時每張約 7000px 高，分幾張存。
+//   複製一份卡片放在法規頁裡、畫面外（不放在 #lbody，不會被閱讀紀錄、背誦模式當成條文），拿掉按鈕、挖空色塊。
+window.lpInkExport = async () => {
+  window.closeLvMenu?.();
+  const lb = document.getElementById('lbody'), lv = document.getElementById('lv'); if(!lb || !lv) return;
+  const cards = [...lb.querySelectorAll('.law-art-card')].filter(c => c.querySelector(':scope > .ink-view'));
+  if(!cards.length){ toast('這部法規還沒有手寫筆記（條文右上角 ✍ 可以寫）'); return; }
+  try{ await loadScript('js/lib/html-to-image.js'); }catch(e){ toast('圖片工具載入失敗（需要網路第一次下載）'); return; }
+  const name = (typeof S === 'object' && S.curLawName) || '法規';
+  const width = Math.round(cards[0].getBoundingClientRect().width) || 360;
+  const bg = getComputedStyle(lv).backgroundColor || '#111';
+  const d = new Date(), stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  toast('正在產生圖片…');
+  const groups = []; let g = [], hh = 0;
+  for(const c of cards){
+    const h = c.getBoundingClientRect().height + 12;
+    if(g.length && hh + h > 7000){ groups.push(g); g = []; hh = 0; }
+    g.push(c); hh += h;
+  }
+  if(g.length) groups.push(g);
+  let n = 0;
+  for(let gi = 0; gi < groups.length; gi++){
+    const box = document.createElement('div');
+    box.style.cssText = 'position:absolute;left:-30000px;top:0;width:' + (width + 24) + 'px;padding:12px;background:' + bg + ';';
+    box.innerHTML = '<div style="font-weight:700;font-size:15px;margin:0 2px 10px;color:var(--t0,#eee)">' + _e(name) + '　手寫筆記' + (groups.length > 1 ? '（' + (gi + 1) + '／' + groups.length + '）' : '') + '</div>';
+    for(const c of groups[gi]){
+      const k = c.cloneNode(true);
+      k.querySelectorAll('button, .law-art-acts').forEach(x => x.remove());
+      k.querySelectorAll('.lp-cz').forEach(x => x.replaceWith(document.createTextNode(x.textContent)));
+      k.classList.remove('lv-flash');
+      k.style.width = width + 'px'; k.style.marginBottom = '12px';
+      box.appendChild(k);
+    }
+    box.insertAdjacentHTML('beforeend', '<div style="font-size:11px;opacity:.6;color:var(--t2,#aaa);margin:2px">Y.C. 平台・' + d.toLocaleDateString('zh-TW') + '</div>');
+    lv.appendChild(box);
+    try{
+      await Promise.all([...box.querySelectorAll('img')].map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; })));
+      // style：放在畫面外只是為了不讓使用者看到，畫成圖片時要放回原點；skipFonts：用手機內建字型，不去下載網路字型（又慢又可能失敗）
+      const blob = await window.htmlToImage.toBlob(box, { pixelRatio:2, backgroundColor:bg, cacheBust:false, skipFonts:true, style:{ position:'static', left:'0', top:'0' } });
+      if(blob){ await dl(blob, name + '_手寫筆記_' + stamp + (groups.length > 1 ? '_' + (gi + 1) : '') + '.png', 'image/png'); n++; }
+    }catch(e){ logError('lpInkExport', e); toast('產生圖片失敗：' + (e.message || e)); }
+    finally{ box.remove(); }
+  }
+  if(n) toast('已存 ' + n + ' 張圖片（' + cards.length + ' 條有筆記的條文）');
+};
 
 // 返回鍵：先關對照、心智圖
 window.lpBack = () => {

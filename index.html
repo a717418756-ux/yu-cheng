@@ -912,6 +912,7 @@
         background:var(--bg1);border:1px solid var(--bd);border-radius:12px;
         padding:4px 0;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:200">
         <button class="lv-menu-item" onclick="lnOpenAll(window.currentLawName);closeLvMenu()">📝 筆記總覽</button>
+        <button class="lv-menu-item" onclick="lpInkExport()">🖼 筆記存成圖片</button><!-- v4.72 有手寫筆記的條文存成 PNG -->
         <button class="lv-menu-item" id="lp-cz-item" onclick="closeLvMenu();lpRecite()">🙈 背誦模式</button><!-- v4.69 合併「遮住重點」「數字挖空」：數字、法律用語、我的挖空、舊重點，可調整 -->
         <button class="lv-menu-item" onclick="ttsReadLaw();closeLvMenu()">🔊 朗讀法條</button>
         <button class="lv-menu-item" id="lv-star-item" onclick="toggleLvFav();closeLvMenu()">☆ 收藏</button>

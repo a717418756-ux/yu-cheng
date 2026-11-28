@@ -1942,6 +1942,16 @@ html[data-layout="desktop"] #fab-wrap{
 .ink-b.dim{ opacity:.4; }
 .ink-b.ink-del{ color:#ff8a8a; }
 .ink-tools .ink-b{ padding:6px 8px; }
+/* v4.72 常用筆（點一下換、長按存）、自動圖形開關 */
+.ink-favs{ align-items:center; }
+.ink-favl{ font-size:11px; color:#aaa; margin-right:2px; }
+.ink-fav{ display:inline-flex; align-items:center; gap:4px; height:30px; padding:0 9px; border-radius:15px; cursor:pointer; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.16); color:#eee; font-size:12px; }
+.ink-fav i{ display:block; width:16px; border-radius:3px; background:var(--c); }
+.ink-fav.on{ border-color:var(--c); box-shadow:0 0 0 1px var(--c) inset; }
+.ink-favm{ height:28px; padding:0 8px; border-color:var(--c); }
+.ink-favm span{ color:var(--c); }
+.ink-shp{ margin-left:auto; }
 .ink-tip{ font-size:11px; color:#aaa; text-align:center; }
 .ink-tip:empty{ display:none; }
 .ink-dot{ width:16px; height:16px; border-radius:50%; background:var(--c); border:2px solid #fff; }
@@ -2121,3 +2131,7 @@ html[data-layout="desktop"] #fab-wrap{
 .lr-st-n span{ flex:none; color:var(--acc); font-size:13px; }
 .lr-st-m{ font-size:12px; color:var(--t2); margin-top:2px; }
 .lr-st-l .lr-mini{ margin-top:5px; }
+/* v4.72 背誦模式：手寫筆記也遮（模糊），點「👁 筆記」顯示 */
+#lbody.lp-rc-ink .law-art-card:not(.lp-ink-show) > .ink-view{ filter:blur(7px); opacity:.45; }
+.lp-inkb{ position:absolute; right:8px; bottom:8px; z-index:6; padding:4px 10px; border-radius:12px; font-size:12px;
+  border:1px solid #ffb74d; background:var(--bg1); color:#ffb74d; cursor:pointer; }
