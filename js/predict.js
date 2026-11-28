@@ -9,6 +9,8 @@
 //   ②一鍵押題練習：前 K 名相關的歷屆考題（從平台題庫取），可只出答錯過的
 //   ③回測命中率：誠實標示「押前 K 名」過去能蓋到幾成題目
 //   ④二技／警佐班切換（警佐班只列佐二類的四科）
+//   v4.73：⚖ 法條、📚 法規改成依「題庫」每一題的關聯法條即時統計（memory.js examStats，和記憶庫 🔥 同一份數字）：
+//     不再只有前 120 條、警佐班也有法規排名、題庫更正後自動跟著變；回測、趨勢、出題理由仍是 11/5 預測資料包的分析（畫面上標明）。
 //
 // 公開 API 見檔尾 window.Predict
 
@@ -67,6 +69,8 @@ async function _wrongSet(){
 async function renderPredict(){
   const el = document.getElementById('pr-body');
   if(!el) return;
+  // v4.73：考試別和記憶庫共用，每次進來重讀（在記憶庫切過的這裡跟著變）
+  try{ const st = JSON.parse(localStorage.getItem('prState') || '{}'); if(st.exam === '警佐' || st.exam === '二技') _cur.exam = st.exam; }catch(e){}
   try{
     await _load();
     _bind();
@@ -91,7 +95,7 @@ function _rSubj(){
 function _views(s){
   const v = [];
   if(_isZuo()){
-    v.push(['articles','⚖ 法條']);
+    v.push(['articles','⚖ 法條'], ['laws','📚 法規']);
     if(s.name === '警察法規') v.push(['scope','🎯 考試範圍']);
     if(s.reasons || s.trend) v.push(['trend','📈 趨勢']);
     return v;
@@ -115,7 +119,7 @@ async function _rBody(){
     '<div class="mem-tabs">' + views.map(([k, t]) => '<button class="mem-tab' + (k===_cur.view?' on':'') + '" data-view="' + esc(k) + '">' + t + '</button>').join('') + '</div>';
   const el = document.getElementById('pr-body');
   if(_cur.view === 'articles') h += await _rArticles(s);
-  else if(_cur.view === 'laws') h += _rLaws(s);
+  else if(_cur.view === 'laws') h += await _rLaws(s);
   else if(_cur.view === 'scope') h += await _rScope(s);
   else if(_cur.view === 'topics') h += _rTopics(s);
   else if(_cur.view.startsWith('pt:')) h += await _rPoints(s, _cur.view.slice(3));
@@ -139,28 +143,58 @@ function _yearBars(by, years){
   }).join('') + '</div>';
 }
 function _kChips(){
-  return '<div class="mem-tools pr-k">' + [10,20,50,120].map(k => '<button class="chip' + (k===_cur.k?' on':'') + '" data-k="' + k + '">' + '前 ' + k + '</button>').join('') +
+  return '<div class="mem-tools pr-k">' + [10,20,50,120,0].map(k => '<button class="chip' + (k===_cur.k?' on':'') + '" data-k="' + k + '">' + (k ? '前 ' + k : '全部') + '</button>').join('') +
     '<button class="chip' + (_cur.sort==='recent'?' on':'') + '" data-sort="1">' + (_cur.sort==='recent'?'依近3年':'依總題數') + ' ⇅</button></div>';
 }
 function _sorted(rows){
   const r = rows.slice();
   if(_cur.sort === 'recent') r.sort((a, b) => (b.recent_count||0) - (a.recent_count||0) || b.count - a.count || (a.rank - b.rank));
-  return r.slice(0, _cur.k);
+  return _cur.k ? r.slice(0, _cur.k) : r;
+}
+// ── v4.73 題庫即時統計 → 排名列（依考過題數，同數依近3年、法規名、條號）──
+const _EXN = () => _isZuo() ? 'zuo' : 'e2';
+let _lawText = null, _lawTextSrc = null;
+async function _texts(){
+  const ls = await da('laws');
+  if(_lawText && _lawTextSrc === ls) return _lawText;
+  _lawText = new Map();
+  ls.forEach(l => { const c = String(l.content || ''); if(c && !c.startsWith('data:')) _lawText.set(l.lawName + '|' + (l.articleNumber || 0), c.replace(/\s+/g, ' ').slice(0, 160)); });
+  _lawTextSrc = ls;
+  return _lawText;
+}
+async function _bankRows(s, kind){
+  const st = await examStats(), ex = st[_EXN()], other = st[_EXN() === 'e2' ? 'zuo' : 'e2'];
+  const sj = ex.bySubj[s.name];
+  if(!sj) return { rows:[], ex, sj:null };
+  const tx = kind === 'arts' ? await _texts() : null;
+  const om = kind === 'arts' ? (other.bySubj[s.name] || {}).arts : (other.bySubj[s.name] || {}).laws;
+  const rows = [...sj[kind].values()].map(a => ({ law:a.law, article:a.article, article_n:a.n, count:a.count, recent_count:a.recent, last_year:a.last,
+      by_year:a.by, question_ids:a.ids, text:tx ? tx.get(a.law + '|' + a.n) : '', otherCount:(om && om.get(kind === 'arts' ? a.law + '|' + a.n : a.law) || {}).count || 0 }))
+    .sort((a, b) => b.count - a.count || b.recent_count - a.recent_count || a.law.localeCompare(b.law, 'zh-TW') || (a.article_n || 0) - (b.article_n || 0));
+  rows.forEach((r, i) => { r.rank = i + 1; });
+  return { rows, ex, sj };
+}
+function _srcNote(ex, sj){
+  return '<div class="mem-prog">依題庫 ' + esc(ex.exam) + ' 的考古題統計：本科 ' + sj.n + ' 題，其中 ' + sj.linked + ' 題有標關聯法條（其餘多是觀念、學理題，不列入）；' +
+    '近3年＝' + ex.recent.join('、') + ' 年。題庫更正後會自動更新。</div>';
 }
 
-// ⚖ 法條
+// ⚖ 法條（v4.73：二技、警佐班都依題庫的關聯法條統計）
 async function _rArticles(s){
-  if(_isZuo()) return _rZuoArticles(s);
-  const rows = _sorted(s.articles);
+  const b = await _bankRows(s, 'arts');
+  if(!b.sj || !b.rows.length) return '<div class="mem-empty">題庫裡沒有這一科「' + esc(b.ex.exam) + '」有標關聯法條的考古題。</div>';
+  _cur._rows = _sorted(b.rows);
+  const rows = _cur._rows;
+  const otherName = _isZuo() ? '警大二技' : '警佐班';
   const [qmap, wrong] = await Promise.all([_qById(), _onlyWrongSet()]);
   const ids = [...new Set(rows.flatMap(a => a.question_ids||[]))];
   const have = ids.filter(id => qmap.has(id) && (!wrong || wrong.has(id)));
-  let h = _btCard(s.backtest, '法條', '條') + _kChips() +
+  let h = _srcNote(b.ex, b.sj) + (_isZuo() ? '' : _btCard(s.backtest, '法條', '條（回測依 11/5 預測資料包）')) + _kChips() +
     '<div class="mem-tools"><button class="btn bp" data-act="practice" style="flex:1">▶ 押題練習：這 ' + rows.length + ' 條的歷屆題（' + have.length + ' 題）</button>' +
     '<button class="btn ' + (_cur.onlyWrong?'bp':'bg') + '" data-act="wrong">只出答錯過的</button></div>' + _nChips();
   if(ids.length && have.length < ids.length && !_cur.onlyWrong)
     h += '<div class="mem-prog">題庫裡找到 ' + have.length + ' ／ ' + ids.length + ' 題（其餘可能已刪除或尚未匯入）</div>';
-  const years = _yearsOf(s);
+  const years = b.ex.years;
   h += '<div class="card">' + rows.map(a => {
     const key = a.law + '|' + a.article_n;
     const ref = a.law + a.article;
@@ -168,7 +202,7 @@ async function _rArticles(s){
     return '<div class="pr-row"><div class="pr-rank' + (a.rank<=10?' top':'') + '">' + a.rank + '</div><div class="pr-main">' +
       '<div class="pr-title">' + esc(a.law) + ' ' + esc(a.article) + '</div>' +
       '<div class="pr-meta">考過 ' + a.count + ' 題・近3年 ' + (a.recent_count||0) + ' 題・最近 ' + (a.last_year||'—') + ' 年' +
-        (a.other ? '・其他考試 ' + Object.entries(a.other).map(([k,v]) => esc(k) + v).join('、') : '') + '</div>' +
+        (a.otherCount ? '・' + otherName + ' ' + a.otherCount + ' 題' : '') + '</div>' +
       _yearBars(a.by_year, years) +
       (a.text ? '<div class="pr-text" data-act="clamp">' + esc(a.text) + '</div>' : '<div class="pr-meta">（平台法規庫沒有這一條的條文）</div>') +
       '<div class="pr-acts">' +
@@ -232,13 +266,17 @@ function _yearsOf(s){
 }
 async function _onlyWrongSet(){ return _cur.onlyWrong ? _wrongSet() : null; }
 
-// 📚 法規
-function _rLaws(s){
-  const rows = s.laws || [];
+// 📚 法規（v4.73：依題庫的關聯法條統計；一題引用同一部法規的好幾條只算一次）
+async function _rLaws(s){
+  const b = await _bankRows(s, 'laws');
+  if(!b.sj || !b.rows.length) return '<div class="mem-empty">題庫裡沒有這一科「' + esc(b.ex.exam) + '」有標關聯法條的考古題。</div>';
+  const rows = b.rows.slice(0, 40);
   const max = Math.max(1, ...rows.map(r => r.count));
-  return _btCard(s.backtest, '法規', '部法規') + '<div class="cc"><div class="ct">各法規考過題數（藍＝全部、橘＝近3年）</div>' + rows.map(r =>
-    '<div class="pr-bar"><div class="pr-bar-l">' + esc(r.law) + '</div><div class="pr-bar-t"><i style="width:' + (100*r.count/max) + '%"></i><i class="r" style="width:' + (100*(r.recent_count||0)/max) + '%"></i></div>' +
-    '<div class="pr-bar-n">' + r.count + '／近' + (r.recent_count||0) + '</div></div>').join('') + '</div>';
+  return _srcNote(b.ex, b.sj) + (_isZuo() ? '' : _btCard(s.backtest, '法規', '部法規（回測依 11/5 預測資料包）')) +
+    '<div class="cc"><div class="ct">各法規考過題數（藍＝全部、橘＝近3年；點一下練這部法規的題目）</div>' + rows.map(r =>
+    '<div class="pr-bar go" data-qids="' + esc(r.question_ids.join(',')) + '" data-label="' + esc(r.law) + '" style="cursor:pointer"><div class="pr-bar-l">' + esc(r.law) + '</div><div class="pr-bar-t"><i style="width:' + (100*r.count/max) + '%"></i><i class="r" style="width:' + (100*(r.recent_count||0)/max) + '%"></i></div>' +
+    '<div class="pr-bar-n">' + r.count + '／近' + (r.recent_count||0) + '</div></div>').join('') + '</div>' +
+    (b.rows.length > rows.length ? '<div class="mem-prog">只列前 ' + rows.length + ' 部，共 ' + b.rows.length + ' 部法規。</div>' : '');
 }
 
 // 🎯 考試範圍（警察法規）：各考試公告的重點法律不同，把題庫裡所有警察法規題依引用的法規分到各考試
@@ -514,11 +552,13 @@ function _bind(){
     }
     else if(ds.act === 'practice'){
       const s = _data.subjects[_cur.si];
-      _practiceIds(_sorted(s.articles).flatMap(a => a.question_ids||[]), s.name + ' 前' + _cur.k + '條');
+      _practiceIds((_cur._rows || []).flatMap(a => a.question_ids||[]), (_isZuo() ? '警佐班 ' : '') + s.name + (_cur.k ? ' 前' + _cur.k + '條' : ' 全部法條'));
     }
   });
 }
 
+// _rZuoArticles、_zuoMap、_practiceZuo：v4.73 起法條排名改用題庫統計，保留給舊資料包格式參考（目前沒有呼叫）
+void _rZuoArticles;
 const Predict = { renderPredict, _predictScope:{ SCOPES:_SCOPES, refLaw:_refLaw, family:_family, qLaws:_qLaws, qScope:_qScope } };
 Object.assign(window, Predict);
 })();
